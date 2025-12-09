@@ -11,20 +11,19 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionEntryListing,
     CollectionPath,
-    ExtraDataFieldFilter,
     ExtraDataFieldsFilter,
     ReadCheckedDataset,
-    UnknownExtraDataFieldFilterNamesError,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
 };
-use odf::utils::data::DataFrameExt;
+
+use crate::utils::{self, DataFrameExtraDataFieldsFilterApplyError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,60 +31,6 @@ use odf::utils::data::DataFrameExt;
 #[dill::interface(dyn ViewCollectionEntriesUseCase)]
 pub struct ViewCollectionEntriesUseCaseImpl {
     query_svc: Arc<dyn QueryService>,
-}
-
-impl ViewCollectionEntriesUseCaseImpl {
-    fn validate_requested_extra_data_fields(
-        df: &DataFrameExt,
-        filter: &ExtraDataFieldsFilter,
-    ) -> Result<(), ViewCollectionEntriesError> {
-        let available_fields = df
-            .schema()
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        let requested_fields = filter.iter().map(|f| &f.field_name).collect::<HashSet<_>>();
-
-        let missing_fields = requested_fields
-            .difference(&available_fields)
-            .map(|f| (*f).clone())
-            .collect::<Vec<_>>();
-
-        if !missing_fields.is_empty() {
-            Err(UnknownExtraDataFieldFilterNamesError {
-                field_names: missing_fields,
-            }
-            .into())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn apply_requested_extra_data_fields_filter(
-        df: DataFrameExt,
-        filter: ExtraDataFieldsFilter,
-    ) -> Result<DataFrameExt, ViewCollectionEntriesError> {
-        use datafusion::logical_expr::{Expr, col, lit};
-
-        Self::validate_requested_extra_data_fields(&df, &filter)?;
-
-        let filter_expr = filter
-            .into_iter()
-            .map(|ExtraDataFieldFilter { field_name, values }| {
-                let values_as_lits = values.into_iter().map(lit).collect();
-                // field1 in [1, 2, 3]
-                col(field_name).in_list(values_as_lits, false)
-            })
-            // ((field1 in [1, 2, 3] AND field2 in [4, 5, 6]) AND field3 in [7, 8, 9])
-            .reduce(Expr::and)
-            // Safety: we use the NonEmpty<T>, so we will always have elements.
-            .unwrap();
-
-        let df = df.filter(filter_expr).int_err()?;
-
-        Ok(df)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +71,14 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         // Note: we are still working with a changelog here in the hope to narrow down
         // the record set before projecting
         let df = if let Some(extra_data_fields_filter) = filter {
-            Self::apply_requested_extra_data_fields_filter(df, extra_data_fields_filter)?
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
+                .map_err(|e| -> ViewCollectionEntriesError {
+                    use DataFrameExtraDataFieldsFilterApplyError as E;
+                    match e {
+                        E::UnknownExtraDataFieldFilterNames(e) => e.into(),
+                        E::Internal(_) => e.int_err().into(),
+                    }
+                })?
         } else {
             df
         };
