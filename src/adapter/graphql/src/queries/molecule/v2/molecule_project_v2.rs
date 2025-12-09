@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{QueryService, auth};
+use kamu_datasets_services::utils;
 use odf::metadata::OperationType;
 
 use crate::prelude::*;
