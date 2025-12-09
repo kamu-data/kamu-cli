@@ -48,9 +48,6 @@ impl MoleculeProjectV2 {
         project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
-        // TODO: filters
-        assert!(filters.is_none());
-
         let (query_service, rebac_dataset_registry_facade) =
             from_catalog_n!(ctx, dyn QueryService, dyn RebacDatasetRegistryFacade);
 
@@ -77,6 +74,20 @@ impl MoleculeProjectV2 {
 
         let Some(df) = df else {
             return Ok(Vec::new());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+                f.by_tags,
+                f.by_categories,
+                f.by_access_levels,
+            )
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
+                .int_err()?
+        } else {
+            df
         };
 
         // For any data room update, we always have two entries: -C and +C.
@@ -327,9 +338,9 @@ page_based_connection!(
 
 #[derive(Clone, InputObject)]
 pub struct MoleculeProjectActivityFilters {
-    // TODO: replace w/ real filters.
-    /// This filter is provided as an example.
-    by_ipnft_uids: Option<Vec<String>>,
+    pub by_tags: Option<Vec<String>>,
+    pub by_categories: Option<Vec<String>>,
+    pub by_access_levels: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
