@@ -134,7 +134,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetDataRoomCollectionEntriesFilters>,
+        filters: Option<GetMoleculeDataRoomCollectionEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;

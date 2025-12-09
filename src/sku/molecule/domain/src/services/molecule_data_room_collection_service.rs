@@ -23,7 +23,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetDataRoomCollectionEntriesFilters>,
+        filters: Option<GetMoleculeDataRoomCollectionEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError>;
 
@@ -71,14 +71,16 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct GetDataRoomCollectionEntriesFilters {
+pub struct GetMoleculeDataRoomCollectionEntriesFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
 }
 
-impl From<GetDataRoomCollectionEntriesFilters> for Option<kamu_datasets::ExtraDataFieldsFilter> {
-    fn from(value: GetDataRoomCollectionEntriesFilters) -> Self {
+impl From<GetMoleculeDataRoomCollectionEntriesFilters>
+    for Option<kamu_datasets::ExtraDataFieldsFilter>
+{
+    fn from(value: GetMoleculeDataRoomCollectionEntriesFilters) -> Self {
         use kamu_datasets::ExtraDataFieldFilter as Filter;
 
         let maybe_tags_filter = value.by_tags.and_then(|values| {

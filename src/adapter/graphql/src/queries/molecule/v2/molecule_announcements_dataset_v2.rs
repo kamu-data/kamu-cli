@@ -93,7 +93,7 @@ impl MoleculeAnnouncements {
         let df = df.limit(page * per_page, Some(per_page)).int_err()?;
 
         let maybe_filters = filters
-            .map(kamu_molecule_domain::GetDataRoomCollectionEntriesFilters::from)
+            .map(kamu_molecule_domain::GetMoleculeDataRoomCollectionEntriesFilters::from)
             .and_then(Option::<kamu_datasets::ExtraDataFieldsFilter>::from);
 
         let df = if let Some(filters) = maybe_filters {
@@ -256,7 +256,7 @@ pub struct MoleculeAnnouncementsFilters {
 }
 
 impl From<MoleculeAnnouncementsFilters>
-    for kamu_molecule_domain::GetDataRoomCollectionEntriesFilters
+    for kamu_molecule_domain::GetMoleculeDataRoomCollectionEntriesFilters
 {
     fn from(value: MoleculeAnnouncementsFilters) -> Self {
         Self {

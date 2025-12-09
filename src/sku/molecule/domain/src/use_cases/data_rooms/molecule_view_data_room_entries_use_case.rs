@@ -11,7 +11,7 @@ use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
-use crate::{GetDataRoomCollectionEntriesFilters, MoleculeDataRoomEntry, MoleculeProject};
+use crate::{GetMoleculeDataRoomCollectionEntriesFilters, MoleculeDataRoomEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ pub trait MoleculeViewDataRoomEntriesUseCase: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<GetDataRoomCollectionEntriesFilters>,
+        filters: Option<GetMoleculeDataRoomCollectionEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError>;
 }

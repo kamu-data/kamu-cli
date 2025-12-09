@@ -171,7 +171,7 @@ pub struct MoleculeDataRoomEntriesFilters {
 }
 
 impl From<MoleculeDataRoomEntriesFilters>
-    for kamu_molecule_domain::GetDataRoomCollectionEntriesFilters
+    for kamu_molecule_domain::GetMoleculeDataRoomCollectionEntriesFilters
 {
     fn from(value: MoleculeDataRoomEntriesFilters) -> Self {
         Self {
