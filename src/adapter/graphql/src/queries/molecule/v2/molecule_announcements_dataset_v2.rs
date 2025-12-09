@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use kamu_core::auth;
+use kamu_datasets_services::utils;
 use kamu_molecule_domain::MoleculeGlobalAnnouncementRecordExt;
 use odf::utils::data::DataFrameExt;
 
@@ -69,8 +70,6 @@ impl MoleculeAnnouncements {
         // TODO: extract a use-case
         //       (same at MoleculeProjectV2::get_announcement_activity_events())
 
-        assert!(filters.is_none());
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
@@ -92,6 +91,16 @@ impl MoleculeAnnouncements {
         let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
         // Apply pagination
         let df = df.limit(page * per_page, Some(per_page)).int_err()?;
+
+        let maybe_filters = filters
+            .map(kamu_molecule_domain::GetDataRoomCollectionEntriesFilters::from)
+            .and_then(Option::<kamu_datasets::ExtraDataFieldsFilter>::from);
+
+        let df = if let Some(filters) = maybe_filters {
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters).int_err()?
+        } else {
+            df
+        };
 
         let records = df.collect_json_aos().await.int_err()?;
         let total_count = records.len();
@@ -244,6 +253,18 @@ pub struct MoleculeAnnouncementsFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
+}
+
+impl From<MoleculeAnnouncementsFilters>
+    for kamu_molecule_domain::GetDataRoomCollectionEntriesFilters
+{
+    fn from(value: MoleculeAnnouncementsFilters) -> Self {
+        Self {
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
