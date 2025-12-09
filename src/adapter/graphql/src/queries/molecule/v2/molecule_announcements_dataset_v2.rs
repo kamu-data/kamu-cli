@@ -92,13 +92,15 @@ impl MoleculeAnnouncements {
         // Apply pagination
         let df = df.limit(page * per_page, Some(per_page)).int_err()?;
 
-        let maybe_filter = filters.and_then(|f| {
-            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
-        });
+        let maybe_filter = filters
+            .map(kamu_molecule_domain::MoleculeAnnouncementsFilters::from)
+            .and_then(|f| {
+                kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+                    f.by_tags,
+                    f.by_categories,
+                    f.by_access_levels,
+                )
+            });
         let df = if let Some(filters) = maybe_filter {
             utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters).int_err()?
         } else {
@@ -256,6 +258,16 @@ pub struct MoleculeAnnouncementsFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
+}
+
+impl From<MoleculeAnnouncementsFilters> for kamu_molecule_domain::MoleculeAnnouncementsFilters {
+    fn from(value: MoleculeAnnouncementsFilters) -> Self {
+        Self {
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
