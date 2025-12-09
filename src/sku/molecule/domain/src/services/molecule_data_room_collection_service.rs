@@ -102,8 +102,8 @@ impl From<GetDataRoomCollectionEntriesFilters> for Option<kamu_datasets::ExtraDa
 
         let filters = maybe_tags_filter
             .into_iter()
-            .chain(maybe_categories_filter.into_iter())
-            .chain(maybe_access_levels_filter.into_iter())
+            .chain(maybe_categories_filter)
+            .chain(maybe_access_levels_filter)
             .collect::<Vec<_>>();
 
         NonEmpty::from_vec(filters)
