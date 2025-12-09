@@ -13,13 +13,7 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{
-    ContentArgs,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    UpdateVersionedFileUseCase,
-    WriteCheckedDataset,
-};
+use kamu_datasets::{ContentArgs, DatasetRegistry, DatasetRegistryExt};
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
@@ -31,11 +25,15 @@ use kamu_molecule_domain::{
     MoleculeDataRoomFileActivityType,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
+    MoleculeReadVersionedFileEntryError,
+    MoleculeReadVersionedFileEntryUseCase,
     MoleculeRemoveDataRoomEntryError,
     MoleculeRemoveDataRoomEntryUseCase,
     MoleculeUpdateDataRoomEntryError,
     MoleculeUpdateDataRoomEntryResult,
     MoleculeUpdateDataRoomEntryUseCase,
+    MoleculeUpdateVersionedFileMetadataError,
+    MoleculeUpdateVersionedFileMetadataUseCase,
     MoleculeUploadVersionedFileVersionError,
     MoleculeUploadVersionedFileVersionUseCase,
 };
@@ -58,8 +56,6 @@ use crate::queries::molecule::v2::{
     MoleculeEncryptionMetadataInput,
     MoleculeProjectV2,
     MoleculeTag,
-    MoleculeVersionedFileEntry,
-    MoleculeVersionedFilePrefetch,
 };
 use crate::utils::{ContentSource, get_content_args};
 
@@ -745,102 +741,74 @@ impl MoleculeDataRoomMutV2 {
         let molecule_subject = molecule_subject(ctx)?;
 
         let (
-            dataset_registry,
             time_source,
-            update_versioned_file_uc,
+            read_versioned_file_entry_uc,
+            update_versioned_file_metadata_uc,
             update_data_room_entry_uc,
             append_global_data_room_activity_uc,
         ) = from_catalog_n!(
             ctx,
-            dyn DatasetRegistry,
             dyn SystemTimeSource,
-            dyn UpdateVersionedFileUseCase,
+            dyn MoleculeReadVersionedFileEntryUseCase,
+            dyn MoleculeUpdateVersionedFileMetadataUseCase,
             dyn MoleculeUpdateDataRoomEntryUseCase,
             dyn MoleculeAppendGlobalDataRoomActivityUseCase
         );
 
         let event_time = time_source.now();
 
-        // NOTE: Access rights will be checked inside the use case.
-        let file_dataset = {
-            use odf::DatasetRefUnresolvedError as E;
-            match dataset_registry
-                .get_dataset_by_ref(&reference.as_ref().as_local_ref())
-                .await
-            {
-                // TODO: Check if the versioned dataset is in data room at all?
-                Ok(hdl) => hdl,
-                Err(E::NotFound(_)) => {
-                    return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
-                        MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
-                    ));
-                }
-                Err(e @ E::Internal(_)) => return Err(e.int_err().into()),
-            }
-        };
+        // 0. Get existing data room entry record and latest versioned file data
 
         let Some(existing_data_room_entry) = self
             .get_latest_data_room_entry(ctx, reference.as_ref())
             .await?
         else {
-            // TODO: Should we differentiate between 'file not found'
-            //       and 'file not linked to data room'?
             return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
                 MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
             ));
         };
 
-        // 1. Update the versioned dataset.
+        let (Some(existing_file_entry), _) = read_versioned_file_entry_uc
+            .execute(reference.as_ref(), None, None)
+            .await
+            .map_err(|e| {
+                use MoleculeReadVersionedFileEntryError as E;
 
-        let mut new_denormalized_file_info = existing_data_room_entry
-            .denormalized_latest_file_info
-            .clone();
-
-        new_denormalized_file_info.access_level = access_level;
-        new_denormalized_file_info.change_by = change_by;
-        if let Some(description) = description {
-            new_denormalized_file_info.description = Some(description);
-        }
-        if let Some(categories) = categories {
-            new_denormalized_file_info.categories = categories;
-        }
-        if let Some(tags) = tags {
-            new_denormalized_file_info.tags = tags;
-        }
-
-        let prefetch = MoleculeVersionedFilePrefetch {
-            system_time: existing_data_room_entry.system_time,
-            event_time: existing_data_room_entry.event_time,
-            denorm: new_denormalized_file_info.clone().into(),
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?
+        else {
+            return Ok(MoleculeDataRoomUpdateFileMetadataResult::FileNotFound(
+                MoleculeDataRoomUpdateFileMetadataResultFileNotFound { r#ref: reference },
+            ));
         };
-        let mut file_entry =
-            MoleculeVersionedFileEntry::new_from_prefetched(file_dataset.clone(), prefetch);
 
-        {
-            // Read the current values: content_text & encryption_metadata
-            let _ = file_entry.detailed_info(ctx).await?;
-
-            // Safety: we just initialized the value
-            let detailed_info = file_entry.detailed_info.get_mut().unwrap();
-
-            detailed_info.content_text = content_text;
-            detailed_info.encryption_metadata = encryption_metadata.map(Into::into);
-        }
-
-        // TODO: we need to do a retraction if any errors...
-        let new_version = update_versioned_file_uc
+        // 1. Update the versioned dataset.
+        let updated_versioned_file_entry = update_versioned_file_metadata_uc
             .execute(
-                WriteCheckedDataset(&file_dataset),
+                reference.as_ref(),
+                existing_file_entry,
                 Some(event_time),
-                None,
-                None,
-                Some(file_entry.to_versioned_file_extra_data()),
+                access_level,
+                change_by,
+                description,
+                categories,
+                tags,
+                content_text,
+                encryption_metadata.map(Into::into),
             )
             .await
-            .int_err()?
-            .new_version;
+            .map_err(|e| {
+                use MoleculeUpdateVersionedFileMetadataError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
-        new_denormalized_file_info.version = new_version;
+        let new_denormalized_file_info = updated_versioned_file_entry.to_denormalized();
 
         // 2. Update the file state in the data room.
 
@@ -872,7 +840,7 @@ impl MoleculeDataRoomMutV2 {
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),
                 r#ref: updated_data_room_entry.reference.clone(),
-                version: new_version,
+                version: updated_versioned_file_entry.version,
                 change_by: new_denormalized_file_info.change_by,
                 access_level: new_denormalized_file_info.access_level,
                 content_type: Some(new_denormalized_file_info.content_type),
@@ -1017,6 +985,7 @@ pub enum MoleculeDataRoomRemoveEntryResult {
 pub enum MoleculeDataRoomUpdateFileMetadataResult {
     Success(MoleculeDataRoomUpdateFileMetadataResultSuccess),
     EntryNotFound(MoleculeDataRoomUpdateFileMetadataResultEntryNotFound),
+    FileNotFound(MoleculeDataRoomUpdateFileMetadataResultFileNotFound),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
 }
@@ -1051,6 +1020,22 @@ impl MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
 
     pub async fn message(&self) -> String {
         "Data room entry not found".to_string()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateFileMetadataResultFileNotFound {
+    pub r#ref: DatasetID<'static>,
+}
+#[ComplexObject]
+impl MoleculeDataRoomUpdateFileMetadataResultFileNotFound {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "File dataset not found".to_string()
     }
 }
 

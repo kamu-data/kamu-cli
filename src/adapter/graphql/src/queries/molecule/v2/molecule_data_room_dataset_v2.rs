@@ -12,16 +12,17 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use file_utils::MediaType;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{FileVersion, ResolvedDataset};
 use kamu_molecule_domain::{
     MoleculeDataRoomActivityEntity,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
+    MoleculeReadVersionedFileEntryError,
+    MoleculeReadVersionedFileEntryUseCase,
     MoleculeViewDataRoomEntriesError,
     MoleculeViewDataRoomEntriesUseCase,
 };
 
-use crate::data_loader::AccessCheckedDatasetRef;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
     MoleculeAccessLevel,
@@ -31,15 +32,7 @@ use crate::queries::molecule::v2::{
     MoleculeProjectV2,
     MoleculeTag,
 };
-use crate::queries::{
-    Dataset,
-    DatasetRequestState,
-    FileVersion,
-    VersionedFile,
-    VersionedFileContentDownload,
-    VersionedFileEntry,
-};
-use crate::utils;
+use crate::queries::{Dataset, VersionedFileContentDownload, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MoleculeDataRoom
@@ -287,11 +280,6 @@ impl MoleculeDataRoomEntry {
     async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
         Ok(Some(MoleculeVersionedFile {
             dataset_id: self.entity.reference.clone(),
-            prefetched_latest: MoleculeVersionedFilePrefetch {
-                system_time: self.entity.system_time,
-                event_time: self.entity.event_time,
-                denorm: self.entity.denormalized_latest_file_info.clone().into(),
-            },
         }))
     }
 }
@@ -308,9 +296,6 @@ page_based_connection!(
 
 pub struct MoleculeVersionedFile {
     pub dataset_id: odf::DatasetID,
-
-    // Filled from denormalized data stored alongside data room entry
-    pub prefetched_latest: MoleculeVersionedFilePrefetch,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -319,98 +304,53 @@ impl MoleculeVersionedFile {
     // TODO: For the list of activities, do we need to display the version at the
     //       time of activity here (specify head)?
     async fn latest(&self, ctx: &Context<'_>) -> Result<Option<MoleculeVersionedFileEntry>> {
-        let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
+        let read_versioned_file_entry_uc =
+            from_catalog_n!(ctx, dyn MoleculeReadVersionedFileEntryUseCase);
 
-        let maybe_resolved_dataset = dataset_handle_data_loader
-            .load_one(AccessCheckedDatasetRef::new(self.dataset_id.as_local_ref()))
+        let (maybe_versioned_file_entry, versioned_file_dataset) = read_versioned_file_entry_uc
+            .execute(&self.dataset_id, None, None)
             .await
-            .map_err(data_loader_error_mapper)?;
+            .map_err(|e| {
+                use MoleculeReadVersionedFileEntryError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
 
-        if let Some(resolved_dataset) = maybe_resolved_dataset {
-            Ok(Some(MoleculeVersionedFileEntry::new_from_prefetched(
-                resolved_dataset,
-                self.prefetched_latest.clone(),
-            )))
-        } else {
-            Ok(None)
-        }
+        Ok(maybe_versioned_file_entry
+            .map(|entry| MoleculeVersionedFileEntry::new(versioned_file_dataset, entry)))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFileEntry {
-    pub entry: VersionedFileEntry,
-    pub basic_info: kamu_molecule_domain::MoleculeVersionedFileEntryBasicInfo,
-    pub detailed_info:
-        tokio::sync::OnceCell<kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo>,
+    pub entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
+    pub base_versioned_file_entry: VersionedFileEntry,
 }
 
 impl MoleculeVersionedFileEntry {
-    pub fn new_from_prefetched(
-        file_dataset: ResolvedDataset,
-        prefetch: MoleculeVersionedFilePrefetch,
+    pub fn new(
+        versioned_file_dataset: ResolvedDataset,
+        entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
     ) -> Self {
         Self {
-            entry: VersionedFileEntry {
-                file_dataset,
+            // TODO: get rid of this, server content/content_url via extra use cases
+            base_versioned_file_entry: VersionedFileEntry {
+                file_dataset: versioned_file_dataset,
                 entity: kamu_datasets::VersionedFileEntry {
-                    system_time: prefetch.system_time,
-                    event_time: prefetch.event_time,
-                    version: prefetch.denorm.version,
-                    content_type: prefetch.denorm.content_type,
-                    content_length: prefetch.denorm.content_length,
-                    content_hash: prefetch.denorm.content_hash,
+                    system_time: entity.system_time,
+                    event_time: entity.event_time,
+                    version: entity.version,
+                    content_type: entity.content_type.clone(),
+                    content_length: entity.content_length,
+                    content_hash: entity.content_hash.clone(),
                     extra_data: kamu_datasets::ExtraDataFields::default(),
                 },
             },
-            basic_info: kamu_molecule_domain::MoleculeVersionedFileEntryBasicInfo {
-                access_level: prefetch.denorm.access_level,
-                change_by: prefetch.denorm.change_by,
-                description: prefetch.denorm.description,
-                categories: prefetch.denorm.categories,
-                tags: prefetch.denorm.tags,
-            },
-            detailed_info: tokio::sync::OnceCell::new(),
+            entity,
         }
-    }
-
-    pub async fn detailed_info(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<&kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo> {
-        self.detailed_info
-            .get_or_try_init(|| self.read_detailed_info(ctx))
-            .await
-    }
-
-    pub(crate) async fn read_detailed_info(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo> {
-        let state = DatasetRequestState::new_resolved(self.entry.file_dataset.clone());
-        let versioned_file = VersionedFile::new(&state);
-        let entry = versioned_file
-            .get_entry(ctx, Some(self.entry.entity.version), None)
-            .await?
-            .expect("Entry must exist");
-        let json = entry.entity.extra_data.into_inner();
-        let detailed_info: kamu_molecule_domain::MoleculeVersionedFileEntryDetailedInfo =
-            serde_json::from_value(json.into()).int_err()?;
-        Ok(detailed_info)
-    }
-
-    pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
-        let extra_data = kamu_molecule_domain::MoleculeVersionedFileExtraData {
-            basic_info: self.basic_info.clone(),
-            detailed_info: self.detailed_info.get().unwrap().clone(),
-        };
-
-        let serde_json::Value::Object(json) = serde_json::to_value(&extra_data).unwrap() else {
-            unreachable!()
-        };
-
-        kamu_datasets::ExtraDataFields::new(json)
     }
 }
 
@@ -418,85 +358,75 @@ impl MoleculeVersionedFileEntry {
 #[Object]
 impl MoleculeVersionedFileEntry {
     async fn system_time(&self) -> &DateTime<Utc> {
-        &self.entry.entity.system_time
+        &self.entity.system_time
     }
 
     async fn event_time(&self) -> &DateTime<Utc> {
-        &self.entry.entity.event_time
+        &self.entity.event_time
     }
 
     async fn version(&self) -> u32 {
-        self.entry.entity.version
+        self.entity.version
     }
 
     async fn content_hash(&self) -> Multihash<'_> {
-        Multihash::from(&self.entry.entity.content_hash)
+        Multihash::from(&self.entity.content_hash)
     }
 
     async fn content_length(&self) -> usize {
-        self.entry.entity.content_length
+        self.entity.content_length
     }
 
     async fn content_type(&self) -> &String {
-        &self.entry.entity.content_type.0
+        &self.entity.content_type.0
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
-        &self.basic_info.access_level
+        &self.entity.basic_info.access_level
     }
 
     async fn change_by(&self) -> &String {
-        &self.basic_info.change_by
+        &self.entity.basic_info.change_by
     }
 
     async fn description(&self) -> &Option<String> {
-        &self.basic_info.description
+        &self.entity.basic_info.description
     }
 
     async fn categories(&self) -> &Vec<MoleculeCategory> {
-        &self.basic_info.categories
+        &self.entity.basic_info.categories
     }
 
     async fn tags(&self) -> &Vec<MoleculeTag> {
-        &self.basic_info.tags
+        &self.entity.basic_info.tags
     }
 
-    async fn content_text(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
-        let detailed_info = self.detailed_info(ctx).await?;
-        Ok(&detailed_info.content_text)
+    async fn content_text(&self) -> Option<&str> {
+        let detailed_info = &self.entity.detailed_info;
+        detailed_info.content_text.as_deref()
     }
 
-    async fn encryption_metadata(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<MoleculeEncryptionMetadata>> {
-        let detailed_info = self.detailed_info(ctx).await?;
-        Ok(detailed_info
+    async fn encryption_metadata(&self) -> Option<MoleculeEncryptionMetadata> {
+        let detailed_info = &self.entity.detailed_info;
+        detailed_info
             .encryption_metadata
             .as_ref()
-            .map(|metadata_record| metadata_record.as_entity().into()))
+            .map(|metadata_record| metadata_record.as_entity().into())
     }
 
     /// Returns encoded content in-band. Should be used for small files only and
     /// will return an error if called on large data.
     pub async fn content(&self, ctx: &Context<'_>) -> Result<Base64Usnp> {
-        self.entry.content(ctx).await
+        self.base_versioned_file_entry.content(ctx).await
     }
 
     /// Returns a direct download URL
     async fn content_url(&self, ctx: &Context<'_>) -> Result<VersionedFileContentDownload> {
-        self.entry.content_url(ctx).await
+        self.base_versioned_file_entry.content_url(ctx).await
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone)]
-pub struct MoleculeVersionedFilePrefetch {
-    pub system_time: DateTime<Utc>,
-    pub event_time: DateTime<Utc>,
-    pub denorm: MoleculeDenormalizeFileToDataRoom,
-}
 
 /// These fields are stored as extra columns in data room collection
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

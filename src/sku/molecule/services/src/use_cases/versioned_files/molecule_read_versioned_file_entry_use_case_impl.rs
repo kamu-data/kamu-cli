@@ -10,12 +10,12 @@
 use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_datasets::{FindVersionedFileVersionUseCase, ReadCheckedDataset, ResolvedDataset};
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
     MoleculeVersionedFileEntry,
-    MoleculeVersionedFileReadError,
-    MoleculeVersionedFileService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +23,32 @@ use kamu_molecule_domain::{
 #[dill::component]
 #[dill::interface(dyn MoleculeReadVersionedFileEntryUseCase)]
 pub struct MoleculeReadVersionedFileEntryUseCaseImpl {
-    versioned_file_service: Arc<dyn MoleculeVersionedFileService>,
+    find_versioned_file_version_uc: Arc<dyn FindVersionedFileVersionUseCase>,
+    rebac_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+}
+
+impl MoleculeReadVersionedFileEntryUseCaseImpl {
+    async fn readable_versioned_file_dataset(
+        &self,
+        versioned_file_dataset_id: &odf::DatasetID,
+    ) -> Result<ResolvedDataset, MoleculeReadVersionedFileEntryError> {
+        let readable_dataset = self
+            .rebac_registry_facade
+            .resolve_dataset_by_ref(
+                &versioned_file_dataset_id.as_local_ref(),
+                kamu_core::auth::DatasetAction::Read,
+            )
+            .await
+            .map_err(|e| match e {
+                RebacDatasetRefUnresolvedError::NotFound(e) => e.int_err().into(),
+                RebacDatasetRefUnresolvedError::Access(e) => {
+                    MoleculeReadVersionedFileEntryError::Access(e)
+                }
+                e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
+            })?;
+
+        Ok(readable_dataset)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,26 +63,36 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
     )]
     async fn execute(
         &self,
-        file_dataset_id: &odf::DatasetID,
+        versioned_file_dataset_id: &odf::DatasetID,
         as_of_version: Option<kamu_datasets::FileVersion>,
-        as_of_block_hash: Option<odf::Multihash>,
-    ) -> Result<Option<MoleculeVersionedFileEntry>, MoleculeReadVersionedFileEntryError> {
+        as_of_head: Option<odf::Multihash>,
+    ) -> Result<
+        (Option<MoleculeVersionedFileEntry>, ResolvedDataset),
+        MoleculeReadVersionedFileEntryError,
+    > {
+        let readable_versioned_file_dataset = self
+            .readable_versioned_file_dataset(versioned_file_dataset_id)
+            .await?;
+
         let maybe_versioned_file_entry = self
-            .versioned_file_service
-            .find_versioned_file_entry(file_dataset_id, as_of_version, as_of_block_hash)
+            .find_versioned_file_version_uc
+            .execute(
+                ReadCheckedDataset(&readable_versioned_file_dataset),
+                as_of_version,
+                as_of_head,
+            )
             .await
             .map_err(|e| match e {
-                MoleculeVersionedFileReadError::VersionedFileNotFound(e) => e.int_err().into(),
-                MoleculeVersionedFileReadError::Access(e) => {
-                    MoleculeReadVersionedFileEntryError::Access(e)
-                }
-                MoleculeVersionedFileReadError::Internal(e) => {
-                    MoleculeReadVersionedFileEntryError::Internal(e)
+                e @ kamu_datasets::FindVersionedFileVersionError::Internal(_) => {
+                    MoleculeReadVersionedFileEntryError::Internal(e.int_err())
                 }
             })?;
 
-        Ok(maybe_versioned_file_entry
-            .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry))
+        Ok((
+            (maybe_versioned_file_entry
+                .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry)),
+            readable_versioned_file_dataset,
+        ))
     }
 }
 

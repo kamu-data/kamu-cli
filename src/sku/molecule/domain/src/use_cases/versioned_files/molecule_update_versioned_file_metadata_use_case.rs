@@ -7,27 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+
+use crate::{MoleculeEncryptionMetadata, MoleculeVersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeVersionedFileService: Send + Sync {
-    async fn find_versioned_file_entry(
+pub trait MoleculeUpdateVersionedFileMetadataUseCase: Send + Sync {
+    async fn execute(
         &self,
         versioned_file_dataset_id: &odf::DatasetID,
-        as_of_version: Option<kamu_datasets::FileVersion>,
-        as_of_head: Option<odf::Multihash>,
-    ) -> Result<Option<kamu_datasets::VersionedFileEntry>, MoleculeVersionedFileReadError>;
+        existing_versioned_file_entry: MoleculeVersionedFileEntry,
+        source_event_time: Option<DateTime<Utc>>,
+        access_level: String,
+        change_by: String,
+        description: Option<String>,
+        categories: Option<Vec<String>>,
+        tags: Option<Vec<String>>,
+        content_text: Option<String>,
+        encryption_metadata: Option<MoleculeEncryptionMetadata>,
+    ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeVersionedFileReadError {
-    #[error(transparent)]
-    VersionedFileNotFound(#[from] odf::DatasetNotFoundError),
-
+pub enum MoleculeUpdateVersionedFileMetadataError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 

@@ -9,8 +9,10 @@
 
 mod molecule_create_versioned_file_dataset_use_case_impl;
 mod molecule_read_versioned_file_entry_use_case_impl;
+mod molecule_update_versioned_file_metadata_use_case_impl;
 mod molecule_upload_versioned_file_version_use_case_impl;
 
 pub use molecule_create_versioned_file_dataset_use_case_impl::*;
 pub use molecule_read_versioned_file_entry_use_case_impl::*;
+pub use molecule_update_versioned_file_metadata_use_case_impl::*;
 pub use molecule_upload_versioned_file_version_use_case_impl::*;

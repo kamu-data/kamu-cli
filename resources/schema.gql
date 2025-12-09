@@ -3390,6 +3390,12 @@ type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDa
 	message: String!
 }
 
+type MoleculeDataRoomUpdateFileMetadataResultFileNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
+}
+
 type MoleculeDataRoomUpdateFileMetadataResultSuccess implements MoleculeDataRoomUpdateFileMetadataResult {
 	entry: MoleculeDataRoomEntry!
 	isSuccess: Boolean!
