@@ -162,9 +162,6 @@ impl MoleculeProjectV2 {
         project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
-        // TODO: filters
-        assert!(filters.is_none());
-
         // TODO: extract a use-case
         //       (same at MoleculeAnnouncements::tail())
 
@@ -181,6 +178,20 @@ impl MoleculeProjectV2 {
 
         let Some(df) = maybe_df else {
             return Ok(Vec::new());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+                f.by_tags,
+                f.by_categories,
+                f.by_access_levels,
+            )
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
+                .int_err()?
+        } else {
+            df
         };
 
         // Sorting will be done after merge
@@ -290,9 +301,6 @@ impl MoleculeProjectV2 {
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
         // TODO: extract use case
-
-        // TODO: filters
-        assert!(filters.is_none());
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
