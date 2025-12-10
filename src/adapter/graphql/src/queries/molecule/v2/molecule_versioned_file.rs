@@ -68,7 +68,7 @@ impl MoleculeVersionedFile<'_> {
         }
     }
 
-    // TODO: consult before publishing this API versientry
+    // TODO: consult before publishing this API endpoint
     #[graphql(skip)]
     #[expect(unused)]
     #[expect(clippy::unused_async)]
