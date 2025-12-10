@@ -15,7 +15,6 @@ use kamu_accounts::LoggedAccount;
 use kamu_core::auth;
 
 use crate::domain::*;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +45,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
         });
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
@@ -93,7 +92,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
         });
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(

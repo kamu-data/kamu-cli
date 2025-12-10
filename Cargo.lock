@@ -8428,6 +8428,7 @@ dependencies = [
  "kamu-core",
  "kamu-datasets",
  "messaging-outbox",
+ "nonempty",
  "num-bigint",
  "opendatafabric",
  "serde",

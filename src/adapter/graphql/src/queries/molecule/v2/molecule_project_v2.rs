@@ -77,7 +77,7 @@ impl MoleculeProjectV2 {
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+            kamu_molecule_domain::molecule_extra_data_fields_filter(
                 f.by_tags,
                 f.by_categories,
                 f.by_access_levels,
@@ -183,7 +183,7 @@ impl MoleculeProjectV2 {
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+            kamu_molecule_domain::molecule_extra_data_fields_filter(
                 f.by_tags,
                 f.by_categories,
                 f.by_access_levels,
