@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{FindVersionedFileVersionUseCase, ReadCheckedDataset, ResolvedDataset};
+use kamu_datasets::{FindVersionedFileVersionUseCase, ReadCheckedDataset};
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
@@ -31,7 +31,7 @@ impl MoleculeReadVersionedFileEntryUseCaseImpl {
     async fn readable_versioned_file_dataset(
         &self,
         versioned_file_dataset_id: &odf::DatasetID,
-    ) -> Result<ReadCheckedDataset<'_>, MoleculeReadVersionedFileEntryError> {
+    ) -> Result<ReadCheckedDataset<'static>, MoleculeReadVersionedFileEntryError> {
         let readable_dataset = self
             .rebac_registry_facade
             .resolve_dataset_by_ref(
@@ -67,7 +67,10 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
         as_of_version: Option<kamu_datasets::FileVersion>,
         as_of_head: Option<odf::Multihash>,
     ) -> Result<
-        (Option<MoleculeVersionedFileEntry>, ResolvedDataset),
+        (
+            Option<MoleculeVersionedFileEntry>,
+            ReadCheckedDataset<'static>,
+        ),
         MoleculeReadVersionedFileEntryError,
     > {
         let read_checked_versioned_file_dataset = self
@@ -91,7 +94,7 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
         Ok((
             (maybe_versioned_file_entry
                 .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry)),
-            read_checked_versioned_file_dataset.into_inner(),
+            read_checked_versioned_file_dataset,
         ))
     }
 }

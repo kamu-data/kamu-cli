@@ -10,33 +10,27 @@
 use internal_error::InternalError;
 use kamu_datasets::ReadCheckedDataset;
 
-use crate::MoleculeVersionedFileEntry;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeReadVersionedFileEntryUseCase: Send + Sync {
-    async fn execute(
+pub trait MoleculeVersionedFileContentProvider: Send + Sync {
+    async fn get_versioned_file_content(
         &self,
-        versioned_file_dataset_id: &odf::DatasetID,
-        as_of_version: Option<kamu_datasets::FileVersion>,
-        as_of_head: Option<odf::Multihash>,
-    ) -> Result<
-        (
-            Option<MoleculeVersionedFileEntry>,
-            ReadCheckedDataset<'static>,
-        ),
-        MoleculeReadVersionedFileEntryError,
-    >;
+        versioned_file_dataset: &ReadCheckedDataset<'_>,
+        content_hash: &odf::Multihash,
+    ) -> Result<bytes::Bytes, MoleculeVersionedFileContentProviderError>;
+
+    async fn get_versioned_file_content_download_data(
+        &self,
+        versioned_file_dataset: &ReadCheckedDataset<'_>,
+        content_hash: &odf::Multihash,
+    ) -> Result<odf::storage::GetExternalUrlResult, MoleculeVersionedFileContentProviderError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeReadVersionedFileEntryError {
-    #[error(transparent)]
-    Access(#[from] odf::AccessError),
-
+pub enum MoleculeVersionedFileContentProviderError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

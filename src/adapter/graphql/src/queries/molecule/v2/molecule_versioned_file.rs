@@ -8,15 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::ReadCheckedDataset;
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
+    MoleculeVersionedFileContentProvider,
+    MoleculeVersionedFileContentProviderError,
 };
 
 use crate::prelude::*;
+use crate::queries::VersionedFileContentDownload;
 use crate::queries::molecule::v2::{MoleculeAccessLevel, MoleculeCategory, MoleculeTag};
-use crate::queries::{VersionedFileContentDownload, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MoleculeVersionedFile
@@ -54,30 +56,18 @@ impl MoleculeVersionedFile {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFileEntry {
-    pub entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
-    pub base_versioned_file_entry: VersionedFileEntry,
+    entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
+    versioned_file_dataset: ReadCheckedDataset<'static>,
 }
 
 impl MoleculeVersionedFileEntry {
     pub fn new(
-        versioned_file_dataset: ResolvedDataset,
+        versioned_file_dataset: ReadCheckedDataset<'static>,
         entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
     ) -> Self {
         Self {
-            // TODO: get rid of this, server content/content_url via extra use cases
-            base_versioned_file_entry: VersionedFileEntry {
-                file_dataset: versioned_file_dataset,
-                entity: kamu_datasets::VersionedFileEntry {
-                    system_time: entity.system_time,
-                    event_time: entity.event_time,
-                    version: entity.version,
-                    content_type: entity.content_type.clone(),
-                    content_length: entity.content_length,
-                    content_hash: entity.content_hash.clone(),
-                    extra_data: kamu_datasets::ExtraDataFields::default(),
-                },
-            },
             entity,
+            versioned_file_dataset,
         }
     }
 }
@@ -145,12 +135,41 @@ impl MoleculeVersionedFileEntry {
     /// Returns encoded content in-band. Should be used for small files only and
     /// will return an error if called on large data.
     pub async fn content(&self, ctx: &Context<'_>) -> Result<Base64Usnp> {
-        self.base_versioned_file_entry.content(ctx).await
+        let molecule_versioned_file_content_provider =
+            from_catalog_n!(ctx, dyn MoleculeVersionedFileContentProvider);
+
+        let content_bytes = molecule_versioned_file_content_provider
+            .get_versioned_file_content(&self.versioned_file_dataset, &self.entity.content_hash)
+            .await
+            .map_err(|e| {
+                use MoleculeVersionedFileContentProviderError as E;
+                match e {
+                    e @ E::Internal(_) => e.int_err(),
+                }
+            })?;
+
+        Ok(Base64Usnp::from(content_bytes))
     }
 
     /// Returns a direct download URL
     async fn content_url(&self, ctx: &Context<'_>) -> Result<VersionedFileContentDownload> {
-        self.base_versioned_file_entry.content_url(ctx).await
+        let molecule_versioned_file_content_provider =
+            from_catalog_n!(ctx, dyn MoleculeVersionedFileContentProvider);
+
+        let download_data = molecule_versioned_file_content_provider
+            .get_versioned_file_content_download_data(
+                &self.versioned_file_dataset,
+                &self.entity.content_hash,
+            )
+            .await
+            .map_err(|e| {
+                use MoleculeVersionedFileContentProviderError as E;
+                match e {
+                    e @ E::Internal(_) => e.int_err(),
+                }
+            })?;
+
+        Ok(VersionedFileContentDownload::from(download_data))
     }
 }
 
