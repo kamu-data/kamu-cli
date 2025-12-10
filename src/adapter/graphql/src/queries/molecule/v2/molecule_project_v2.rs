@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{QueryService, auth};
-use kamu_datasets_services::utils;
 use odf::metadata::OperationType;
 
 use crate::prelude::*;
@@ -85,8 +84,11 @@ impl MoleculeProjectV2 {
             )
         });
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
-                .int_err()?
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
         } else {
             df
         };
@@ -188,8 +190,11 @@ impl MoleculeProjectV2 {
             )
         });
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
-                .int_err()?
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
         } else {
             df
         };
@@ -350,6 +355,18 @@ pub struct MoleculeProjectActivityFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+}
+
+impl From<MoleculeProjectActivityFilters>
+    for kamu_molecule_domain::MoleculeGlobalActivitiesFilters
+{
+    fn from(value: MoleculeProjectActivityFilters) -> Self {
+        Self {
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

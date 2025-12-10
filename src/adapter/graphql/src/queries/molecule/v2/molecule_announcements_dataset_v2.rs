@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use kamu_core::auth;
-use kamu_datasets_services::utils;
 use kamu_molecule_domain::MoleculeGlobalAnnouncementRecordExt;
 use odf::utils::data::DataFrameExt;
 
@@ -102,7 +101,8 @@ impl MoleculeAnnouncements {
                 )
             });
         let df = if let Some(filters) = maybe_filter {
-            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters).int_err()?
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters)
+                .int_err()?
         } else {
             df
         };

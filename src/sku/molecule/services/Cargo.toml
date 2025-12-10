@@ -28,16 +28,17 @@ default = []
 [dependencies]
 common-macros = { workspace = true }
 database-common = { workspace = true }
-internal-error = { workspace = true }
 file-utils = { workspace = true }
-messaging-outbox = { workspace = true }
-time-source = { workspace = true }
-odf = { workspace = true, default-features = false }
+internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
-kamu-datasets = { workspace = true }
-kamu-molecule-domain = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-datasets-services = { workspace = true }
+kamu-molecule-domain = { workspace = true }
+messaging-outbox = { workspace = true }
+odf = { workspace = true, default-features = false }
+time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
