@@ -188,6 +188,8 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .await
             .int_err()?;
 
+        // TODO: outbox event
+
         Ok(MoleculeCreateAnnouncementResult {
             new_announcement_id,
         })

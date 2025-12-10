@@ -11,12 +11,12 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use kamu_core::auth;
 use kamu_molecule_domain::{
+    MoleculeFindProjectAnnouncementError,
+    MoleculeFindProjectAnnouncementUseCase,
     MoleculeGlobalAnnouncementRecordExt,
     MoleculeViewProjectAnnouncementsUseCase,
 };
-use odf::utils::data::DataFrameExt;
 
 use crate::prelude::*;
 use crate::queries::Dataset;
@@ -33,23 +33,6 @@ use crate::queries::molecule::v2::{
 pub struct MoleculeAnnouncements {
     pub dataset: Dataset,
     pub project: Arc<MoleculeProjectV2>,
-}
-
-impl MoleculeAnnouncements {
-    async fn get_data_frame(&self, ctx: &Context<'_>) -> Result<Option<DataFrameExt>> {
-        let molecule_dataset_service =
-            from_catalog_n!(ctx, dyn kamu_molecule_domain::MoleculeDatasetService);
-
-        let (_, maybe_df) = molecule_dataset_service
-            .get_project_announcements_data_frame(
-                &self.project.entity.announcements_dataset_id,
-                auth::DatasetAction::Read,
-            )
-            .await
-            .int_err()?;
-
-        Ok(maybe_df)
-    }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -86,7 +69,13 @@ impl MoleculeAnnouncements {
                 }),
             )
             .await
-            .int_err()?;
+            .map_err(|e| {
+                use kamu_molecule_domain::MoleculeViewProjectAnnouncementsError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
         let nodes = listing
             .list
@@ -113,26 +102,30 @@ impl MoleculeAnnouncements {
         ctx: &Context<'_>,
         id: MoleculeAnnouncementId,
     ) -> Result<Option<MoleculeAnnouncementEntry>> {
-        // TODO: extract a use-case
+        let find_project_announcement_uc =
+            from_catalog_n!(ctx, dyn MoleculeFindProjectAnnouncementUseCase);
 
-        let maybe_df = self.get_data_frame(ctx).await?;
+        // TODO: scalar validation
+        let id = uuid::Uuid::parse_str(&id).int_err()?;
 
-        let Some(df) = maybe_df else {
-            return Ok(None);
-        };
+        let maybe_announcement = find_project_announcement_uc
+            .execute(&self.project.entity, id)
+            .await
+            .map_err(|e| {
+                use MoleculeFindProjectAnnouncementError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?
+            .map(|record| {
+                MoleculeAnnouncementEntry::new_from_project_announcement_record(
+                    &self.project,
+                    record,
+                )
+            });
 
-        use datafusion::logical_expr::{col, lit};
-
-        // TODO: add col const from snapshot?
-        let df = df.filter(col("announcement_id").eq(lit(id))).int_err()?;
-        let records = df.collect_json_aos().await.int_err()?;
-        let entry = records
-            .into_iter()
-            .next()
-            .map(|record| MoleculeAnnouncementEntry::from_json(&self.project, record))
-            .transpose()?;
-
-        Ok(entry)
+        Ok(maybe_announcement)
     }
 }
 
