@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -99,8 +100,8 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
         };
 
         let versioned_file_extra_data = MoleculeVersionedFileExtraData {
-            basic_info: versioned_file_basic_info.clone(),
-            detailed_info: versioned_file_detailed_info.clone(),
+            basic_info: Cow::Owned(versioned_file_basic_info.clone()),
+            detailed_info: Cow::Owned(versioned_file_detailed_info.clone()),
         };
 
         let update_version_result = self
