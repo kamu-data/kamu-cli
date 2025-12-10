@@ -3170,6 +3170,48 @@ async fn test_molecule_v2_activity() {
         Some(true),
     );
 
+    // Activities are empty
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": []
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
+
     /*
     // Create a few versioned files
     let res = harness
@@ -3772,7 +3814,7 @@ async fn test_molecule_v2_activity() {
             },
         ])
     );
+     */
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
