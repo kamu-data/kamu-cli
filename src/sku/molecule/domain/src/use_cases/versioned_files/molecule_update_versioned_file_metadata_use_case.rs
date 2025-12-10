@@ -10,7 +10,11 @@
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::{MoleculeEncryptionMetadata, MoleculeVersionedFileEntry};
+use crate::{
+    MoleculeVersionedFileEntry,
+    MoleculeVersionedFileEntryBasicInfo,
+    MoleculeVersionedFileEntryDetailedInfo,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,13 +25,8 @@ pub trait MoleculeUpdateVersionedFileMetadataUseCase: Send + Sync {
         versioned_file_dataset_id: &odf::DatasetID,
         existing_versioned_file_entry: MoleculeVersionedFileEntry,
         source_event_time: Option<DateTime<Utc>>,
-        access_level: String,
-        change_by: String,
-        description: Option<String>,
-        categories: Option<Vec<String>>,
-        tags: Option<Vec<String>>,
-        content_text: Option<String>,
-        encryption_metadata: Option<MoleculeEncryptionMetadata>,
+        basic_info: MoleculeVersionedFileEntryBasicInfo,
+        detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError>;
 }
 

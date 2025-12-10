@@ -45,7 +45,7 @@ pub struct MoleculeVersionedFileEntry {
 
 impl MoleculeVersionedFileEntry {
     pub fn from_raw_versioned_file_entry(raw: kamu_datasets::VersionedFileEntry) -> Self {
-        let extra_data = MoleculeVersionedFileExtraData::from_extra_data_fields(raw.extra_data);
+        let extra_data = MoleculeVersionedFileEntryExtraData::from_fields(raw.extra_data);
 
         MoleculeVersionedFileEntry {
             system_time: raw.system_time,
@@ -60,7 +60,7 @@ impl MoleculeVersionedFileEntry {
     }
 
     pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
-        let extra_data = MoleculeVersionedFileExtraData {
+        let extra_data = MoleculeVersionedFileEntryExtraData {
             basic_info: Cow::Borrowed(&self.basic_info),
             detailed_info: Cow::Borrowed(&self.detailed_info),
         };
@@ -111,7 +111,7 @@ pub struct MoleculeVersionedFileEntryDetailedInfo {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeVersionedFileExtraData<'a> {
+pub struct MoleculeVersionedFileEntryExtraData<'a> {
     #[serde(flatten)]
     pub basic_info: Cow<'a, MoleculeVersionedFileEntryBasicInfo>,
 
@@ -119,7 +119,7 @@ pub struct MoleculeVersionedFileExtraData<'a> {
     pub detailed_info: Cow<'a, MoleculeVersionedFileEntryDetailedInfo>,
 }
 
-impl Default for MoleculeVersionedFileExtraData<'_> {
+impl Default for MoleculeVersionedFileEntryExtraData<'_> {
     fn default() -> Self {
         Self {
             basic_info: Cow::Owned(MoleculeVersionedFileEntryBasicInfo::default()),
@@ -128,15 +128,15 @@ impl Default for MoleculeVersionedFileExtraData<'_> {
     }
 }
 
-impl MoleculeVersionedFileExtraData<'static> {
-    pub fn from_extra_data_fields(extra_data: kamu_datasets::ExtraDataFields) -> Self {
+impl MoleculeVersionedFileEntryExtraData<'static> {
+    pub fn from_fields(extra_data: kamu_datasets::ExtraDataFields) -> Self {
         serde_json::from_value(serde_json::Value::Object(extra_data.into_inner()))
             .unwrap_or_default()
     }
 }
 
-impl MoleculeVersionedFileExtraData<'_> {
-    pub fn to_extra_data_fields(&self) -> kamu_datasets::ExtraDataFields {
+impl MoleculeVersionedFileEntryExtraData<'_> {
+    pub fn to_fields(&self) -> kamu_datasets::ExtraDataFields {
         let serde_json::Value::Object(json) = serde_json::to_value(self).unwrap() else {
             unreachable!()
         };

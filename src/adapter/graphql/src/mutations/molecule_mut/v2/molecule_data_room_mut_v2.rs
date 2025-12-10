@@ -36,6 +36,8 @@ use kamu_molecule_domain::{
     MoleculeUpdateVersionedFileMetadataUseCase,
     MoleculeUploadVersionedFileVersionError,
     MoleculeUploadVersionedFileVersionUseCase,
+    MoleculeVersionedFileEntryBasicInfo,
+    MoleculeVersionedFileEntryDetailedInfo,
 };
 use time_source::SystemTimeSource;
 
@@ -125,13 +127,17 @@ impl MoleculeDataRoomMutV2 {
                 versioned_file_dataset,
                 Some(event_time),
                 content_args,
-                access_level,
-                change_by,
-                description,
-                categories,
-                tags,
-                content_text,
-                encryption_metadata.map(Into::into),
+                MoleculeVersionedFileEntryBasicInfo {
+                    access_level,
+                    change_by,
+                    description,
+                    categories: categories.unwrap_or_default(),
+                    tags: tags.unwrap_or_default(),
+                },
+                MoleculeVersionedFileEntryDetailedInfo {
+                    content_text,
+                    encryption_metadata: encryption_metadata.map(Into::into),
+                },
             )
             .await
             .map_err(|e| {
@@ -259,13 +265,17 @@ impl MoleculeDataRoomMutV2 {
                 file_dataset,
                 Some(event_time),
                 content_args,
-                access_level,
-                change_by,
-                description,
-                categories,
-                tags,
-                content_text,
-                encryption_metadata.map(Into::into),
+                MoleculeVersionedFileEntryBasicInfo {
+                    access_level,
+                    change_by,
+                    description,
+                    categories: categories.unwrap_or_default(),
+                    tags: tags.unwrap_or_default(),
+                },
+                MoleculeVersionedFileEntryDetailedInfo {
+                    content_text,
+                    encryption_metadata: encryption_metadata.map(Into::into),
+                },
             )
             .await
             .int_err()?;
@@ -791,13 +801,17 @@ impl MoleculeDataRoomMutV2 {
                 reference.as_ref(),
                 existing_file_entry,
                 Some(event_time),
-                access_level,
-                change_by,
-                description,
-                categories,
-                tags,
-                content_text,
-                encryption_metadata.map(Into::into),
+                MoleculeVersionedFileEntryBasicInfo {
+                    access_level,
+                    change_by,
+                    description,
+                    categories: categories.unwrap_or_default(),
+                    tags: tags.unwrap_or_default(),
+                },
+                MoleculeVersionedFileEntryDetailedInfo {
+                    content_text,
+                    encryption_metadata: encryption_metadata.map(Into::into),
+                },
             )
             .await
             .map_err(|e| {

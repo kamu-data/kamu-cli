@@ -15,13 +15,12 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::{ResolvedDataset, UpdateVersionedFileUseCase, WriteCheckedDataset};
 use kamu_molecule_domain::{
-    MoleculeEncryptionMetadata,
     MoleculeUpdateVersionedFileMetadataError,
     MoleculeUpdateVersionedFileMetadataUseCase,
     MoleculeVersionedFileEntry,
     MoleculeVersionedFileEntryBasicInfo,
     MoleculeVersionedFileEntryDetailedInfo,
-    MoleculeVersionedFileExtraData,
+    MoleculeVersionedFileEntryExtraData,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,34 +73,16 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
         versioned_file_dataset_id: &odf::DatasetID,
         existing_versioned_file_entry: MoleculeVersionedFileEntry,
         source_event_time: Option<DateTime<Utc>>,
-        access_level: String,
-        change_by: String,
-        description: Option<String>,
-        categories: Option<Vec<String>>,
-        tags: Option<Vec<String>>,
-        content_text: Option<String>,
-        encryption_metadata: Option<MoleculeEncryptionMetadata>,
+        basic_info: MoleculeVersionedFileEntryBasicInfo,
+        detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError> {
         let versioned_file_dataset = self
             .writable_versioned_file_dataset(versioned_file_dataset_id)
             .await?;
 
-        let versioned_file_basic_info = MoleculeVersionedFileEntryBasicInfo {
-            access_level,
-            change_by,
-            description,
-            categories: categories.unwrap_or_default(),
-            tags: tags.unwrap_or_default(),
-        };
-
-        let versioned_file_detailed_info = MoleculeVersionedFileEntryDetailedInfo {
-            content_text,
-            encryption_metadata: encryption_metadata.map(MoleculeEncryptionMetadata::into_record),
-        };
-
-        let versioned_file_extra_data = MoleculeVersionedFileExtraData {
-            basic_info: Cow::Owned(versioned_file_basic_info.clone()),
-            detailed_info: Cow::Owned(versioned_file_detailed_info.clone()),
+        let entry_extra_data = MoleculeVersionedFileEntryExtraData {
+            basic_info: Cow::Borrowed(&basic_info),
+            detailed_info: Cow::Borrowed(&detailed_info),
         };
 
         let update_version_result = self
@@ -111,7 +92,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
                 source_event_time,
                 None,
                 None,
-                Some(versioned_file_extra_data.to_extra_data_fields()),
+                Some(entry_extra_data.to_fields()),
             )
             .await
             .int_err()?;
@@ -128,8 +109,8 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
             content_type: existing_versioned_file_entry.content_type,
             content_length: existing_versioned_file_entry.content_length,
             content_hash: existing_versioned_file_entry.content_hash,
-            basic_info: versioned_file_basic_info,
-            detailed_info: versioned_file_detailed_info,
+            basic_info,
+            detailed_info,
         })
     }
 }
