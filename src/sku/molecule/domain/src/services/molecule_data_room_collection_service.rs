@@ -14,6 +14,7 @@ use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: hide inside service implementations
 #[async_trait::async_trait]
 pub trait MoleculeDataRoomCollectionService: Send + Sync {
     async fn get_data_room_collection_entries(

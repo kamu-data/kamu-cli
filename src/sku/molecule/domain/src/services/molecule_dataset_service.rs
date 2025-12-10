@@ -17,6 +17,7 @@ use crate::MoleculeProject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: split on parts and hide inside service implementations
 #[async_trait::async_trait]
 pub trait MoleculeDatasetService: Send + Sync {
     async fn get_projects_dataset(
