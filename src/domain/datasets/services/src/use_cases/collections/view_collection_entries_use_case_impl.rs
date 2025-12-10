@@ -10,16 +10,19 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
     CollectionEntry,
     CollectionEntryListing,
     CollectionPath,
+    ExtraDataFieldsFilter,
     ReadCheckedDataset,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
 };
+
+use crate::utils::{self, DataFrameExtraDataFieldsFilterApplyError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,6 +47,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
+        filter: Option<ExtraDataFieldsFilter>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
@@ -65,6 +69,19 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         // Apply filters
         // Note: we are still working with a changelog here in the hope to narrow down
         // the record set before projecting
+        let df = if let Some(extra_data_fields_filter) = filter {
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
+                .map_err(|e| -> ViewCollectionEntriesError {
+                    use DataFrameExtraDataFieldsFilterApplyError as E;
+                    match e {
+                        E::UnknownExtraDataFieldFilterNames(e) => e.into(),
+                        E::Internal(_) => e.int_err().into(),
+                    }
+                })?
+        } else {
+            df
+        };
+
         let df = match path_prefix {
             None => df,
             Some(path_prefix) => df

@@ -12,6 +12,8 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
 
+use crate::MoleculeDataRoomEntriesFilters;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -22,7 +24,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        // TODO: extra data filters
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError>;
 

@@ -20,12 +20,22 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeViewGlobalDataRoomActivitiesUseCase: Send + Sync {
+pub trait MoleculeViewGlobalActivitiesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        filters: Option<MoleculeGlobalActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct MoleculeGlobalActivitiesFilters {
+    pub by_tags: Option<Vec<String>>,
+    pub by_categories: Option<Vec<String>>,
+    pub by_access_levels: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

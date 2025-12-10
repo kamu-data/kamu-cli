@@ -48,9 +48,6 @@ impl MoleculeProjectV2 {
         project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
-        // TODO: filters
-        assert!(filters.is_none());
-
         let (query_service, rebac_dataset_registry_facade) =
             from_catalog_n!(ctx, dyn QueryService, dyn RebacDatasetRegistryFacade);
 
@@ -77,6 +74,23 @@ impl MoleculeProjectV2 {
 
         let Some(df) = df else {
             return Ok(Vec::new());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+                f.by_tags,
+                f.by_categories,
+                f.by_access_levels,
+            )
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // For any data room update, we always have two entries: -C and +C.
@@ -150,9 +164,6 @@ impl MoleculeProjectV2 {
         project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
-        // TODO: filters
-        assert!(filters.is_none());
-
         // TODO: extract a use-case
         //       (same at MoleculeAnnouncements::tail())
 
@@ -169,6 +180,23 @@ impl MoleculeProjectV2 {
 
         let Some(df) = maybe_df else {
             return Ok(Vec::new());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            kamu_molecule_services::utils::molecule_extra_data_fields_filter(
+                f.by_tags,
+                f.by_categories,
+                f.by_access_levels,
+            )
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // Sorting will be done after merge
@@ -279,9 +307,6 @@ impl MoleculeProjectV2 {
     ) -> Result<MoleculeActivityEventV2Connection> {
         // TODO: extract use case
 
-        // TODO: filters
-        assert!(filters.is_none());
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
@@ -327,9 +352,21 @@ page_based_connection!(
 
 #[derive(Clone, InputObject)]
 pub struct MoleculeProjectActivityFilters {
-    // TODO: replace w/ real filters.
-    /// This filter is provided as an example.
-    by_ipnft_uids: Option<Vec<String>>,
+    pub by_tags: Option<Vec<String>>,
+    pub by_categories: Option<Vec<String>>,
+    pub by_access_levels: Option<Vec<String>>,
+}
+
+impl From<MoleculeProjectActivityFilters>
+    for kamu_molecule_domain::MoleculeGlobalActivitiesFilters
+{
+    fn from(value: MoleculeProjectActivityFilters) -> Self {
+        Self {
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,6 +15,7 @@ pub use kamu_molecule_domain as domain;
 mod dependencies;
 mod services;
 mod use_cases;
+pub mod utils;
 
 pub use dependencies::*;
 pub use services::*;
