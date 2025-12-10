@@ -15,19 +15,21 @@ use kamu_accounts::LoggedAccount;
 use kamu_core::auth;
 
 use crate::domain::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewGlobalDataRoomActivitiesUseCase)]
-pub struct MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
+#[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
+pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
     molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
 }
 
-impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
+impl MoleculeViewGlobalActivitiesUseCaseImpl {
     async fn get_global_data_room_activities_listing(
         &self,
         molecule_subject: &LoggedAccount,
+        filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let (_, maybe_df) = self
             .molecule_dataset_service
@@ -41,6 +43,19 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
 
         let Some(df) = maybe_df else {
             return Ok(MoleculeDataRoomActivityListing::default());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // Sorting will be done after merge
@@ -61,6 +76,7 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
     async fn get_global_announcement_activities_listing(
         &self,
         molecule_subject: &LoggedAccount,
+        filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let (_, maybe_df) = self
             .molecule_dataset_service
@@ -74,6 +90,19 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
 
         let Some(df) = maybe_df else {
             return Ok(MoleculeDataRoomActivityListing::default());
+        };
+
+        let maybe_extra_data_fields_filter = filters.and_then(|f| {
+            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+        });
+        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
+                df,
+                extra_data_fields_filter,
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // Sorting will be done after merge
@@ -96,18 +125,17 @@ impl MoleculeViewGlobalDataRoomActivitiesUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeViewGlobalDataRoomActivitiesUseCase
-    for MoleculeViewGlobalDataRoomActivitiesUseCaseImpl
-{
-    #[tracing::instrument(level = "debug", name = MoleculeViewGlobalDataRoomActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
+impl MoleculeViewGlobalActivitiesUseCase for MoleculeViewGlobalActivitiesUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeViewGlobalActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        filters: Option<MoleculeGlobalActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
-            self.get_global_data_room_activities_listing(molecule_subject),
-            self.get_global_announcement_activities_listing(molecule_subject),
+            self.get_global_data_room_activities_listing(molecule_subject, filters.clone()),
+            self.get_global_announcement_activities_listing(molecule_subject, filters),
         )?;
 
         // Get the total count before pagination

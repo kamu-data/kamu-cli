@@ -90,8 +90,6 @@ impl MoleculeDataRoomProjection<'_> {
         per_page: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
     ) -> Result<MoleculeDataRoomEntryConnection> {
-        assert!(filters.is_none());
-
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
         let page = page.unwrap_or(0);
 
@@ -104,15 +102,19 @@ impl MoleculeDataRoomProjection<'_> {
                 self.as_of.clone(),
                 path_prefix.map(Into::into),
                 max_depth,
+                filters.map(Into::into),
                 Some(PaginationOpts {
                     limit: per_page,
                     offset: page * per_page,
                 }),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeViewDataRoomEntriesError::Access(e) => GqlError::Access(e),
-                MoleculeViewDataRoomEntriesError::Internal(e) => e.int_err().into(),
+            .map_err(|e| -> GqlError {
+                use MoleculeViewDataRoomEntriesError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(_) => e.int_err().into(),
+                }
             })?;
 
         let api_entry_nodes = molecule_entries_listing
@@ -165,6 +167,16 @@ pub struct MoleculeDataRoomEntriesFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
+}
+
+impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeDataRoomEntriesFilters {
+    fn from(value: MoleculeDataRoomEntriesFilters) -> Self {
+        Self {
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

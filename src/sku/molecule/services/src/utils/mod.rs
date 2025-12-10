@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_append_data_room_activity_use_case_impl;
-mod molecule_view_global_activities_use_case_impl;
+mod extra_data_fields_filter;
 
-pub use molecule_append_data_room_activity_use_case_impl::*;
-pub use molecule_view_global_activities_use_case_impl::*;
+pub use extra_data_fields_filter::*;

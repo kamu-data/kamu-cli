@@ -3527,10 +3527,9 @@ type MoleculeProject {
 }
 
 input MoleculeProjectActivityFilters {
-	"""
-	This filter is provided as an example.
-	"""
-	byIpnftUids: [String!]
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
 }
 
 type MoleculeProjectConnection {

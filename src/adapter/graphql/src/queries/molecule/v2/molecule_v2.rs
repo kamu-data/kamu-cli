@@ -18,7 +18,7 @@ use kamu_molecule_domain::{
     MoleculeGlobalActivity,
     MoleculeProjectListing,
     MoleculeViewDataRoomActivitiesError,
-    MoleculeViewGlobalDataRoomActivitiesUseCase,
+    MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewProjectsError,
     MoleculeViewProjectsUseCase,
 };
@@ -143,23 +143,21 @@ impl MoleculeV2 {
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
-        // TODO: filters
-        assert!(filters.is_none());
-
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (view_global_data_room_activities_uc, molecule_view_projects_uc) = from_catalog_n!(
+        let (view_global_activities_uc, molecule_view_projects_uc) = from_catalog_n!(
             ctx,
-            dyn MoleculeViewGlobalDataRoomActivitiesUseCase,
+            dyn MoleculeViewGlobalActivitiesUseCase,
             dyn MoleculeViewProjectsUseCase
         );
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
-        let listing = view_global_data_room_activities_uc
+        let listing = view_global_activities_uc
             .execute(
                 &molecule_subject,
+                filters.map(Into::into),
                 Some(PaginationOpts::from_page(page, per_page)),
             )
             .await

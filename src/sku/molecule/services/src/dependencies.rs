@@ -35,7 +35,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeUpdateVersionedFileMetadataUseCaseImpl>();
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
-    b.add::<MoleculeViewGlobalDataRoomActivitiesUseCaseImpl>();
+    b.add::<MoleculeViewGlobalActivitiesUseCaseImpl>();
 
     b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
 }

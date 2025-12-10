@@ -404,7 +404,7 @@ impl MoleculeDatasetSnapshots {
                 }
                     .into(),
                 odf::metadata::SetInfo {
-                    description: Some("Project announcements".into()),
+                    description: Some("Projects announcements".into()),
                     keywords: Some(vec![
                         "DeSci".to_string(),
                         "BioTech".to_string(),
