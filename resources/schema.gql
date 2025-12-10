@@ -3276,7 +3276,7 @@ type MoleculeDataRoomEntry {
 	path: CollectionPath!
 	ref: DatasetID!
 	changeBy: String!
-	asVersionedFile: MoleculeVersionedFile
+	asVersionedFile: MoleculeVersionedFile!
 }
 
 type MoleculeDataRoomEntryConnection {
@@ -3806,7 +3806,8 @@ type MoleculeV2 {
 }
 
 type MoleculeVersionedFile {
-	latest: MoleculeVersionedFileEntry
+	latest: MoleculeVersionedFileEntry!
+	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry!
 }
 
 type MoleculeVersionedFileEntry {

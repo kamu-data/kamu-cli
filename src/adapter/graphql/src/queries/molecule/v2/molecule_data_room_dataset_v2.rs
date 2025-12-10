@@ -275,10 +275,8 @@ impl MoleculeDataRoomEntry {
     }
 
     #[expect(clippy::unused_async)]
-    async fn as_versioned_file(&self) -> Result<Option<MoleculeVersionedFile>> {
-        Ok(Some(MoleculeVersionedFile {
-            dataset_id: self.entity.reference.clone(),
-        }))
+    async fn as_versioned_file(&self) -> Result<MoleculeVersionedFile<'_>> {
+        Ok(MoleculeVersionedFile::new(&self.entity))
     }
 }
 

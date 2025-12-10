@@ -288,7 +288,7 @@ pub enum MoleculeSemanticSearchFoundItem {
 
 #[derive(SimpleObject)]
 pub struct MoleculeSemanticSearchFoundFile {
-    pub entry: MoleculeVersionedFile,
+    pub entry: MoleculeVersionedFile<'static>,
 }
 
 #[derive(SimpleObject)]
