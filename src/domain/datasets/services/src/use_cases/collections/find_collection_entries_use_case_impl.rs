@@ -48,7 +48,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         let Some(df) = self
             .query_svc
             .get_data(
-                collection_dataset.clone(),
+                collection_dataset.into_inner(),
                 GetDataOptions {
                     block_hash: as_of.clone(),
                 },
@@ -119,7 +119,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         let Some(df) = self
             .query_svc
             .get_data(
-                collection_dataset.clone(),
+                collection_dataset.into_inner(),
                 GetDataOptions {
                     block_hash: as_of.clone(),
                 },

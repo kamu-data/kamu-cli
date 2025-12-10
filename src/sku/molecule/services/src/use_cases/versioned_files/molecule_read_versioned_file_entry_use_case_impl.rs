@@ -31,7 +31,7 @@ impl MoleculeReadVersionedFileEntryUseCaseImpl {
     async fn readable_versioned_file_dataset(
         &self,
         versioned_file_dataset_id: &odf::DatasetID,
-    ) -> Result<ResolvedDataset, MoleculeReadVersionedFileEntryError> {
+    ) -> Result<ReadCheckedDataset<'_>, MoleculeReadVersionedFileEntryError> {
         let readable_dataset = self
             .rebac_registry_facade
             .resolve_dataset_by_ref(
@@ -47,7 +47,7 @@ impl MoleculeReadVersionedFileEntryUseCaseImpl {
                 e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
             })?;
 
-        Ok(readable_dataset)
+        Ok(ReadCheckedDataset::from_owned(readable_dataset))
     }
 }
 
@@ -70,14 +70,14 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
         (Option<MoleculeVersionedFileEntry>, ResolvedDataset),
         MoleculeReadVersionedFileEntryError,
     > {
-        let readable_versioned_file_dataset = self
+        let read_checked_versioned_file_dataset = self
             .readable_versioned_file_dataset(versioned_file_dataset_id)
             .await?;
 
         let maybe_versioned_file_entry = self
             .find_versioned_file_version_uc
             .execute(
-                ReadCheckedDataset(&readable_versioned_file_dataset),
+                read_checked_versioned_file_dataset.clone(),
                 as_of_version,
                 as_of_head,
             )
@@ -91,7 +91,7 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
         Ok((
             (maybe_versioned_file_entry
                 .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry)),
-            readable_versioned_file_dataset,
+            read_checked_versioned_file_dataset.into_inner(),
         ))
     }
 }

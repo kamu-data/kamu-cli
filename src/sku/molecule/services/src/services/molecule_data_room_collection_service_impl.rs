@@ -89,7 +89,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
         match self
             .update_collection_entries
             .execute(
-                WriteCheckedDataset(&writable_data_room),
+                WriteCheckedDataset::from_ref(&writable_data_room),
                 source_event_time,
                 operations,
                 expected_head,
@@ -142,7 +142,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         let entries_listing = self
             .view_collection_entries
             .execute(
-                ReadCheckedDataset(&readable_data_room),
+                ReadCheckedDataset::from_ref(&readable_data_room),
                 as_of,
                 path_prefix,
                 max_depth,
@@ -175,7 +175,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
 
         let maybe_entry = self
             .find_collection_entries
-            .execute_find_by_path(ReadCheckedDataset(&readable_data_room), as_of, path)
+            .execute_find_by_path(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                path,
+            )
             .await
             .map_err(|e| match e {
                 e @ FindCollectionEntriesError::Internal(_) => e.int_err(),
@@ -200,7 +204,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
 
         let maybe_entry = self
             .find_collection_entries
-            .execute_find_by_ref(ReadCheckedDataset(&readable_data_room), as_of, &[r#ref])
+            .execute_find_by_ref(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                &[r#ref],
+            )
             .await
             .map_err(|e| match e {
                 e @ FindCollectionEntriesError::Internal(_) => e.int_err(),

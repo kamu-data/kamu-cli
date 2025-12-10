@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::WriteCheckedDataset;
 
 use crate::MoleculeProject;
 
@@ -22,7 +22,7 @@ pub trait MoleculeCreateVersionedFileDatasetUseCase: Send + Sync {
         molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path: kamu_datasets::CollectionPathV2,
-    ) -> Result<ResolvedDataset, MoleculeCreateVersionedFileDatasetError>;
+    ) -> Result<WriteCheckedDataset<'_>, MoleculeCreateVersionedFileDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

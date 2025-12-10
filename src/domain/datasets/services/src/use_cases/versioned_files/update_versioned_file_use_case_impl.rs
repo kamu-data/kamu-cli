@@ -111,7 +111,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
         let entity = if let Some(args) = content_args_maybe {
-            let (latest_version, _) = self.get_latest_version(file_dataset.clone()).await?;
+            let (latest_version, _) = self.get_latest_version((*file_dataset).clone()).await?;
             let new_version = latest_version + 1;
 
             let now = self.system_time_source.now();
@@ -145,7 +145,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
             result
         } else {
             let mut last_entity = self
-                .get_versioned_file_entity_from_latest_entry(file_dataset.clone())
+                .get_versioned_file_entity_from_latest_entry((*file_dataset).clone())
                 .await?
                 .unwrap();
 
@@ -162,7 +162,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
         let ingest_result = self
             .push_ingest_data_use_case
             .execute(
-                file_dataset.clone(),
+                file_dataset.into_inner(),
                 kamu_core::DataSource::Buffer(entity.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{ResolvedDataset, UpdateVersionedFileUseCase, WriteCheckedDataset};
+use kamu_datasets::{UpdateVersionedFileUseCase, WriteCheckedDataset};
 use kamu_molecule_domain::{
     MoleculeUpdateVersionedFileMetadataError,
     MoleculeUpdateVersionedFileMetadataUseCase,
@@ -38,8 +38,8 @@ impl MoleculeUpdateVersionedFileMetadataUseCaseImpl {
     async fn writable_versioned_file_dataset(
         &self,
         versioned_file_dataset_id: &odf::DatasetID,
-    ) -> Result<ResolvedDataset, MoleculeUpdateVersionedFileMetadataError> {
-        let writable_dataset = self
+    ) -> Result<WriteCheckedDataset<'_>, MoleculeUpdateVersionedFileMetadataError> {
+        let resolved_dataset = self
             .rebac_registry_facade
             .resolve_dataset_by_ref(
                 &versioned_file_dataset_id.as_local_ref(),
@@ -54,7 +54,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCaseImpl {
                 e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
             })?;
 
-        Ok(writable_dataset)
+        Ok(WriteCheckedDataset::from_owned(resolved_dataset))
     }
 }
 
@@ -76,7 +76,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
         basic_info: MoleculeVersionedFileEntryBasicInfo,
         detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError> {
-        let versioned_file_dataset = self
+        let write_checked_versioned_file_dataset = self
             .writable_versioned_file_dataset(versioned_file_dataset_id)
             .await?;
 
@@ -88,7 +88,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
         let update_version_result = self
             .update_versioned_file_uc
             .execute(
-                WriteCheckedDataset(&versioned_file_dataset),
+                write_checked_versioned_file_dataset,
                 source_event_time,
                 None,
                 None,

@@ -16,6 +16,7 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCaseOptions,
     ResolvedDataset,
+    WriteCheckedDataset,
 };
 use kamu_molecule_domain::{
     MoleculeCreateVersionedFileDatasetError,
@@ -77,7 +78,7 @@ impl MoleculeCreateVersionedFileDatasetUseCase for MoleculeCreateVersionedFileDa
         molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path: kamu_datasets::CollectionPathV2,
-    ) -> Result<ResolvedDataset, MoleculeCreateVersionedFileDatasetError> {
+    ) -> Result<WriteCheckedDataset<'_>, MoleculeCreateVersionedFileDatasetError> {
         let alias = self
             .build_new_file_dataset_alias(molecule_project, &path)
             .await;
@@ -110,7 +111,7 @@ impl MoleculeCreateVersionedFileDatasetUseCase for MoleculeCreateVersionedFileDa
             .await
             .int_err()?;
 
-        Ok(versioned_file_dataset)
+        Ok(WriteCheckedDataset::from_owned(versioned_file_dataset))
     }
 }
 

@@ -63,7 +63,7 @@ impl<'a> VersionedFile<'a> {
         let find_versioned_file_version = from_catalog_n!(ctx, dyn FindVersionedFileVersionUseCase);
         let maybe_entry = find_versioned_file_version
             .execute(
-                ReadCheckedDataset(readable_file_dataset),
+                ReadCheckedDataset::from_ref(readable_file_dataset),
                 as_of_version,
                 as_of_block_hash.map(Into::into),
             )
@@ -99,7 +99,7 @@ impl VersionedFile<'_> {
         let view_versioned_file_history = from_catalog_n!(ctx, dyn ViewVersionedFileHistoryUseCase);
         let history_page = view_versioned_file_history
             .execute(
-                ReadCheckedDataset(file_dataset),
+                ReadCheckedDataset::from_ref(file_dataset),
                 max_version,
                 Some(PaginationOpts {
                     offset: page * per_page,
