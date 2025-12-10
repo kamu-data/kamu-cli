@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::ReadCheckedDataset;
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
@@ -37,7 +36,7 @@ impl MoleculeVersionedFile {
         let read_versioned_file_entry_uc =
             from_catalog_n!(ctx, dyn MoleculeReadVersionedFileEntryUseCase);
 
-        let (maybe_versioned_file_entry, versioned_file_dataset) = read_versioned_file_entry_uc
+        let maybe_versioned_file_entry = read_versioned_file_entry_uc
             .execute(&self.dataset_id, None, None)
             .await
             .map_err(|e| {
@@ -49,25 +48,25 @@ impl MoleculeVersionedFile {
             })?;
 
         Ok(maybe_versioned_file_entry
-            .map(|entry| MoleculeVersionedFileEntry::new(versioned_file_dataset, entry)))
+            .map(|entry| MoleculeVersionedFileEntry::new(self.dataset_id.clone(), entry)))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFileEntry {
+    versioned_file_dataset_id: odf::DatasetID,
     entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
-    versioned_file_dataset: ReadCheckedDataset<'static>,
 }
 
 impl MoleculeVersionedFileEntry {
     pub fn new(
-        versioned_file_dataset: ReadCheckedDataset<'static>,
+        versioned_file_dataset_id: odf::DatasetID,
         entity: kamu_molecule_domain::MoleculeVersionedFileEntry,
     ) -> Self {
         Self {
+            versioned_file_dataset_id,
             entity,
-            versioned_file_dataset,
         }
     }
 }
@@ -139,12 +138,13 @@ impl MoleculeVersionedFileEntry {
             from_catalog_n!(ctx, dyn MoleculeVersionedFileContentProvider);
 
         let content_bytes = molecule_versioned_file_content_provider
-            .get_versioned_file_content(&self.versioned_file_dataset, &self.entity.content_hash)
+            .get_versioned_file_content(&self.versioned_file_dataset_id, &self.entity.content_hash)
             .await
             .map_err(|e| {
                 use MoleculeVersionedFileContentProviderError as E;
                 match e {
-                    e @ E::Internal(_) => e.int_err(),
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
                 }
             })?;
 
@@ -158,14 +158,15 @@ impl MoleculeVersionedFileEntry {
 
         let download_data = molecule_versioned_file_content_provider
             .get_versioned_file_content_download_data(
-                &self.versioned_file_dataset,
+                &self.versioned_file_dataset_id,
                 &self.entity.content_hash,
             )
             .await
             .map_err(|e| {
                 use MoleculeVersionedFileContentProviderError as E;
                 match e {
-                    e @ E::Internal(_) => e.int_err(),
+                    E::Access(e) => GqlError::Access(e),
+                    e @ E::Internal(_) => e.int_err().into(),
                 }
             })?;
 

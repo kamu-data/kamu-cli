@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_datasets::{ContentArgs, WriteCheckedDataset};
+use kamu_datasets::ContentArgs;
 
 use crate::{
     MoleculeVersionedFileEntry,
@@ -23,19 +23,12 @@ use crate::{
 pub trait MoleculeUploadVersionedFileVersionUseCase: Send + Sync {
     async fn execute(
         &self,
-        versioned_file_dataset_ref: MoleculeUploadVersionedFileDatasetRef<'_>,
+        versioned_file_dataset_id: &odf::DatasetID,
         source_event_time: Option<DateTime<Utc>>,
         content_args: ContentArgs,
         basic_info: MoleculeVersionedFileEntryBasicInfo,
         detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUploadVersionedFileVersionError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub enum MoleculeUploadVersionedFileDatasetRef<'a> {
-    Id(&'a odf::DatasetID),
-    WriteChecked(WriteCheckedDataset<'a>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_datasets::ReadCheckedDataset;
 
 use crate::MoleculeVersionedFileEntry;
 
@@ -21,13 +20,7 @@ pub trait MoleculeReadVersionedFileEntryUseCase: Send + Sync {
         versioned_file_dataset_id: &odf::DatasetID,
         as_of_version: Option<kamu_datasets::FileVersion>,
         as_of_head: Option<odf::Multihash>,
-    ) -> Result<
-        (
-            Option<MoleculeVersionedFileEntry>,
-            ReadCheckedDataset<'static>,
-        ),
-        MoleculeReadVersionedFileEntryError,
-    >;
+    ) -> Result<Option<MoleculeVersionedFileEntry>, MoleculeReadVersionedFileEntryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

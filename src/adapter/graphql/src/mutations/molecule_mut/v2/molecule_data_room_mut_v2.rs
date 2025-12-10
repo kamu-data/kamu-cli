@@ -34,7 +34,6 @@ use kamu_molecule_domain::{
     MoleculeUpdateDataRoomEntryUseCase,
     MoleculeUpdateVersionedFileMetadataError,
     MoleculeUpdateVersionedFileMetadataUseCase,
-    MoleculeUploadVersionedFileDatasetRef,
     MoleculeUploadVersionedFileVersionError,
     MoleculeUploadVersionedFileVersionUseCase,
     MoleculeVersionedFileEntryBasicInfo,
@@ -107,7 +106,7 @@ impl MoleculeDataRoomMutV2 {
         let event_time = time_source.now();
 
         // 1. Create an empty versioned dataset.
-        let versioned_file_dataset = create_versioned_file_dataset_uc
+        let versioned_file_dataset_id = create_versioned_file_dataset_uc
             .execute(&molecule_subject, &self.project.entity, path.clone())
             .await
             .map_err(|e| {
@@ -119,13 +118,11 @@ impl MoleculeDataRoomMutV2 {
                 }
             })?;
 
-        let versioned_file_ref = versioned_file_dataset.get_id().clone();
-
         // 2. Upload the first version to just created dataset.
         // NOTE: Version and content hash get updated to correct values below
         let versioned_file_entry = upload_versioned_file_version_uc
             .execute(
-                MoleculeUploadVersionedFileDatasetRef::WriteChecked(versioned_file_dataset),
+                &versioned_file_dataset_id,
                 Some(event_time),
                 content_args,
                 MoleculeVersionedFileEntryBasicInfo {
@@ -158,7 +155,7 @@ impl MoleculeDataRoomMutV2 {
                 &self.project.entity,
                 Some(event_time),
                 path.clone().into_v1(),
-                versioned_file_ref.clone(),
+                versioned_file_dataset_id.clone(),
                 versioned_file_entry.to_denormalized(),
             )
             .await
@@ -179,7 +176,7 @@ impl MoleculeDataRoomMutV2 {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into_v1(),
-                r#ref: versioned_file_ref,
+                r#ref: versioned_file_dataset_id,
                 version: versioned_file_entry.version,
                 change_by: versioned_file_entry.basic_info.change_by,
                 access_level: versioned_file_entry.basic_info.access_level,
@@ -254,7 +251,7 @@ impl MoleculeDataRoomMutV2 {
         // NOTE: Access rights will be checked inside the use case.
         let versioned_file_entry = upload_versioned_file_version_uc
             .execute(
-                MoleculeUploadVersionedFileDatasetRef::Id(reference.as_ref()),
+                &existing_data_room_entry.reference,
                 Some(event_time),
                 content_args,
                 MoleculeVersionedFileEntryBasicInfo {
@@ -770,7 +767,7 @@ impl MoleculeDataRoomMutV2 {
             ));
         };
 
-        let (Some(existing_file_entry), _) = read_versioned_file_entry_uc
+        let Some(existing_file_entry) = read_versioned_file_entry_uc
             .execute(reference.as_ref(), None, None)
             .await
             .map_err(|e| {

@@ -66,13 +66,7 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
         versioned_file_dataset_id: &odf::DatasetID,
         as_of_version: Option<kamu_datasets::FileVersion>,
         as_of_head: Option<odf::Multihash>,
-    ) -> Result<
-        (
-            Option<MoleculeVersionedFileEntry>,
-            ReadCheckedDataset<'static>,
-        ),
-        MoleculeReadVersionedFileEntryError,
-    > {
+    ) -> Result<Option<MoleculeVersionedFileEntry>, MoleculeReadVersionedFileEntryError> {
         let read_checked_versioned_file_dataset = self
             .readable_versioned_file_dataset(versioned_file_dataset_id)
             .await?;
@@ -91,11 +85,8 @@ impl MoleculeReadVersionedFileEntryUseCase for MoleculeReadVersionedFileEntryUse
                 }
             })?;
 
-        Ok((
-            (maybe_versioned_file_entry
-                .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry)),
-            read_checked_versioned_file_dataset,
-        ))
+        Ok(maybe_versioned_file_entry
+            .map(MoleculeVersionedFileEntry::from_raw_versioned_file_entry))
     }
 }
 

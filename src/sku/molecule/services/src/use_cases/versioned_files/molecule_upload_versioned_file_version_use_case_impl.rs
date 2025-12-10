@@ -16,7 +16,6 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::{ContentArgs, UpdateVersionedFileUseCase, WriteCheckedDataset};
 use kamu_molecule_domain::{
-    MoleculeUploadVersionedFileDatasetRef,
     MoleculeUploadVersionedFileVersionError,
     MoleculeUploadVersionedFileVersionUseCase,
     MoleculeVersionedFileEntry,
@@ -39,29 +38,24 @@ pub struct MoleculeUploadVersionedFileVersionUseCaseImpl {
 impl MoleculeUploadVersionedFileVersionUseCaseImpl {
     async fn write_checked_dataset<'a>(
         &self,
-        versioned_file_dataset_ref: MoleculeUploadVersionedFileDatasetRef<'a>,
+        versioned_file_dataset_id: &odf::DatasetID,
     ) -> Result<WriteCheckedDataset<'a>, MoleculeUploadVersionedFileVersionError> {
-        match versioned_file_dataset_ref {
-            MoleculeUploadVersionedFileDatasetRef::Id(versioned_file_dataset_id) => {
-                let resolved_dataset = self
-                    .rebac_registry_facade
-                    .resolve_dataset_by_ref(
-                        &versioned_file_dataset_id.as_local_ref(),
-                        kamu_core::auth::DatasetAction::Write,
-                    )
-                    .await
-                    .map_err(|e| match e {
-                        RebacDatasetRefUnresolvedError::NotFound(e) => e.int_err().into(),
-                        RebacDatasetRefUnresolvedError::Access(e) => {
-                            MoleculeUploadVersionedFileVersionError::Access(e)
-                        }
-                        e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
-                    })?;
+        let resolved_dataset = self
+            .rebac_registry_facade
+            .resolve_dataset_by_ref(
+                &versioned_file_dataset_id.as_local_ref(),
+                kamu_core::auth::DatasetAction::Write,
+            )
+            .await
+            .map_err(|e| match e {
+                RebacDatasetRefUnresolvedError::NotFound(e) => e.int_err().into(),
+                RebacDatasetRefUnresolvedError::Access(e) => {
+                    MoleculeUploadVersionedFileVersionError::Access(e)
+                }
+                e @ RebacDatasetRefUnresolvedError::Internal(_) => e.int_err().into(),
+            })?;
 
-                Ok(WriteCheckedDataset::from_owned(resolved_dataset))
-            }
-            MoleculeUploadVersionedFileDatasetRef::WriteChecked(write_checked) => Ok(write_checked),
-        }
+        Ok(WriteCheckedDataset::from_owned(resolved_dataset))
     }
 }
 
@@ -77,14 +71,14 @@ impl MoleculeUploadVersionedFileVersionUseCase for MoleculeUploadVersionedFileVe
     )]
     async fn execute(
         &self,
-        versioned_file_dataset_ref: MoleculeUploadVersionedFileDatasetRef<'_>,
+        versioned_file_dataset_id: &odf::DatasetID,
         source_event_time: Option<DateTime<Utc>>,
         content_args: ContentArgs,
         basic_info: MoleculeVersionedFileEntryBasicInfo,
         detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUploadVersionedFileVersionError> {
         let write_checked_versioned_file_dataset = self
-            .write_checked_dataset(versioned_file_dataset_ref)
+            .write_checked_dataset(versioned_file_dataset_id)
             .await?;
 
         let content_type = content_args.content_type.clone();
