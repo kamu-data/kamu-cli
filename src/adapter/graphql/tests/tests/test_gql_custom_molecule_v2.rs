@@ -189,6 +189,40 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     }
     "#
 );
+const CREATE_VERSIONED_FILE: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              uploadFile(
+                path: $path
+                content: $content
+                contentType: $contentType
+                changeBy: $changeBy
+                accessLevel: $accessLevel
+                description: $description
+                categories: $categories
+                tags: $tags
+                contentText: $contentText
+                encryptionMetadata: $encryptionMetadata
+              ) {
+                isSuccess
+                message
+                ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                  entry {
+                    ref
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2622,41 +2656,6 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Create a few versioned files to use as attachments
-    const CREATE_VERSIONED_FILE: &str = indoc!(
-        r#"
-        mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
-          molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
-                dataRoom {
-                  uploadFile(
-                    path: $path
-                    content: $content
-                    contentType: $contentType
-                    changeBy: $changeBy
-                    accessLevel: $accessLevel
-                    description: $description
-                    categories: $categories
-                    tags: $tags
-                    contentText: $contentText
-                    encryptionMetadata: $encryptionMetadata
-                  ) {
-                    isSuccess
-                    message
-                    ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                      entry {
-                        ref
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
-    );
-
     let project_1_file_1_dataset_id = {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
@@ -3212,44 +3211,119 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    /*
     // Create a few versioned files
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
-                async_graphql::Variables::from_json(json!({
-                    // TODO: Need ability  to create datasets with target AccountID
-                    "datasetAlias": format!("{project_account_name}/test-file-1"),
-                })),
-            ),
+    let project_1_file_1_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "description": "Plain text file (foo)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
         )
-        .await;
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
-    let test_file_1 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
-        ["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
 
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
-                async_graphql::Variables::from_json(json!({
-                    // TODO: Need ability  to create datasets with target AccountID
-                    "datasetAlias": format!("{project_account_name}/test-file-2"),
-                })),
-            ),
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+    let project_1_file_2_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "accessLevel": "public",
+                "description": "Plain text file (bar)",
+                "categories": [],
+                "tags": [],
+                "contentText": "hello bar",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
         )
-        .await;
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
-    let test_file_2 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
-        ["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
 
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+
+    /*
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
