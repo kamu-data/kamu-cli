@@ -87,10 +87,10 @@ const ENABLE_PROJECT: &str = indoc!(
 // TODO: find a way to output tags/categories
 const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
     r#"
-    {
+    query ($filters: MoleculeProjectActivityFilters) {
       molecule {
         v2 {
-          activity {
+          activity(filters: $filters) {
             nodes {
               ... on MoleculeActivityFileAddedV2 {
                 __typename
@@ -138,11 +138,11 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
 );
 const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
-    query ($ipnftUid: String!) {
+    query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
-            activity {
+            activity(filters: $filters) {
               nodes {
                 ... on MoleculeActivityFileAddedV2 {
                   __typename
@@ -890,7 +890,9 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -906,6 +908,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1084,7 +1087,7 @@ async fn test_molecule_v2_data_room_operations() {
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1101,6 +1104,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1262,7 +1266,7 @@ async fn test_molecule_v2_data_room_operations() {
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1279,6 +1283,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1567,7 +1572,9 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -1583,6 +1590,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1959,7 +1967,9 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -1975,6 +1985,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2172,7 +2183,9 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -2188,6 +2201,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2474,7 +2488,9 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -2490,6 +2506,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3086,7 +3103,9 @@ async fn test_molecule_v2_announcements_operations() {
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
-            async_graphql::Variables::default(),
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -3102,6 +3121,7 @@ async fn test_molecule_v2_announcements_operations() {
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": PROJECT_1_UID,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3119,7 +3139,6 @@ async fn test_molecule_v2_announcements_operations() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[test_log::test(tokio::test)]
 async fn test_molecule_v2_activity() {
     let harness = GraphQLMoleculeV1Harness::builder()
@@ -3127,23 +3146,31 @@ async fn test_molecule_v2_activity() {
         .build()
         .await;
 
-    // Create project (projects dataset is auto-created)
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
-            })),
-        ))
-        .await;
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    assert!(res.is_ok(), "{res:#?}");
-    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
-    let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
-    let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
+    assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitafast",
+                    "ipnftUid": PROJECT_1_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
 
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
+
+    /*
     // Create a few versioned files
     let res = harness
         .execute_authorized_query(
