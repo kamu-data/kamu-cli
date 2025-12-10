@@ -10,8 +10,12 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use kamu_core::auth;
-use kamu_molecule_domain::MoleculeGlobalAnnouncementRecordExt;
+use kamu_molecule_domain::{
+    MoleculeGlobalAnnouncementRecordExt,
+    MoleculeViewProjectAnnouncementsUseCase,
+};
 use odf::utils::data::DataFrameExt;
 
 use crate::prelude::*;
@@ -66,59 +70,40 @@ impl MoleculeAnnouncements {
         per_page: Option<usize>,
         filters: Option<MoleculeAnnouncementsFilters>,
     ) -> Result<MoleculeAnnouncementEntryConnection> {
-        // TODO: extract a use-case
-        //       (same at MoleculeProjectV2::get_announcement_activity_events())
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
 
-        let maybe_df = self.get_data_frame(ctx).await?;
+        let view_project_announcements_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectAnnouncementsUseCase);
 
-        let Some(df) = maybe_df else {
-            return Ok(MoleculeAnnouncementEntryConnection::new(
-                vec![],
-                page,
-                per_page,
-                0,
-            ));
-        };
+        let listing = view_project_announcements_uc
+            .execute(
+                &self.project.entity,
+                filters.map(Into::into),
+                Some(PaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                }),
+            )
+            .await
+            .int_err()?;
 
-        use datafusion::logical_expr::col;
-
-        // Sort the df by offset descending
-        // TODO: add col const from snapshot?
-        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
-        // Apply pagination
-        let df = df.limit(page * per_page, Some(per_page)).int_err()?;
-
-        let maybe_filter = filters
-            .map(kamu_molecule_domain::MoleculeAnnouncementsFilters::from)
-            .and_then(|f| {
-                kamu_molecule_domain::molecule_extra_data_fields_filter(
-                    f.by_tags,
-                    f.by_categories,
-                    f.by_access_levels,
-                )
-            });
-        let df = if let Some(filters) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters)
-                .int_err()?
-        } else {
-            df
-        };
-
-        let records = df.collect_json_aos().await.int_err()?;
-        let total_count = records.len();
-        let nodes = records
+        let nodes = listing
+            .list
             .into_iter()
-            .map(|record| MoleculeAnnouncementEntry::from_json(&self.project, record))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|record| {
+                MoleculeAnnouncementEntry::new_from_project_announcement_record(
+                    &self.project,
+                    record,
+                )
+            })
+            .collect::<Vec<_>>();
 
         Ok(MoleculeAnnouncementEntryConnection::new(
             nodes,
             page,
             per_page,
-            total_count,
+            listing.total_count,
         ))
     }
 

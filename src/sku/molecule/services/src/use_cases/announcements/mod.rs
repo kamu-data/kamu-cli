@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod molecule_create_announcement_use_case_impl;
+mod molecule_view_project_announcements_use_case_impl;
 
 pub use molecule_create_announcement_use_case_impl::*;
+pub use molecule_view_project_announcements_use_case_impl::*;

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_create_announcement_use_case;
-mod molecule_view_project_announcements_use_case;
+mod extra_data_fields_filter;
 
-pub use molecule_create_announcement_use_case::*;
-pub use molecule_view_project_announcements_use_case::*;
+pub use extra_data_fields_filter::*;
