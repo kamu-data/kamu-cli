@@ -9,6 +9,8 @@
 
 mod molecule_data_room_collection_service_impl;
 mod molecule_dataset_service_impl;
+mod molecule_versioned_file_content_provider_impl;
 
 pub use molecule_data_room_collection_service_impl::*;
 pub use molecule_dataset_service_impl::*;
+pub use molecule_versioned_file_content_provider_impl::*;

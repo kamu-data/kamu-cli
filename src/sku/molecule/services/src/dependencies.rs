@@ -14,6 +14,7 @@ use crate::*;
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeDatasetServiceImpl>();
     b.add::<MoleculeDataRoomCollectionServiceImpl>();
+    b.add::<MoleculeVersionedFileContentProviderImpl>();
 
     b.add::<MoleculeEnableProjectUseCaseImpl>();
     b.add::<MoleculeCreateProjectUseCaseImpl>();
@@ -27,6 +28,11 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeRemoveDataRoomEntryUseCaseImpl>();
     b.add::<MoleculeUpdateDataRoomEntryUseCaseImpl>();
     b.add::<MoleculeViewDataRoomEntriesUseCaseImpl>();
+
+    b.add::<MoleculeCreateVersionedFileDatasetUseCaseImpl>();
+    b.add::<MoleculeReadVersionedFileEntryUseCaseImpl>();
+    b.add::<MoleculeUploadVersionedFileVersionUseCaseImpl>();
+    b.add::<MoleculeUpdateVersionedFileMetadataUseCaseImpl>();
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalActivitiesUseCaseImpl>();

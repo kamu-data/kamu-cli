@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
 use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +56,7 @@ impl MoleculeDataRoomEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
-    pub content_type: String,
+    pub content_type: MediaType,
     pub content_length: usize,
     pub content_hash: odf::Multihash,
 
@@ -72,7 +73,7 @@ impl Default for MoleculeDenormalizeFileToDataRoom {
     fn default() -> Self {
         Self {
             version: 0,
-            content_type: String::new(),
+            content_type: MediaType::OCTET_STREAM.to_owned(),
             content_length: 0,
             content_hash: odf::Multihash::from_digest_sha3_256(b""),
             access_level: String::new(),

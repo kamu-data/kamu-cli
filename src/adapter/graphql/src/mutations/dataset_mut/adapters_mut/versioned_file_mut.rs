@@ -68,7 +68,7 @@ impl<'a> VersionedFileMut<'a> {
 
         match update_versioned_file
             .execute(
-                WriteCheckedDataset(file_dataset),
+                WriteCheckedDataset::from_ref(file_dataset),
                 None,
                 Some(content_args),
                 expected_head.map(Into::into),
@@ -163,7 +163,7 @@ impl<'a> VersionedFileMut<'a> {
 
         match update_versioned_file
             .execute(
-                WriteCheckedDataset(file_dataset),
+                WriteCheckedDataset::from_ref(file_dataset),
                 None,
                 Some(content_args),
                 expected_head.map(Into::into),
@@ -204,7 +204,7 @@ impl<'a> VersionedFileMut<'a> {
 
         match update_versioned_file
             .execute(
-                WriteCheckedDataset(file_dataset),
+                WriteCheckedDataset::from_ref(file_dataset),
                 None,
                 None,
                 expected_head.map(Into::into),

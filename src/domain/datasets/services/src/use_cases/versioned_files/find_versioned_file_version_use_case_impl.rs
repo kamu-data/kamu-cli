@@ -42,7 +42,7 @@ impl FindVersionedFileVersionUseCase for FindVersionedFileVersionUseCaseImpl {
         let query_res = if let Some(block_hash) = as_of_block_hash {
             self.query_svc
                 .tail(
-                    file_dataset.clone(),
+                    file_dataset.into_inner(),
                     0,
                     1,
                     GetDataOptions {
@@ -54,7 +54,7 @@ impl FindVersionedFileVersionUseCase for FindVersionedFileVersionUseCaseImpl {
             use datafusion::logical_expr::{col, lit};
 
             self.query_svc
-                .get_data(file_dataset.clone(), GetDataOptions::default())
+                .get_data(file_dataset.into_inner(), GetDataOptions::default())
                 .await
                 .map(|res| GetDataResponse {
                     df: res
@@ -65,7 +65,7 @@ impl FindVersionedFileVersionUseCase for FindVersionedFileVersionUseCaseImpl {
                 })
         } else {
             self.query_svc
-                .tail(file_dataset.clone(), 0, 1, GetDataOptions::default())
+                .tail(file_dataset.into_inner(), 0, 1, GetDataOptions::default())
                 .await
         }
         .int_err()?;

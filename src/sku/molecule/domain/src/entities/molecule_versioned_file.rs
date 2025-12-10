@@ -7,146 +7,140 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
+use chrono::{DateTime, Utc};
+use file_utils::MediaType;
+use kamu_datasets::FileVersion;
+
+use crate::{MoleculeDenormalizeFileToDataRoom, MoleculeEncryptionMetadataRecord};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: clarify valid values
-#[derive(Clone, Debug)]
-pub struct MoleculeEncryptionMetadata {
-    pub data_to_encrypt_hash: String,
-    pub access_control_conditions: String,
-    pub encrypted_by: String,
-    pub encrypted_at: String,
-    pub chain: String,
-    pub lit_sdk_version: String,
-    pub lit_network: String,
-    pub template_name: String,
-    pub contract_version: String,
+pub struct MoleculeVersionedFileEntry {
+    /// System time when this entry was created
+    pub system_time: DateTime<Utc>,
+
+    /// Event time when this entry was created
+    pub event_time: DateTime<Utc>,
+
+    /// File version
+    pub version: FileVersion,
+
+    /// Media type of the file content
+    pub content_type: MediaType,
+
+    /// Size of the content in bytes
+    pub content_length: usize,
+
+    /// Multihash of the file content
+    pub content_hash: odf::Multihash,
+
+    /// Basic versioned file info
+    pub basic_info: MoleculeVersionedFileEntryBasicInfo,
+
+    /// Detailed versioned file info
+    pub detailed_info: MoleculeVersionedFileEntryDetailedInfo,
 }
 
-impl MoleculeEncryptionMetadata {
-    pub fn into_record(self) -> MoleculeEncryptionMetadataRecord {
-        MoleculeEncryptionMetadataRecord::new(self)
+impl MoleculeVersionedFileEntry {
+    pub fn from_raw_versioned_file_entry(raw: kamu_datasets::VersionedFileEntry) -> Self {
+        let extra_data = MoleculeVersionedFileEntryExtraData::from_fields(raw.extra_data);
+
+        MoleculeVersionedFileEntry {
+            system_time: raw.system_time,
+            event_time: raw.event_time,
+            version: raw.version,
+            content_type: raw.content_type,
+            content_length: raw.content_length,
+            content_hash: raw.content_hash,
+            basic_info: extra_data.basic_info.into_owned(),
+            detailed_info: extra_data.detailed_info.into_owned(),
+        }
+    }
+
+    pub fn to_versioned_file_extra_data(&self) -> kamu_datasets::ExtraDataFields {
+        let extra_data = MoleculeVersionedFileEntryExtraData {
+            basic_info: Cow::Borrowed(&self.basic_info),
+            detailed_info: Cow::Borrowed(&self.detailed_info),
+        };
+
+        let serde_json::Value::Object(json) = serde_json::to_value(&extra_data).unwrap() else {
+            unreachable!()
+        };
+
+        kamu_datasets::ExtraDataFields::new(json)
+    }
+
+    pub fn to_denormalized(&self) -> MoleculeDenormalizeFileToDataRoom {
+        MoleculeDenormalizeFileToDataRoom {
+            access_level: self.basic_info.access_level.clone(),
+            change_by: self.basic_info.change_by.clone(),
+            version: self.version,
+            content_type: self.content_type.clone(),
+            content_length: self.content_length,
+            content_hash: self.content_hash.clone(),
+            description: self.basic_info.description.clone(),
+            categories: self.basic_info.categories.clone(),
+            tags: self.basic_info.tags.clone(),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: structure used for de/serialization
-//       (as a JSON string, not a JSON object)
-//       and storage in versioned file datasets in (!) string column
-#[derive(Clone, Debug)]
-pub struct MoleculeEncryptionMetadataRecord {
-    // Allow for future record evolution
-    pub version: u32,
-
-    pub data_to_encrypt_hash: String,
-    pub access_control_conditions: String,
-    pub encrypted_by: String,
-    pub encrypted_at: String,
-    pub chain: String,
-    pub lit_sdk_version: String,
-    pub lit_network: String,
-    pub template_name: String,
-    pub contract_version: String,
+#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeVersionedFileEntryBasicInfo {
+    #[serde(rename = "molecule_access_level")]
+    pub access_level: String,
+    #[serde(rename = "molecule_change_by")]
+    pub change_by: String,
+    pub description: Option<String>,
+    pub categories: Vec<String>,
+    pub tags: Vec<String>,
 }
 
-impl MoleculeEncryptionMetadataRecord {
-    pub fn new(metadata: MoleculeEncryptionMetadata) -> Self {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeVersionedFileEntryDetailedInfo {
+    pub content_text: Option<String>,
+    pub encryption_metadata: Option<MoleculeEncryptionMetadataRecord>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeVersionedFileEntryExtraData<'a> {
+    #[serde(flatten)]
+    pub basic_info: Cow<'a, MoleculeVersionedFileEntryBasicInfo>,
+
+    #[serde(flatten)]
+    pub detailed_info: Cow<'a, MoleculeVersionedFileEntryDetailedInfo>,
+}
+
+impl Default for MoleculeVersionedFileEntryExtraData<'_> {
+    fn default() -> Self {
         Self {
-            version: 0,
-            data_to_encrypt_hash: metadata.data_to_encrypt_hash,
-            access_control_conditions: metadata.access_control_conditions,
-            encrypted_by: metadata.encrypted_by,
-            encrypted_at: metadata.encrypted_at,
-            chain: metadata.chain,
-            lit_sdk_version: metadata.lit_sdk_version,
-            lit_network: metadata.lit_network,
-            template_name: metadata.template_name,
-            contract_version: metadata.contract_version,
-        }
-    }
-
-    pub fn as_entity(&self) -> MoleculeEncryptionMetadata {
-        MoleculeEncryptionMetadata {
-            data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
-            access_control_conditions: self.access_control_conditions.clone(),
-            encrypted_by: self.encrypted_by.clone(),
-            encrypted_at: self.encrypted_at.clone(),
-            chain: self.chain.clone(),
-            lit_sdk_version: self.lit_sdk_version.clone(),
-            lit_network: self.lit_network.clone(),
-            template_name: self.template_name.clone(),
-            contract_version: self.contract_version.clone(),
+            basic_info: Cow::Owned(MoleculeVersionedFileEntryBasicInfo::default()),
+            detailed_info: Cow::Owned(MoleculeVersionedFileEntryDetailedInfo::default()),
         }
     }
 }
 
-mod encryption_metadata_record_serde {
-    use super::MoleculeEncryptionMetadataRecord;
-
-    // Helper structure has regular de/serialization
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Helper {
-        version: u32,
-        data_to_encrypt_hash: String,
-        access_control_conditions: String,
-        encrypted_by: String,
-        encrypted_at: String,
-        chain: String,
-        lit_sdk_version: String,
-        lit_network: String,
-        template_name: String,
-        contract_version: String,
+impl MoleculeVersionedFileEntryExtraData<'static> {
+    pub fn from_fields(extra_data: kamu_datasets::ExtraDataFields) -> Self {
+        serde_json::from_value(serde_json::Value::Object(extra_data.into_inner()))
+            .unwrap_or_default()
     }
+}
 
-    impl serde::Serialize for MoleculeEncryptionMetadataRecord {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let helper = Helper {
-                version: self.version,
-                data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
-                access_control_conditions: self.access_control_conditions.clone(),
-                encrypted_by: self.encrypted_by.clone(),
-                encrypted_at: self.encrypted_at.clone(),
-                chain: self.chain.clone(),
-                lit_sdk_version: self.lit_sdk_version.clone(),
-                lit_network: self.lit_network.clone(),
-                template_name: self.template_name.clone(),
-                contract_version: self.contract_version.clone(),
-            };
-
-            let json_value_as_json_string =
-                serde_json::to_string(&helper).map_err(serde::ser::Error::custom)?;
-            serializer.serialize_str(&json_value_as_json_string)
-        }
-    }
-
-    impl<'de> serde::Deserialize<'de> for MoleculeEncryptionMetadataRecord {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let json_value_as_json_string = String::deserialize(deserializer)?;
-
-            let helper: Helper = serde_json::from_str(&json_value_as_json_string)
-                .map_err(serde::de::Error::custom)?;
-
-            Ok(Self {
-                version: helper.version,
-                data_to_encrypt_hash: helper.data_to_encrypt_hash,
-                access_control_conditions: helper.access_control_conditions,
-                encrypted_by: helper.encrypted_by,
-                encrypted_at: helper.encrypted_at,
-                chain: helper.chain,
-                lit_sdk_version: helper.lit_sdk_version,
-                lit_network: helper.lit_network,
-                template_name: helper.template_name,
-                contract_version: helper.contract_version,
-            })
-        }
+impl MoleculeVersionedFileEntryExtraData<'_> {
+    pub fn to_fields(&self) -> kamu_datasets::ExtraDataFields {
+        let serde_json::Value::Object(json) = serde_json::to_value(self).unwrap() else {
+            unreachable!()
+        };
+        kamu_datasets::ExtraDataFields::new(json)
     }
 }
 

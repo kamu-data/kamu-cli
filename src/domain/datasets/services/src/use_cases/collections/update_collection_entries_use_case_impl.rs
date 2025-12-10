@@ -59,7 +59,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
         // TODO: PERF: Filter paths relevant to operations
         let query_res = self
             .query_svc
-            .get_data((*collection_dataset).clone(), GetDataOptions::default())
+            .get_data((**collection_dataset).clone(), GetDataOptions::default())
             .await
             .int_err()?;
 
@@ -238,7 +238,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
             match self
                 .push_ingest_data_use_case
                 .execute_multi(
-                    collection_dataset.clone(),
+                    (*collection_dataset).clone(),
                     data_sources,
                     kamu_core::PushIngestDataUseCaseOptions {
                         source_name: None,
