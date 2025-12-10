@@ -3806,8 +3806,8 @@ type MoleculeV2 {
 }
 
 type MoleculeVersionedFile {
-	latest: MoleculeVersionedFileEntry!
-	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry!
+	latest: MoleculeVersionedFileEntry
+	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry
 }
 
 type MoleculeVersionedFileEntry {

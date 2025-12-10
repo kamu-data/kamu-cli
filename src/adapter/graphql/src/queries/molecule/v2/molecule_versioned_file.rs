@@ -43,7 +43,10 @@ impl<'a> MoleculeVersionedFile<'a> {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeVersionedFile<'_> {
-    pub async fn latest(&self, ctx: &Context<'_>) -> Result<MoleculeVersionedFileEntry<'_>> {
+    pub async fn latest(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<MoleculeVersionedFileEntry<'_>>> {
         // TODO: detect that data room entry is also the latest one, and if so,
         // rely on denormalized info
 
@@ -51,19 +54,18 @@ impl MoleculeVersionedFile<'_> {
         let maybe_versioned_file_entry =
             try_read_versioned_file_entry(ctx, &self.data_room_entry.reference, None, None).await?;
 
-        let Some(versioned_file_entry) = maybe_versioned_file_entry else {
+        if let Some(versioned_file_entry) = maybe_versioned_file_entry {
+            Ok(Some(MoleculeVersionedFileEntry::new_prefetched(
+                &self.data_room_entry.reference,
+                versioned_file_entry,
+            )))
+        } else {
             tracing::warn!(
                 versioned_file_dataset_id = %self.data_room_entry.reference,
                 "Versioned file has no versions yet",
             );
-
-            return Err(GqlError::gql("Versioned file has no versions yet"));
-        };
-
-        Ok(MoleculeVersionedFileEntry::new_prefetched(
-            &self.data_room_entry.reference,
-            versioned_file_entry,
-        ))
+            Ok(None)
+        }
     }
 
     // TODO: consult before publishing this API versientry
@@ -78,7 +80,7 @@ impl MoleculeVersionedFile<'_> {
         &self,
         ctx: &Context<'_>,
         block_hash: Multihash<'static>,
-    ) -> Result<MoleculeVersionedFileEntry<'_>> {
+    ) -> Result<Option<MoleculeVersionedFileEntry<'_>>> {
         let block_hash: odf::Multihash = block_hash.into();
 
         let maybe_versioned_file_entry = try_read_versioned_file_entry(
@@ -89,22 +91,19 @@ impl MoleculeVersionedFile<'_> {
         )
         .await?;
 
-        let Some(versioned_file_entry) = maybe_versioned_file_entry else {
+        if let Some(versioned_file_entry) = maybe_versioned_file_entry {
+            Ok(Some(MoleculeVersionedFileEntry::new_prefetched(
+                &self.data_room_entry.reference,
+                versioned_file_entry,
+            )))
+        } else {
             tracing::warn!(
                 versioned_file_dataset_id = %self.data_room_entry.reference,
                 block_hash = %block_hash,
                 "No matching versioned file entry found for block hash",
             );
-
-            return Err(GqlError::gql(format!(
-                "No matching versioned file entry found for block hash '{block_hash}'",
-            )));
-        };
-
-        Ok(MoleculeVersionedFileEntry::new_prefetched(
-            &self.data_room_entry.reference,
-            versioned_file_entry,
-        ))
+            Ok(None)
+        }
     }
 }
 
