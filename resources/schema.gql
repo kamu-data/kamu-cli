@@ -3806,7 +3806,17 @@ type MoleculeV2 {
 }
 
 type MoleculeVersionedFile {
+	"""
+	Returns the latest versioned file entry, regardless of data room version
+	"""
 	latest: MoleculeVersionedFileEntry
+	"""
+	Returns the versioned file entry that matches the data room entry
+	"""
+	matching: MoleculeVersionedFileEntry!
+	"""
+	Returns particular versioned file entry, regardless of data room version
+	"""
 	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry
 }
 

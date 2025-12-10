@@ -202,7 +202,11 @@ impl MoleculeDataRoomMutV2 {
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
-            entry: MoleculeDataRoomEntry::new_from_data_room_entry(&self.project, data_room_entry),
+            entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                &self.project,
+                data_room_entry,
+                true,
+            ),
         }
         .into())
     }
@@ -327,6 +331,7 @@ impl MoleculeDataRoomMutV2 {
             entry: MoleculeDataRoomEntry::new_from_data_room_entry(
                 &self.project,
                 updated_data_room_entry,
+                true,
             ),
         }
         .into())
@@ -871,6 +876,7 @@ impl MoleculeDataRoomMutV2 {
             entry: MoleculeDataRoomEntry::new_from_data_room_entry(
                 &self.project,
                 updated_data_room_entry,
+                true,
             ),
         }
         .into())

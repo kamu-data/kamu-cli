@@ -30,52 +30,63 @@ use crate::queries::molecule::v2::{
 
 pub struct MoleculeVersionedFile<'a> {
     data_room_entry: &'a kamu_molecule_domain::MoleculeDataRoomEntry,
+    is_latest_data_room_entry: bool,
 }
 
 impl<'a> MoleculeVersionedFile<'a> {
     pub fn new(
         data_room_entry: &'a kamu_molecule_domain::MoleculeDataRoomEntry,
+        is_latest_data_room_entry: bool,
     ) -> MoleculeVersionedFile<'a> {
-        MoleculeVersionedFile { data_room_entry }
+        MoleculeVersionedFile {
+            data_room_entry,
+            is_latest_data_room_entry,
+        }
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeVersionedFile<'_> {
+    /// Returns the latest versioned file entry, regardless of data room version
     pub async fn latest(
         &self,
         ctx: &Context<'_>,
     ) -> Result<Option<MoleculeVersionedFileEntry<'_>>> {
-        // TODO: detect that data room entry is also the latest one, and if so,
-        // rely on denormalized info
-
-        // Read the latest versioned file entry
-        let maybe_versioned_file_entry =
-            try_read_versioned_file_entry(ctx, &self.data_room_entry.reference, None, None).await?;
-
-        if let Some(versioned_file_entry) = maybe_versioned_file_entry {
-            Ok(Some(MoleculeVersionedFileEntry::new_prefetched(
-                &self.data_room_entry.reference,
-                versioned_file_entry,
-            )))
+        // When requesting latest file version on the latest data room,
+        //  it makes sense to rely on already loaded denormalized info
+        if self.is_latest_data_room_entry {
+            Ok(Some(
+                MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry),
+            ))
         } else {
-            tracing::warn!(
-                versioned_file_dataset_id = %self.data_room_entry.reference,
-                "Versioned file has no versions yet",
-            );
-            Ok(None)
+            // If as_of is specified on the data room entry, we don't know if that is the
+            // latest one, so we need to read the latest versioned file entry explicitly
+            let maybe_versioned_file_entry =
+                try_read_versioned_file_entry(ctx, &self.data_room_entry.reference, None, None)
+                    .await?;
+
+            if let Some(versioned_file_entry) = maybe_versioned_file_entry {
+                Ok(Some(MoleculeVersionedFileEntry::new_prefetched(
+                    &self.data_room_entry.reference,
+                    versioned_file_entry,
+                )))
+            } else {
+                tracing::warn!(
+                    versioned_file_dataset_id = %self.data_room_entry.reference,
+                    "Versioned file has no versions yet",
+                );
+                Ok(None)
+            }
         }
     }
 
-    // TODO: consult before publishing this API endpoint
-    #[graphql(skip)]
-    #[expect(unused)]
-    #[expect(clippy::unused_async)]
+    /// Returns the versioned file entry that matches the data room entry
     pub async fn matching(&self) -> MoleculeVersionedFileEntry<'_> {
         MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry)
     }
 
+    /// Returns particular versioned file entry, regardless of data room version
     pub async fn as_of(
         &self,
         ctx: &Context<'_>,

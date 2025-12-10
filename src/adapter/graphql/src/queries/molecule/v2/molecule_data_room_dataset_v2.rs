@@ -118,7 +118,13 @@ impl MoleculeDataRoomProjection<'_> {
         let api_entry_nodes = molecule_entries_listing
             .list
             .into_iter()
-            .map(|e| MoleculeDataRoomEntry::new_from_data_room_entry(self.project, e))
+            .map(|e| {
+                MoleculeDataRoomEntry::new_from_data_room_entry(
+                    self.project,
+                    e,
+                    self.as_of.is_none(),
+                )
+            })
             .collect::<Vec<_>>();
 
         Ok(MoleculeDataRoomEntryConnection::new(
@@ -144,8 +150,9 @@ impl MoleculeDataRoomProjection<'_> {
                 MoleculeFindDataRoomEntryError::Internal(e) => e.int_err().into(),
             })?;
 
-        let maybe_api_entry =
-            maybe_entry.map(|e| MoleculeDataRoomEntry::new_from_data_room_entry(self.project, e));
+        let maybe_api_entry = maybe_entry.map(|e| {
+            MoleculeDataRoomEntry::new_from_data_room_entry(self.project, e, self.as_of.is_none())
+        });
 
         Ok(maybe_api_entry)
     }
@@ -166,7 +173,8 @@ pub struct MoleculeDataRoomEntriesFilters {
 
 pub struct MoleculeDataRoomEntry {
     pub entity: kamu_molecule_domain::MoleculeDataRoomEntry,
-    pub project: Arc<MoleculeProjectV2>,
+    project: Arc<MoleculeProjectV2>,
+    is_latest_data_room_entry: bool,
 }
 
 impl MoleculeDataRoomEntry {
@@ -189,7 +197,7 @@ impl MoleculeDataRoomEntry {
             kamu_molecule_domain::MoleculeDataRoomEntry::from_collection_entry(collection_entity);
 
         let data_room_entry =
-            MoleculeDataRoomEntry::new_from_data_room_entry(project, data_room_entity);
+            MoleculeDataRoomEntry::new_from_data_room_entry(project, data_room_entity, false);
 
         Ok((op, data_room_entry))
     }
@@ -197,10 +205,12 @@ impl MoleculeDataRoomEntry {
     pub fn new_from_data_room_entry(
         project: &Arc<MoleculeProjectV2>,
         data_room_entry: kamu_molecule_domain::MoleculeDataRoomEntry,
+        is_latest_data_room_entry: bool,
     ) -> Self {
         Self {
             entity: data_room_entry,
             project: project.clone(),
+            is_latest_data_room_entry,
         }
     }
 
@@ -232,6 +242,7 @@ impl MoleculeDataRoomEntry {
         Self {
             entity,
             project: project.clone(),
+            is_latest_data_room_entry: false,
         }
     }
 
@@ -276,9 +287,14 @@ impl MoleculeDataRoomEntry {
 
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<MoleculeVersionedFile<'_>> {
-        Ok(MoleculeVersionedFile::new(&self.entity))
+        Ok(MoleculeVersionedFile::new(
+            &self.entity,
+            self.is_latest_data_room_entry,
+        ))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(
     MoleculeDataRoomEntry,
