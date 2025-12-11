@@ -136,6 +136,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
     }
     "#
 );
+// TODO: find a way to output tags/categories
 const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
@@ -3144,6 +3145,8 @@ async fn test_molecule_v2_activity() {
         .await;
 
     const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
+    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
     assert_eq!(
         {
@@ -3218,7 +3221,7 @@ async fn test_molecule_v2_activity() {
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "changeBy": USER_1,
                 "accessLevel": "public",
                 "description": "Plain text file (foo)",
                 "categories": ["test-category"],
@@ -3273,7 +3276,7 @@ async fn test_molecule_v2_activity() {
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "changeBy": USER_2,
                 "accessLevel": "public",
                 "description": "Plain text file (bar)",
                 "categories": [],
@@ -3353,7 +3356,7 @@ async fn test_molecule_v2_activity() {
                 "ipnftUid": PROJECT_1_UID,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "changeBy": USER_1,
                 "accessLevel": "public",
             })),
         )
@@ -3382,7 +3385,7 @@ async fn test_molecule_v2_activity() {
                 "ipnftUid": PROJECT_1_UID,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "changeBy": USER_2,
                 "accessLevel": "public",
             })),
         )
@@ -3446,7 +3449,7 @@ async fn test_molecule_v2_activity() {
                 "body": "Blah blah 1",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
                 "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeChangeBy": USER_1,
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
             })),
@@ -3489,7 +3492,7 @@ async fn test_molecule_v2_activity() {
                 "ipnftUid": PROJECT_1_UID,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo [2]"),
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "changeBy": USER_1,
                 "accessLevel": "public",
             })),
         )
@@ -3544,140 +3547,123 @@ async fn test_molecule_v2_activity() {
 
     // TODO: check activity
 
-    /*
-
     // Check project activity events
-    const LIST_EVENTS: &str = indoc!(
-        r#"
-        query ($ipnftUid: String!) {
-            molecule {
-                project(ipnftUid: $ipnftUid) {
-                    activity {
-                        nodes {
-                            __typename
-                            ... on MoleculeProjectEventDataRoomEntryAdded {
-                                entry {
-                                    path
-                                }
-                            }
-                            ... on MoleculeProjectEventDataRoomEntryRemoved {
-                                entry {
-                                    path
-                                }
-                            }
-                            ... on MoleculeProjectEventDataRoomEntryUpdated {
-                                newEntry {
-                                    path
-                                }
-                            }
-                            ... on MoleculeProjectEventAnnouncement {
-                                announcement
-                            }
-                            ... on MoleculeProjectEventFileUpdated {
-                                dataset { alias }
-                                newEntry {
-                                    version
-                                }
-                            }
-                        }
+
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
                     }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_1_id,
+                        "headline": "Test announcement 1",
+                        "body": "Blah blah 1",
+                        "attachments": [
+                            project_1_file_1_dataset_id,
+                            project_1_file_2_dataset_id,
+                        ],
+                        "accessLevel": "holders",
+                        "changeBy": USER_1,
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1", "test-tag2"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
                 }
             }
-        }
-        "#
+        })
     );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(LIST_EVENTS).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            })),
-        ))
-        .await;
 
-    assert!(res.is_ok(), "{res:#?}");
-    let mut json = res.data.into_json().unwrap();
-    let nodes = &mut json["molecule"]["project"]["activity"]["nodes"];
-
-    let any = serde_json::Value::Null;
-    nodes[1]["announcement"]["announcement_id"] = any.clone();
-    nodes[1]["announcement"]["system_time"] = any.clone();
-    nodes[1]["announcement"]["event_time"] = any.clone();
-
-    assert_eq!(
-        *nodes,
-        json!([
-            {
-                "__typename": "MoleculeProjectEventFileUpdated",
-                "dataset": {
-                    "alias": "molecule.vitafast/test-file-1",
-                },
-                "newEntry": {
-                    "version": 2,
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventAnnouncement",
-                "announcement": {
-                    "announcement_id": &any,
-                    "attachments": [&test_file_1, &test_file_2],
-                    "body": "Blah blah",
-                    "event_time": &any,
-                    "headline": "Test announcement 1",
-                    "molecule_access_level": "holders",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "system_time": &any,
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventDataRoomEntryUpdated",
-                "newEntry": {
-                    "path": "/foo",
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
-                "entry": {
-                    "path": "/baz",
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventDataRoomEntryRemoved",
-                "entry": {
-                    "path": "/bar",
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
-                "entry": {
-                    "path": "/bar",
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
-                "entry": {
-                    "path": "/foo",
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventFileUpdated",
-                "dataset": {
-                    "alias": "molecule.vitafast/test-file-2",
-                },
-                "newEntry": {
-                    "version": 1,
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventFileUpdated",
-                "dataset": {
-                    "alias": "molecule.vitafast/test-file-1",
-                },
-                "newEntry": {
-                    "version": 1,
-                },
-            },
-        ])
-    );
+    /*
 
     ///////////////////////////////////////////////////////////////////////////////
 
