@@ -2633,12 +2633,12 @@ async fn test_molecule_v2_announcements_operations() {
     // Announcements are empty
     const LIST_ANNOUNCEMENTS: &str = indoc!(
         r#"
-        query ($ipnftUid: String!) {
+        query ($ipnftUid: String!, $filters: MoleculeAnnouncementsFilters) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
                 announcements {
-                  tail {
+                  tail(filters: $filters) {
                     totalCount
                     nodes {
                       id
@@ -2664,6 +2664,7 @@ async fn test_molecule_v2_announcements_operations() {
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
                 "ipnftUid": PROJECT_1_UID,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2807,7 +2808,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
-                "moleculeAccessLevel": "holders",
+                "moleculeAccessLevel": "public",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
@@ -2970,11 +2971,49 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Announcements are listed as expected
+    let all_announcements_tail_nodes = value!([
+        {
+            "id": project_1_announcement_3_id,
+            "headline": "Test announcement 3",
+            "body": "Blah blah 3",
+            "attachments": [
+                project_1_file_1_dataset_id,
+                project_1_file_2_dataset_id,
+            ],
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+            "categories": [],
+            "tags": ["test-tag1"],
+        },
+        {
+            "id": project_1_announcement_2_id,
+            "headline": "Test announcement 2",
+            "body": "Blah blah 2",
+            "attachments": [
+                project_1_file_1_dataset_id,
+            ],
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+            "categories": ["test-category-1"],
+            "tags": ["test-tag1", "test-tag2"],
+        },
+        {
+            "id": project_1_announcement_1_id,
+            "headline": "Test announcement 1",
+            "body": "Blah blah 1",
+            "attachments": [],
+            "accessLevel": "public",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "categories": ["test-category-1", "test-category-2"],
+            "tags": ["test-tag1", "test-tag2", "test-tag3"],
+        },
+    ]);
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
                 "ipnftUid": PROJECT_1_UID,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2987,44 +3026,8 @@ async fn test_molecule_v2_announcements_operations() {
                         "announcements": {
                             "tail": {
                                 "totalCount": 3,
-                                "nodes": [
-                                    {
-                                        "id": project_1_announcement_3_id,
-                                        "headline": "Test announcement 3",
-                                        "body": "Blah blah 3",
-                                        "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
-                                        ],
-                                        "accessLevel": "holders",
-                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
-                                        "categories": [],
-                                        "tags": ["test-tag1"],
-                                    },
-                                    {
-                                        "id": project_1_announcement_2_id,
-                                        "headline": "Test announcement 2",
-                                        "body": "Blah blah 2",
-                                        "attachments": [
-                                            project_1_file_1_dataset_id,
-                                        ],
-                                        "accessLevel": "holders",
-                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                                        "categories": ["test-category-1"],
-                                        "tags": ["test-tag1", "test-tag2"],
-                                    },
-                                    {
-                                        "id": project_1_announcement_1_id,
-                                        "headline": "Test announcement 1",
-                                        "body": "Blah blah 1",
-                                        "attachments": [],
-                                        "accessLevel": "holders",
-                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                                        "categories": ["test-category-1", "test-category-2"],
-                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
-                                    },
-                                ]
-                            }
+                                "nodes": all_announcements_tail_nodes
+                            },
                         }
                     }
                 }
@@ -3073,7 +3076,7 @@ async fn test_molecule_v2_announcements_operations() {
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
                         "attachments": [],
-                        "accessLevel": "holders",
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                         "categories": ["test-category-1", "test-category-2"],
                         "tags": ["test-tag1", "test-tag2", "test-tag3"],
@@ -3129,6 +3132,723 @@ async fn test_molecule_v2_announcements_operations() {
             "molecule": {
                 "v2": {
                     "project": expected_activity_node
+                }
+            }
+        })
+    );
+
+    /////////////
+    // Filters //
+    /////////////
+
+    // Filters without values
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 3,
+                                "nodes": all_announcements_tail_nodes
+                            },
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by tags: [test-tag2]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": ["test-tag2"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 2,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by tags: [test-tag3]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": ["test-tag3"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 1,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    // {
+                                    //     "id": project_1_announcement_2_id,
+                                    //     "headline": "Test announcement 2",
+                                    //     "body": "Blah blah 2",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                    //     "categories": ["test-category-1"],
+                                    //     "tags": ["test-tag1", "test-tag2"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by tags: [test-tag2, test-tag1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": ["test-tag2", "test-tag1"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 2,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by categories: [test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-1"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 2,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by categories: [test-category-2]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-2"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 1,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    // {
+                                    //     "id": project_1_announcement_2_id,
+                                    //     "headline": "Test announcement 2",
+                                    //     "body": "Blah blah 2",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                    //     "categories": ["test-category-1"],
+                                    //     "tags": ["test-tag1", "test-tag2"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by categories: [test-category-2, test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-2", "test-category-1"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 1,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    // {
+                                    //     "id": project_1_announcement_2_id,
+                                    //     "headline": "Test announcement 2",
+                                    //     "body": "Blah blah 2",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                    //     "categories": ["test-category-1"],
+                                    //     "tags": ["test-tag1", "test-tag2"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by access levels: [public]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 1,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    // {
+                                    //     "id": project_1_announcement_2_id,
+                                    //     "headline": "Test announcement 2",
+                                    //     "body": "Blah blah 2",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                    //     "categories": ["test-category-1"],
+                                    //     "tags": ["test-tag1", "test-tag2"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by access levels: [holders]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["holders"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 2,
+                                "nodes": [
+                                    {
+                                        "id": project_1_announcement_3_id,
+                                        "headline": "Test announcement 3",
+                                        "body": "Blah blah 3",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                            project_1_file_2_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                        "categories": [],
+                                        "tags": ["test-tag1"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    // {
+                                    //     "id": project_1_announcement_1_id,
+                                    //     "headline": "Test announcement 1",
+                                    //     "body": "Blah blah 1",
+                                    //     "attachments": [],
+                                    //     "accessLevel": "public",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                    //     "categories": ["test-category-1", "test-category-2"],
+                                    //     "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    // },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters by access levels: [public, holders]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["holders", "public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 3,
+                                "nodes": [
+                                    {
+                                        "id": project_1_announcement_3_id,
+                                        "headline": "Test announcement 3",
+                                        "body": "Blah blah 3",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                            project_1_file_2_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                        "categories": [],
+                                        "tags": ["test-tag1"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_2_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [
+                                            project_1_file_1_dataset_id,
+                                        ],
+                                        "accessLevel": "holders",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
+                                    },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters combination: [test-tag1, test-tag2] AND [test-category-1] AND
+    // [public]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ANNOUNCEMENTS,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byTags": ["test-tag1", "test-tag2"],
+                    "byCategories": ["test-category-2"],
+                    "byAccessLevels": ["public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "announcements": {
+                            "tail": {
+                                "totalCount": 1,
+                                "nodes": [
+                                    // {
+                                    //     "id": project_1_announcement_3_id,
+                                    //     "headline": "Test announcement 3",
+                                    //     "body": "Blah blah 3",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //         project_1_file_2_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                    //     "categories": [],
+                                    //     "tags": ["test-tag1"],
+                                    // },
+                                    // {
+                                    //     "id": project_1_announcement_2_id,
+                                    //     "headline": "Test announcement 2",
+                                    //     "body": "Blah blah 2",
+                                    //     "attachments": [
+                                    //         project_1_file_1_dataset_id,
+                                    //     ],
+                                    //     "accessLevel": "holders",
+                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                    //     "categories": ["test-category-1"],
+                                    //     "tags": ["test-tag1", "test-tag2"],
+                                    // },
+                                    {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [],
+                                        "accessLevel": "public",
+                                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                        "categories": ["test-category-1", "test-category-2"],
+                                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                                    },
+                                ]
+                            }
+                        }
+                    }
                 }
             }
         })
@@ -4545,6 +5265,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by tags: [tag2]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -4646,6 +5367,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by tags: [tag2, tag1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -4747,6 +5469,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -4848,6 +5571,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-2]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -4949,6 +5673,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-2, test-category-1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5050,6 +5775,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [public]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5151,6 +5877,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [holders]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5252,6 +5979,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [public, holders]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5280,6 +6008,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters combination: [test-tag1] AND [test-category-1] AND [holders]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5547,6 +6276,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by tags: [tag2]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5658,6 +6388,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by tags: [tag2, tag1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5769,6 +6500,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5880,6 +6612,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-2]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -5991,6 +6724,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by categories: [test-category-2, test-category-1]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -6102,6 +6836,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [public]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -6213,6 +6948,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [holders]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -6324,6 +7060,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters by access levels: [public, holders]
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -6349,6 +7086,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
     // Filters combination: [test-tag2] AND [test-category-1] AND [holders]
     assert_eq!(
         GraphQLQueryRequest::new(
