@@ -12,7 +12,6 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::*;
 
 use crate::MoleculeProjectsDatasetService;
@@ -36,17 +35,17 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
-        // Access projects dataset snapshot
-        let Some(df) = self
+        let maybe_changelog_df = self
             .molecule_projects_dataset_service
-            .get_projects_changelog_projection_data_frame(
-                molecule_subject,
-                DatasetAction::Read,
-                false,
-            )
-            .await?
-            .1
-        else {
+            .request_read_of_projects_dataset(&molecule_subject.account_name)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?
+            .try_get_changelog_projection_data_frame("account_id")
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?;
+
+        // Access projects dataset snapshot
+        let Some(df) = maybe_changelog_df else {
             return Ok(MoleculeProjectListing::default());
         };
 

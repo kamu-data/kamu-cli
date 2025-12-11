@@ -18,8 +18,6 @@ use kamu_accounts::{
     LoggedAccount,
 };
 use kamu_auth_rebac::RebacService;
-use kamu_core::PushIngestDataUseCase;
-use kamu_core::auth::DatasetAction;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -36,7 +34,6 @@ pub struct MoleculeCreateProjectUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     rebac_service: Arc<dyn RebacService>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -62,10 +59,17 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ipnft_token_id: num_bigint::BigInt,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Resolve projects ledger with Write privileges
-        let (projects_dataset, df_opt) = self
+        let projects_write_accessor = self
             .molecule_projects_dataset_service
-            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, true)
-            .await?;
+            .request_write_of_projects_dataset(&molecule_subject.account_name, true)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;
+
+        let maybe_raw_ledge_df = projects_write_accessor
+            .as_read_accessor()
+            .try_get_raw_ledger_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;
 
         use datafusion::prelude::*;
 
@@ -74,7 +78,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let lowercase_ipnft_symbol = ipnft_symbol;
 
         // Check for conflicts
-        if let Some(df) = df_opt {
+        if let Some(df) = maybe_raw_ledge_df {
             let df = df
                 .filter(
                     col("ipnft_uid")
@@ -199,19 +203,8 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let changelog_record =
             project.as_changelog_record(u8::from(odf::metadata::OperationType::Append));
 
-        self.push_ingest_use_case
-            .execute(
-                projects_dataset,
-                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        projects_write_accessor
+            .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;
 

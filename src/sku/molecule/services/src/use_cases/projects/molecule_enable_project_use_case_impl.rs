@@ -11,8 +11,6 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::PushIngestDataUseCase;
-use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::metadata::OperationType;
@@ -25,7 +23,6 @@ use crate::MoleculeProjectsDatasetService;
 #[dill::interface(dyn MoleculeEnableProjectUseCase)]
 pub struct MoleculeEnableProjectUseCaseImpl {
     molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
-    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -47,12 +44,19 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
-        let (projects_dataset, df_opt) = self
+        let projects_write_accessor = self
             .molecule_projects_dataset_service
-            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
-            .await?;
+            .request_write_of_projects_dataset(&molecule_subject.account_name, false)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
 
-        let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = df_opt else {
+        let maybe_raw_ledger_df = projects_write_accessor
+            .as_read_accessor()
+            .try_get_raw_ledger_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
+
+        let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = maybe_raw_ledger_df else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),
@@ -104,19 +108,8 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
 
         let changelog_record = project.as_changelog_record(u8::from(OperationType::Append));
 
-        self.push_ingest_use_case
-            .execute(
-                projects_dataset,
-                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        projects_write_accessor
+            .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;
 

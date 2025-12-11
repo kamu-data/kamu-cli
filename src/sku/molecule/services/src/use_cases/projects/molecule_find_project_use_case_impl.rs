@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_accounts::LoggedAccount;
-use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::*;
 
 use crate::MoleculeProjectsDatasetService;
@@ -34,12 +33,18 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
-        let (_, project) = self
+        let maybe_project_json = self
             .molecule_projects_dataset_service
-            .get_project_changelog_entry(molecule_subject, DatasetAction::Read, false, &ipnft_uid)
-            .await?;
+            .request_read_of_projects_dataset(&molecule_subject.account_name)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?
+            .try_get_changelog_projection_entry("account_id", "ipnft_uid", &ipnft_uid)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;
 
-        Ok(project)
+        Ok(maybe_project_json
+            .map(MoleculeProject::from_json)
+            .transpose()?)
     }
 }
 

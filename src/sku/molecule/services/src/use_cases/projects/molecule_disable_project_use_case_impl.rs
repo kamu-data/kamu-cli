@@ -11,8 +11,6 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::PushIngestDataUseCase;
-use kamu_core::auth::DatasetAction;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -24,7 +22,6 @@ use crate::MoleculeProjectsDatasetService;
 #[dill::interface(dyn MoleculeDisableProjectUseCase)]
 pub struct MoleculeDisableProjectUseCaseImpl {
     molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
-    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -46,12 +43,21 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
         let now = chrono::Utc::now();
 
-        let (projects_dataset, project_opt) = self
+        let projects_write_accessor = self
             .molecule_projects_dataset_service
-            .get_project_changelog_entry(molecule_subject, DatasetAction::Write, false, &ipnft_uid)
-            .await?;
+            .request_write_of_projects_dataset(&molecule_subject.account_name, false)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?;
 
-        let Some(mut project) = project_opt else {
+        let maybe_project = projects_write_accessor
+            .as_read_accessor()
+            .try_get_changelog_projection_entry("account_id", "ipnft_uid", &ipnft_uid)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?
+            .map(MoleculeProject::from_json)
+            .transpose()?;
+
+        let Some(mut project) = maybe_project else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),
@@ -64,19 +70,8 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         let changelog_record =
             project.as_changelog_record(u8::from(odf::metadata::OperationType::Retract));
 
-        self.push_ingest_use_case
-            .execute(
-                projects_dataset,
-                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        projects_write_accessor
+            .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;
 

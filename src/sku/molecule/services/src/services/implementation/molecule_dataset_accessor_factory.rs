@@ -100,7 +100,6 @@ impl MoleculeDatasetWriteAccessor {
         &self.dataset
     }
 
-    #[expect(dead_code)]
     pub(crate) fn as_read_accessor(&self) -> MoleculeDatasetReadAccessor {
         MoleculeDatasetReadAccessor {
             query_service: Arc::clone(&self.query_service),
@@ -146,7 +145,9 @@ impl MoleculeDatasetReadAccessor {
         &self.dataset
     }
 
-    pub(crate) async fn try_get_data_frame(&self) -> Result<Option<DataFrameExt>, QueryError> {
+    pub(crate) async fn try_get_raw_ledger_data_frame(
+        &self,
+    ) -> Result<Option<DataFrameExt>, QueryError> {
         match self
             .query_service
             .get_data((*self.dataset).clone(), GetDataOptions::default())
@@ -156,6 +157,53 @@ impl MoleculeDatasetReadAccessor {
             Err(QueryError::Access(e)) => Err(e.into()),
             Err(e) => Err(e.int_err().into()),
         }
+    }
+
+    pub(crate) async fn try_get_changelog_projection_data_frame(
+        &self,
+        primary_key: &str,
+    ) -> Result<Option<DataFrameExt>, QueryError> {
+        let maybe_df = self.try_get_raw_ledger_data_frame().await?;
+
+        let df = if let Some(df) = maybe_df {
+            Some(
+                odf::utils::data::changelog::project(
+                    df,
+                    &[primary_key.to_string()],
+                    &odf::metadata::DatasetVocabulary::default(),
+                )
+                .int_err()?,
+            )
+        } else {
+            None
+        };
+
+        Ok(df)
+    }
+
+    pub(crate) async fn try_get_changelog_projection_entry(
+        &self,
+        primary_key: &str,
+        filter_key: &str,
+        filter_value: &str,
+    ) -> Result<Option<serde_json::Value>, QueryError> {
+        use datafusion::prelude::*;
+
+        let df_opt = self
+            .try_get_changelog_projection_data_frame(primary_key)
+            .await?;
+
+        let Some(df) = df_opt else {
+            return Ok(None);
+        };
+
+        let df = df.filter(col(filter_key).eq(lit(filter_value))).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        assert!(records.len() <= 1);
+
+        let maybe_the_record = records.into_iter().next();
+        Ok(maybe_the_record)
     }
 }
 

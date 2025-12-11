@@ -11,7 +11,6 @@ mod molecule_activities_dataset_service_impl;
 mod molecule_announcements_dataset_service_impl;
 mod molecule_data_room_collection_service_impl;
 mod molecule_dataset_accessor_factory;
-mod molecule_datasets_helper;
 mod molecule_projects_dataset_service_impl;
 mod molecule_versioned_file_content_provider_impl;
 
