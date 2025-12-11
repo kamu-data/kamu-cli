@@ -4183,7 +4183,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Check global activity events
-    let expected_global_activity_nodes = value!([
+    let expected_all_global_activity_nodes = value!([
         {
             "__typename": "MoleculeActivityAnnouncementV2",
             "announcement": {
@@ -4284,7 +4284,61 @@ async fn test_molecule_v2_activity() {
             "molecule": {
                 "v2": {
                     "activity": {
-                        "nodes": expected_global_activity_nodes
+                        "nodes": expected_all_global_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    ////////////////////
+    // Global filters //
+    ////////////////////
+
+    // Filters without values
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_all_global_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byTags": [],
+                    "byCategories": [],
+                    "byAccessLevels": [],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_all_global_activity_nodes
                     }
                 }
             }
