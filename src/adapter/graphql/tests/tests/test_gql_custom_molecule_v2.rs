@@ -4118,7 +4118,7 @@ async fn test_molecule_v2_activity() {
                 "attachments": [],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": USER_2,
-                "categories": ["test-category-2"],
+                "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
             })),
         )
@@ -4176,7 +4176,7 @@ async fn test_molecule_v2_activity() {
                                         "attachments": [],
                                         "accessLevel": "holders",
                                         "changeBy": USER_2,
-                                        "categories": ["test-category-2"],
+                                        "categories": ["test-category-1", "test-category-2"],
                                         "tags": ["test-tag2"],
                                     }
                                 },
@@ -4199,7 +4199,7 @@ async fn test_molecule_v2_activity() {
                 "attachments": [],
                 "accessLevel": "holders",
                 "changeBy": USER_2,
-                "categories": ["test-category-2"],
+                "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
             }
         },
@@ -4380,7 +4380,7 @@ async fn test_molecule_v2_activity() {
                             //         "attachments": [],
                             //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
-                            //         "categories": ["test-category-2"],
+                            //         "categories": ["test-category-1", "test-category-2"],
                             //         "tags": ["test-tag2"],
                             //     }
                             // },
@@ -4491,7 +4491,7 @@ async fn test_molecule_v2_activity() {
                                     "attachments": [],
                                     "accessLevel": "holders",
                                     "changeBy": USER_2,
-                                    "categories": ["test-category-2"],
+                                    "categories": ["test-category-1", "test-category-2"],
                                     "tags": ["test-tag2"],
                                 }
                             },
@@ -4602,7 +4602,7 @@ async fn test_molecule_v2_activity() {
                             //         "attachments": [],
                             //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
-                            //         "categories": ["test-category-2"],
+                            //         "categories": ["test-category-1", "test-category-2"],
                             //         "tags": ["test-tag2"],
                             //     }
                             // },
@@ -4704,19 +4704,19 @@ async fn test_molecule_v2_activity() {
                 "v2": {
                     "activity": {
                         "nodes": [
-                            // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
-                            //     "announcement": {
-                            //         "id": project_2_announcement_1_id,
-                            //         "headline": "Test announcement 2",
-                            //         "body": "Blah blah 2",
-                            //         "attachments": [],
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //         "categories": ["test-category-2"],
-                            //         "tags": ["test-tag2"],
-                            //     }
-                            // },
+                            {
+                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "announcement": {
+                                    "id": project_2_announcement_1_id,
+                                    "headline": "Test announcement 2",
+                                    "body": "Blah blah 2",
+                                    "attachments": [],
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_2,
+                                    "categories": ["test-category-1", "test-category-2"],
+                                    "tags": ["test-tag2"],
+                                }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileRemovedV2",
                             //     "entry": {
@@ -4824,7 +4824,7 @@ async fn test_molecule_v2_activity() {
                                     "attachments": [],
                                     "accessLevel": "holders",
                                     "changeBy": USER_2,
-                                    "categories": ["test-category-2"],
+                                    "categories": ["test-category-1", "test-category-2"],
                                     "tags": ["test-tag2"],
                                 }
                             },
@@ -4892,6 +4892,117 @@ async fn test_molecule_v2_activity() {
                                     "changeBy": USER_2,
                                 }
                             },
+                            // {
+                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "entry": {
+                            //         "path": "/foo.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "changeBy": USER_1,
+                            //     }
+                            // },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+    // Filters by categories: [test-category-2, test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byTags": [],
+                    "byCategories": ["test-category-2", "test-category-1"],
+                    "byAccessLevels": [],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "announcement": {
+                                    "id": project_2_announcement_1_id,
+                                    "headline": "Test announcement 2",
+                                    "body": "Blah blah 2",
+                                    "attachments": [],
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_2,
+                                    "categories": ["test-category-1", "test-category-2"],
+                                    "tags": ["test-tag2"],
+                                }
+                            },
+                            // {
+                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "entry": {
+                            //         "path": "/bar.txt",
+                            //         "ref": project_1_file_2_dataset_id,
+                            //         "changeBy": USER_2,
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "entry": {
+                            //         "path": "/foo_renamed.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "changeBy": USER_1,
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "announcement": {
+                            //         "id": project_1_announcement_1_id,
+                            //         "headline": "Test announcement 1",
+                            //         "body": "Blah blah 1",
+                            //         "attachments": [
+                            //             project_1_file_1_dataset_id,
+                            //             project_1_file_2_dataset_id,
+                            //         ],
+                            //         "accessLevel": "holders",
+                            //         "changeBy": USER_1,
+                            //         "categories": ["test-category-1"],
+                            //         "tags": ["test-tag1", "test-tag2"],
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "entry": {
+                            //         "path": "/foo_renamed.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "changeBy": USER_1,
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "entry": {
+                            //         "path": "/bar.txt",
+                            //         "ref": project_1_file_2_dataset_id,
+                            //         "changeBy": USER_2,
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "entry": {
+                            //         "path": "/foo.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "changeBy": USER_1,
+                            //     }
+                            // },
+                            // {
+                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "entry": {
+                            //         "path": "/bar.txt",
+                            //         "ref": project_1_file_2_dataset_id,
+                            //         "changeBy": USER_2,
+                            //     }
+                            // },
                             // {
                             //     "__typename": "MoleculeActivityFileAddedV2",
                             //     "entry": {
