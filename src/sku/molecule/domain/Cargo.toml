@@ -33,6 +33,7 @@ internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false }
 

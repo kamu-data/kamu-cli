@@ -12,6 +12,7 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_core::auth;
 use kamu_molecule_domain::*;
 
@@ -79,15 +80,23 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (_, maybe_df) = self
+        let maybe_df = match self
             .molecule_announcements_dataset_service
-            .get_global_announcements_data_frame(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Read,
-                // TODO: try to create once as start-up job?
-                true,
-            )
-            .await?;
+            .request_read_of_global_announcements_dataset(&molecule_subject.account_name)
+            .await
+        {
+            Ok(maybe_df) => Ok(maybe_df),
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
+                // No announcements dataset yet is fine, just return empty listing
+                return Ok(MoleculeDataRoomActivityListing::default());
+            }
+            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
+                MoleculeViewDataRoomActivitiesError,
+            >(e)),
+        }?
+        .try_get_data_frame()
+        .await
+        .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
 
         let Some(df) = maybe_df else {
             return Ok(MoleculeDataRoomActivityListing::default());

@@ -10,17 +10,16 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu_core::auth;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeAnnouncementsDatasetService;
+use crate::MoleculeDatasetAccessorFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectAnnouncementUseCase)]
 pub struct MoleculeFindProjectAnnouncementUseCaseImpl {
-    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
+    accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,14 +39,14 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         id: uuid::Uuid,
     ) -> Result<Option<MoleculeProjectAnnouncementRecord>, MoleculeFindProjectAnnouncementError>
     {
-        let (_, maybe_df) = self
-            .molecule_announcements_dataset_service
-            .get_project_announcements_data_frame(
-                &molecule_project.announcements_dataset_id,
-                auth::DatasetAction::Read,
-            )
+        let maybe_df = self
+            .accessor_factory
+            .read_accessor(&molecule_project.announcements_dataset_id.as_local_ref())
             .await
-            .int_err()?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectAnnouncementError>)?
+            .try_get_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectAnnouncementError>)?;
 
         let Some(df) = maybe_df else {
             return Ok(None);

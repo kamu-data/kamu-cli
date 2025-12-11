@@ -12,6 +12,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
+    b.add::<MoleculeDatasetAccessorFactory>();
     b.add::<MoleculeProjectsDatasetServiceImpl>();
     b.add::<MoleculeActivitiesDatasetServiceImpl>();
     b.add::<MoleculeAnnouncementsDatasetServiceImpl>();

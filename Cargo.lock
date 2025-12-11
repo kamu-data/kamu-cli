@@ -8425,6 +8425,7 @@ dependencies = [
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
+ "kamu-auth-rebac",
  "kamu-core",
  "kamu-datasets",
  "messaging-outbox",

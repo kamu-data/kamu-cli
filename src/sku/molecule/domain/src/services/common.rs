@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
+use kamu_core::QueryError;
 use kamu_datasets::CollectionPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +53,43 @@ pub enum MoleculeGetDatasetError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait MoleculeDatasetErrorExt {
+    fn adapt<E>(self) -> E
+    where
+        E: From<odf::AccessError> + From<InternalError>;
+}
+
+impl MoleculeDatasetErrorExt for RebacDatasetRefUnresolvedError {
+    fn adapt<E>(self) -> E
+    where
+        E: From<odf::AccessError> + From<InternalError>,
+    {
+        match self {
+            RebacDatasetRefUnresolvedError::NotFound(e) => e.int_err().into(),
+            RebacDatasetRefUnresolvedError::Access(e) => e.into(),
+            RebacDatasetRefUnresolvedError::Internal(e) => e.into(),
+        }
+    }
+}
+
+impl MoleculeDatasetErrorExt for QueryError {
+    fn adapt<E>(self) -> E
+    where
+        E: From<odf::AccessError> + From<InternalError>,
+    {
+        match self {
+            QueryError::Access(e) => e.into(),
+            QueryError::Internal(e) => e.into(),
+
+            QueryError::BadQuery(_)
+            | QueryError::DatasetNotFound(_)
+            | QueryError::DatasetBlockNotFound(_) => self.int_err().into(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
