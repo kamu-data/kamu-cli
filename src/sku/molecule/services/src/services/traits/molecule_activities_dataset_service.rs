@@ -7,28 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth;
-use kamu_datasets::ResolvedDataset;
-use kamu_molecule_domain::MoleculeGetDatasetError;
-use odf::utils::data::DataFrameExt;
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
+
+use crate::{MoleculeDatasetReadAccessor, MoleculeDatasetWriteAccessor};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait MoleculeActivitiesDatasetService: Send + Sync {
-    async fn get_global_data_room_activity_dataset(
+    async fn request_read_of_global_activity_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: auth::DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
+    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError>;
 
-    async fn get_global_data_room_activity_data_frame(
+    async fn request_write_of_global_activity_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: auth::DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

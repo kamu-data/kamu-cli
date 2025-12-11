@@ -9,23 +9,22 @@
 
 use std::sync::Arc;
 
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{QueryService, auth};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, ResolvedDataset};
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
-use odf::utils::data::DataFrameExt;
 
-use super::molecule_datasets_helper::MoleculeDatasetsHelper;
-use crate::MoleculeActivitiesDatasetService;
+use crate::{
+    MoleculeActivitiesDatasetService,
+    MoleculeDatasetAccessorFactory,
+    MoleculeDatasetReadAccessor,
+    MoleculeDatasetWriteAccessor,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeActivitiesDatasetService)]
 pub struct MoleculeActivitiesDatasetServiceImpl {
-    rebac_dataset_registry: Arc<dyn RebacDatasetRegistryFacade>,
-    create_dataset_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-    query_service: Arc<dyn QueryService>,
+    accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
 }
 
 impl MoleculeActivitiesDatasetServiceImpl {}
@@ -37,59 +36,49 @@ impl MoleculeActivitiesDatasetServiceImpl {}
 impl MoleculeActivitiesDatasetService for MoleculeActivitiesDatasetServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeActivitiesDatasetServiceImpl_get_global_data_room_activity_dataset,
+        name = MoleculeActivitiesDatasetServiceImpl_request_read_of_global_activity_dataset,
         skip_all,
-        fields(molecule_account_name, ?action, create_if_not_exist)
+        fields(molecule_account_name)
     )]
-    async fn get_global_data_room_activity_dataset(
+    async fn request_read_of_global_activity_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: auth::DatasetAction,
-        create_if_not_exist: bool,
-    ) -> Result<ResolvedDataset, MoleculeGetDatasetError> {
-        let data_room_activity_dataset_alias =
-            MoleculeDatasetSnapshots::global_data_room_activity_alias(
-                molecule_account_name.clone(),
-            );
+    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError> {
+        let activity_dataset_alias = MoleculeDatasetSnapshots::global_data_room_activity_alias(
+            molecule_account_name.clone(),
+        );
 
-        MoleculeDatasetsHelper::get_or_create_dataset(
-            self.create_dataset_use_case.as_ref(),
-            self.rebac_dataset_registry.as_ref(),
-            &data_room_activity_dataset_alias.as_local_ref(),
-            action,
-            create_if_not_exist,
-            || MoleculeDatasetSnapshots::global_data_room_activity(molecule_account_name.clone()),
-        )
-        .await
+        self.accessor_factory
+            .read_accessor(&activity_dataset_alias.as_local_ref())
+            .await
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeActivitiesDatasetServiceImpl_get_global_data_room_activity_data_frame,
+        name = MoleculeActivitiesDatasetServiceImpl_request_write_of_global_activity_dataset,
         skip_all,
-        fields(molecule_account_name, ?action, create_if_not_exist)
+        fields(molecule_account_name, create_if_not_exist)
     )]
-    async fn get_global_data_room_activity_data_frame(
+    async fn request_write_of_global_activity_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
-        action: auth::DatasetAction,
         create_if_not_exist: bool,
-    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError> {
-        let data_room_activity_dataset = self
-            .get_global_data_room_activity_dataset(
-                molecule_account_name,
-                action,
+    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError> {
+        let activity_dataset_alias = MoleculeDatasetSnapshots::global_data_room_activity_alias(
+            molecule_account_name.clone(),
+        );
+
+        self.accessor_factory
+            .write_accessor(
+                &activity_dataset_alias.as_local_ref(),
                 create_if_not_exist,
+                || {
+                    MoleculeDatasetSnapshots::global_data_room_activity(
+                        molecule_account_name.clone(),
+                    )
+                },
             )
-            .await?;
-
-        let maybe_df = MoleculeDatasetsHelper::try_get_data_frame(
-            self.query_service.as_ref(),
-            data_room_activity_dataset.clone(),
-        )
-        .await?;
-
-        Ok((data_room_activity_dataset, maybe_df))
+            .await
     }
 }
 

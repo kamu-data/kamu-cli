@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::auth;
+use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
 use crate::MoleculeActivitiesDatasetService;
@@ -22,7 +21,6 @@ use crate::MoleculeActivitiesDatasetService;
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
     molecule_activities_dataset_service: Arc<dyn MoleculeActivitiesDatasetService>,
-    push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,42 +41,16 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         source_event_time: Option<DateTime<Utc>>,
         activity: MoleculeDataRoomActivityEntity,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
-        let data_room_activity_dataset = self
+        let global_activities_accessor = self
             .molecule_activities_dataset_service
-            .get_global_data_room_activity_dataset(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Write,
-                // TODO: try to create once as start-up job?
-                true,
-            )
+            .request_write_of_global_activity_dataset(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
-            .map_err(|e| -> MoleculeAppendDataRoomActivityError {
-                use MoleculeGetDatasetError as E;
-
-                match e {
-                    MoleculeGetDatasetError::NotFound(_) => {
-                        unreachable!()
-                    }
-                    MoleculeGetDatasetError::Access(e) => e.into(),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
         let data_record = activity.into_insert_record();
 
-        self.push_ingest_use_case
-            .execute(
-                data_room_activity_dataset,
-                kamu_core::DataSource::Buffer(data_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        global_activities_accessor
+            .push_ndjson_data(data_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 
