@@ -223,6 +223,24 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
     }
     "#
 );
+const MOVE_ENTRY_QUERY: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $fromPath: CollectionPath!, $toPath: CollectionPath!) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              moveEntry(fromPath: $fromPath, toPath: $toPath) {
+                isSuccess
+                message
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1812,25 +1830,6 @@ async fn test_molecule_v2_data_room_operations() {
     ///////////////
     // moveEntry //
     ///////////////
-    const MOVE_ENTRY_QUERY: &str = indoc!(
-        r#"
-        mutation ($ipnftUid: String!, $fromPath: CollectionPath!, $toPath: CollectionPath!) {
-          molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
-                dataRoom {
-                  moveEntry(fromPath: $fromPath, toPath: $toPath) {
-                    isSuccess
-                    message
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
-    );
-
     // Non-existent file
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -3407,42 +3406,38 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    /*
     // Move a file (retract + append)
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-            mutation ($datasetId: DatasetID!, $pathFrom: CollectionPath!, $pathTo: CollectionPath!) {
-                datasets {
-                    byId(datasetId: $datasetId) {
-                        asCollection {
-                            moveEntry(pathFrom: $pathFrom, pathTo: $pathTo) {
-                                isSuccess
-                                message
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "fromPath": "/foo.txt",
+                "toPath": "/foo_renamed.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": true,
+                                "message": "",
                             }
                         }
                     }
                 }
             }
-            "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": &data_room_did,
-                "pathFrom": "/bar",
-                "pathTo": "/baz"
-            }))),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
-        json!({
-            "isSuccess": true,
-            "message": "",
         })
     );
+
+    // TODO: check activity
+
+    /*
 
     // Update a file (correction from-to)
     let res = harness
