@@ -3438,46 +3438,6 @@ async fn test_molecule_v2_activity() {
     // TODO: check activity
 
     /*
-
-    // Update a file (correction from-to)
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-            mutation ($datasetId: DatasetID!, $pathFrom: CollectionPath!, $pathTo: CollectionPath!, $extraData: JSON) {
-                datasets {
-                    byId(datasetId: $datasetId) {
-                        asCollection {
-                            moveEntry(pathFrom: $pathFrom, pathTo: $pathTo, extraData: $extraData) {
-                                isSuccess
-                                message
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": &data_room_did,
-                "pathFrom": "/foo",
-                "pathTo": "/foo",
-                "extraData": {
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD"
-                },
-            }))),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
     // Create an announcement
     const CREATE_ANNOUNCEMENT: &str = indoc!(
         r#"
