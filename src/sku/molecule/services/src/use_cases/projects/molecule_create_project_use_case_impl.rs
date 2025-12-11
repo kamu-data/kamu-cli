@@ -58,16 +58,17 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ipnft_address: String,
         ipnft_token_id: num_bigint::BigInt,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
-        // Resolve projects ledger with Write privileges
-        let projects_write_accessor = self
+        // Gain write access to projects dataset
+        let projects_writer = self
             .molecule_projects_dataset_service
-            .request_write_of_projects_dataset(&molecule_subject.account_name, true)
+            .writer(&molecule_subject.account_name, true)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;
 
-        let maybe_raw_ledge_df = projects_write_accessor
-            .as_read_accessor()
-            .try_get_raw_ledger_data_frame()
+        // Obtain raw ledger DF
+        let maybe_raw_ledger_df = projects_writer
+            .as_reader()
+            .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;
 
@@ -78,7 +79,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let lowercase_ipnft_symbol = ipnft_symbol;
 
         // Check for conflicts
-        if let Some(df) = maybe_raw_ledge_df {
+        if let Some(df) = maybe_raw_ledger_df {
             let df = df
                 .filter(
                     col("ipnft_uid")
@@ -91,6 +92,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                 .limit(0, Some(1))
                 .int_err()?;
 
+            // If any record found, it's a conflict
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
                 return Err(MoleculeCreateProjectError::Conflict {
@@ -203,7 +205,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         let changelog_record =
             project.as_changelog_record(u8::from(odf::metadata::OperationType::Append));
 
-        projects_write_accessor
+        projects_writer
             .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;

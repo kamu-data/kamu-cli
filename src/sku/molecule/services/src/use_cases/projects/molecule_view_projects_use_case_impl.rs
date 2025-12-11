@@ -35,16 +35,20 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
-        let maybe_changelog_df = self
+        // Gain read access to projects dataset
+        let projects_reader = self
             .molecule_projects_dataset_service
-            .request_read_of_projects_dataset(&molecule_subject.account_name)
-            .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?
-            .try_get_changelog_projection_data_frame("account_id")
+            .reader(&molecule_subject.account_name)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?;
 
-        // Access projects dataset snapshot
+        // Load changelog projection DF
+        let maybe_changelog_df = projects_reader
+            .changelog_projection_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?;
+
+        // Empty? Return empty listing
         let Some(df) = maybe_changelog_df else {
             return Ok(MoleculeProjectListing::default());
         };

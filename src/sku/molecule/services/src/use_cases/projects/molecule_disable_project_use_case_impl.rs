@@ -43,20 +43,23 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
         let now = chrono::Utc::now();
 
-        let projects_write_accessor = self
+        // Gain write access to projects dataset
+        let projects_writer = self
             .molecule_projects_dataset_service
-            .request_write_of_projects_dataset(&molecule_subject.account_name, false)
+            .writer(&molecule_subject.account_name, false)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?;
 
-        let maybe_project = projects_write_accessor
-            .as_read_accessor()
-            .try_get_changelog_projection_entry("account_id", "ipnft_uid", &ipnft_uid)
+        // Try to latest project state
+        let maybe_project = projects_writer
+            .as_reader()
+            .changelog_projection_entry_by("account_id", "ipnft_uid", &ipnft_uid)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?
             .map(MoleculeProject::from_json)
             .transpose()?;
 
+        // Not found? Sorry
         let Some(mut project) = maybe_project else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
@@ -64,17 +67,20 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
                 },
             ));
         };
+
+        // Add retraction record to disable the project
         project.system_time = now;
         project.event_time = now;
 
         let changelog_record =
             project.as_changelog_record(u8::from(odf::metadata::OperationType::Retract));
 
-        projects_write_accessor
+        projects_writer
             .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;
 
+        // Notify external listeners
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,

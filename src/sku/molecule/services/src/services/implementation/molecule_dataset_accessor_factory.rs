@@ -141,13 +141,11 @@ pub struct MoleculeDatasetReadAccessor {
 
 impl MoleculeDatasetReadAccessor {
     #[expect(dead_code)]
-    pub(crate) fn get_read_checked_dataset(&self) -> &ReadCheckedDataset<'_> {
+    pub(crate) fn read_checked_dataset(&self) -> &ReadCheckedDataset<'_> {
         &self.dataset
     }
 
-    pub(crate) async fn try_get_raw_ledger_data_frame(
-        &self,
-    ) -> Result<Option<DataFrameExt>, QueryError> {
+    pub(crate) async fn raw_ledger_data_frame(&self) -> Result<Option<DataFrameExt>, QueryError> {
         match self
             .query_service
             .get_data((*self.dataset).clone(), GetDataOptions::default())
@@ -159,11 +157,11 @@ impl MoleculeDatasetReadAccessor {
         }
     }
 
-    pub(crate) async fn try_get_changelog_projection_data_frame(
+    pub(crate) async fn changelog_projection_data_frame_by(
         &self,
         primary_key: &str,
     ) -> Result<Option<DataFrameExt>, QueryError> {
-        let maybe_df = self.try_get_raw_ledger_data_frame().await?;
+        let maybe_df = self.raw_ledger_data_frame().await?;
 
         let df = if let Some(df) = maybe_df {
             Some(
@@ -181,7 +179,7 @@ impl MoleculeDatasetReadAccessor {
         Ok(df)
     }
 
-    pub(crate) async fn try_get_changelog_projection_entry(
+    pub(crate) async fn changelog_projection_entry_by(
         &self,
         primary_key: &str,
         filter_key: &str,
@@ -189,9 +187,7 @@ impl MoleculeDatasetReadAccessor {
     ) -> Result<Option<serde_json::Value>, QueryError> {
         use datafusion::prelude::*;
 
-        let df_opt = self
-            .try_get_changelog_projection_data_frame(primary_key)
-            .await?;
+        let df_opt = self.changelog_projection_data_frame_by(primary_key).await?;
 
         let Some(df) = df_opt else {
             return Ok(None);

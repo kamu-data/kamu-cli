@@ -46,7 +46,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                 MoleculeViewDataRoomActivitiesError,
             >(e)),
         }?
-        .try_get_raw_ledger_data_frame()
+        .raw_ledger_data_frame()
         .await
         .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
 
@@ -101,7 +101,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                 MoleculeViewDataRoomActivitiesError,
             >(e)),
         }?
-        .try_get_raw_ledger_data_frame()
+        .raw_ledger_data_frame()
         .await
         .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
 

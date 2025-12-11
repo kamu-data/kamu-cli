@@ -44,18 +44,21 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
-        let projects_write_accessor = self
+        // Gain write access to projects dataset
+        let projects_writer = self
             .molecule_projects_dataset_service
-            .request_write_of_projects_dataset(&molecule_subject.account_name, false)
+            .writer(&molecule_subject.account_name, false)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
 
-        let maybe_raw_ledger_df = projects_write_accessor
-            .as_read_accessor()
-            .try_get_raw_ledger_data_frame()
+        // Observe raw ledger DF to find the project
+        let maybe_raw_ledger_df = projects_writer
+            .as_reader()
+            .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
 
+        // No records at all yet?
         let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = maybe_raw_ledger_df else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
@@ -64,6 +67,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
+        // Find the latest ledger record for the given ipnft_uid
         let df = ledger_df
             .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
             .int_err()?
@@ -73,6 +77,9 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             .int_err()?;
 
         let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
+        assert!(records.len() <= 1);
+
+        // No record found?
         let Some(record) = records.into_iter().next() else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
@@ -81,12 +88,14 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
+        // Decode operation type
         let op = record
             .get("op")
             .and_then(serde_json::Value::as_u64)
             .and_then(|value| u8::try_from(value).ok())
             .and_then(|value| OperationType::try_from(value).ok());
 
+        // TODO: maybe internal error instead?
         let Some(op) = op else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
@@ -95,24 +104,28 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
+        // Reconstruct project entity
         let mut project = MoleculeProject::from_json(record).int_err()?;
         project.ipnft_symbol.make_ascii_lowercase();
 
+        // Idempotent handling: ignore if not retracted
         if !matches!(op, OperationType::Retract) {
             return Ok(project);
         }
 
+        // Add Append record to re-enable the project
         let now = chrono::Utc::now();
         project.system_time = now;
         project.event_time = now;
 
         let changelog_record = project.as_changelog_record(u8::from(OperationType::Append));
 
-        projects_write_accessor
+        projects_writer
             .push_ndjson_data(changelog_record.to_bytes(), Some(now))
             .await
             .int_err()?;
 
+        // Notify external listeners
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,

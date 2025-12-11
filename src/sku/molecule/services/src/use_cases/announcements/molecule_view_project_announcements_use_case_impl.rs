@@ -44,7 +44,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
             .read_accessor(&molecule_project.announcements_dataset_id.as_local_ref())
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?
-            .try_get_raw_ledger_data_frame()
+            .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?;
 

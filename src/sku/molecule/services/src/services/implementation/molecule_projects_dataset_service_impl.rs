@@ -16,7 +16,9 @@ use crate::{
     MoleculeDatasetAccessorFactory,
     MoleculeDatasetReadAccessor,
     MoleculeDatasetWriteAccessor,
+    MoleculeProjectsDatasetReader,
     MoleculeProjectsDatasetService,
+    MoleculeProjectsDatasetWriter,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,43 +36,79 @@ pub struct MoleculeProjectsDatasetServiceImpl {
 impl MoleculeProjectsDatasetService for MoleculeProjectsDatasetServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectsDatasetServiceImpl_request_read_of_projects_dataset,
+        name = MoleculeProjectsDatasetServiceImpl_reader,
         skip_all,
         fields(molecule_account_name)
     )]
-    async fn request_read_of_projects_dataset(
+    async fn reader(
         &self,
         molecule_account_name: &odf::AccountName,
-    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<Arc<dyn MoleculeProjectsDatasetReader>, RebacDatasetRefUnresolvedError> {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
-        self.accessor_factory
+        let read_accessor = self
+            .accessor_factory
             .read_accessor(&projects_dataset_alias.as_local_ref())
-            .await
+            .await?;
+
+        Ok(Arc::new(MoleculeProjectsDatasetReadAccessorImpl(
+            read_accessor,
+        )))
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectsDatasetServiceImpl_request_write_of_projects_dataset,
+        name = MoleculeProjectsDatasetServiceImpl_writer,
         skip_all,
         fields(molecule_account_name, create_if_not_exist)
     )]
-    async fn request_write_of_projects_dataset(
+    async fn writer(
         &self,
         molecule_account_name: &odf::AccountName,
         create_if_not_exist: bool,
-    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<Arc<dyn MoleculeProjectsDatasetWriter>, RebacDatasetRefUnresolvedError> {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
-        self.accessor_factory
+        let write_accessor = self
+            .accessor_factory
             .write_accessor(
                 &projects_dataset_alias.as_local_ref(),
                 create_if_not_exist,
                 || MoleculeDatasetSnapshots::projects(molecule_account_name.clone()),
             )
-            .await
+            .await?;
+
+        Ok(Arc::new(MoleculeProjectsDatasetWriteAccessorImpl(
+            write_accessor,
+        )))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct MoleculeProjectsDatasetReadAccessorImpl(MoleculeDatasetReadAccessor);
+
+impl MoleculeProjectsDatasetReader for MoleculeProjectsDatasetReadAccessorImpl {
+    fn raw_read_accessor(&self) -> &MoleculeDatasetReadAccessor {
+        &self.0
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct MoleculeProjectsDatasetWriteAccessorImpl(MoleculeDatasetWriteAccessor);
+
+impl MoleculeProjectsDatasetWriter for MoleculeProjectsDatasetWriteAccessorImpl {
+    fn raw_write_accessor(&self) -> &MoleculeDatasetWriteAccessor {
+        &self.0
+    }
+
+    fn as_reader(&self) -> Arc<dyn MoleculeProjectsDatasetReader> {
+        Arc::new(MoleculeProjectsDatasetReadAccessorImpl(
+            self.0.as_read_accessor(),
+        ))
     }
 }
 

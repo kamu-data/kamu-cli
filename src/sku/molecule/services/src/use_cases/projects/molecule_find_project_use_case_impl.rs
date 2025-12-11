@@ -33,18 +33,23 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
-        let maybe_project_json = self
+        // Gain read access to projects dataset
+        let projects_reader = self
             .molecule_projects_dataset_service
-            .request_read_of_projects_dataset(&molecule_subject.account_name)
-            .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?
-            .try_get_changelog_projection_entry("account_id", "ipnft_uid", &ipnft_uid)
+            .reader(&molecule_subject.account_name)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;
 
-        Ok(maybe_project_json
+        // Query for the project by ipnft_uid
+        let maybe_project = projects_reader
+            .changelog_entry_by_ipnft_uid(&ipnft_uid)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?
             .map(MoleculeProject::from_json)
-            .transpose()?)
+            .transpose()?;
+
+        // Return the project if found
+        Ok(maybe_project)
     }
 }
 
