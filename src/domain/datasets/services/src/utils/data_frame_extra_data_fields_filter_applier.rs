@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::sync::{Arc, LazyLock};
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{
@@ -16,6 +17,11 @@ use kamu_datasets::{
     UnknownExtraDataFieldFilterNamesError,
 };
 use odf::utils::data::DataFrameExt;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static ARRAY_HAS_ALL_UDF: LazyLock<Arc<datafusion::logical_expr::ScalarUDF>> =
+    LazyLock::new(|| datafusion::functions_nested::array_has::array_has_all_udf());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

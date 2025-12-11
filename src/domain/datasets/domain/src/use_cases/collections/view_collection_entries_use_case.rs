@@ -54,6 +54,7 @@ pub struct ExtraDataFieldFilter {
     pub field_name: String,
     // TODO: Support another types (e.g. INTs)
     pub values: NonEmpty<String>,
+    pub is_array: bool,
 }
 
 pub type CollectionEntryListing = EntityPageListing<CollectionEntry>;
