@@ -21,10 +21,11 @@ use kamu_auth_rebac::RebacService;
 use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
+use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::domain::*;
+use crate::MoleculeProjectsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

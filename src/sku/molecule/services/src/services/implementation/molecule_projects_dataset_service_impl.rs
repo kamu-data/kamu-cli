@@ -14,10 +14,11 @@ use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{GetDataOptions, QueryError, QueryService, auth};
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, ResolvedDataset};
+use kamu_molecule_domain::*;
 use odf::utils::data::DataFrameExt;
 
 use super::molecule_datasets_helper::MoleculeDatasetsHelper;
-use crate::domain::*;
+use crate::MoleculeProjectsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

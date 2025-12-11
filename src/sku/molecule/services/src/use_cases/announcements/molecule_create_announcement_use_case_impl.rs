@@ -13,9 +13,10 @@ use chrono::Utc;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth;
+use kamu_molecule_domain::*;
 use odf::serde::DatasetDefaultVocabularySystemColumns;
 
-use crate::domain::*;
+use crate::MoleculeAnnouncementsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

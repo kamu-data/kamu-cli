@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -11,8 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
-
-use crate::MoleculeDataRoomEntriesFilters;
+use kamu_molecule_domain::{MoleculeDataRoomEntriesFilters, MoleculeUpdateDataRoomEntryResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,26 +67,6 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub enum MoleculeUpdateDataRoomEntryResult {
-    Success(MoleculeUpdateDataRoomEntrySuccess),
-    UpToDate,
-    EntryNotFound(CollectionPath),
-}
-
-#[derive(Debug)]
-pub struct MoleculeUpdateDataRoomEntrySuccess {
-    pub old_head: odf::Multihash,
-    pub new_head: odf::Multihash,
-    pub inserted_records: Vec<(
-        odf::metadata::OperationType,
-        kamu_datasets::CollectionEntryRecord,
-    )>,
-    pub system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

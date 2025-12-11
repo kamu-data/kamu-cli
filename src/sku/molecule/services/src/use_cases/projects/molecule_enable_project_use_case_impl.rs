@@ -13,10 +13,11 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_core::PushIngestDataUseCase;
 use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::metadata::OperationType;
 
-use crate::domain::*;
+use crate::MoleculeProjectsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

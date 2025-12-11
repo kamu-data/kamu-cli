@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::MoleculeProjectsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

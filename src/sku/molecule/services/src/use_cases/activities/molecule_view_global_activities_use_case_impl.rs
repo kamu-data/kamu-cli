@@ -13,8 +13,9 @@ use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_core::auth;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::{MoleculeActivitiesDatasetService, MoleculeAnnouncementsDatasetService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

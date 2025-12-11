@@ -16,6 +16,12 @@ use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
 
+use crate::{
+    MoleculeDataRoomCollectionReadError,
+    MoleculeDataRoomCollectionService,
+    MoleculeDataRoomCollectionWriteError,
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]

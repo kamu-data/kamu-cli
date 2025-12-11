@@ -137,16 +137,6 @@ pub struct MoleculeAnnouncementEntry {
 }
 
 impl MoleculeAnnouncementEntry {
-    pub fn from_json(
-        project: &Arc<MoleculeProjectV2>,
-        record: serde_json::Value,
-    ) -> Result<Self, InternalError> {
-        let record: kamu_molecule_domain::MoleculeProjectAnnouncementRecord =
-            serde_json::from_value(record).int_err()?;
-
-        Ok(Self::new_from_project_announcement_record(project, record))
-    }
-
     pub fn new_from_global_announcement_record(
         project: &Arc<MoleculeProjectV2>,
         entity: kamu_molecule_domain::MoleculeGlobalAnnouncementRecord,

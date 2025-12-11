@@ -12,8 +12,9 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_core::auth;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::MoleculeAnnouncementsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

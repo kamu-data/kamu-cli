@@ -7,29 +7,46 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::LoggedAccount;
 use kamu_core::auth;
 use kamu_datasets::ResolvedDataset;
+use kamu_molecule_domain::{MoleculeGetDatasetError, MoleculeProject};
 use odf::utils::data::DataFrameExt;
-
-use crate::MoleculeGetDatasetError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeActivitiesDatasetService: Send + Sync {
-    async fn get_global_data_room_activity_dataset(
+pub trait MoleculeProjectsDatasetService: Send + Sync {
+    async fn get_projects_dataset(
         &self,
         molecule_account_name: &odf::AccountName,
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<ResolvedDataset, MoleculeGetDatasetError>;
 
-    async fn get_global_data_room_activity_data_frame(
+    /// Returns raw ledger data without projection
+    async fn get_projects_raw_ledger_data_frame(
         &self,
-        molecule_account_name: &odf::AccountName,
+        molecule_subject: &LoggedAccount,
         action: auth::DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    /// Returns the projected changelog
+    async fn get_projects_changelog_projection_data_frame(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+    ) -> Result<(ResolvedDataset, Option<DataFrameExt>), MoleculeGetDatasetError>;
+
+    async fn get_project_changelog_entry(
+        &self,
+        molecule_subject: &LoggedAccount,
+        action: auth::DatasetAction,
+        create_if_not_exist: bool,
+        ipnft_uid: &str,
+    ) -> Result<(ResolvedDataset, Option<MoleculeProject>), MoleculeGetDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

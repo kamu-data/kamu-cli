@@ -12,6 +12,10 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{QueryService, auth};
+use kamu_molecule_domain::{
+    MoleculeViewProjectAnnouncementsError,
+    MoleculeViewProjectAnnouncementsUseCase,
+};
 use odf::metadata::OperationType;
 
 use crate::prelude::*;
@@ -164,54 +168,40 @@ impl MoleculeProjectV2 {
         project: &Arc<MoleculeProjectV2>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<Vec<MoleculeActivityEventV2>> {
-        // TODO: extract a use-case
-        //       (same at MoleculeAnnouncements::tail())
+        let view_project_announcements_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectAnnouncementsUseCase);
 
-        let molecule_announcements_dataset_service = from_catalog_n!(
-            ctx,
-            dyn kamu_molecule_domain::MoleculeAnnouncementsDatasetService
-        );
-
-        let (_, maybe_df) = molecule_announcements_dataset_service
-            .get_project_announcements_data_frame(
-                &self.entity.announcements_dataset_id,
-                auth::DatasetAction::Read,
+        let announcements_listing = view_project_announcements_uc
+            .execute(
+                &project.entity,
+                filters.map(
+                    |filters| kamu_molecule_domain::MoleculeAnnouncementsFilters {
+                        by_tags: filters.by_tags,
+                        by_categories: filters.by_categories,
+                        by_access_levels: filters.by_access_levels,
+                    },
+                ),
+                None,
             )
             .await
-            .int_err()?;
+            .map_err(|e| {
+                use MoleculeViewProjectAnnouncementsError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
-        let Some(df) = maybe_df else {
-            return Ok(Vec::new());
-        };
-
-        let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            kamu_molecule_domain::molecule_extra_data_fields_filter(
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
-        });
-        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
-                df,
-                extra_data_fields_filter,
-            )
-            .int_err()?
-        } else {
-            df
-        };
-
-        // Sorting will be done after merge
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let events = records
+        let events = announcements_listing
+            .list
             .into_iter()
             .map(|record| {
-                let entry = MoleculeAnnouncementEntry::from_json(project, record)?;
-                Ok(MoleculeActivityEventV2::announcement(entry))
+                let entry = MoleculeAnnouncementEntry::new_from_project_announcement_record(
+                    project, record,
+                );
+                MoleculeActivityEventV2::announcement(entry)
             })
-            .collect::<Result<Vec<_>, InternalError>>()?;
+            .collect::<Vec<_>>();
 
         Ok(events)
     }

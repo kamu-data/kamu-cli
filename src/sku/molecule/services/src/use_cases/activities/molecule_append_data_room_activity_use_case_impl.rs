@@ -12,8 +12,9 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::auth;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::MoleculeActivitiesDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

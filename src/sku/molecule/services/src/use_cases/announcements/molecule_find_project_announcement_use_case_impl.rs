@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_core::auth;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::MoleculeAnnouncementsDatasetService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

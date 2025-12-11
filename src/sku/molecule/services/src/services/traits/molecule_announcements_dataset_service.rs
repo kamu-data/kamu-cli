@@ -9,9 +9,8 @@
 
 use kamu_core::auth;
 use kamu_datasets::ResolvedDataset;
+use kamu_molecule_domain::MoleculeGetDatasetError;
 use odf::utils::data::DataFrameExt;
-
-use crate::MoleculeGetDatasetError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
