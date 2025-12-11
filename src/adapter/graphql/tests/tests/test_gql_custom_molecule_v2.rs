@@ -1000,7 +1000,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -1196,7 +1196,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -1375,7 +1375,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -1682,7 +1682,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -2058,7 +2058,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -2256,7 +2256,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -2561,7 +2561,7 @@ async fn test_molecule_v2_data_room_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3110,7 +3110,7 @@ async fn test_molecule_v2_announcements_operations() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3189,7 +3189,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3359,7 +3359,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3517,7 +3517,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3628,7 +3628,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3769,7 +3769,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -3906,7 +3906,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
@@ -4052,7 +4052,7 @@ async fn test_molecule_v2_activity() {
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node.clone()
+                "v2": expected_activity_node
             }
         })
     );
