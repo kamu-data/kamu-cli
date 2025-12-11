@@ -198,6 +198,8 @@ impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataE
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Convert into an enum to differentiate between not finding a source and
+// ambiguity between several sources.
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
 pub struct SourceNotFoundError {
@@ -216,7 +218,7 @@ impl SourceNotFoundError {
 
 impl From<SourceNotFoundError> for PushSourceNotFoundError {
     fn from(val: SourceNotFoundError) -> Self {
-        PushSourceNotFoundError::new(val.source_name)
+        PushSourceNotFoundError::new_with_messaage(val.source_name, val.message)
     }
 }
 

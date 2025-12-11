@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- Support for re-defining the `AddPushSource`
+
 ## [0.254.1] - 2025-12-08
 ### Fixed
 - Fixed bug in applying projected offsets for flow states in a situation when delayed transaction
