@@ -107,27 +107,35 @@ pub enum PushIngestPlanningError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error, Default)]
+#[error("{message}")]
 pub struct PushSourceNotFoundError {
     source_name: Option<String>,
+    message: String,
 }
 
 impl PushSourceNotFoundError {
     pub fn new(source_name: Option<impl Into<String>>) -> Self {
-        Self {
-            source_name: source_name.map(Into::into),
+        match source_name {
+            None => Self::new_with_messaage(
+                source_name,
+                "Dataset does not define a default push source, consider specifying the source \
+                 name",
+            ),
+            Some(source_name) => {
+                let source_name = source_name.into();
+                let message = format!("Dataset does not define a push source '{source_name}'");
+                Self::new_with_messaage(Some(source_name), message)
+            }
         }
     }
-}
 
-impl std::fmt::Display for PushSourceNotFoundError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.source_name {
-            None => write!(
-                f,
-                "Dataset does not define a default push source, consider specifying the source \
-                 name"
-            ),
-            Some(s) => write!(f, "Dataset does not define a push source '{s}'"),
+    pub fn new_with_messaage(
+        source_name: Option<impl Into<String>>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            source_name: source_name.map(Into::into),
+            message: message.into(),
         }
     }
 }
