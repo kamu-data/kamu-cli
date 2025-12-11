@@ -24,6 +24,7 @@ use crate::queries::molecule::v2::{
     MoleculeAccessLevel,
     MoleculeAnnouncementId,
     MoleculeCategory,
+    MoleculeChangeBy,
     MoleculeProjectV2,
     MoleculeTag,
 };
@@ -178,12 +179,12 @@ impl MoleculeAnnouncementEntry {
         id.to_string()
     }
 
-    async fn headline(&self) -> &String {
-        &self.entity.record.headline
+    async fn headline(&self) -> &str {
+        self.entity.record.headline.as_str()
     }
 
-    async fn body(&self) -> &String {
-        &self.entity.record.body
+    async fn body(&self) -> &str {
+        self.entity.record.body.as_str()
     }
 
     async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
@@ -200,18 +201,20 @@ impl MoleculeAnnouncementEntry {
     }
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
-    async fn change_by(&self) -> &String {
+    async fn change_by(&self) -> &MoleculeChangeBy {
         &self.entity.record.change_by
     }
 
-    async fn categories(&self) -> &Vec<MoleculeCategory> {
+    async fn categories(&self) -> &[MoleculeCategory] {
         &self.entity.record.categories
     }
 
-    async fn tags(&self) -> &Vec<MoleculeTag> {
+    async fn tags(&self) -> &[MoleculeTag] {
         &self.entity.record.tags
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(
     MoleculeAnnouncementEntry,
