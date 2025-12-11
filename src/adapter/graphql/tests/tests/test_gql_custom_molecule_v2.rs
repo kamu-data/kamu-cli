@@ -3323,60 +3323,91 @@ async fn test_molecule_v2_activity() {
         file_dataset_id
     };
 
-    /*
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
-        mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
-            datasets {
-                byId(datasetId: $datasetId) {
-                    asVersionedFile {
-                        uploadNewVersion(content: $content) {
-                            isSuccess
-                            message
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    ref: $ref
+                    content: $content
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                  ) {
+                    isSuccess
+                    message
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPLOAD_NEW_VERSION,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "ref": project_1_file_1_dataset_id,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
                         }
                     }
                 }
             }
-        }
-        "#
+        })
     );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
-            async_graphql::Variables::from_json(json!({
-                "datasetId": &test_file_1,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 1"),
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
     assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
-        json!({
-            "isSuccess": true,
-            "message": "",
+        GraphQLQueryRequest::new(
+            UPLOAD_NEW_VERSION,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "ref": project_1_file_2_dataset_id,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "accessLevel": "public",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
         })
     );
 
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
-            async_graphql::Variables::from_json(json!({
-                "datasetId": &test_file_2,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 2"),
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
-
+    /*
     // Link new file into the project data room
     const COLLECTION_ADD_ENTRY: &str = indoc!(
         r#"
