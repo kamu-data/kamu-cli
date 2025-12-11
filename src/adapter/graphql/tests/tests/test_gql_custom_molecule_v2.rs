@@ -3481,26 +3481,40 @@ async fn test_molecule_v2_activity() {
 
     // TODO: check activity
 
-    /*
-
-    // Upload new file version
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
-            async_graphql::Variables::from_json(json!({
-                "datasetId": &test_file_1,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 1 - updated"),
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
+    // Upload a new file version
     assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
-        json!({
-            "isSuccess": true,
-            "message": "",
+        GraphQLQueryRequest::new(
+            UPLOAD_NEW_VERSION,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "ref": project_1_file_1_dataset_id,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo [2]"),
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
         })
     );
+
+    // TODO: check activity
+
+    /*
 
     // Remove a file
     let res = harness
