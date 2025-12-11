@@ -21,7 +21,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectsUseCase)]
 pub struct MoleculeViewProjectsUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
         // Access projects dataset snapshot
         let Some(df) = self
-            .molecule_dataset_service
+            .molecule_projects_dataset_service
             .get_projects_changelog_projection_data_frame(
                 molecule_subject,
                 DatasetAction::Read,

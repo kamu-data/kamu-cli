@@ -21,7 +21,8 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
 pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_activities_dataset_service: Arc<dyn MoleculeActivitiesDatasetService>,
+    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
 }
 
 impl MoleculeViewGlobalActivitiesUseCaseImpl {
@@ -31,7 +32,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let (_, maybe_df) = self
-            .molecule_dataset_service
+            .molecule_activities_dataset_service
             .get_global_data_room_activity_data_frame(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Read,
@@ -78,7 +79,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let (_, maybe_df) = self
-            .molecule_dataset_service
+            .molecule_announcements_dataset_service
             .get_global_announcements_data_frame(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Read,

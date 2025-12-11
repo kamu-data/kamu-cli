@@ -167,10 +167,12 @@ impl MoleculeProjectV2 {
         // TODO: extract a use-case
         //       (same at MoleculeAnnouncements::tail())
 
-        let molecule_dataset_service =
-            from_catalog_n!(ctx, dyn kamu_molecule_domain::MoleculeDatasetService);
+        let molecule_announcements_dataset_service = from_catalog_n!(
+            ctx,
+            dyn kamu_molecule_domain::MoleculeAnnouncementsDatasetService
+        );
 
-        let (_, maybe_df) = molecule_dataset_service
+        let (_, maybe_df) = molecule_announcements_dataset_service
             .get_project_announcements_data_frame(
                 &self.entity.announcements_dataset_id,
                 auth::DatasetAction::Read,

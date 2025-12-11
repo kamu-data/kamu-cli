@@ -20,7 +20,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_activities_dataset_service: Arc<dyn MoleculeActivitiesDatasetService>,
     push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
 }
 
@@ -43,7 +43,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         activity: MoleculeDataRoomActivityEntity,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
         let data_room_activity_dataset = self
-            .molecule_dataset_service
+            .molecule_activities_dataset_service
             .get_global_data_room_activity_dataset(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Write,

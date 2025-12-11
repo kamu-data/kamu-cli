@@ -23,7 +23,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeEnableProjectUseCase)]
 pub struct MoleculeEnableProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     outbox: Arc<dyn Outbox>,
 }
@@ -47,7 +47,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         use datafusion::prelude::*;
 
         let (projects_dataset, df_opt) = self
-            .molecule_dataset_service
+            .molecule_projects_dataset_service
             .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
             .await?;
 

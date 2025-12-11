@@ -19,7 +19,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectUseCase)]
 pub struct MoleculeFindProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +34,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
         let (_, project) = self
-            .molecule_dataset_service
+            .molecule_projects_dataset_service
             .get_project_changelog_entry(molecule_subject, DatasetAction::Read, false, &ipnft_uid)
             .await?;
 

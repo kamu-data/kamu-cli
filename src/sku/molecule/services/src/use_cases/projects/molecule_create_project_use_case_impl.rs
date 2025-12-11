@@ -31,7 +31,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateProjectUseCase)]
 pub struct MoleculeCreateProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -62,7 +62,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Resolve projects ledger with Write privileges
         let (projects_dataset, df_opt) = self
-            .molecule_dataset_service
+            .molecule_projects_dataset_service
             .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, true)
             .await?;
 

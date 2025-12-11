@@ -22,7 +22,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeDisableProjectUseCase)]
 pub struct MoleculeDisableProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
     push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     outbox: Arc<dyn Outbox>,
 }
@@ -46,7 +46,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         let now = chrono::Utc::now();
 
         let (projects_dataset, project_opt) = self
-            .molecule_dataset_service
+            .molecule_projects_dataset_service
             .get_project_changelog_entry(molecule_subject, DatasetAction::Write, false, &ipnft_uid)
             .await?;
 

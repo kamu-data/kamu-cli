@@ -20,7 +20,7 @@ use crate::domain::*;
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectAnnouncementsUseCase)]
 pub struct MoleculeViewProjectAnnouncementsUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
         let (_, maybe_df) = self
-            .molecule_dataset_service
+            .molecule_announcements_dataset_service
             .get_project_announcements_data_frame(
                 &molecule_project.announcements_dataset_id,
                 auth::DatasetAction::Read,

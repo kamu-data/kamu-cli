@@ -11,9 +11,8 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth;
-use kamu_datasets::ResolvedDataset;
 use odf::serde::DatasetDefaultVocabularySystemColumns;
 
 use crate::domain::*;
@@ -24,7 +23,7 @@ use crate::domain::*;
 #[dill::interface(dyn MoleculeCreateAnnouncementUseCase)]
 pub struct MoleculeCreateAnnouncementUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
     push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
 }
 
@@ -66,25 +65,6 @@ impl MoleculeCreateAnnouncementUseCaseImpl {
 
         Ok(())
     }
-
-    async fn get_project_announcements_dataset(
-        &self,
-        molecule_project: &MoleculeProject,
-    ) -> Result<ResolvedDataset, MoleculeCreateAnnouncementError> {
-        self.rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(
-                &molecule_project.announcements_dataset_id.as_local_ref(),
-                auth::DatasetAction::Write,
-            )
-            .await
-            .map_err(|e| {
-                use RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::Access(e) => e.into(),
-                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
-                }
-            })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +89,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         // 1. Resolve global announcements dataset
 
         let global_announcements_dataset = self
-            .molecule_dataset_service
+            .molecule_announcements_dataset_service
             .get_global_announcements_dataset(
                 &molecule_subject.account_name,
                 auth::DatasetAction::Write,
@@ -169,8 +149,21 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         // 4. Store project announcements
         let project_announcements_dataset = self
-            .get_project_announcements_dataset(molecule_project)
-            .await?;
+            .molecule_announcements_dataset_service
+            .get_project_announcements_dataset(
+                &molecule_project.announcements_dataset_id,
+                auth::DatasetAction::Write,
+            )
+            .await
+            .map_err(|e| match e {
+                MoleculeGetDatasetError::NotFound(e) => {
+                    MoleculeCreateAnnouncementError::Internal(e.int_err())
+                }
+                MoleculeGetDatasetError::Access(e) => MoleculeCreateAnnouncementError::Access(e),
+                MoleculeGetDatasetError::Internal(e) => {
+                    MoleculeCreateAnnouncementError::Internal(e)
+                }
+            })?;
 
         self.push_ingest_use_case
             .execute(
