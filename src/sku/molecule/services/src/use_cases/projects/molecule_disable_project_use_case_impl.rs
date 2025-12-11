@@ -14,14 +14,14 @@ use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::MoleculeProjectsDatasetService;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeDisableProjectUseCase)]
 pub struct MoleculeDisableProjectUseCaseImpl {
-    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -45,7 +45,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
 
         // Gain write access to projects dataset
         let projects_writer = self
-            .molecule_projects_dataset_service
+            .projects_service
             .writer(&molecule_subject.account_name, false)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?;
@@ -53,7 +53,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         // Try to latest project state
         let maybe_project = projects_writer
             .as_reader()
-            .changelog_projection_entry_by("account_id", "ipnft_uid", &ipnft_uid)
+            .changelog_entry_by_ipnft_uid(&ipnft_uid)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?
             .map(MoleculeProject::from_json)

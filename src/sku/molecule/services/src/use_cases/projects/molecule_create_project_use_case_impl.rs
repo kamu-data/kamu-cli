@@ -23,14 +23,14 @@ use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::MoleculeProjectsDatasetService;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateProjectUseCase)]
 pub struct MoleculeCreateProjectUseCaseImpl {
-    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
     account_service: Arc<dyn AccountService>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -60,7 +60,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Gain write access to projects dataset
         let projects_writer = self
-            .molecule_projects_dataset_service
+            .projects_service
             .writer(&molecule_subject.account_name, true)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;

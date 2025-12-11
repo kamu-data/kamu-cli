@@ -14,18 +14,18 @@ use kamu_molecule_domain::*;
 
 use crate::{
     MoleculeDatasetAccessorFactory,
-    MoleculeDatasetReadAccessor,
-    MoleculeDatasetWriteAccessor,
-    MoleculeProjectsDatasetReader,
-    MoleculeProjectsDatasetService,
-    MoleculeProjectsDatasetWriter,
+    MoleculeDatasetReader,
+    MoleculeDatasetWriter,
+    MoleculeProjectsReader,
+    MoleculeProjectsService,
+    MoleculeProjectsWriter,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeProjectsDatasetService)]
-pub struct MoleculeProjectsDatasetServiceImpl {
+#[dill::interface(dyn MoleculeProjectsService)]
+pub struct MoleculeProjectsServiceImpl {
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
 }
 
@@ -33,33 +33,31 @@ pub struct MoleculeProjectsDatasetServiceImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeProjectsDatasetService for MoleculeProjectsDatasetServiceImpl {
+impl MoleculeProjectsService for MoleculeProjectsServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectsDatasetServiceImpl_reader,
+        name = MoleculeProjectsServiceImpl_reader,
         skip_all,
         fields(molecule_account_name)
     )]
     async fn reader(
         &self,
         molecule_account_name: &odf::AccountName,
-    ) -> Result<Arc<dyn MoleculeProjectsDatasetReader>, RebacDatasetRefUnresolvedError> {
+    ) -> Result<Arc<dyn MoleculeProjectsReader>, RebacDatasetRefUnresolvedError> {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
-        let read_accessor = self
+        let reader = self
             .accessor_factory
-            .read_accessor(&projects_dataset_alias.as_local_ref())
+            .reader(&projects_dataset_alias.as_local_ref())
             .await?;
 
-        Ok(Arc::new(MoleculeProjectsDatasetReadAccessorImpl(
-            read_accessor,
-        )))
+        Ok(Arc::new(MoleculeProjectsReaderImpl(reader)))
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeProjectsDatasetServiceImpl_writer,
+        name = MoleculeProjectsServiceImpl_writer,
         skip_all,
         fields(molecule_account_name, create_if_not_exist)
     )]
@@ -67,48 +65,44 @@ impl MoleculeProjectsDatasetService for MoleculeProjectsDatasetServiceImpl {
         &self,
         molecule_account_name: &odf::AccountName,
         create_if_not_exist: bool,
-    ) -> Result<Arc<dyn MoleculeProjectsDatasetWriter>, RebacDatasetRefUnresolvedError> {
+    ) -> Result<Arc<dyn MoleculeProjectsWriter>, RebacDatasetRefUnresolvedError> {
         let projects_dataset_alias =
             MoleculeDatasetSnapshots::projects_alias(molecule_account_name.clone());
 
-        let write_accessor = self
+        let writer = self
             .accessor_factory
-            .write_accessor(
+            .writer(
                 &projects_dataset_alias.as_local_ref(),
                 create_if_not_exist,
                 || MoleculeDatasetSnapshots::projects(molecule_account_name.clone()),
             )
             .await?;
 
-        Ok(Arc::new(MoleculeProjectsDatasetWriteAccessorImpl(
-            write_accessor,
-        )))
+        Ok(Arc::new(MoleculeProjectsWriterImpl(writer)))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct MoleculeProjectsDatasetReadAccessorImpl(MoleculeDatasetReadAccessor);
+struct MoleculeProjectsReaderImpl(MoleculeDatasetReader);
 
-impl MoleculeProjectsDatasetReader for MoleculeProjectsDatasetReadAccessorImpl {
-    fn raw_read_accessor(&self) -> &MoleculeDatasetReadAccessor {
+impl MoleculeProjectsReader for MoleculeProjectsReaderImpl {
+    fn raw_reader(&self) -> &MoleculeDatasetReader {
         &self.0
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct MoleculeProjectsDatasetWriteAccessorImpl(MoleculeDatasetWriteAccessor);
+struct MoleculeProjectsWriterImpl(MoleculeDatasetWriter);
 
-impl MoleculeProjectsDatasetWriter for MoleculeProjectsDatasetWriteAccessorImpl {
-    fn raw_write_accessor(&self) -> &MoleculeDatasetWriteAccessor {
+impl MoleculeProjectsWriter for MoleculeProjectsWriterImpl {
+    fn raw_writer(&self) -> &MoleculeDatasetWriter {
         &self.0
     }
 
-    fn as_reader(&self) -> Arc<dyn MoleculeProjectsDatasetReader> {
-        Arc::new(MoleculeProjectsDatasetReadAccessorImpl(
-            self.0.as_read_accessor(),
-        ))
+    fn as_reader(&self) -> Arc<dyn MoleculeProjectsReader> {
+        Arc::new(MoleculeProjectsReaderImpl(self.0.as_reader()))
     }
 }
 

@@ -13,10 +13,10 @@ use crate::*;
 
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeDatasetAccessorFactory>();
-    b.add::<MoleculeProjectsDatasetServiceImpl>();
-    b.add::<MoleculeActivitiesDatasetServiceImpl>();
-    b.add::<MoleculeAnnouncementsDatasetServiceImpl>();
     b.add::<MoleculeDataRoomCollectionServiceImpl>();
+    b.add::<MoleculeGlobalActivitiesServiceImpl>();
+    b.add::<MoleculeAnnouncementsServiceImpl>();
+    b.add::<MoleculeProjectsServiceImpl>();
     b.add::<MoleculeVersionedFileContentProviderImpl>();
 
     b.add::<MoleculeEnableProjectUseCaseImpl>();

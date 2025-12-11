@@ -12,14 +12,14 @@ use std::sync::Arc;
 use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeProjectsDatasetService;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectUseCase)]
 pub struct MoleculeFindProjectUseCaseImpl {
-    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
         // Gain read access to projects dataset
         let projects_reader = self
-            .molecule_projects_dataset_service
+            .projects_service
             .reader(&molecule_subject.account_name)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;

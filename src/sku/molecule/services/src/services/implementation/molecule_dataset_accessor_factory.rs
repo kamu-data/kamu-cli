@@ -23,6 +23,7 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: nothing Molecule-specific here, move to kamu-datasets crate
 #[dill::component]
 pub struct MoleculeDatasetAccessorFactory {
     create_dataset_from_snapshot_uc: Arc<dyn CreateDatasetFromSnapshotUseCase>,
@@ -34,27 +35,27 @@ pub struct MoleculeDatasetAccessorFactory {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MoleculeDatasetAccessorFactory {
-    pub async fn read_accessor(
+    pub async fn reader(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
             .await?;
 
-        Ok(MoleculeDatasetReadAccessor {
+        Ok(MoleculeDatasetReader {
             query_service: self.query_service.clone(),
             dataset: ReadCheckedDataset::from_owned(resolved_dataset),
         })
     }
 
-    pub async fn write_accessor(
+    pub async fn writer(
         &self,
         dataset_ref: &odf::DatasetRef,
         create_if_not_exist: bool,
         snapshot_getter: impl FnOnce() -> odf::DatasetSnapshot,
-    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError> {
         let resolved_dataset = match self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Write)
@@ -78,7 +79,7 @@ impl MoleculeDatasetAccessorFactory {
             Err(e) => Err(e),
         }?;
 
-        Ok(MoleculeDatasetWriteAccessor {
+        Ok(MoleculeDatasetWriter {
             push_ingest_uc: self.push_ingest_uc.clone(),
             query_service: self.query_service.clone(),
             dataset: WriteCheckedDataset::from_owned(resolved_dataset),
@@ -88,20 +89,20 @@ impl MoleculeDatasetAccessorFactory {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDatasetWriteAccessor {
+pub struct MoleculeDatasetWriter {
     push_ingest_uc: Arc<dyn PushIngestDataUseCase>,
     query_service: Arc<dyn QueryService>,
     dataset: WriteCheckedDataset<'static>,
 }
 
-impl MoleculeDatasetWriteAccessor {
+impl MoleculeDatasetWriter {
     #[expect(dead_code)]
     pub(crate) fn get_write_checked_dataset(&self) -> &WriteCheckedDataset<'_> {
         &self.dataset
     }
 
-    pub(crate) fn as_read_accessor(&self) -> MoleculeDatasetReadAccessor {
-        MoleculeDatasetReadAccessor {
+    pub(crate) fn as_reader(&self) -> MoleculeDatasetReader {
+        MoleculeDatasetReader {
             query_service: Arc::clone(&self.query_service),
             dataset: self.dataset.clone().into(),
         }
@@ -134,12 +135,12 @@ impl MoleculeDatasetWriteAccessor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDatasetReadAccessor {
+pub struct MoleculeDatasetReader {
     query_service: Arc<dyn QueryService>,
     dataset: ReadCheckedDataset<'static>,
 }
 
-impl MoleculeDatasetReadAccessor {
+impl MoleculeDatasetReader {
     #[expect(dead_code)]
     pub(crate) fn read_checked_dataset(&self) -> &ReadCheckedDataset<'_> {
         &self.dataset

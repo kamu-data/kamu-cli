@@ -14,14 +14,14 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeProjectsDatasetService;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectsUseCase)]
 pub struct MoleculeViewProjectsUseCaseImpl {
-    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
         // Gain read access to projects dataset
         let projects_reader = self
-            .molecule_projects_dataset_service
+            .projects_service
             .reader(&molecule_subject.account_name)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?;

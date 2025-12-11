@@ -15,15 +15,15 @@ use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
-use crate::{MoleculeActivitiesDatasetService, MoleculeAnnouncementsDatasetService};
+use crate::{MoleculeAnnouncementsService, MoleculeGlobalActivitiesService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
 pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
-    molecule_activities_dataset_service: Arc<dyn MoleculeActivitiesDatasetService>,
-    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
+    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
 impl MoleculeViewGlobalActivitiesUseCaseImpl {
@@ -32,31 +32,40 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let maybe_df = match self
-            .molecule_activities_dataset_service
-            .request_read_of_global_activity_dataset(&molecule_subject.account_name)
+        // Get read access to global activities dataset
+        let activities_reader = match self
+            .global_activities_service
+            .reader(&molecule_subject.account_name)
             .await
         {
-            Ok(maybe_df) => Ok(maybe_df),
+            Ok(reader) => Ok(reader),
+
+            // No activities dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                // No activities dataset yet is fine, just return empty listing
                 return Ok(MoleculeDataRoomActivityListing::default());
             }
+
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
                 MoleculeViewDataRoomActivitiesError,
             >(e)),
-        }?
-        .raw_ledger_data_frame()
-        .await
-        .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+        }?;
 
+        // Load raw ledger DF
+        let maybe_df = activities_reader
+            .raw_ledger_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+
+        // Empty? Return empty listing
         let Some(df) = maybe_df else {
             return Ok(MoleculeDataRoomActivityListing::default());
         };
 
+        // Apply filters, if presnet
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
             molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
         });
+
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
                 df,
@@ -71,6 +80,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let records = df.collect_json_aos().await.int_err()?;
         let total_count = records.len();
 
+        // Convert to entities
         let list = records
             .into_iter()
             .map(|record| {
@@ -88,8 +98,8 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
         let maybe_df = match self
-            .molecule_announcements_dataset_service
-            .request_read_of_global_announcements_dataset(&molecule_subject.account_name)
+            .announcements_service
+            .global_reader(&molecule_subject.account_name)
             .await
         {
             Ok(maybe_df) => Ok(maybe_df),

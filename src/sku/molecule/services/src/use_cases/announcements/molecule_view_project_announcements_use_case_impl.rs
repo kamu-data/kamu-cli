@@ -13,14 +13,14 @@ use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeDatasetAccessorFactory;
+use crate::MoleculeAnnouncementsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectAnnouncementsUseCase)]
 pub struct MoleculeViewProjectAnnouncementsUseCaseImpl {
-    accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
+    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,15 +39,20 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
-        let maybe_df = self
-            .accessor_factory
-            .read_accessor(&molecule_project.announcements_dataset_id.as_local_ref())
+        // Gain read access to project's announcements dataset
+        let projects_announcements_reader = self
+            .announcements_service
+            .project_reader(molecule_project)
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?;
+
+        // Obtain raw ledger DF
+        let maybe_df = projects_announcements_reader
             .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?;
 
+        // Empty? Return empty listing
         let Some(df) = maybe_df else {
             return Ok(MoleculeProjectAnnouncementListing::default());
         };

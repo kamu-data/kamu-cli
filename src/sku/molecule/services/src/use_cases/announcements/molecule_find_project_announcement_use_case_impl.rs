@@ -12,14 +12,14 @@ use std::sync::Arc;
 use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeDatasetAccessorFactory;
+use crate::MoleculeAnnouncementsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectAnnouncementUseCase)]
 pub struct MoleculeFindProjectAnnouncementUseCaseImpl {
-    accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
+    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,15 +39,20 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         id: uuid::Uuid,
     ) -> Result<Option<MoleculeProjectAnnouncementRecord>, MoleculeFindProjectAnnouncementError>
     {
-        let maybe_df = self
-            .accessor_factory
-            .read_accessor(&molecule_project.announcements_dataset_id.as_local_ref())
+        // Gain read access to project's announcements dataset
+        let projects_announcements_reader = self
+            .announcements_service
+            .project_reader(molecule_project)
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectAnnouncementError>)?
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectAnnouncementError>)?;
+
+        // Obtain raw ledger DF
+        let maybe_df = projects_announcements_reader
             .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectAnnouncementError>)?;
 
+        // Empty? Return None
         let Some(df) = maybe_df else {
             return Ok(None);
         };

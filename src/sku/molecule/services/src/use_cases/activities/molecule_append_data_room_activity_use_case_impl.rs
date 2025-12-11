@@ -13,14 +13,14 @@ use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeActivitiesDatasetService;
+use crate::MoleculeGlobalActivitiesService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
-    molecule_activities_dataset_service: Arc<dyn MoleculeActivitiesDatasetService>,
+    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,15 +41,15 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         source_event_time: Option<DateTime<Utc>>,
         activity: MoleculeDataRoomActivityEntity,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
-        let global_activities_accessor = self
-            .molecule_activities_dataset_service
-            .request_write_of_global_activity_dataset(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
+        let global_activities_writer = self
+            .global_activities_service
+            .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
         let data_record = activity.into_insert_record();
 
-        global_activities_accessor
+        global_activities_writer
             .push_ndjson_data(data_record.to_bytes(), source_event_time)
             .await
             .int_err()?;

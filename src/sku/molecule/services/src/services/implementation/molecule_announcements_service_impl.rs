@@ -13,17 +13,17 @@ use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
 use crate::{
-    MoleculeAnnouncementsDatasetService,
+    MoleculeAnnouncementsService,
     MoleculeDatasetAccessorFactory,
-    MoleculeDatasetReadAccessor,
-    MoleculeDatasetWriteAccessor,
+    MoleculeDatasetReader,
+    MoleculeDatasetWriter,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeAnnouncementsDatasetService)]
-pub struct MoleculeAnnouncementsDatasetServiceImpl {
+#[dill::interface(dyn MoleculeAnnouncementsService)]
+pub struct MoleculeAnnouncementsServiceImpl {
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
 }
 
@@ -31,44 +31,78 @@ pub struct MoleculeAnnouncementsDatasetServiceImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeAnnouncementsDatasetService for MoleculeAnnouncementsDatasetServiceImpl {
+impl MoleculeAnnouncementsService for MoleculeAnnouncementsServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeAnnouncementsDatasetServiceImpl_request_read_of_global_announcements_dataset,
+        name = MoleculeAnnouncementsServiceImpl_global_reader,
         skip_all,
         fields(molecule_account_name)
     )]
-    async fn request_read_of_global_announcements_dataset(
+    async fn global_reader(
         &self,
         molecule_account_name: &odf::AccountName,
-    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError> {
         let announcements_dataset_alias =
             MoleculeDatasetSnapshots::global_announcements_alias(molecule_account_name.clone());
 
         self.accessor_factory
-            .read_accessor(&announcements_dataset_alias.as_local_ref())
+            .reader(&announcements_dataset_alias.as_local_ref())
             .await
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeAnnouncementsDatasetServiceImpl_request_write_of_global_announcements_dataset,
+        name = MoleculeAnnouncementsServiceImpl_global_writer,
         skip_all,
         fields(molecule_account_name)
     )]
-    async fn request_write_of_global_announcements_dataset(
+    async fn global_writer(
         &self,
         molecule_account_name: &odf::AccountName,
         create_if_not_exist: bool,
-    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError> {
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError> {
         let announcements_dataset_alias =
             MoleculeDatasetSnapshots::global_announcements_alias(molecule_account_name.clone());
 
         self.accessor_factory
-            .write_accessor(
+            .writer(
                 &announcements_dataset_alias.as_local_ref(),
                 create_if_not_exist,
                 || MoleculeDatasetSnapshots::global_announcements(molecule_account_name.clone()),
+            )
+            .await
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeAnnouncementsServiceImpl_project_reader,
+        skip_all,
+        fields(molecule_project_id = %molecule_project.ipnft_uid)
+    )]
+    async fn project_reader(
+        &self,
+        molecule_project: &MoleculeProject,
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError> {
+        self.accessor_factory
+            .reader(&molecule_project.announcements_dataset_id.as_local_ref())
+            .await
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeAnnouncementsServiceImpl_project_writer,
+        skip_all,
+        fields(molecule_project_id = %molecule_project.ipnft_uid)
+    )]
+    async fn project_writer(
+        &self,
+        molecule_project: &MoleculeProject,
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError> {
+        self.accessor_factory
+            .writer(
+                &molecule_project.announcements_dataset_id.as_local_ref(),
+                false,
+                || unreachable!("Project announcements dataset should exist already"),
             )
             .await
     }

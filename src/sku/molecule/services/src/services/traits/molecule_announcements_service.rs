@@ -8,23 +8,34 @@
 // by the Apache License, Version 2.0.
 
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
+use kamu_molecule_domain::MoleculeProject;
 
-use crate::{MoleculeDatasetReadAccessor, MoleculeDatasetWriteAccessor};
+use crate::{MoleculeDatasetReader, MoleculeDatasetWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeActivitiesDatasetService: Send + Sync {
-    async fn request_read_of_global_activity_dataset(
+pub trait MoleculeAnnouncementsService: Send + Sync {
+    async fn global_reader(
         &self,
         molecule_account_name: &odf::AccountName,
-    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError>;
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError>;
 
-    async fn request_write_of_global_activity_dataset(
+    async fn global_writer(
         &self,
         molecule_account_name: &odf::AccountName,
         create_if_not_exist: bool,
-    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError>;
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError>;
+
+    async fn project_reader(
+        &self,
+        molecule_project: &MoleculeProject,
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError>;
+
+    async fn project_writer(
+        &self,
+        molecule_project: &MoleculeProject,
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

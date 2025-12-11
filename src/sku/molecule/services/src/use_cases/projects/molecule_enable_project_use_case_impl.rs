@@ -15,14 +15,14 @@ use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::metadata::OperationType;
 
-use crate::MoleculeProjectsDatasetService;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeEnableProjectUseCase)]
 pub struct MoleculeEnableProjectUseCaseImpl {
-    molecule_projects_dataset_service: Arc<dyn MoleculeProjectsDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -46,7 +46,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
 
         // Gain write access to projects dataset
         let projects_writer = self
-            .molecule_projects_dataset_service
+            .projects_service
             .writer(&molecule_subject.account_name, false)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;

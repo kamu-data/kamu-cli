@@ -9,22 +9,22 @@
 
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 
-use crate::{MoleculeDatasetReadAccessor, MoleculeDatasetWriteAccessor};
+use crate::{MoleculeDatasetReader, MoleculeDatasetWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeAnnouncementsDatasetService: Send + Sync {
-    async fn request_read_of_global_announcements_dataset(
+pub trait MoleculeGlobalActivitiesService: Send + Sync {
+    async fn reader(
         &self,
         molecule_account_name: &odf::AccountName,
-    ) -> Result<MoleculeDatasetReadAccessor, RebacDatasetRefUnresolvedError>;
+    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError>;
 
-    async fn request_write_of_global_announcements_dataset(
+    async fn writer(
         &self,
         molecule_account_name: &odf::AccountName,
         create_if_not_exist: bool,
-    ) -> Result<MoleculeDatasetWriteAccessor, RebacDatasetRefUnresolvedError>;
+    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

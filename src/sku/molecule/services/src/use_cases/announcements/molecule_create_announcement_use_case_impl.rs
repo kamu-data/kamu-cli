@@ -15,16 +15,15 @@ use kamu_core::auth;
 use kamu_molecule_domain::*;
 use odf::serde::DatasetDefaultVocabularySystemColumns;
 
-use crate::{MoleculeAnnouncementsDatasetService, MoleculeDatasetAccessorFactory};
+use crate::MoleculeAnnouncementsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateAnnouncementUseCase)]
 pub struct MoleculeCreateAnnouncementUseCaseImpl {
-    accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    molecule_announcements_dataset_service: Arc<dyn MoleculeAnnouncementsDatasetService>,
+    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
 impl MoleculeCreateAnnouncementUseCaseImpl {
@@ -89,9 +88,9 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         // 1. Resolve global announcements dataset
 
-        let global_announcements_accessor = self
-            .molecule_announcements_dataset_service
-            .request_write_of_global_announcements_dataset(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
+        let global_announcements_writer = self
+            .announcements_service
+            .global_writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
@@ -117,22 +116,18 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         let project_announcement_record =
             global_announcement_record.as_project_announcement_record();
 
-        global_announcements_accessor
+        global_announcements_writer
             .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
             .await?;
 
         // 4. Store project announcements
-        let project_announcements_accessor = self
-            .accessor_factory
-            .write_accessor(
-                &molecule_project.announcements_dataset_id.as_local_ref(),
-                false,
-                || unreachable!("Project announcements dataset should exist already"),
-            )
+        let project_announcements_writer = self
+            .announcements_service
+            .project_writer(molecule_project)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
-        project_announcements_accessor
+        project_announcements_writer
             .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
             .await?;
 
