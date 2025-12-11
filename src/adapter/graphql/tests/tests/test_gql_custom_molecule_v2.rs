@@ -3145,6 +3145,7 @@ async fn test_molecule_v2_activity() {
         .await;
 
     const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
@@ -3663,24 +3664,32 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    /*
-
     ///////////////////////////////////////////////////////////////////////////////
 
     // Create another project
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "ipnftTokenId": "10",
-            })),
-        ))
-        .await;
+    assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitaslow",
+                    "ipnftUid": PROJECT_2_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
+                    "ipnftTokenId": "10",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
 
+    /*
     // Create an announcement
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
