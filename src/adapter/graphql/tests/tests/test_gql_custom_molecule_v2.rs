@@ -3694,13 +3694,13 @@ async fn test_molecule_v2_activity() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "ipnftUid": PROJECT_2_UID,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
-                "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+                "attachments": [],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": USER_2,
-                "categories": [],
+                "categories": ["test-category-2"],
                 "tags": ["test-tag1"],
             })),
         )
@@ -3732,101 +3732,152 @@ async fn test_molecule_v2_activity() {
         new_announcement_id
     };
 
-    /*
-    // Check global activity events
-    const LIST_ACTIVITY: &str = indoc!(
-        r#"
-        query {
-            molecule {
-                activity {
-                    nodes {
-                        __typename
-                        project {
-                            ipnftSymbol
-                        }
-                        ... on MoleculeProjectEventDataRoomEntryAdded {
-                            entry {
-                                path
-                            }
-                        }
-                        ... on MoleculeProjectEventDataRoomEntryRemoved {
-                            entry {
-                                path
-                            }
-                        }
-                        ... on MoleculeProjectEventDataRoomEntryUpdated {
-                            newEntry {
-                                path
-                            }
-                        }
-                        ... on MoleculeProjectEventAnnouncement {
-                            announcement
-                        }
-                        ... on MoleculeProjectEventFileUpdated {
-                            dataset { alias }
-                            newEntry {
-                                version
-                            }
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_2_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "activity": {
+                            "nodes": [
+                                {
+                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "announcement": {
+                                        "id": project_2_announcement_1_id,
+                                        "headline": "Test announcement 2",
+                                        "body": "Blah blah 2",
+                                        "attachments": [],
+                                        "accessLevel": "holders",
+                                        "changeBy": USER_2,
+                                        "categories": ["test-category-2"],
+                                        "tags": ["test-tag1"],
+                                    }
+                                },
+                            ]
                         }
                     }
                 }
             }
-        }
-        "#
+        })
     );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(LIST_ACTIVITY))
-        .await;
 
-    assert!(res.is_ok(), "{res:#?}");
-    let mut json = res.data.into_json().unwrap();
-    let nodes = &mut json["molecule"]["activity"]["nodes"];
-    nodes[0]["announcement"]["announcement_id"] = any.clone();
-    nodes[0]["announcement"]["system_time"] = any.clone();
-    nodes[0]["announcement"]["event_time"] = any.clone();
-    nodes[1]["announcement"]["announcement_id"] = any.clone();
-    nodes[1]["announcement"]["system_time"] = any.clone();
-    nodes[1]["announcement"]["event_time"] = any.clone();
-
-    // NOTE: Only announcements are currently supported
+    // Check global activity events
+    let expected_global_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityAnnouncementV2",
+            "announcement": {
+                "id": project_2_announcement_1_id,
+                "headline": "Test announcement 2",
+                "body": "Blah blah 2",
+                "attachments": [],
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+                "categories": ["test-category-2"],
+                "tags": ["test-tag1"],
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileRemovedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityAnnouncementV2",
+            "announcement": {
+                "id": project_1_announcement_1_id,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [
+                    project_1_file_1_dataset_id,
+                    project_1_file_2_dataset_id,
+                ],
+                "accessLevel": "holders",
+                "changeBy": USER_1,
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "changeBy": USER_1,
+            }
+        },
+    ]);
     assert_eq!(
-        *nodes,
-        json!([
-            {
-                "__typename": "MoleculeProjectEventAnnouncement",
-                "project": {
-                    "ipnftSymbol": "vitaslow",
-                },
-                "announcement": {
-                    "announcement_id": &any,
-                    "attachments": [],
-                    "body": "Blah blah bleh",
-                    "event_time": &any,
-                    "headline": "Test announcement 2",
-                    "molecule_access_level": "holders",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "system_time": &any,
-                },
-            },
-            {
-                "__typename": "MoleculeProjectEventAnnouncement",
-                "project": {
-                    "ipnftSymbol": "vitafast",
-                },
-                "announcement": {
-                    "announcement_id": &any,
-                    "attachments": [&test_file_1, &test_file_2],
-                    "body": "Blah blah",
-                    "event_time": &any,
-                    "headline": "Test announcement 1",
-                    "molecule_access_level": "holders",
-                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "system_time": &any,
-                },
-            },
-        ])
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_global_activity_nodes
+                    }
+                }
+            }
+        })
     );
-     */
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
