@@ -5176,7 +5176,7 @@ dependencies = [
 
 [[package]]
 name = "format-utils"
-version = "0.254.0"
+version = "0.254.1"
 dependencies = [
  "pretty_assertions",
 ]
@@ -8414,7 +8414,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-domain"
-version = "0.254.0"
+version = "0.254.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -8440,7 +8440,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-services"
-version = "0.254.0"
+version = "0.254.1"
 dependencies = [
  "async-trait",
  "bytes",

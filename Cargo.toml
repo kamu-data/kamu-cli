@@ -266,8 +266,8 @@ kamu-adapter-odata = { version = "0.254.1", path = "src/adapter/odata", default-
 kamu-adapter-oauth = { version = "0.254.1", path = "src/adapter/oauth", default-features = false }
 
 # SKU modules
-kamu-molecule-domain = { version = "0.254.0", path = "src/sku/molecule/domain", default-features = false }
-kamu-molecule-services = { version = "0.254.0", path = "src/sku/molecule/services", default-features = false }
+kamu-molecule-domain = { version = "0.254.1", path = "src/sku/molecule/domain", default-features = false }
+kamu-molecule-services = { version = "0.254.1", path = "src/sku/molecule/services", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.254.1", path = "src/e2e/app/cli/common", default-features = false }
