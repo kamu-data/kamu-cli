@@ -5239,6 +5239,31 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+    // Filters by access levels: [public, holders]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byTags": [],
+                    "byCategories": [],
+                    "byAccessLevels": ["public", "holders"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_all_global_activity_nodes
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
