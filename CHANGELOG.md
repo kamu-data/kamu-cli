@@ -19,6 +19,15 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## Unreleased
+### Added
+- Support for re-defining the `AddPushSource`
+
+## [0.254.1] - 2025-12-08
+### Fixed
+- Fixed bug in applying projected offsets for flow states in a situation when delayed transaction
+   commits events with higher event IDs than later started transactions, and they all are in the same fetched bulk
+
 ## [0.254.0] - 2025-12-05
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows

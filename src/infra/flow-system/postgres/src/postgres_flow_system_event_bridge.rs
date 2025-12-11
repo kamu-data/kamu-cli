@@ -276,9 +276,22 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        let (last_event_id, last_tx_id) = event_ids_with_tx_ids
+        // Order (tx_id, event_id) is critical here.
+        // We must write the highest event_id for the highest tx_id to ensure
+        // idempotency. This means there might be events with higher event_id
+        // but lower tx_id in this batch.
+        //
+        // I.e.:
+        //   tx-id: 226813, event-id: 7004-7006, 7009-7011, 7013-7018
+        //   tx-id: 226814, event-id: 7003
+        //   tx-id: 226815, event-id: 7007-7008
+        // Event though the highest event-id is 7018, we must record (226815, 7008) as
+        // the last projected offset. Recording (226813, 7018) would cause
+        // re-processing of events from tx-id 226814 and 226815!!!
+
+        let (last_tx_id, last_event_id) = event_ids_with_tx_ids
             .iter()
-            .map(|(event_id, tx_id)| (event_id.into_inner(), *tx_id))
+            .map(|(event_id, tx_id)| (*tx_id, event_id.into_inner()))
             .max()
             .unwrap();
 
