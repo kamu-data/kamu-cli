@@ -271,6 +271,24 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
     }
     "#
 );
+const REMOVE_ENTRY_QUERY: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $path: CollectionPath!) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              removeEntry(path: $path) {
+                isSuccess
+                message
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2066,24 +2084,6 @@ async fn test_molecule_v2_data_room_operations() {
     /////////////////
     // removeEntry //
     /////////////////
-    const REMOVE_ENTRY_QUERY: &str = indoc!(
-        r#"
-        mutation ($ipnftUid: String!, $path: CollectionPath!) {
-          molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
-                dataRoom {
-                  removeEntry(path: $path) {
-                    isSuccess
-                    message
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
-    );
 
     // Non-existent file
     assert_eq!(
@@ -3514,42 +3514,37 @@ async fn test_molecule_v2_activity() {
 
     // TODO: check activity
 
-    /*
-
     // Remove a file
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-            mutation ($datasetId: DatasetID!, $path: CollectionPath!) {
-                datasets {
-                    byId(datasetId: $datasetId) {
-                        asCollection {
-                            removeEntry(path: $path) {
-                                isSuccess
-                                message
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            REMOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "removeEntry": {
+                                "isSuccess": true,
+                                "message": "",
                             }
                         }
                     }
                 }
             }
-            "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": &data_room_did,
-                "path": "/bar",
-            }))),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["removeEntry"],
-        json!({
-            "isSuccess": true,
-            "message": "",
         })
     );
+
+    // TODO: check activity
+
+    /*
 
     // Check project activity events
     const LIST_EVENTS: &str = indoc!(
