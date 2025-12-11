@@ -905,8 +905,8 @@ async fn test_molecule_v2_data_room_operations() {
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "accessLevel": "public",
                 "description": "Plain text file",
-                "categories": ["test-category"],
-                "tags": ["test-tag1", "test-tag2"],
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1"],
                 "contentText": "hello",
                 "encryptionMetadata": {
                     "dataToEncryptHash": "EM1",
@@ -966,8 +966,8 @@ async fn test_molecule_v2_data_room_operations() {
                             "litSdkVersion": "EM6",
                             "templateName": "EM8",
                         },
-                        "categories": ["test-category"],
-                        "tags": ["test-tag1", "test-tag2"],
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1"],
                     }
                 }
             }
@@ -1096,7 +1096,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "accessLevel": "public",
                 "description": "Plain text file",
-                "categories": ["test-category"],
+                "categories": ["test-category-2"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello",
                 "encryptionMetadata": {
@@ -1141,7 +1141,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                         "accessLevel": "public",
                         "description": "Plain text file",
-                        "categories": ["test-category"],
+                        "categories": ["test-category-2"],
                         "tags": ["test-tag1", "test-tag2"],
                         "contentText": "hello",
                         "encryptionMetadata": {
@@ -1290,7 +1290,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                "accessLevel": "public",
+                "accessLevel": "holders",
             }))),
         )
         .await;
@@ -1320,7 +1320,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "contentHash": "f16203338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392",
                         "contentType": "text/plain",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                        "accessLevel": "public",
+                        "accessLevel": "holders",
                         "description": null,
                         "categories": [],
                         "tags": [],
@@ -1402,36 +1402,35 @@ async fn test_molecule_v2_data_room_operations() {
     // List data room entries and denormalized file fields
     const LIST_ENTRIES_QUERY: &str = indoc!(
         r#"
-        query ($ipnftUid: String!) {
-            molecule {
-                v2 {
-                    project(ipnftUid: $ipnftUid) {
-                        dataRoom {
-                            latest {
-                                entries {
-                                    totalCount
-                                    nodes {
-                                        path
-                                        ref
-                                        changeBy
-
-                                        asVersionedFile {
-                                            latest {
-                                                contentType
-                                                categories
-                                                tags
-                                                accessLevel
-                                                version
-                                                description
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+        query ($ipnftUid: String!, $filters: MoleculeDataRoomEntriesFilters) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  latest {
+                    entries(filters: $filters) {
+                      totalCount
+                      nodes {
+                        path
+                        ref
+                        changeBy
+                        asVersionedFile {
+                          latest {
+                            contentType
+                            categories
+                            tags
+                            accessLevel
+                            version
+                            description
+                          }
                         }
+                      }
                     }
+                  }
                 }
+              }
             }
+          }
         }
         "#
     );
@@ -1440,6 +1439,7 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(async_graphql::Request::new(LIST_ENTRIES_QUERY).variables(
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "filters": null,
             })),
         ))
         .await;
@@ -1460,7 +1460,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "contentType": "text/plain",
                             "version": 1,
                             "description": "Plain text file",
-                            "categories": ["test-category"],
+                            "categories": ["test-category-2"],
                             "tags": ["test-tag1", "test-tag2"],
                         }
                     }
@@ -1471,7 +1471,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "asVersionedFile": {
                         "latest": {
-                            "accessLevel": "public",
+                            "accessLevel": "holders",
                             "contentType": "text/plain",
                             "version": 1,
                             "description": null,
@@ -1490,8 +1490,8 @@ async fn test_molecule_v2_data_room_operations() {
                             "contentType": "text/plain",
                             "version": 1,
                             "description": "Plain text file",
-                            "categories": ["test-category"],
-                            "tags": ["test-tag1", "test-tag2"],
+                            "categories": ["test-category-1"],
+                            "tags": ["test-tag1"],
                         }
                     }
                 },
@@ -1570,8 +1570,8 @@ async fn test_molecule_v2_data_room_operations() {
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                 "accessLevel": "public",
                 "description": "Plain text file that was updated",
-                "categories": ["test-category"],
-                "tags": ["test-tag1", "test-tag2"],
+                "categories": ["test-category-1", "test-category-3"],
+                "tags": ["test-tag1", "test-tag4"],
                 "contentText": "bye",
                 "encryptionMetadata": {
                     "dataToEncryptHash": "EM1",
@@ -1611,8 +1611,8 @@ async fn test_molecule_v2_data_room_operations() {
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                         "accessLevel": "public",
                         "description": "Plain text file that was updated",
-                        "categories": ["test-category"],
-                        "tags": ["test-tag1", "test-tag2"],
+                        "categories": ["test-category-1", "test-category-3"],
+                        "tags": ["test-tag1", "test-tag4"],
                         "contentText": "bye",
                         "encryptionMetadata": {
                             "dataToEncryptHash": "EM1",
@@ -1777,8 +1777,8 @@ async fn test_molecule_v2_data_room_operations() {
                     "contentText": "bye",
                     "contentType": "text/plain",
                     "description": "Plain text file that was updated",
-                    "categories": ["test-category"],
-                    "tags": ["test-tag1", "test-tag2"],
+                    "categories": ["test-category-1", "test-category-3"],
+                    "tags": ["test-tag1", "test-tag4"],
                     "encryptionMetadata": {
                         "dataToEncryptHash": "EM1",
                         "accessControlConditions": "EM2",
@@ -1861,7 +1861,7 @@ async fn test_molecule_v2_data_room_operations() {
             "asVersionedFile": {
                 "latest": {
                     "version": 1,
-                    "accessLevel": "public",
+                    "accessLevel": "holders",
                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "contentHash": "f16203338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392",
                     "contentType": "text/plain",
@@ -1936,11 +1936,60 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    let all_entries_nodes = json!([
+        {
+            "path": "/2025/foo.txt",
+            "ref": file_1_did,
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+            "asVersionedFile": {
+                "latest": {
+                    "accessLevel": "public",
+                    "contentType": "text/plain",
+                    "version": 2,
+                    "description": "Plain text file that was updated",
+                    "categories": ["test-category-1", "test-category-3"],
+                    "tags": ["test-tag1", "test-tag4"],
+                }
+            }
+        },
+        {
+            "path": "/bar.txt",
+            "ref": file_2_did,
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "asVersionedFile": {
+                "latest": {
+                    "accessLevel": "public",
+                    "contentType": "text/plain",
+                    "version": 1,
+                    "description": "Plain text file",
+                    "categories": ["test-category-2"],
+                    "tags": ["test-tag1", "test-tag2"],
+                }
+            }
+        },
+        {
+            "path": "/baz.txt",
+            "ref": file_3_did,
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "asVersionedFile": {
+                "latest": {
+                    "accessLevel": "holders",
+                    "contentType": "text/plain",
+                    "version": 1,
+                    "description": null,
+                    "categories": [],
+                    "tags": [],
+                }
+            }
+        },
+    ]);
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
-            async_graphql::Variables::from_json(json!({
+            async_graphql::Variables::from_value(value!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -1950,53 +1999,7 @@ async fn test_molecule_v2_data_room_operations() {
         .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
-            "nodes": [
-                {
-                    "path": "/2025/foo.txt",
-                    "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                    "asVersionedFile": {
-                        "latest": {
-                            "accessLevel": "public",
-                            "contentType": "text/plain",
-                            "version": 2,
-                            "description": "Plain text file that was updated",
-                            "categories": ["test-category"],
-                            "tags": ["test-tag1", "test-tag2"],
-                        }
-                    }
-                },
-                {
-                    "path": "/bar.txt",
-                    "ref": file_2_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "asVersionedFile": {
-                        "latest": {
-                            "accessLevel": "public",
-                            "contentType": "text/plain",
-                            "version": 1,
-                            "description": "Plain text file",
-                            "categories": ["test-category"],
-                            "tags": ["test-tag1", "test-tag2"],
-                        }
-                    }
-                },
-                {
-                    "path": "/baz.txt",
-                    "ref": file_3_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                    "asVersionedFile": {
-                        "latest": {
-                            "accessLevel": "public",
-                            "contentType": "text/plain",
-                            "version": 1,
-                            "description": null,
-                            "categories": [],
-                            "tags": [],
-                        }
-                    }
-                },
-            ],
+            "nodes": all_entries_nodes,
         })
     );
 
@@ -2082,6 +2085,685 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    /////////////
+    // Filters //
+    /////////////
+
+    // Filters without values
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 3,
+            "nodes": all_entries_nodes,
+        })
+    );
+
+    // Filters by tags: [test-tag4]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": ["test-tag4"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": file_2_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": "Plain text file",
+                //             "categories": ["test-category-2"],
+                //             "tags": ["test-tag1", "test-tag2"],
+                //         }
+                //     }
+                // },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by tags: [test-tag1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": ["test-tag1", "test-tag1"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 2,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category-2"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by tags: [test-tag2, test-tag1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": ["test-tag2", "test-tag1"],
+                    "byCategories": null,
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                // {
+                //     "path": "/2025/foo.txt",
+                //     "ref": file_1_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 2,
+                //             "description": "Plain text file that was updated",
+                //             "categories": ["test-category-1", "test-category-3"],
+                //             "tags": ["test-tag1", "test-tag4"],
+                //         }
+                //     }
+                // },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category-2"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by categories: [test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-1"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": file_2_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": "Plain text file",
+                //             "categories": ["test-category-2"],
+                //             "tags": ["test-tag1", "test-tag2"],
+                //         }
+                //     }
+                // },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by categories: [test-category-2]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-2"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                // {
+                //     "path": "/2025/foo.txt",
+                //     "ref": file_1_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 2,
+                //             "description": "Plain text file that was updated",
+                //             "categories": ["test-category-1", "test-category-3"],
+                //             "tags": ["test-tag1", "test-tag4"],
+                //         }
+                //     }
+                // },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category-2"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by categories: [test-category-3, test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": ["test-category-3", "test-category-1"],
+                    "byAccessLevels": null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": file_2_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": "Plain text file",
+                //             "categories": ["test-category-2"],
+                //             "tags": ["test-tag1", "test-tag2"],
+                //         }
+                //     }
+                // },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by access levels: [public]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 2,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category-2"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by access levels: [holders]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["holders"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                // {
+                //     "path": "/2025/foo.txt",
+                //     "ref": file_1_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 2,
+                //             "description": "Plain text file that was updated",
+                //             "categories": ["test-category-1", "test-category-3"],
+                //             "tags": ["test-tag1", "test-tag4"],
+                //         }
+                //     }
+                // },
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": file_2_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": "Plain text file",
+                //             "categories": ["test-category-2"],
+                //             "tags": ["test-tag1", "test-tag2"],
+                //         }
+                //     }
+                // },
+                {
+                    "path": "/baz.txt",
+                    "ref": file_3_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "holders",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": null,
+                            "categories": [],
+                            "tags": [],
+                        }
+                    }
+                },
+            ],
+        })
+    );
+
+    // Filters by access levels: [holders, public]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels": ["holders", "public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 3,
+            "nodes": all_entries_nodes,
+        })
+    );
+
+    // Filters combination: [test-tag4] AND [test-category-1] AND
+    // [public]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": ["test-tag4"],
+                    "byCategories": ["test-category-1"],
+                    "byAccessLevels": ["public"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": file_2_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "public",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": "Plain text file",
+                //             "categories": ["test-category-2"],
+                //             "tags": ["test-tag1", "test-tag2"],
+                //         }
+                //     }
+                // },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
     /////////////////
     // removeEntry //
     /////////////////
@@ -2146,6 +2828,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2166,8 +2849,8 @@ async fn test_molecule_v2_data_room_operations() {
                             "contentType": "text/plain",
                             "version": 2,
                             "description": "Plain text file that was updated",
-                            "categories": ["test-category"],
-                            "tags": ["test-tag1", "test-tag2"],
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
                         }
                     }
                 },
@@ -2181,7 +2864,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "contentType": "text/plain",
                             "version": 1,
                             "description": "Plain text file",
-                            "categories": ["test-category"],
+                            "categories": ["test-category-2"],
                             "tags": ["test-tag1", "test-tag2"],
                         }
                     }
@@ -2407,6 +3090,7 @@ async fn test_molecule_v2_data_room_operations() {
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
+                "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2442,7 +3126,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "contentType": "text/plain",
                             "version": 1,
                             "description": "Plain text file",
-                            "categories": ["test-category"],
+                            "categories": ["test-category-2"],
                             "tags": ["test-tag1", "test-tag2"],
                         }
                     }
@@ -2592,7 +3276,6 @@ async fn test_molecule_v2_data_room_operations() {
     //
     // Introduce tests for:
     // - Attempt to create new file with path that already exists - expect error
-    // - Filter by: accessLevel
     // - Get entries with prefix and maxDepth
 }
 
