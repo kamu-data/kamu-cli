@@ -28,6 +28,7 @@ ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
+query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
