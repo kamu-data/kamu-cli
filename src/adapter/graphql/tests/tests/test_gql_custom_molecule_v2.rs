@@ -241,6 +241,36 @@ const MOVE_ENTRY_QUERY: &str = indoc!(
     }
     "#
 );
+const CREATE_ANNOUNCEMENT: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $moleculeAccessLevel: String!, $moleculeChangeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            announcements {
+              create(
+                headline: $headline
+                body: $body
+                attachments: $attachments
+                moleculeAccessLevel: $moleculeAccessLevel
+                moleculeChangeBy: $moleculeChangeBy
+                categories: $categories
+                tags: $tags
+              ) {
+                isSuccess
+                message
+                __typename
+                ... on CreateAnnouncementSuccess {
+                  announcementId
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2768,37 +2798,6 @@ async fn test_molecule_v2_announcements_operations() {
     };
 
     // Create an announcement without attachments
-    const CREATE_ANNOUNCEMENT: &str = indoc!(
-        r#"
-        mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $moleculeAccessLevel: String!, $moleculeChangeBy: String!, $categories: [String!]!, $tags: [String!]!) {
-          molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
-                announcements {
-                  create(
-                    headline: $headline
-                    body: $body
-                    attachments: $attachments
-                    moleculeAccessLevel: $moleculeAccessLevel
-                    moleculeChangeBy: $moleculeChangeBy
-                    categories: $categories
-                    tags: $tags
-                  ) {
-                    isSuccess
-                    message
-                    __typename
-                    ... on CreateAnnouncementSuccess {
-                      announcementId
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        "#
-    );
-
     let project_1_announcement_1_id = {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
@@ -3437,57 +3436,52 @@ async fn test_molecule_v2_activity() {
 
     // TODO: check activity
 
-    /*
     // Create an announcement
-    const CREATE_ANNOUNCEMENT: &str = indoc!(
-        r#"
-        mutation (
-            $ipnftUid: String!,
-            $headline: String!,
-            $body: String!,
-            $attachments: [String!],
-            $moleculeAccessLevel: String!,
-            $moleculeChangeBy: String!,
-        ) {
-            molecule {
-                project(ipnftUid: $ipnftUid) {
-                    createAnnouncement(
-                        headline: $headline,
-                        body: $body,
-                        attachments: $attachments,
-                        moleculeAccessLevel: $moleculeAccessLevel,
-                        moleculeChangeBy: $moleculeChangeBy,
-                    ) {
-                        isSuccess
-                        message
-                    }
-                }
-            }
-        }
-        "#
-    );
-
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+    let project_1_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
                 "headline": "Test announcement 1",
-                "body": "Blah blah",
-                "attachments": [test_file_1, test_file_2],
+                "body": "Blah blah 1",
+                "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
             })),
-        ))
-        .await;
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    // TODO: check activity
+
+    /*
 
     // Upload new file version
     let res = harness
