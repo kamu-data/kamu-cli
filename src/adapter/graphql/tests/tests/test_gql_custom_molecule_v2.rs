@@ -3440,7 +3440,7 @@ async fn test_molecule_v2_activity() {
 
     // TODO: check activity
 
-    // Create an announcement
+    // Create an announcement for the first project
     let project_1_announcement_1_id = {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
@@ -3689,30 +3689,50 @@ async fn test_molecule_v2_activity() {
         Some(true),
     );
 
-    /*
-    // Create an announcement
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10",
+    // Create an announcement for the second project
+    let project_2_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
                 "headline": "Test announcement 2",
-                "body": "Blah blah bleh",
-                "attachments": [],
+                "body": "Blah blah 2",
+                "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
                 "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeChangeBy": USER_2,
+                "categories": [],
+                "tags": ["test-tag1"],
             })),
-        ))
-        .await;
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
 
-    assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
-        json!({
-            "isSuccess": true,
-            "message": "",
-        })
-    );
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
 
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    /*
     // Check global activity events
     const LIST_ACTIVITY: &str = indoc!(
         r#"
