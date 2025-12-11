@@ -3325,6 +3325,64 @@ async fn test_molecule_v2_activity() {
         file_dataset_id
     };
 
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
+
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
@@ -3409,7 +3467,81 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    // Move a file (retract + append)
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
+
+    // Move a file
     assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
@@ -3438,7 +3570,87 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    // TODO: check activity
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     // Create an announcement for the first project
     let project_1_announcement_1_id = {
@@ -3483,7 +3695,103 @@ async fn test_molecule_v2_activity() {
         new_announcement_id
     };
 
-    // TODO: check activity
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_1_id,
+                        "headline": "Test announcement 1",
+                        "body": "Blah blah 1",
+                        "attachments": [
+                            project_1_file_1_dataset_id,
+                            project_1_file_2_dataset_id,
+                        ],
+                        "accessLevel": "holders",
+                        "changeBy": USER_1,
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1", "test-tag2"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     // Upload a new file version
     assert_eq!(
@@ -3516,7 +3824,111 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    // TODO: check activity
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_1_id,
+                        "headline": "Test announcement 1",
+                        "body": "Blah blah 1",
+                        "attachments": [
+                            project_1_file_1_dataset_id,
+                            project_1_file_2_dataset_id,
+                        ],
+                        "accessLevel": "holders",
+                        "changeBy": USER_1,
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1", "test-tag2"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "changeBy": USER_2,
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node.clone()
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": expected_activity_node
+                }
+            }
+        })
+    );
 
     // Remove a file
     assert_eq!(
