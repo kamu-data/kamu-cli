@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{MoleculeProject, MoleculeProjectAnnouncementRecord};
+use crate::{MoleculeAnnouncementChangelogEntry, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +19,7 @@ pub trait MoleculeFindProjectAnnouncementUseCase: Send + Sync {
         &self,
         molecule_project: &MoleculeProject,
         id: uuid::Uuid,
-    ) -> Result<Option<MoleculeProjectAnnouncementRecord>, MoleculeFindProjectAnnouncementError>;
+    ) -> Result<Option<MoleculeAnnouncementChangelogEntry>, MoleculeFindProjectAnnouncementError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

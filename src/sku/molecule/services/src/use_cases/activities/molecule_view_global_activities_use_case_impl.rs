@@ -97,24 +97,31 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeGlobalActivitiesFilters>,
     ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let maybe_df = match self
+        // Get read access to global announcements dataset
+        let announcements_reader = match self
             .announcements_service
             .global_reader(&molecule_subject.account_name)
             .await
         {
-            Ok(maybe_df) => Ok(maybe_df),
+            Ok(reader) => Ok(reader),
+
+            // No announcements dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                // No announcements dataset yet is fine, just return empty listing
                 return Ok(MoleculeDataRoomActivityListing::default());
             }
+
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
                 MoleculeViewDataRoomActivitiesError,
             >(e)),
-        }?
-        .raw_ledger_data_frame()
-        .await
-        .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+        }?;
 
+        // Load raw ledger DF
+        let maybe_df = announcements_reader
+            .raw_ledger_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+
+        // Empty? Return empty listing
         let Some(df) = maybe_df else {
             return Ok(MoleculeDataRoomActivityListing::default());
         };
@@ -139,7 +146,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeGlobalAnnouncementRecord::from_json(record)?;
+                let entity = MoleculeGlobalAnnouncementChangelogEntry::from_json(record)?;
                 Ok(MoleculeGlobalActivity::Announcement(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;

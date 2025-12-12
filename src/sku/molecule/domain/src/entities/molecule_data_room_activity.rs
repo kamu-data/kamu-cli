@@ -60,7 +60,7 @@ pub struct MoleculeDataRoomActivityEntity {
 
 impl MoleculeDataRoomActivityEntity {
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let r: MoleculeDataRoomActivityRecord = serde_json::from_value(record).int_err()?;
+        let r: MoleculeDataRoomActivityChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
             system_time: r.system_columns.system_time,
@@ -81,15 +81,15 @@ impl MoleculeDataRoomActivityEntity {
         })
     }
 
-    pub fn into_insert_record(self) -> MoleculeDataRoomActivityRecord {
-        MoleculeDataRoomActivityRecord {
+    pub fn into_insert_record(self) -> MoleculeDataRoomActivityChangelogEntry {
+        MoleculeDataRoomActivityChangelogEntry {
             system_columns: odf::serde::DatasetDefaultVocabularySystemColumns {
                 offset: None,
                 op: odf::metadata::OperationType::Append,
                 system_time: self.system_time,
                 event_time: self.event_time,
             },
-            record: MoleculeDataRoomActivityDataRecord {
+            record: MoleculeDataRoomActivityRecord {
                 activity_type: self.activity_type,
                 ipnft_uid: self.ipnft_uid,
                 path: self.path,
@@ -111,7 +111,7 @@ impl MoleculeDataRoomActivityEntity {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeDataRoomActivityDataRecord {
+pub struct MoleculeDataRoomActivityRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 
     pub ipnft_uid: String,
@@ -143,8 +143,8 @@ pub struct MoleculeDataRoomActivityDataRecord {
     pub tags: Vec<String>,
 }
 
-pub type MoleculeDataRoomActivityRecord =
-    odf::serde::DatasetDefaultVocabularyRecord<MoleculeDataRoomActivityDataRecord>;
+pub type MoleculeDataRoomActivityChangelogEntry =
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeDataRoomActivityRecord>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

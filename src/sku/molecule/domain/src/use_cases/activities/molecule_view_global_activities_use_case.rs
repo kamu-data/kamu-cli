@@ -14,7 +14,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use crate::{
     MoleculeDataRoomActivityEntity,
     MoleculeGetDatasetError,
-    MoleculeGlobalAnnouncementRecord,
+    MoleculeGlobalAnnouncementChangelogEntry,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ pub struct MoleculeGlobalActivitiesFilters {
 
 pub enum MoleculeGlobalActivity {
     DataRoomActivity(MoleculeDataRoomActivityEntity),
-    Announcement(MoleculeGlobalAnnouncementRecord),
+    Announcement(MoleculeGlobalAnnouncementChangelogEntry),
 }
 
 impl MoleculeGlobalActivity {

@@ -14,7 +14,7 @@ use database_common::PaginationOpts;
 use kamu_molecule_domain::{
     MoleculeFindProjectAnnouncementError,
     MoleculeFindProjectAnnouncementUseCase,
-    MoleculeGlobalAnnouncementRecordExt,
+    MoleculeGlobalAnnouncementChangelogEntryExt,
     MoleculeViewProjectAnnouncementsUseCase,
 };
 
@@ -133,27 +133,27 @@ impl MoleculeAnnouncements {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeAnnouncementEntry {
-    pub entity: kamu_molecule_domain::MoleculeProjectAnnouncementRecord,
+    pub changelog_entry: kamu_molecule_domain::MoleculeAnnouncementChangelogEntry,
     pub project: Arc<MoleculeProjectV2>,
 }
 
 impl MoleculeAnnouncementEntry {
     pub fn new_from_global_announcement_record(
         project: &Arc<MoleculeProjectV2>,
-        entity: kamu_molecule_domain::MoleculeGlobalAnnouncementRecord,
+        changelog_entry: kamu_molecule_domain::MoleculeGlobalAnnouncementChangelogEntry,
     ) -> Self {
         Self {
-            entity: entity.into_project_announcement_record(),
+            changelog_entry: changelog_entry.into_announcement_entry(),
             project: project.clone(),
         }
     }
 
     pub fn new_from_project_announcement_record(
         project: &Arc<MoleculeProjectV2>,
-        entity: kamu_molecule_domain::MoleculeProjectAnnouncementRecord,
+        changelog_entry: kamu_molecule_domain::MoleculeAnnouncementChangelogEntry,
     ) -> Self {
         Self {
-            entity,
+            changelog_entry,
             project: project.clone(),
         }
     }
@@ -167,28 +167,27 @@ impl MoleculeAnnouncementEntry {
     }
 
     async fn system_time(&self) -> DateTime<Utc> {
-        self.entity.system_columns.system_time
+        self.changelog_entry.system_columns.system_time
     }
 
     async fn event_time(&self) -> DateTime<Utc> {
-        self.entity.system_columns.event_time
+        self.changelog_entry.system_columns.event_time
     }
 
     async fn id(&self) -> MoleculeAnnouncementId {
-        let id = self.entity.record.announcement_id.as_ref().unwrap();
-        id.to_string()
+        self.changelog_entry.record.announcement_id.to_string()
     }
 
     async fn headline(&self) -> &str {
-        self.entity.record.headline.as_str()
+        self.changelog_entry.record.headline.as_str()
     }
 
     async fn body(&self) -> &str {
-        self.entity.record.body.as_str()
+        self.changelog_entry.record.body.as_str()
     }
 
     async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
-        self.entity
+        self.changelog_entry
             .record
             .attachments
             .iter()
@@ -197,20 +196,20 @@ impl MoleculeAnnouncementEntry {
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
-        &self.entity.record.access_level
+        &self.changelog_entry.record.access_level
     }
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
     async fn change_by(&self) -> &MoleculeChangeBy {
-        &self.entity.record.change_by
+        &self.changelog_entry.record.change_by
     }
 
     async fn categories(&self) -> &[MoleculeCategory] {
-        &self.entity.record.categories
+        &self.changelog_entry.record.categories
     }
 
     async fn tags(&self) -> &[MoleculeTag] {
-        &self.entity.record.tags
+        &self.changelog_entry.record.tags
     }
 }
 

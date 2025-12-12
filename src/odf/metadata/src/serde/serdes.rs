@@ -249,7 +249,7 @@ pub struct DatasetDefaultVocabularySystemColumns {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(bound = "T: serde::Serialize + for<'a> serde::Deserialize<'a>")]
-pub struct DatasetDefaultVocabularyRecord<T> {
+pub struct DatasetDefaultVocabularyChangelogEntry<T> {
     #[serde(flatten)]
     pub system_columns: DatasetDefaultVocabularySystemColumns,
 
@@ -257,7 +257,7 @@ pub struct DatasetDefaultVocabularyRecord<T> {
     pub record: T,
 }
 
-impl<T> DatasetDefaultVocabularyRecord<T>
+impl<T> DatasetDefaultVocabularyChangelogEntry<T>
 where
     T: serde::Serialize + for<'a> serde::Deserialize<'a>,
 {

@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::{MoleculeGlobalAnnouncementDataRecord, MoleculeProject};
+use crate::{MoleculeAnnouncementRecord, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
-        global_announcement: MoleculeGlobalAnnouncementDataRecord,
+        announcement: MoleculeAnnouncementRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }
 

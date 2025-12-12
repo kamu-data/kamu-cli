@@ -91,7 +91,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
 
         let announcements = records
             .into_iter()
-            .map(MoleculeProjectAnnouncementRecord::from_json)
+            .map(MoleculeAnnouncementChangelogEntry::from_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
