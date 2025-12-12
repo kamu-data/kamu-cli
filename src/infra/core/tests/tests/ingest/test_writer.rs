@@ -634,7 +634,7 @@ async fn test_data_writer_nullability_required_to_optional_incompatible() {
     assert_matches!(
         res,
         Err(WriteDataError::ExecutionError(err))
-        if err.to_string().contains("Column population contains 1 null values while none were expected")
+        if err.to_string().contains("Column `population` contains 1 null values while none were expected")
     );
 }
 
