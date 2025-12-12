@@ -1518,9 +1518,8 @@ impl GraphQLMoleculeV1Harness {
     }
 
     pub async fn create_projects_dataset(&self) -> CreateDatasetResult {
-        let snapshot = kamu_adapter_graphql::molecule::Molecule::dataset_snapshot_projects_v1(
-            "molecule/projects".parse().unwrap(),
-        );
+        let snapshot =
+            kamu_molecule_domain::MoleculeDatasetSnapshots::projects("molecule".parse().unwrap());
 
         let create_dataset = self
             .catalog_authorized

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_datasets::{DatasetColumn, DatasetSnapshots};
+use odf::schema::{DataField, DataSchema, DataType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,16 +25,16 @@ impl MoleculeDatasetSnapshots {
     pub fn projects(molecule_account_name: odf::AccountName) -> odf::metadata::DatasetSnapshot {
         let alias = Self::projects_alias(molecule_account_name);
 
-        let schema = odf::schema::DataSchema::builder()
+        let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                odf::schema::DataField::string("account_id"),
-                odf::schema::DataField::string("ipnft_symbol"),
-                odf::schema::DataField::string("ipnft_uid"),
-                odf::schema::DataField::string("ipnft_address"),
-                odf::schema::DataField::string("ipnft_token_id"),
-                odf::schema::DataField::string("data_room_dataset_id"),
-                odf::schema::DataField::string("announcements_dataset_id"),
+                DataField::string("account_id"),
+                DataField::string("ipnft_symbol"),
+                DataField::string("ipnft_uid"),
+                DataField::string("ipnft_address"),
+                DataField::string("ipnft_token_id"),
+                DataField::string("data_room_dataset_id"),
+                DataField::string("announcements_dataset_id"),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -189,48 +190,19 @@ impl MoleculeDatasetSnapshots {
             odf::DatasetName::new_unchecked(DATASET_NAME),
         );
 
-        let schema = odf::schema::DataSchema::builder()
+        let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                odf::schema::DataField::string("announcement_id"),
-                odf::schema::DataField::string("headline"),
-                odf::schema::DataField::string("body"),
+                DataField::string("announcement_id"),
+                DataField::string("headline"),
+                DataField::string("body"),
                 // TODO: Link as odf::DatasetIDs not just strings
-                // NOTE: read comment about optionality below
-                odf::schema::DataField::list(
-                    "attachments",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                odf::schema::DataField::string("molecule_access_level"),
-                odf::schema::DataField::string("molecule_change_by"),
-                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
-                //       types in the following columns during ingesting:
-                //       REQUIRED group categories (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
-                //          }
-                //       }
-                //       REQUIRED group tags (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
-                //         }
-                //       }
-                //
-                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
-                //          Expected: REQUIRED like it should be.
-                //
-                //       By the reason of this, we need to add these columns as optional into data
-                //       schema.
-                // -->
-                odf::schema::DataField::list(
-                    "categories",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                odf::schema::DataField::list(
-                    "tags",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                // <--
+                DataField::list("attachments", DataType::string()),
+                DataField::string("molecule_access_level"),
+                DataField::string("molecule_change_by"),
+                // NOTE: These were added in V2 and must be optional for schema compatibility
+                DataField::list("categories", DataType::string()).optional(),
+                DataField::list("tags", DataType::string()).optional(),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -320,49 +292,19 @@ impl MoleculeDatasetSnapshots {
             odf::DatasetName::new_unchecked(DATASET_NAME),
         );
 
-        let schema = odf::schema::DataSchema::builder()
+        let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                odf::schema::DataField::string("ipnft_uid"),
-                odf::schema::DataField::string("announcement_id"),
-                odf::schema::DataField::string("headline"),
-                odf::schema::DataField::string("body"),
+                DataField::string("ipnft_uid"),
+                DataField::string("announcement_id"),
+                DataField::string("headline"),
+                DataField::string("body"),
                 // TODO: Link as odf::DatasetIDs not just strings
-                // NOTE: read comment about optionality below
-                odf::schema::DataField::list(
-                    "attachments",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                odf::schema::DataField::string("molecule_access_level"),
-                odf::schema::DataField::string("molecule_change_by"),
-                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
-                //       types in the following columns during ingesting:
-                //       REQUIRED group categories (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
-                //          }
-                //       }
-                //       REQUIRED group tags (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
-                //         }
-                //       }
-                //
-                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
-                //          Expected: REQUIRED like it should be.
-                //
-                //       By the reason of this, we need to add these columns as optional into data
-                //       schema.
-                // -->
-                odf::schema::DataField::list(
-                    "categories",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                odf::schema::DataField::list(
-                    "tags",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                // <--
+                DataField::list("attachments", DataType::string()),
+                DataField::string("molecule_access_level"),
+                DataField::string("molecule_change_by"),
+                DataField::list("categories", DataType::string()),
+                DataField::list("tags", DataType::string()),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -448,49 +390,23 @@ impl MoleculeDatasetSnapshots {
     ) -> odf::DatasetSnapshot {
         let alias = Self::global_data_room_activity_alias(molecule_account_name);
 
-        let schema = odf::schema::DataSchema::builder()
+        let schema = DataSchema::builder()
             // Add these columns but use Append strategy
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                odf::schema::DataField::string("activity_type"),
-                odf::schema::DataField::string("ipnft_uid"),
-                odf::schema::DataField::string("path"),
-                odf::schema::DataField::string("ref"),
-                odf::schema::DataField::u32("version"),
-                odf::schema::DataField::string("molecule_change_by"),
-                odf::schema::DataField::string("molecule_access_level"),
-                odf::schema::DataField::string("content_type").optional(),
-                odf::schema::DataField::u64("content_length"),
-                odf::schema::DataField::string("content_hash"),
-                odf::schema::DataField::string("description").optional(),
-                // TODO: DataWriterDataFusion::validate_schema_compatible(): detects incompatible
-                //       types in the following columns during ingesting:
-                //       REQUIRED group categories (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (1)
-                //          }
-                //       }
-                //       REQUIRED group tags (LIST) {
-                //         REPEATED group list {
-                //           OPTIONAL BYTE_ARRAY item (STRING); <-- (2)
-                //         }
-                //       }
-                //
-                // (1), (2) OPTIONAL by some reason (in new data), but it's not in data frame.
-                //          Expected: REQUIRED like it should be.
-                //
-                //       By the reason of this, we need to add these columns as optional into data
-                //       schema.
-                // -->
-                odf::schema::DataField::list(
-                    "categories",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                odf::schema::DataField::list(
-                    "tags",
-                    odf::schema::DataType::optional(odf::schema::DataType::string()),
-                ),
-                // <--
+                DataField::string("activity_type"),
+                DataField::string("ipnft_uid"),
+                DataField::string("path"),
+                DataField::string("ref"),
+                DataField::u32("version"),
+                DataField::string("molecule_change_by"),
+                DataField::string("molecule_access_level"),
+                DataField::string("content_type").optional(),
+                DataField::u64("content_length"),
+                DataField::string("content_hash"),
+                DataField::string("description").optional(),
+                DataField::list("categories", DataType::string()),
+                DataField::list("tags", DataType::string()),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");

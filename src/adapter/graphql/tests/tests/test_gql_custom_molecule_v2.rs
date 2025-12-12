@@ -13,8 +13,10 @@ use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::LoggedAccount;
 use kamu_core::*;
+use kamu_datasets::DatasetRegistryExt;
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use num_bigint::BigInt;
+use odf::dataset::MetadataChainExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -7883,6 +7885,189 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(resourcegen)]
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_dump_dataset_snapshots() {
+    // NOTE: Instead of dumping the source snapshots of datasets here we create
+    // datasets all and scan their metadata chains to dump events exactly how they
+    // appear in real datasets
+
+    const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let dataset_reg = harness
+        .catalog_authorized
+        .get_one::<dyn kamu_datasets::DatasetRegistry>()
+        .unwrap();
+
+    let (project_data_room_dataset, project_announcements_dataset) = {
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+                async_graphql::Variables::from_json(json!({
+                    "ipnftSymbol": "VITAFAST",
+                    "ipnftUid": PROJECT_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            ))
+            .await;
+
+        let data = res.data.into_json().unwrap();
+
+        let data_room_dataset = dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let announcements_dataset = dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        (data_room_dataset, announcements_dataset)
+    };
+
+    let project_file_dataset = {
+        let data = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap()
+    };
+
+    // Create an announcement to force creation of global announcements dataset
+    GraphQLQueryRequest::new(
+        CREATE_ANNOUNCEMENT,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": PROJECT_UID,
+            "headline": "Test announcement",
+            "body": "Blah blah",
+            "attachments": [],
+            "moleculeAccessLevel": "holders",
+            "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "categories": [],
+            "tags": [],
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .into_result()
+    .unwrap();
+
+    let molecule_projects_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
+        .await
+        .unwrap();
+
+    let molecule_data_room_activity_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/data-room-activity".parse().unwrap())
+        .await
+        .unwrap();
+
+    let molecule_announcements_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/announcements".parse().unwrap())
+        .await
+        .unwrap();
+
+    dump_snapshot(molecule_projects_dataset.as_ref(), "molecule-projects").await;
+    dump_snapshot(
+        molecule_announcements_dataset.as_ref(),
+        "molecule-announcements",
+    )
+    .await;
+    dump_snapshot(
+        molecule_data_room_activity_dataset.as_ref(),
+        "molecule-data-room-activity",
+    )
+    .await;
+    dump_snapshot(project_data_room_dataset.as_ref(), "project-data-room").await;
+    dump_snapshot(
+        project_announcements_dataset.as_ref(),
+        "project-announcements",
+    )
+    .await;
+    dump_snapshot(project_file_dataset.as_ref(), "project-file").await;
+}
+
+async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
+    use futures::TryStreamExt;
+
+    let blocks: Vec<_> = dataset
+        .as_metadata_chain()
+        .iter_blocks()
+        .try_collect()
+        .await
+        .unwrap();
+
+    let snapshot = odf::DatasetSnapshot {
+        name: name.parse().unwrap(),
+        kind: odf::DatasetKind::Root,
+        metadata: blocks
+            .into_iter()
+            .rev()
+            .map(|(_, b)| b.event)
+            .filter(|e| {
+                !matches!(
+                    e,
+                    odf::MetadataEvent::Seed(_) | odf::MetadataEvent::AddData(_)
+                )
+            })
+            .collect(),
+    };
+
+    let yaml = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+
+    let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push(format!("../../../resources/molecule/{name}.yaml"));
+
+    std::fs::write(path, &yaml).unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
