@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth;
 use kamu_molecule_domain::*;
-use odf::serde::DatasetDefaultVocabularySystemColumns;
 
 use crate::MoleculeAnnouncementsService;
 
@@ -29,7 +28,7 @@ pub struct MoleculeCreateAnnouncementUseCaseImpl {
 impl MoleculeCreateAnnouncementUseCaseImpl {
     async fn validate_attachments(
         &self,
-        announcement: &MoleculeAnnouncementRecord,
+        announcement: &MoleculeAnnouncementPayloadRecord,
     ) -> Result<(), MoleculeCreateAnnouncementError> {
         if announcement.attachments.is_empty() {
             // Nothing to validate
@@ -81,25 +80,17 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
-        announcement: MoleculeAnnouncementRecord,
+        announcement: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError> {
-        // TODO: Align timestamps with ingest
-        let now = Utc::now();
-
         // 1. Validate input data
 
         self.validate_attachments(&announcement).await?;
 
         // 2. Store global announcement
 
-        let global_announcement_entry = MoleculeGlobalAnnouncementChangelogEntry {
-            system_columns: DatasetDefaultVocabularySystemColumns {
-                offset: None,
-                op: odf::metadata::OperationType::Append,
-                system_time: now,
-                event_time: source_event_time.unwrap_or(now),
-            },
-            record: MoleculeGlobalAnnouncementRecord {
+        let global_announcement_record = MoleculeGlobalAnnouncementChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: MoleculeGlobalAnnouncementPayloadRecord {
                 ipnft_uid: molecule_project.ipnft_uid.clone(),
                 announcement,
             },
@@ -112,12 +103,12 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         global_announcements_writer
-            .push_ndjson_data(global_announcement_entry.to_bytes(), source_event_time)
+            .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
             .await?;
 
         // 3. Store project announcement
 
-        let project_announcement_entry = global_announcement_entry.into_announcement_entry();
+        let project_announcement_record = global_announcement_record.into_announcement_record();
 
         let project_announcements_writer = self
             .announcements_service
@@ -126,13 +117,13 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         project_announcements_writer
-            .push_ndjson_data(project_announcement_entry.to_bytes(), source_event_time)
+            .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
             .await?;
 
         // TODO: outbox event
 
         Ok(MoleculeCreateAnnouncementResult {
-            new_announcement_id: project_announcement_entry.record.announcement_id,
+            new_announcement_id: project_announcement_record.payload.announcement_id,
         })
     }
 }

@@ -223,7 +223,7 @@ impl MoleculeV2 {
                         Ok(activity_event)
                     }
                     MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
-                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement_record(
+                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
                             project,
                             announcement_activity_entity,
                         );

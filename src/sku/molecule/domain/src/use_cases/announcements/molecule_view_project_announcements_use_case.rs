@@ -10,7 +10,7 @@
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 
-use crate::{MoleculeAnnouncementChangelogEntry, MoleculeAnnouncementsFilters, MoleculeProject};
+use crate::{MoleculeAnnouncement, MoleculeAnnouncementsFilters, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,7 @@ pub trait MoleculeViewProjectAnnouncementsUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeProjectAnnouncementListing = EntityPageListing<MoleculeAnnouncementChangelogEntry>;
+pub type MoleculeProjectAnnouncementListing = EntityPageListing<MoleculeAnnouncement>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

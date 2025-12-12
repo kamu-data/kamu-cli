@@ -196,9 +196,7 @@ impl MoleculeProjectV2 {
             .list
             .into_iter()
             .map(|record| {
-                let entry = MoleculeAnnouncementEntry::new_from_project_announcement_record(
-                    project, record,
-                );
+                let entry = MoleculeAnnouncementEntry::new_from_announcement(project, record);
                 MoleculeActivityEventV2::announcement(entry)
             })
             .collect::<Vec<_>>();

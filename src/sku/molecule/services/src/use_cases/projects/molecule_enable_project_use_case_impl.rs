@@ -9,11 +9,12 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
+use kamu_core::PushIngestResult;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
-use odf::metadata::OperationType;
 
 use crate::MoleculeProjectsService;
 
@@ -40,6 +41,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         ipnft_uid: String,
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
@@ -88,59 +90,58 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
-        // Decode operation type
-        let op = record
-            .get("op")
-            .and_then(serde_json::Value::as_u64)
-            .and_then(|value| u8::try_from(value).ok())
-            .and_then(|value| OperationType::try_from(value).ok());
+        // Reconstruct last changelog entry available
+        let last_changelog_entry = MoleculeProjectChangelogEntry::from_json(record).int_err()?;
 
-        // TODO: maybe internal error instead?
-        let Some(op) = op else {
-            return Err(MoleculeEnableProjectError::ProjectNotFound(
-                ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.clone(),
-                },
-            ));
-        };
-
-        // Reconstruct project entity
-        let mut project = MoleculeProject::from_json(record).int_err()?;
-        project.ipnft_symbol.make_ascii_lowercase();
-
-        // Idempotent handling: ignore if not retracted
-        if !matches!(op, OperationType::Retract) {
-            return Ok(project);
+        // Idempotent handling: if already enabled, return as is
+        if last_changelog_entry.system_columns.op != odf::metadata::OperationType::Retract {
+            // Project is already enabled
+            return Ok(MoleculeProject::from_payload(
+                last_changelog_entry.payload,
+                last_changelog_entry.system_columns.system_time,
+                last_changelog_entry.system_columns.event_time,
+            )?);
         }
 
         // Add Append record to re-enable the project
-        let now = chrono::Utc::now();
-        project.system_time = now;
-        project.event_time = now;
+        let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: last_changelog_entry.payload,
+        };
 
-        let changelog_record = project.as_changelog_record(u8::from(OperationType::Append));
-
-        projects_writer
-            .push_ndjson_data(changelog_record.to_bytes(), Some(now))
+        let push_res = projects_writer
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 
-        // Notify external listeners
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
-                MoleculeProjectMessage::reenabled(
-                    now,
-                    molecule_subject.account_id.clone(),
-                    project.account_id.clone(),
-                    project.ipnft_uid.clone(),
-                    project.ipnft_symbol.clone(),
-                ),
-            )
-            .await
-            .int_err()?;
+        match push_res {
+            PushIngestResult::UpToDate => unreachable!(),
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                        MoleculeProjectMessage::reenabled(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            new_changelog_record.payload.account_id.clone(),
+                            new_changelog_record.payload.ipnft_uid.clone(),
+                            new_changelog_record.payload.ipnft_symbol.clone(),
+                        ),
+                    )
+                    .await
+                    .int_err()?;
 
-        Ok(project)
+                Ok(MoleculeProject::from_payload(
+                    new_changelog_record.payload,
+                    insertion_system_time,
+                    source_event_time.unwrap_or(insertion_system_time),
+                )?)
+            }
+        }
     }
 }
 

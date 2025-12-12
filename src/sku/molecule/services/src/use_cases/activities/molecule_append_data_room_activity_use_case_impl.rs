@@ -39,7 +39,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        activity: MoleculeDataRoomActivityEntity,
+        activity_record: MoleculeDataRoomActivityRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
         let global_activities_writer = self
             .global_activities_service
@@ -47,10 +47,13 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
-        let data_record = activity.into_insert_record();
+        let new_changelog_record = MoleculeDataRoomActivityChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: activity_record,
+        };
 
         global_activities_writer
-            .push_ndjson_data(data_record.to_bytes(), source_event_time)
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 

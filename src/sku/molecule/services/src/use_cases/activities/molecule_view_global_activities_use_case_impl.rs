@@ -84,7 +84,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeDataRoomActivityEntity::from_json(record)?;
+                let entity = MoleculeDataRoomActivity::from_json(record)?;
                 Ok(MoleculeGlobalActivity::DataRoomActivity(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
@@ -146,7 +146,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeGlobalAnnouncementChangelogEntry::from_json(record)?;
+                let entity = MoleculeGlobalAnnouncement::from_json(record)?;
                 Ok(MoleculeGlobalActivity::Announcement(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;

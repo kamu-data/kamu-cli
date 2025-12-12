@@ -7,12 +7,135 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
+pub struct MoleculeAnnouncement {
+    /// System time when this announcement was created/updated
+    pub system_time: DateTime<Utc>,
+
+    /// Event time when this announcement was created/updated
+    pub event_time: DateTime<Utc>,
+
+    pub announcement_id: uuid::Uuid,
+
+    pub headline: String,
+
+    pub body: String,
+
+    pub attachments: Vec<odf::DatasetID>,
+
+    // TODO: enum?
+    pub access_level: String,
+
+    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    pub change_by: String,
+
+    pub categories: Vec<String>,
+
+    pub tags: Vec<String>,
+}
+
+impl MoleculeAnnouncement {
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let entry: MoleculeAnnouncementChangelogEntry = serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            system_time: entry.system_columns.system_time,
+            event_time: entry.system_columns.event_time,
+            announcement_id: entry.payload.announcement_id,
+            headline: entry.payload.headline,
+            body: entry.payload.body,
+            attachments: entry.payload.attachments,
+            access_level: entry.payload.access_level,
+            change_by: entry.payload.change_by,
+            categories: entry.payload.categories,
+            tags: entry.payload.tags,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+pub struct MoleculeGlobalAnnouncement {
+    pub ipnft_uid: String,
+    pub announcement: MoleculeAnnouncement,
+}
+
+impl MoleculeGlobalAnnouncement {
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let entry: MoleculeGlobalAnnouncementChangelogEntry =
+            serde_json::from_value(record).int_err()?;
+
+        Ok(Self {
+            ipnft_uid: entry.payload.ipnft_uid,
+            announcement: MoleculeAnnouncement {
+                system_time: entry.system_columns.system_time,
+                event_time: entry.system_columns.event_time,
+                announcement_id: entry.payload.announcement.announcement_id,
+                headline: entry.payload.announcement.headline,
+                body: entry.payload.announcement.body,
+                attachments: entry.payload.announcement.attachments,
+                access_level: entry.payload.announcement.access_level,
+                change_by: entry.payload.announcement.change_by,
+                categories: entry.payload.announcement.categories,
+                tags: entry.payload.announcement.tags,
+            },
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MoleculeAnnouncementChangelogEntry =
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeAnnouncementPayloadRecord>;
+
+pub type MoleculeAnnouncementChangelogInsertionRecord =
+    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<MoleculeAnnouncementPayloadRecord>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct MoleculeGlobalAnnouncementPayloadRecord {
+    pub ipnft_uid: String,
+
+    #[serde(flatten)]
+    pub announcement: MoleculeAnnouncementPayloadRecord,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MoleculeGlobalAnnouncementChangelogEntry =
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeGlobalAnnouncementPayloadRecord>;
+
+pub type MoleculeGlobalAnnouncementChangelogInsertionRecord =
+    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<
+        MoleculeGlobalAnnouncementPayloadRecord,
+    >;
+
+pub trait MoleculeGlobalAnnouncementChangelogInsertionRecordExt {
+    fn into_announcement_record(self) -> MoleculeAnnouncementChangelogInsertionRecord;
+}
+
+impl MoleculeGlobalAnnouncementChangelogInsertionRecordExt
+    for MoleculeGlobalAnnouncementChangelogInsertionRecord
+{
+    fn into_announcement_record(self) -> MoleculeAnnouncementChangelogInsertionRecord {
+        MoleculeAnnouncementChangelogInsertionRecord {
+            op: self.op,
+            payload: self.payload.announcement,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeAnnouncementRecord {
+pub struct MoleculeAnnouncementPayloadRecord {
     pub announcement_id: uuid::Uuid,
 
     pub headline: String,
@@ -34,68 +157,6 @@ pub struct MoleculeAnnouncementRecord {
 
     #[serde(default)]
     pub tags: Vec<String>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type MoleculeAnnouncementChangelogEntry =
-    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeAnnouncementRecord>;
-
-pub trait MoleculeAnnouncementChangelogEntryExt {
-    fn from_json(
-        record: serde_json::Value,
-    ) -> Result<MoleculeAnnouncementChangelogEntry, InternalError>;
-}
-
-impl MoleculeAnnouncementChangelogEntryExt for MoleculeAnnouncementChangelogEntry {
-    fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        serde_json::from_value(record).int_err()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeGlobalAnnouncementRecord {
-    pub ipnft_uid: String,
-
-    #[serde(flatten)]
-    pub announcement: MoleculeAnnouncementRecord,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type MoleculeGlobalAnnouncementChangelogEntry =
-    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeGlobalAnnouncementRecord>;
-
-pub trait MoleculeGlobalAnnouncementChangelogEntryExt {
-    fn from_json(
-        record: serde_json::Value,
-    ) -> Result<MoleculeGlobalAnnouncementChangelogEntry, InternalError>;
-
-    fn as_announcement_entry(&self) -> MoleculeAnnouncementChangelogEntry;
-
-    fn into_announcement_entry(self) -> MoleculeAnnouncementChangelogEntry;
-}
-
-impl MoleculeGlobalAnnouncementChangelogEntryExt for MoleculeGlobalAnnouncementChangelogEntry {
-    fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        serde_json::from_value(record).int_err()
-    }
-
-    fn as_announcement_entry(&self) -> MoleculeAnnouncementChangelogEntry {
-        MoleculeAnnouncementChangelogEntry {
-            system_columns: self.system_columns.clone(),
-            record: self.record.announcement.clone(),
-        }
-    }
-
-    fn into_announcement_entry(self) -> MoleculeAnnouncementChangelogEntry {
-        MoleculeAnnouncementChangelogEntry {
-            system_columns: self.system_columns,
-            record: self.record.announcement,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

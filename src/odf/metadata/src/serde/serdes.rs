@@ -236,7 +236,7 @@ impl<'de> serde::Deserialize<'de> for OperationType {
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct DatasetDefaultVocabularySystemColumns {
-    pub offset: Option<u64>, // Optional for creation
+    pub offset: u64,
 
     pub op: OperationType,
 
@@ -254,10 +254,28 @@ pub struct DatasetDefaultVocabularyChangelogEntry<T> {
     pub system_columns: DatasetDefaultVocabularySystemColumns,
 
     #[serde(flatten)]
-    pub record: T,
+    pub payload: T,
 }
 
 impl<T> DatasetDefaultVocabularyChangelogEntry<T>
+where
+    T: serde::Serialize + for<'a> serde::Deserialize<'a>,
+{
+    pub fn from_json(record: serde_json::Value) -> Result<Self, Error> {
+        serde_json::from_value(record).map_err(Error::serde)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(bound = "T: serde::Serialize + for<'a> serde::Deserialize<'a>")]
+pub struct DatasetDefaultVocabularyChangelogInsertionRecord<T> {
+    pub op: OperationType,
+
+    #[serde(flatten)]
+    pub payload: T,
+}
+
+impl<T> DatasetDefaultVocabularyChangelogInsertionRecord<T>
 where
     T: serde::Serialize + for<'a> serde::Deserialize<'a>,
 {

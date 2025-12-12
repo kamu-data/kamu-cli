@@ -11,11 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{
-    MoleculeDataRoomActivityEntity,
-    MoleculeGetDatasetError,
-    MoleculeGlobalAnnouncementChangelogEntry,
-};
+use crate::{MoleculeDataRoomActivity, MoleculeGetDatasetError, MoleculeGlobalAnnouncement};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +27,10 @@ pub trait MoleculeViewGlobalActivitiesUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeGlobalActivity>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, Debug)]
 pub struct MoleculeGlobalActivitiesFilters {
     pub by_tags: Option<Vec<String>>,
@@ -41,27 +41,25 @@ pub struct MoleculeGlobalActivitiesFilters {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum MoleculeGlobalActivity {
-    DataRoomActivity(MoleculeDataRoomActivityEntity),
-    Announcement(MoleculeGlobalAnnouncementChangelogEntry),
+    DataRoomActivity(MoleculeDataRoomActivity),
+    Announcement(MoleculeGlobalAnnouncement),
 }
 
 impl MoleculeGlobalActivity {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             Self::DataRoomActivity(entity) => entity.event_time,
-            Self::Announcement(entity) => entity.system_columns.event_time,
+            Self::Announcement(entity) => entity.announcement.event_time,
         }
     }
 
     pub fn ipnft_uid(&self) -> &String {
         match self {
             Self::DataRoomActivity(entity) => &entity.ipnft_uid,
-            Self::Announcement(entity) => &entity.record.ipnft_uid,
+            Self::Announcement(entity) => &entity.ipnft_uid,
         }
     }
 }
-
-pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeGlobalActivity>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

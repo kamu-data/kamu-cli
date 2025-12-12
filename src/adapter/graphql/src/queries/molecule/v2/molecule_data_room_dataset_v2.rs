@@ -14,7 +14,7 @@ use database_common::PaginationOpts;
 use file_utils::MediaType;
 use kamu_datasets::FileVersion;
 use kamu_molecule_domain::{
-    MoleculeDataRoomActivityEntity,
+    MoleculeDataRoomActivity,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
     MoleculeViewDataRoomEntriesError,
@@ -228,7 +228,7 @@ impl MoleculeDataRoomEntry {
 
     pub fn new_from_data_room_activity_entity(
         project: &Arc<MoleculeProjectV2>,
-        activity_entity: MoleculeDataRoomActivityEntity,
+        activity_entity: MoleculeDataRoomActivity,
     ) -> Self {
         let entity = kamu_molecule_domain::MoleculeDataRoomEntry {
             system_time: activity_entity.system_time,

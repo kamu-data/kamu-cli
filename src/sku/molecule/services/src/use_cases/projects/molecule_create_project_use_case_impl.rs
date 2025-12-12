@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{
     AccountService,
@@ -18,10 +19,10 @@ use kamu_accounts::{
     LoggedAccount,
 };
 use kamu_auth_rebac::RebacService;
+use kamu_core::PushIngestResult;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
-use time_source::SystemTimeSource;
 
 use crate::MoleculeProjectsService;
 
@@ -36,7 +37,6 @@ pub struct MoleculeCreateProjectUseCaseImpl {
     create_dataset_from_snapshot_use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     rebac_service: Arc<dyn RebacService>,
     outbox: Arc<dyn Outbox>,
-    time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +53,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         mut ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,
@@ -187,44 +188,54 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .await
             .int_err()?;
 
-        let now = self.time_source.now();
-
         // Add project entry
-        let project = MoleculeProject {
+        let project_payload = MoleculeProjectPayloadRecord {
             account_id: project_account.id.clone(),
-            system_time: now,
-            event_time: now,
             ipnft_symbol: lowercase_ipnft_symbol.clone(),
             ipnft_address,
-            ipnft_token_id,
+            ipnft_token_id: ipnft_token_id.to_string(),
             ipnft_uid: ipnft_uid.clone(),
             data_room_dataset_id: data_room_create_res.dataset_handle.id,
             announcements_dataset_id: announcements_create_res.dataset_handle.id,
         };
 
-        let changelog_record =
-            project.as_changelog_record(u8::from(odf::metadata::OperationType::Append));
+        let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: project_payload,
+        };
 
-        projects_writer
-            .push_ndjson_data(changelog_record.to_bytes(), Some(now))
+        let push_res = projects_writer
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
-                MoleculeProjectMessage::created(
-                    now,
-                    molecule_subject.account_id.clone(),
-                    project_account.id,
-                    ipnft_uid,
-                    lowercase_ipnft_symbol,
-                ),
-            )
-            .await
-            .int_err()?;
+        match push_res {
+            PushIngestResult::UpToDate => unreachable!(),
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                        MoleculeProjectMessage::created(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            project_account.id,
+                            ipnft_uid.clone(),
+                            lowercase_ipnft_symbol.clone(),
+                        ),
+                    )
+                    .await
+                    .int_err()?;
 
-        Ok(project)
+                Ok(MoleculeProject::from_payload(
+                    new_changelog_record.payload,
+                    insertion_system_time,
+                    source_event_time.unwrap_or(insertion_system_time),
+                )?)
+            }
+        }
     }
 }
 

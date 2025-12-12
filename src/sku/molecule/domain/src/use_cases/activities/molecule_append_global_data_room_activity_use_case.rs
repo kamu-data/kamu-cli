@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::MoleculeDataRoomActivityEntity;
+use crate::MoleculeDataRoomActivityRecord;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub trait MoleculeAppendGlobalDataRoomActivityUseCase: Send + Sync {
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        activity: MoleculeDataRoomActivityEntity,
+        activity_record: MoleculeDataRoomActivityRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError>;
 }
 

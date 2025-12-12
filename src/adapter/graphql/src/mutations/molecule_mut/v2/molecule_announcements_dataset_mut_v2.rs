@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_molecule_domain::{MoleculeAnnouncementRecord, MoleculeCreateAnnouncementUseCase};
+use kamu_molecule_domain::{MoleculeAnnouncementPayloadRecord, MoleculeCreateAnnouncementUseCase};
 use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
@@ -55,7 +55,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
 
         let event_time = time_source.now();
 
-        let announcement = MoleculeAnnouncementRecord {
+        let announcement_record = MoleculeAnnouncementPayloadRecord {
             announcement_id: uuid::Uuid::new_v4(),
             headline,
             body,
@@ -77,7 +77,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                announcement,
+                announcement_record,
             )
             .await
         {

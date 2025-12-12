@@ -37,8 +37,7 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         &self,
         molecule_project: &MoleculeProject,
         id: uuid::Uuid,
-    ) -> Result<Option<MoleculeAnnouncementChangelogEntry>, MoleculeFindProjectAnnouncementError>
-    {
+    ) -> Result<Option<MoleculeAnnouncement>, MoleculeFindProjectAnnouncementError> {
         // Gain read access to project's announcements dataset
         let projects_announcements_reader = self
             .announcements_service
@@ -68,7 +67,7 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         let announcement_record = records
             .into_iter()
             .next()
-            .map(MoleculeAnnouncementChangelogEntry::from_json)
+            .map(MoleculeAnnouncement::from_json)
             .transpose()?;
 
         Ok(announcement_record)

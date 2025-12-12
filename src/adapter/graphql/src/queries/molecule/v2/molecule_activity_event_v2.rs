@@ -54,7 +54,7 @@ impl MoleculeActivityEventV2 {
             Self::FileAdded(e) => e.entry.entity.event_time,
             Self::FileUpdated(e) => e.entry.entity.event_time,
             Self::FileRemoved(e) => e.entry.entity.event_time,
-            Self::Announcement(e) => e.announcement.changelog_entry.system_columns.event_time,
+            Self::Announcement(e) => e.announcement.entity.event_time,
         }
     }
 }

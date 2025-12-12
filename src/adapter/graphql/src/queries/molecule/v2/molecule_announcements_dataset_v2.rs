@@ -14,7 +14,6 @@ use database_common::PaginationOpts;
 use kamu_molecule_domain::{
     MoleculeFindProjectAnnouncementError,
     MoleculeFindProjectAnnouncementUseCase,
-    MoleculeGlobalAnnouncementChangelogEntryExt,
     MoleculeViewProjectAnnouncementsUseCase,
 };
 
@@ -81,12 +80,7 @@ impl MoleculeAnnouncements {
         let nodes = listing
             .list
             .into_iter()
-            .map(|record| {
-                MoleculeAnnouncementEntry::new_from_project_announcement_record(
-                    &self.project,
-                    record,
-                )
-            })
+            .map(|record| MoleculeAnnouncementEntry::new_from_announcement(&self.project, record))
             .collect::<Vec<_>>();
 
         Ok(MoleculeAnnouncementEntryConnection::new(
@@ -119,11 +113,8 @@ impl MoleculeAnnouncements {
                     E::Internal(_) => e.int_err().into(),
                 }
             })?
-            .map(|record| {
-                MoleculeAnnouncementEntry::new_from_project_announcement_record(
-                    &self.project,
-                    record,
-                )
+            .map(|announcement| {
+                MoleculeAnnouncementEntry::new_from_announcement(&self.project, announcement)
             });
 
         Ok(maybe_announcement)
@@ -133,27 +124,27 @@ impl MoleculeAnnouncements {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeAnnouncementEntry {
-    pub changelog_entry: kamu_molecule_domain::MoleculeAnnouncementChangelogEntry,
+    pub entity: kamu_molecule_domain::MoleculeAnnouncement,
     pub project: Arc<MoleculeProjectV2>,
 }
 
 impl MoleculeAnnouncementEntry {
-    pub fn new_from_global_announcement_record(
+    pub fn new_from_global_announcement(
         project: &Arc<MoleculeProjectV2>,
-        changelog_entry: kamu_molecule_domain::MoleculeGlobalAnnouncementChangelogEntry,
+        global_entity: kamu_molecule_domain::MoleculeGlobalAnnouncement,
     ) -> Self {
         Self {
-            changelog_entry: changelog_entry.into_announcement_entry(),
+            entity: global_entity.announcement,
             project: project.clone(),
         }
     }
 
-    pub fn new_from_project_announcement_record(
+    pub fn new_from_announcement(
         project: &Arc<MoleculeProjectV2>,
-        changelog_entry: kamu_molecule_domain::MoleculeAnnouncementChangelogEntry,
+        entity: kamu_molecule_domain::MoleculeAnnouncement,
     ) -> Self {
         Self {
-            changelog_entry,
+            entity,
             project: project.clone(),
         }
     }
@@ -167,49 +158,44 @@ impl MoleculeAnnouncementEntry {
     }
 
     async fn system_time(&self) -> DateTime<Utc> {
-        self.changelog_entry.system_columns.system_time
+        self.entity.system_time
     }
 
     async fn event_time(&self) -> DateTime<Utc> {
-        self.changelog_entry.system_columns.event_time
+        self.entity.event_time
     }
 
     async fn id(&self) -> MoleculeAnnouncementId {
-        self.changelog_entry.record.announcement_id.to_string()
+        self.entity.announcement_id.to_string()
     }
 
     async fn headline(&self) -> &str {
-        self.changelog_entry.record.headline.as_str()
+        self.entity.headline.as_str()
     }
 
     async fn body(&self) -> &str {
-        self.changelog_entry.record.body.as_str()
+        self.entity.body.as_str()
     }
 
     async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
-        self.changelog_entry
-            .record
-            .attachments
-            .iter()
-            .map(Into::into)
-            .collect()
+        self.entity.attachments.iter().map(Into::into).collect()
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
-        &self.changelog_entry.record.access_level
+        &self.entity.access_level
     }
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
     async fn change_by(&self) -> &MoleculeChangeBy {
-        &self.changelog_entry.record.change_by
+        &self.entity.change_by
     }
 
     async fn categories(&self) -> &[MoleculeCategory] {
-        &self.changelog_entry.record.categories
+        &self.entity.categories
     }
 
     async fn tags(&self) -> &[MoleculeTag] {
-        &self.changelog_entry.record.tags
+        &self.entity.tags
     }
 }
 
