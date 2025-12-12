@@ -9,21 +9,21 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::PushIngestDataUseCase;
-use kamu_core::auth::DatasetAction;
+use kamu_core::PushIngestResult;
+use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::domain::*;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeDisableProjectUseCase)]
 pub struct MoleculeDisableProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
-    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -41,59 +41,74 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         ipnft_uid: String,
     ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
-        let now = chrono::Utc::now();
+        // Gain write access to projects dataset
+        let projects_writer = self
+            .projects_service
+            .writer(&molecule_subject.account_name, false)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?;
 
-        let (projects_dataset, project_opt) = self
-            .molecule_dataset_service
-            .get_project_changelog_entry(molecule_subject, DatasetAction::Write, false, &ipnft_uid)
-            .await?;
+        // Try to find the latest project state
+        let maybe_last_changelog_entry = projects_writer
+            .as_reader()
+            .changelog_entry_by_ipnft_uid(&ipnft_uid)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?
+            .map(MoleculeProjectChangelogEntry::from_json)
+            .transpose()
+            .int_err()?;
 
-        let Some(mut project) = project_opt else {
+        // Not found? Sorry
+        let Some(last_changelog_entry) = maybe_last_changelog_entry else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),
                 },
             ));
         };
-        project.system_time = now;
-        project.event_time = now;
 
-        let changelog_record =
-            project.as_changelog_record(u8::from(odf::metadata::OperationType::Retract));
+        // Add retraction record to disable the project
+        let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Retract,
+            payload: last_changelog_entry.payload,
+        };
 
-        self.push_ingest_use_case
-            .execute(
-                projects_dataset,
-                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        let push_res = projects_writer
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
-                MoleculeProjectMessage::disabled(
-                    now,
-                    molecule_subject.account_id.clone(),
-                    project.account_id.clone(),
-                    project.ipnft_uid.clone(),
-                    project.ipnft_symbol.clone(),
-                ),
-            )
-            .await
-            .int_err()?;
+        match push_res {
+            PushIngestResult::UpToDate => unreachable!(),
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                        MoleculeProjectMessage::disabled(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            new_changelog_record.payload.account_id.clone(),
+                            new_changelog_record.payload.ipnft_uid.clone(),
+                            new_changelog_record.payload.ipnft_symbol.clone(),
+                        ),
+                    )
+                    .await
+                    .int_err()?;
 
-        Ok(project)
+                Ok(MoleculeProject::from_payload(
+                    new_changelog_record.payload,
+                    insertion_system_time,
+                    source_event_time.unwrap_or(insertion_system_time),
+                )?)
+            }
+        }
     }
 }
 

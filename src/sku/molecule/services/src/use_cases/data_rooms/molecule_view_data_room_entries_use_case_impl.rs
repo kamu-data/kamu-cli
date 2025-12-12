@@ -12,8 +12,9 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

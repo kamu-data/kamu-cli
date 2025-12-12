@@ -17,7 +17,7 @@ use kamu_molecule_domain::{
     MoleculeFindProjectUseCase,
     MoleculeGlobalActivity,
     MoleculeProjectListing,
-    MoleculeViewDataRoomActivitiesError,
+    MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewProjectsError,
     MoleculeViewProjectsUseCase,
@@ -162,7 +162,7 @@ impl MoleculeV2 {
             )
             .await
             .map_err(|e| -> GqlError {
-                use MoleculeViewDataRoomActivitiesError as E;
+                use MoleculeViewGlobalActivitiesError as E;
                 match e {
                     E::Access(e) => e.into(),
                     E::Internal(_) => e.int_err().into(),
@@ -223,7 +223,7 @@ impl MoleculeV2 {
                         Ok(activity_event)
                     }
                     MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
-                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement_record(
+                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
                             project,
                             announcement_activity_entity,
                         );

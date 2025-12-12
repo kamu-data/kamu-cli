@@ -10,16 +10,16 @@
 use std::sync::Arc;
 
 use kamu_accounts::LoggedAccount;
-use kamu_core::auth::DatasetAction;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeFindProjectUseCase)]
 pub struct MoleculeFindProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,12 +33,23 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         ipnft_uid: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
-        let (_, project) = self
-            .molecule_dataset_service
-            .get_project_changelog_entry(molecule_subject, DatasetAction::Read, false, &ipnft_uid)
-            .await?;
+        // Gain read access to projects dataset
+        let projects_reader = self
+            .projects_service
+            .reader(&molecule_subject.account_name)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;
 
-        Ok(project)
+        // Query for the project by ipnft_uid
+        let maybe_project = projects_reader
+            .changelog_entry_by_ipnft_uid(&ipnft_uid)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?
+            .map(MoleculeProject::from_json)
+            .transpose()?;
+
+        // Return the project if found
+        Ok(maybe_project)
     }
 }
 

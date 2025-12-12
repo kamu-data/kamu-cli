@@ -7,13 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_molecule_domain::*;
+use messaging_outbox::register_message_dispatcher;
+
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
-    b.add::<MoleculeDatasetServiceImpl>();
+    b.add::<MoleculeDatasetAccessorFactory>();
+
     b.add::<MoleculeDataRoomCollectionServiceImpl>();
+    b.add::<MoleculeGlobalActivitiesServiceImpl>();
+    b.add::<MoleculeAnnouncementsServiceImpl>();
+    b.add::<MoleculeProjectsServiceImpl>();
     b.add::<MoleculeVersionedFileContentProviderImpl>();
 
     b.add::<MoleculeEnableProjectUseCaseImpl>();
@@ -36,8 +43,28 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
 
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalActivitiesUseCaseImpl>();
+    b.add::<MoleculeViewProjectActivitiesUseCaseImpl>();
 
     b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
+    b.add::<MoleculeFindProjectAnnouncementUseCaseImpl>();
+    b.add::<MoleculeViewProjectAnnouncementsUseCaseImpl>();
+
+    register_message_dispatcher::<MoleculeProjectMessage>(
+        b,
+        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+    );
+    register_message_dispatcher::<MoleculeDataRoomMessage>(
+        b,
+        MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
+    );
+    register_message_dispatcher::<MoleculeAnnouncementMessage>(
+        b,
+        MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
+    );
+    register_message_dispatcher::<MoleculeActivityMessage>(
+        b,
+        MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

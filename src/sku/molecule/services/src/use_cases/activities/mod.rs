@@ -9,6 +9,8 @@
 
 mod molecule_append_data_room_activity_use_case_impl;
 mod molecule_view_global_activities_use_case_impl;
+mod molecule_view_project_activities_use_case_impl;
 
 pub use molecule_append_data_room_activity_use_case_impl::*;
 pub use molecule_view_global_activities_use_case_impl::*;
+pub use molecule_view_project_activities_use_case_impl::*;

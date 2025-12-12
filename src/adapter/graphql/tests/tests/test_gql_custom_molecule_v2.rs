@@ -9,6 +9,7 @@
 
 use async_graphql::value;
 use base64::Engine as _;
+use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::LoggedAccount;
 use kamu_core::*;
@@ -538,6 +539,7 @@ async fn test_molecule_v2_disable_enable_project() {
     create_project_uc
         .execute(
             &molecule_subject,
+            Some(Utc::now()),
             "VITAFAST".to_string(),
             ipnft_uid.to_string(),
             "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1".to_string(),

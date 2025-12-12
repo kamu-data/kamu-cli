@@ -15,6 +15,12 @@ use internal_error::{InternalError, ResultIntoInternal};
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug, Clone)]
 pub struct MoleculeProject {
+    /// System time when this project was created/updated
+    pub system_time: DateTime<Utc>,
+
+    /// Event time when this project was created/updated
+    pub event_time: DateTime<Utc>,
+
     /// Account ID associated with this project
     pub account_id: odf::AccountID,
 
@@ -23,12 +29,6 @@ pub struct MoleculeProject {
 
     /// Dataset ID for announcements
     pub announcements_dataset_id: odf::DatasetID,
-
-    /// System time when this project was created/updated
-    pub system_time: DateTime<Utc>,
-
-    /// Event time when this project was created/updated
-    pub event_time: DateTime<Utc>,
 
     /// Symbolic name of the project
     pub ipnft_symbol: String,
@@ -48,73 +48,63 @@ pub struct MoleculeProject {
 
 impl MoleculeProject {
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let record: MoleculeProjectChangelogRecord = serde_json::from_value(record).int_err()?;
+        let entry: MoleculeProjectChangelogEntry = serde_json::from_value(record).int_err()?;
 
-        let ipnft_token_id = record
-            .data
+        let ipnft_token_id = entry
+            .payload
             .ipnft_token_id
             .parse()
             .map_err(|e| InternalError::new(format!("Invalid BigInt: {e}")))?;
 
         Ok(Self {
-            system_time: record.system_time,
-            event_time: record.event_time,
-            ipnft_symbol: record.data.ipnft_symbol,
-            ipnft_uid: record.data.ipnft_uid,
-            ipnft_address: record.data.ipnft_address,
+            system_time: entry.system_columns.system_time,
+            event_time: entry.system_columns.event_time,
+            ipnft_symbol: entry.payload.ipnft_symbol,
+            ipnft_uid: entry.payload.ipnft_uid,
+            ipnft_address: entry.payload.ipnft_address,
             ipnft_token_id,
-            account_id: record.data.account_id,
-            data_room_dataset_id: record.data.data_room_dataset_id,
-            announcements_dataset_id: record.data.announcements_dataset_id,
+            account_id: entry.payload.account_id,
+            data_room_dataset_id: entry.payload.data_room_dataset_id,
+            announcements_dataset_id: entry.payload.announcements_dataset_id,
         })
     }
 
-    pub fn as_changelog_record(&self, op: u8) -> MoleculeProjectChangelogRecord {
-        MoleculeProjectChangelogRecord {
-            offset: None,
-            op,
-            system_time: self.system_time,
-            event_time: self.event_time,
-            data: MoleculeProjectDataRecord {
-                ipnft_symbol: self.ipnft_symbol.clone(),
-                ipnft_uid: self.ipnft_uid.clone(),
-                ipnft_address: self.ipnft_address.clone(),
-                ipnft_token_id: self.ipnft_token_id.to_string(),
-                account_id: self.account_id.clone(),
-                data_room_dataset_id: self.data_room_dataset_id.clone(),
-                announcements_dataset_id: self.announcements_dataset_id.clone(),
-            },
-        }
+    pub fn from_payload(
+        payload: MoleculeProjectPayloadRecord,
+        system_time: DateTime<Utc>,
+        event_time: DateTime<Utc>,
+    ) -> Result<Self, InternalError> {
+        let ipnft_token_id = payload
+            .ipnft_token_id
+            .parse()
+            .map_err(|e| InternalError::new(format!("Invalid BigInt: {e}")))?;
+
+        Ok(Self {
+            system_time,
+            event_time,
+            ipnft_symbol: payload.ipnft_symbol,
+            ipnft_uid: payload.ipnft_uid,
+            ipnft_address: payload.ipnft_address,
+            ipnft_token_id,
+            account_id: payload.account_id,
+            data_room_dataset_id: payload.data_room_dataset_id,
+            announcements_dataset_id: payload.announcements_dataset_id,
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeProjectChangelogRecord {
-    pub offset: Option<u64>, // Optional for creation
+pub type MoleculeProjectChangelogEntry =
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeProjectPayloadRecord>;
 
-    pub op: u8,
+pub type MoleculeProjectChangelogInsertionRecord =
+    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<MoleculeProjectPayloadRecord>;
 
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
-    pub event_time: DateTime<Utc>,
-
-    #[serde(flatten)]
-    pub data: MoleculeProjectDataRecord,
-}
-
-impl MoleculeProjectChangelogRecord {
-    pub fn to_bytes(&self) -> bytes::Bytes {
-        let json = serde_json::to_string(self).unwrap();
-        bytes::Bytes::from_owner(json.into_bytes())
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeProjectDataRecord {
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeProjectPayloadRecord {
     pub ipnft_symbol: String,
 
     pub ipnft_uid: String,

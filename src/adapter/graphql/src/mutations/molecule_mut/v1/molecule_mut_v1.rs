@@ -15,6 +15,7 @@ use kamu_molecule_domain::{
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
 };
+use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
@@ -46,10 +47,13 @@ impl MoleculeMutV1 {
 
         let molecule_subject = molecule_subject(ctx)?;
 
-        let create_project_uc = from_catalog_n!(ctx, dyn MoleculeCreateProjectUseCase);
+        let (time_source, create_project_uc) =
+            from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeCreateProjectUseCase);
+
         let project = match create_project_uc
             .execute(
                 &molecule_subject,
+                Some(time_source.now()),
                 ipnft_symbol,
                 ipnft_uid,
                 ipnft_address,

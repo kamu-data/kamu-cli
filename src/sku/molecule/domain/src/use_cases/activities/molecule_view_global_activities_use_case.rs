@@ -9,13 +9,9 @@
 
 use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 
-use crate::{
-    MoleculeDataRoomActivityEntity,
-    MoleculeGetDatasetError,
-    MoleculeGlobalAnnouncementRecord,
-};
+use crate::{MoleculeDataRoomActivity, MoleculeGlobalAnnouncement};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,15 +20,19 @@ pub trait MoleculeViewGlobalActivitiesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        filters: Option<MoleculeGlobalActivitiesFilters>,
+        filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError>;
+    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub type MoleculeGlobalActivityListing = EntityPageListing<MoleculeGlobalActivity>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, Debug)]
-pub struct MoleculeGlobalActivitiesFilters {
+pub struct MoleculeActivitiesFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
@@ -41,32 +41,30 @@ pub struct MoleculeGlobalActivitiesFilters {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum MoleculeGlobalActivity {
-    DataRoomActivity(MoleculeDataRoomActivityEntity),
-    Announcement(MoleculeGlobalAnnouncementRecord),
+    DataRoomActivity(MoleculeDataRoomActivity),
+    Announcement(MoleculeGlobalAnnouncement),
 }
 
 impl MoleculeGlobalActivity {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             Self::DataRoomActivity(entity) => entity.event_time,
-            Self::Announcement(entity) => entity.system_columns.event_time,
+            Self::Announcement(entity) => entity.announcement.event_time,
         }
     }
 
     pub fn ipnft_uid(&self) -> &String {
         match self {
             Self::DataRoomActivity(entity) => &entity.ipnft_uid,
-            Self::Announcement(entity) => &entity.record.ipnft_uid,
+            Self::Announcement(entity) => &entity.ipnft_uid,
         }
     }
 }
 
-pub type MoleculeDataRoomActivityListing = EntityPageListing<MoleculeGlobalActivity>;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum MoleculeViewDataRoomActivitiesError {
+pub enum MoleculeViewGlobalActivitiesError {
     #[error(transparent)]
     Access(
         #[from]
@@ -76,16 +74,6 @@ pub enum MoleculeViewDataRoomActivitiesError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<MoleculeGetDatasetError> for MoleculeViewDataRoomActivitiesError {
-    fn from(e: MoleculeGetDatasetError) -> Self {
-        use MoleculeGetDatasetError as E;
-        match e {
-            E::Access(e) => e.into(),
-            E::NotFound(_) | E::Internal(_) => e.int_err().into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
