@@ -86,8 +86,8 @@ impl MoleculeDataRoomActivity {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeDataRoomActivityRecord {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeDataRoomActivityPayloadRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 
     pub ipnft_uid: String,
@@ -122,10 +122,12 @@ pub struct MoleculeDataRoomActivityRecord {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type MoleculeDataRoomActivityChangelogEntry =
-    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeDataRoomActivityRecord>;
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeDataRoomActivityPayloadRecord>;
 
 pub type MoleculeDataRoomActivityChangelogInsertionRecord =
-    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<MoleculeDataRoomActivityRecord>;
+    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<
+        MoleculeDataRoomActivityPayloadRecord,
+    >;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

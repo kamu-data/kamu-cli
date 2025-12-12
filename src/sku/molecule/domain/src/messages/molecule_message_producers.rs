@@ -18,4 +18,7 @@ pub const MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE: &str =
 pub const MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE: &str =
     "xyz.molecule.kamu.MoleculeAnnouncementService";
 
+pub const MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE: &str =
+    "xyz.molecule.kamu.MoleculeActivityService";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

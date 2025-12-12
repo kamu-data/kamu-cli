@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
+use kamu_core::PushIngestResult;
 use kamu_molecule_domain::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::MoleculeGlobalActivitiesService;
 
@@ -21,6 +23,7 @@ use crate::MoleculeGlobalActivitiesService;
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
     global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,23 +42,49 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        activity_record: MoleculeDataRoomActivityRecord,
+        activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
+        // Gain write access to global activities dataset
         let global_activities_writer = self
             .global_activities_service
             .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
+        // Append new activity record
         let new_changelog_record = MoleculeDataRoomActivityChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
             payload: activity_record,
         };
 
-        global_activities_writer
+        let push_res = global_activities_writer
             .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
+
+        // Check commit status
+        match push_res {
+            PushIngestResult::UpToDate => {
+                unreachable!("We just created a new announcement, it cannot be up-to-date")
+            }
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
+                        MoleculeActivityMessage::published(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            new_changelog_record.payload,
+                        ),
+                    )
+                    .await
+                    .int_err()?;
+            }
+        }
 
         Ok(())
     }

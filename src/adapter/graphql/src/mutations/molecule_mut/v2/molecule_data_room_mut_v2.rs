@@ -21,7 +21,7 @@ use kamu_molecule_domain::{
     MoleculeCreateDataRoomEntryUseCase,
     MoleculeCreateVersionedFileDatasetError,
     MoleculeCreateVersionedFileDatasetUseCase,
-    MoleculeDataRoomActivityRecord,
+    MoleculeDataRoomActivityPayloadRecord,
     MoleculeDataRoomFileActivityType,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
@@ -170,7 +170,7 @@ impl MoleculeDataRoomMutV2 {
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
         {
-            let data_room_activity_record = MoleculeDataRoomActivityRecord {
+            let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: path.into_v1(),
@@ -298,7 +298,7 @@ impl MoleculeDataRoomMutV2 {
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
         {
-            let data_room_activity_record = MoleculeDataRoomActivityRecord {
+            let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),
@@ -395,7 +395,7 @@ impl MoleculeDataRoomMutV2 {
             )
             .int_err()?;
 
-        let data_room_activity_record = MoleculeDataRoomActivityRecord {
+        let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
             activity_type,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
             path: collection_entry_record.path,
@@ -847,7 +847,7 @@ impl MoleculeDataRoomMutV2 {
         // 3. Log the activity.
         // TODO: asynchronous write of activity log
         {
-            let data_room_activity_record = MoleculeDataRoomActivityRecord {
+            let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
                 path: updated_data_room_entry.path.clone(),

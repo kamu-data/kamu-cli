@@ -139,9 +139,8 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
                 self.outbox
                     .post_message(
                         MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
-                        MoleculeAnnouncementMessage::created(
+                        MoleculeAnnouncementMessage::published(
                             insertion_system_time,
-                            molecule_subject.account_id.clone(),
                             molecule_subject.account_id.clone(),
                             molecule_project.ipnft_uid.clone(),
                             project_announcement_record.payload,

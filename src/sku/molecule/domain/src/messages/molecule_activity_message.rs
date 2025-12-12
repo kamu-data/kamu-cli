@@ -10,54 +10,51 @@
 use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 
-use crate::MoleculeAnnouncementPayloadRecord;
+use crate::MoleculeDataRoomActivityPayloadRecord;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const MOLECULE_ANNOUNCEMENT_MESSAGE_OUTBOX_VERSION: u32 = 1;
+const MOLECULE_ACTIVITY_MESSAGE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents messages related to the announcements published in Molecule
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum MoleculeAnnouncementMessage {
-    Published(MoleculeAnnouncementMessagePublished),
+pub enum MoleculeActivityMessage {
+    Published(MoleculeActivityMessagePublished),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MoleculeAnnouncementMessage {
+impl MoleculeActivityMessage {
     pub fn published(
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
-        ipnft_uid: String,
-        announcement_record: MoleculeAnnouncementPayloadRecord,
+        activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Self {
-        Self::Published(MoleculeAnnouncementMessagePublished {
+        Self::Published(MoleculeActivityMessagePublished {
             event_time,
             molecule_account_id,
-            ipnft_uid,
-            announcement_record,
+            activity_record,
         })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Message for MoleculeAnnouncementMessage {
+impl Message for MoleculeActivityMessage {
     fn version() -> u32 {
-        MOLECULE_ANNOUNCEMENT_MESSAGE_OUTBOX_VERSION
+        MOLECULE_ACTIVITY_MESSAGE_OUTBOX_VERSION
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct MoleculeAnnouncementMessagePublished {
+pub struct MoleculeActivityMessagePublished {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
-    pub ipnft_uid: String,
-    pub announcement_record: MoleculeAnnouncementPayloadRecord,
+    pub activity_record: MoleculeDataRoomActivityPayloadRecord,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
