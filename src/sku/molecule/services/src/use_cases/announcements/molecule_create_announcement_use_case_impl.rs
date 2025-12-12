@@ -10,9 +10,11 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::auth;
+use kamu_core::{PushIngestResult, auth};
 use kamu_molecule_domain::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::MoleculeAnnouncementsService;
 
@@ -23,6 +25,7 @@ use crate::MoleculeAnnouncementsService;
 pub struct MoleculeCreateAnnouncementUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 impl MoleculeCreateAnnouncementUseCaseImpl {
@@ -82,6 +85,8 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         source_event_time: Option<DateTime<Utc>>,
         announcement: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError> {
+        let new_announcement_id = announcement.announcement_id;
+
         // 1. Validate input data
 
         self.validate_attachments(&announcement).await?;
@@ -102,9 +107,11 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
-        global_announcements_writer
+        let push_res = global_announcements_writer
             .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
             .await?;
+
+        assert!(matches!(push_res, PushIngestResult::Updated { .. }));
 
         // 3. Store project announcement
 
@@ -116,15 +123,38 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
-        project_announcements_writer
+        let push_res = project_announcements_writer
             .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
             .await?;
 
-        // TODO: outbox event
+        match push_res {
+            PushIngestResult::UpToDate => {
+                unreachable!("We just created a new announcement, it cannot be up-to-date")
+            }
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // 4. Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
+                        MoleculeAnnouncementMessage::created(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            molecule_subject.account_id.clone(),
+                            molecule_project.ipnft_uid.clone(),
+                            project_announcement_record.payload,
+                        ),
+                    )
+                    .await
+                    .int_err()?;
 
-        Ok(MoleculeCreateAnnouncementResult {
-            new_announcement_id: project_announcement_record.payload.announcement_id,
-        })
+                Ok(MoleculeCreateAnnouncementResult {
+                    new_announcement_id,
+                })
+            }
+        }
     }
 }
 

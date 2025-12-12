@@ -86,7 +86,7 @@ impl MoleculeDataRoomActivity {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDataRoomActivityRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 

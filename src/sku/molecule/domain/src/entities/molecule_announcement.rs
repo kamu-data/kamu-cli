@@ -134,7 +134,7 @@ impl MoleculeGlobalAnnouncementChangelogInsertionRecordExt
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeAnnouncementPayloadRecord {
     pub announcement_id: uuid::Uuid,
 
