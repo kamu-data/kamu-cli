@@ -61,7 +61,8 @@ impl MoleculeDataRoomEntry {
             unreachable!()
         };
 
-        let op = odf::metadata::OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
+        let op =
+            odf::metadata::OperationType::try_from(u8::try_from(raw_op).int_err()?).int_err()?;
 
         let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
         let data_room_entry = Self::from_collection_entry(collection_entity);
