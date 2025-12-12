@@ -190,30 +190,6 @@ pub struct MoleculeDataRoomEntry {
 }
 
 impl MoleculeDataRoomEntry {
-    pub fn new_from_json(
-        mut value: serde_json::Value,
-        project: &Arc<MoleculeProjectV2>,
-        vocab: &odf::metadata::DatasetVocabulary,
-    ) -> Result<(odf::metadata::OperationType, Self)> {
-        let Some(obj) = value.as_object_mut() else {
-            unreachable!()
-        };
-        let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
-            unreachable!()
-        };
-
-        let op = odf::metadata::OperationType::try_from(u8::try_from(raw_op).unwrap()).unwrap();
-
-        let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
-        let data_room_entity =
-            kamu_molecule_domain::MoleculeDataRoomEntry::from_collection_entry(collection_entity);
-
-        let data_room_entry =
-            MoleculeDataRoomEntry::new_from_data_room_entry(project, data_room_entity, false);
-
-        Ok((op, data_room_entry))
-    }
-
     pub fn new_from_data_room_entry(
         project: &Arc<MoleculeProjectV2>,
         data_room_entry: kamu_molecule_domain::MoleculeDataRoomEntry,
@@ -256,10 +232,6 @@ impl MoleculeDataRoomEntry {
             project: project.clone(),
             is_latest_data_room_entry: false,
         }
-    }
-
-    pub fn is_same_reference(&self, other: &Self) -> bool {
-        self.entity.reference == other.entity.reference
     }
 }
 

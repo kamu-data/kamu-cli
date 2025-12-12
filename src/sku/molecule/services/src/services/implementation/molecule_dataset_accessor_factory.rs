@@ -30,7 +30,8 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: nothing Molecule-specific here, move to kamu-datasets crate
+// TODO: nothing Molecule-specific here, but pretty hard for now to put it
+// somewhere else,  as types from multiple crates are involved
 #[dill::component]
 pub struct MoleculeDatasetAccessorFactory {
     create_dataset_from_snapshot_uc: Arc<dyn CreateDatasetFromSnapshotUseCase>,

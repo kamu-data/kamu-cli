@@ -10,13 +10,13 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{QueryService, auth};
+use database_common::PaginationOpts;
 use kamu_molecule_domain::{
-    MoleculeViewProjectAnnouncementsError,
-    MoleculeViewProjectAnnouncementsUseCase,
+    MoleculeDataRoomFileActivityType,
+    MoleculeProjectActivity,
+    MoleculeViewDataRoomActivitiesError,
+    MoleculeViewProjectActivitiesUseCase,
 };
-use odf::metadata::OperationType;
 
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
@@ -44,164 +44,6 @@ impl MoleculeProjectV2 {
 
     fn as_arc(&self) -> Arc<Self> {
         Arc::new(self.clone())
-    }
-
-    async fn get_data_room_activity_events(
-        &self,
-        ctx: &Context<'_>,
-        project: &Arc<MoleculeProjectV2>,
-        filters: Option<MoleculeProjectActivityFilters>,
-    ) -> Result<Vec<MoleculeActivityEventV2>> {
-        let (query_service, rebac_dataset_registry_facade) =
-            from_catalog_n!(ctx, dyn QueryService, dyn RebacDatasetRegistryFacade);
-
-        let resolved_dataset = rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(
-                &self.entity.data_room_dataset_id.as_local_ref(),
-                auth::DatasetAction::Read,
-            )
-            .await
-            .map_err(|e| -> GqlError {
-                use RebacDatasetRefUnresolvedError as E;
-
-                match e {
-                    E::Access(e) => e.into(),
-                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
-                }
-            })?;
-
-        let df = query_service
-            .get_data(resolved_dataset, Default::default())
-            .await
-            .int_err()?
-            .df;
-
-        let Some(df) = df else {
-            return Ok(Vec::new());
-        };
-
-        let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            kamu_molecule_domain::molecule_extra_data_fields_filter(
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
-        });
-        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
-                df,
-                extra_data_fields_filter,
-            )
-            .int_err()?
-        } else {
-            df
-        };
-
-        // For any data room update, we always have two entries: -C and +C.
-        // We can ignore all -C entries.
-        use datafusion::logical_expr::{col, lit};
-
-        let vocab = odf::metadata::DatasetVocabulary::default();
-        let df = df
-            .filter(
-                col(vocab.operation_type_column.as_str())
-                    .not_eq(lit(OperationType::CorrectFrom as i32)),
-            )
-            .int_err()?;
-
-        // We need sorting here, since the order is important for processing.
-        let df = df.sort(vec![col("offset").sort(false, false)]).int_err()?;
-
-        let records = df.collect_json_aos().await.int_err()?;
-
-        let mut nodes = Vec::with_capacity(records.len());
-        let mut record_iter = records.into_iter().peekable();
-
-        while let Some(current) = record_iter.next() {
-            let (op, entry) = MoleculeDataRoomEntry::new_from_json(current, project, &vocab)?;
-
-            let event = match op {
-                OperationType::Append => {
-                    // NOTE: Reverse order due to ORDER BY.
-                    //
-                    // If the next entry is equivalent to the current
-                    // one, then it's a file update.
-                    //
-                    // More details: UpdateCollectionEntriesUseCaseImpl
-
-                    // TODO: extract use case based on common logic like
-                    //       UpdateCollectionEntriesUseCaseImpl.
-                    let is_file_updated_event = if let Some(next) = record_iter.peek() {
-                        let (next_op, next_entry) =
-                            MoleculeDataRoomEntry::new_from_json(next.clone(), project, &vocab)?;
-
-                        next_op == OperationType::Retract && entry.is_same_reference(&next_entry)
-                    } else {
-                        false
-                    };
-
-                    if is_file_updated_event {
-                        // Yes, these two records represent the same update event,
-                        // no need to process the next one, so we consume it.
-                        let _ = record_iter.next();
-                        MoleculeActivityEventV2::file_updated(entry)
-                    } else {
-                        MoleculeActivityEventV2::file_added(entry)
-                    }
-                }
-                OperationType::Retract => MoleculeActivityEventV2::file_removed(entry),
-                OperationType::CorrectTo => MoleculeActivityEventV2::file_updated(entry),
-                OperationType::CorrectFrom => {
-                    unreachable!()
-                }
-            };
-
-            nodes.push(event);
-        }
-
-        Ok(nodes)
-    }
-
-    async fn get_announcement_activity_events(
-        &self,
-        ctx: &Context<'_>,
-        project: &Arc<MoleculeProjectV2>,
-        filters: Option<MoleculeProjectActivityFilters>,
-    ) -> Result<Vec<MoleculeActivityEventV2>> {
-        let view_project_announcements_uc =
-            from_catalog_n!(ctx, dyn MoleculeViewProjectAnnouncementsUseCase);
-
-        let announcements_listing = view_project_announcements_uc
-            .execute(
-                &project.entity,
-                filters.map(
-                    |filters| kamu_molecule_domain::MoleculeAnnouncementsFilters {
-                        by_tags: filters.by_tags,
-                        by_categories: filters.by_categories,
-                        by_access_levels: filters.by_access_levels,
-                    },
-                ),
-                None,
-            )
-            .await
-            .map_err(|e| {
-                use MoleculeViewProjectAnnouncementsError as E;
-                match e {
-                    E::Access(e) => GqlError::Access(e),
-                    E::Internal(_) => e.int_err().into(),
-                }
-            })?;
-
-        let events = announcements_listing
-            .list
-            .into_iter()
-            .map(|record| {
-                let entry = MoleculeAnnouncementEntry::new_from_announcement(project, record);
-                MoleculeActivityEventV2::announcement(entry)
-            })
-            .collect::<Vec<_>>();
-
-        Ok(events)
     }
 }
 
@@ -295,39 +137,63 @@ impl MoleculeProjectV2 {
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
     ) -> Result<MoleculeActivityEventV2Connection> {
-        // TODO: extract use case
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
+        let view_project_activities_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectActivitiesUseCase);
+
+        let listing = view_project_activities_uc
+            .execute(
+                &self.entity,
+                filters.map(Into::into),
+                Some(PaginationOpts {
+                    limit: per_page,
+                    offset: page * per_page,
+                }),
+            )
+            .await
+            .map_err(|e| {
+                use MoleculeViewDataRoomActivitiesError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
         let self_arc = self.as_arc();
 
-        let (mut data_room_activity_events, mut announcement_activity_events) = tokio::try_join!(
-            self.get_data_room_activity_events(ctx, &self_arc, filters.clone()),
-            self.get_announcement_activity_events(ctx, &self_arc, filters),
-        )?;
+        let nodes = listing
+            .list
+            .into_iter()
+            .map(|activity| match activity {
+                MoleculeProjectActivity::DataRoomActivity(data_room_activity_entity) => {
+                    let activity_type = data_room_activity_entity.activity_type;
+                    let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                        &self_arc,
+                        data_room_activity_entity,
+                    );
 
-        // Get the total count before pagination
-        let total_count = data_room_activity_events.len() + announcement_activity_events.len();
+                    use MoleculeDataRoomFileActivityType as Type;
 
-        // Merge lists
-        let mut events = {
-            let mut v = Vec::with_capacity(total_count);
-            v.append(&mut data_room_activity_events);
-            v.append(&mut announcement_activity_events);
-            v
-        };
-
-        // Sort by event time descending
-        events.sort_unstable_by_key(|event| std::cmp::Reverse(event.event_time()));
-
-        // Pagination
-        let safe_offset = (page * per_page).min(total_count);
-        events.drain(..safe_offset);
-        events.truncate(per_page);
+                    match activity_type {
+                        Type::Added => MoleculeActivityEventV2::file_added(entry),
+                        Type::Updated => MoleculeActivityEventV2::file_updated(entry),
+                        Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+                    }
+                }
+                MoleculeProjectActivity::Announcement(announcement_activity_entity) => {
+                    let entry = MoleculeAnnouncementEntry::new_from_announcement(
+                        &self_arc,
+                        announcement_activity_entity,
+                    );
+                    MoleculeActivityEventV2::announcement(entry)
+                }
+            })
+            .collect::<Vec<_>>();
 
         Ok(MoleculeActivityEventV2Connection::new(
-            events, page, per_page,
+            nodes, page, per_page,
         ))
     }
 }
@@ -349,9 +215,7 @@ pub struct MoleculeProjectActivityFilters {
     pub by_access_levels: Option<Vec<String>>,
 }
 
-impl From<MoleculeProjectActivityFilters>
-    for kamu_molecule_domain::MoleculeGlobalActivitiesFilters
-{
+impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActivitiesFilters {
     fn from(value: MoleculeProjectActivityFilters) -> Self {
         Self {
             by_tags: value.by_tags,

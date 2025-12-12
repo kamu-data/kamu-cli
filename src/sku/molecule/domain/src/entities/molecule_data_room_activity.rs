@@ -11,6 +11,8 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::MoleculeDataRoomEntry;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
@@ -82,6 +84,30 @@ impl MoleculeDataRoomActivity {
             tags: r.payload.tags,
         })
     }
+
+    pub fn from_data_room_operation(
+        activity_type: MoleculeDataRoomFileActivityType,
+        entry: MoleculeDataRoomEntry,
+        ipnft_uid: String,
+    ) -> Self {
+        Self {
+            system_time: entry.system_time,
+            event_time: entry.event_time,
+            activity_type,
+            ipnft_uid,
+            path: entry.path,
+            r#ref: entry.reference,
+            version: entry.denormalized_latest_file_info.version,
+            change_by: entry.denormalized_latest_file_info.change_by,
+            access_level: entry.denormalized_latest_file_info.access_level,
+            content_type: Some(entry.denormalized_latest_file_info.content_type),
+            content_length: entry.denormalized_latest_file_info.content_length,
+            content_hash: entry.denormalized_latest_file_info.content_hash,
+            description: entry.denormalized_latest_file_info.description,
+            categories: entry.denormalized_latest_file_info.categories,
+            tags: entry.denormalized_latest_file_info.tags,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,14 +154,5 @@ pub type MoleculeDataRoomActivityChangelogInsertionRecord =
     odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<
         MoleculeDataRoomActivityPayloadRecord,
     >;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct MoleculeActivityFilters {
-    pub by_tags: Option<Vec<String>>,
-    pub by_categories: Option<Vec<String>>,
-    pub by_access_levels: Option<Vec<String>>,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

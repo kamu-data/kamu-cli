@@ -30,8 +30,8 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
     async fn get_global_data_room_activities_listing(
         &self,
         molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeGlobalActivitiesFilters>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+        filters: Option<MoleculeActivitiesFilters>,
+    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         // Get read access to global activities dataset
         let activities_reader = match self
             .global_activities_service
@@ -42,11 +42,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
             // No activities dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeDataRoomActivityListing::default());
+                return Ok(MoleculeGlobalActivityListing::default());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
-                MoleculeViewDataRoomActivitiesError,
+                MoleculeViewGlobalActivitiesError,
             >(e)),
         }?;
 
@@ -54,11 +54,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let maybe_df = activities_reader
             .raw_ledger_data_frame()
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeDataRoomActivityListing::default());
+            return Ok(MoleculeGlobalActivityListing::default());
         };
 
         // Apply filters, if presnet
@@ -89,14 +89,14 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeDataRoomActivityListing { list, total_count })
+        Ok(MoleculeGlobalActivityListing { list, total_count })
     }
 
     async fn get_global_announcement_activities_listing(
         &self,
         molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeGlobalActivitiesFilters>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+        filters: Option<MoleculeActivitiesFilters>,
+    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         // Get read access to global announcements dataset
         let announcements_reader = match self
             .announcements_service
@@ -107,11 +107,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
             // No announcements dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeDataRoomActivityListing::default());
+                return Ok(MoleculeGlobalActivityListing::default());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
-                MoleculeViewDataRoomActivitiesError,
+                MoleculeViewGlobalActivitiesError,
             >(e)),
         }?;
 
@@ -119,11 +119,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let maybe_df = announcements_reader
             .raw_ledger_data_frame()
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewDataRoomActivitiesError>)?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeDataRoomActivityListing::default());
+            return Ok(MoleculeGlobalActivityListing::default());
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
@@ -151,7 +151,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeDataRoomActivityListing { list, total_count })
+        Ok(MoleculeGlobalActivityListing { list, total_count })
     }
 }
 
@@ -164,9 +164,9 @@ impl MoleculeViewGlobalActivitiesUseCase for MoleculeViewGlobalActivitiesUseCase
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeGlobalActivitiesFilters>,
+        filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeDataRoomActivityListing, MoleculeViewDataRoomActivitiesError> {
+    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
             self.get_global_data_room_activities_listing(molecule_subject, filters.clone()),
             self.get_global_announcement_activities_listing(molecule_subject, filters),
@@ -194,7 +194,7 @@ impl MoleculeViewGlobalActivitiesUseCase for MoleculeViewGlobalActivitiesUseCase
             list.truncate(pagination.limit);
         }
 
-        Ok(MoleculeDataRoomActivityListing { list, total_count })
+        Ok(MoleculeGlobalActivityListing { list, total_count })
     }
 }
 
