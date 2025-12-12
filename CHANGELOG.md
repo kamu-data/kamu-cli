@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## Unreleased
 ### Added
 - Support for re-defining the `AddPushSource`
+### Changed
+- Schema nullability coercion now works for `List` field elements
 
 ## [0.254.1] - 2025-12-08
 ### Fixed

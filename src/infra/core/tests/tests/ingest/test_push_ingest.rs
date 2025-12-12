@@ -1039,7 +1039,7 @@ async fn test_ingest_push_with_predefined_data_schema() {
     assert_matches!(
         res,
         Err(PushIngestError::ExecutionError(err))
-        if err.to_string().contains("Column population contains 1 null values while none were expected")
+        if err.to_string().contains("Column `population` contains 1 null values while none were expected")
     );
 }
 

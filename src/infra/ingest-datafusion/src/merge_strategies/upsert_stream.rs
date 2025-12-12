@@ -438,7 +438,7 @@ impl MergeStrategyUpsertStream {
         let df: DataFrameExt = DataFrame::new(session_state, plan).into();
 
         // Perform nullability correction, as all columns become nullable after join
-        let df = df.assert_collumns_not_null(|f| non_null_columns.contains(f.name()))?;
+        let df = df.assert_columns_not_null(|f| non_null_columns.contains(f.name()))?;
 
         Ok(df)
     }
