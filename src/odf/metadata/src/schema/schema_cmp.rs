@@ -11,14 +11,119 @@ use crate::dtos::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct DataTypeDiff<'a> {
+    pub items: Vec<DataTypeDiffItem<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub enum DataTypeDiffItem<'a> {
+    Changed {
+        lhs: &'a DataType,
+        rhs: &'a DataType,
+    },
+    BecameOptional {
+        lhs: &'a DataType,
+        rhs: &'a DataType,
+    },
+    BecameRequired {
+        lhs: &'a DataType,
+        rhs: &'a DataType,
+    },
+    StructDiff {
+        lhs: &'a DataTypeStruct,
+        rhs: &'a DataTypeStruct,
+        fields_diff: Vec<DataSchemaDiffItem<'a>>,
+    },
+    ListDiff {
+        lhs: &'a DataTypeList,
+        rhs: &'a DataTypeList,
+        item_type_diff: Vec<DataTypeDiffItem<'a>>,
+    },
+}
+
+impl DataType {
+    pub fn diff<'a>(&'a self, other: &'a Self) -> DataTypeDiff<'a> {
+        let mut items = Vec::new();
+        Self::diff_impl(self, other, &mut items);
+        DataTypeDiff { items }
+    }
+
+    fn diff_impl<'a>(lhs: &'a Self, rhs: &'a Self, diff: &mut Vec<DataTypeDiffItem<'a>>) {
+        match (lhs, rhs) {
+            (lhs, rhs) if *lhs == *rhs => {}
+            (
+                DataType::Option(DataTypeOption { inner: inner_lhs }),
+                DataType::Option(DataTypeOption { inner: inner_rhs }),
+            ) => {
+                Self::diff_impl(inner_lhs, inner_rhs, diff);
+            }
+            (lhs, DataType::Option(DataTypeOption { inner: inner_rhs })) => {
+                diff.push(DataTypeDiffItem::BecameOptional { lhs, rhs });
+                Self::diff_impl(lhs, inner_rhs, diff);
+            }
+            (DataType::Option(DataTypeOption { inner: inner_lhs }), rhs) => {
+                diff.push(DataTypeDiffItem::BecameRequired { lhs, rhs });
+                Self::diff_impl(inner_lhs, rhs, diff);
+            }
+            (
+                DataType::Struct(lhs @ DataTypeStruct { fields: fields_lhs }),
+                DataType::Struct(rhs @ DataTypeStruct { fields: fields_rhs }),
+            ) => {
+                let fields_diff = DataSchema::diff_impl(fields_lhs, None, fields_rhs, None);
+                if !fields_diff.is_empty() {
+                    diff.push(DataTypeDiffItem::StructDiff {
+                        lhs,
+                        rhs,
+                        fields_diff,
+                    });
+                }
+            }
+            (
+                DataType::List(
+                    lhs_t @ DataTypeList {
+                        item_type: item_type_lhs,
+                        fixed_length: fixed_length_lhs,
+                    },
+                ),
+                DataType::List(
+                    rhs_t @ DataTypeList {
+                        item_type: item_type_rhs,
+                        fixed_length: fixed_length_rhs,
+                    },
+                ),
+            ) => {
+                let item_type_diff = Self::diff(item_type_lhs, item_type_rhs).items;
+
+                if item_type_diff.is_empty() {
+                    assert_ne!(fixed_length_lhs, fixed_length_rhs);
+                    diff.push(DataTypeDiffItem::Changed { lhs, rhs });
+                } else {
+                    diff.push(DataTypeDiffItem::ListDiff {
+                        lhs: lhs_t,
+                        rhs: rhs_t,
+                        item_type_diff,
+                    });
+                }
+            }
+            (_, _) => diff.push(DataTypeDiffItem::Changed { lhs, rhs }),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub enum DataSchemaCmp<'a> {
     /// Schemas are identical twins in both types and attributes
     Identical,
     /// Schemas are equivalent according to specified options
-    Equivalent(DataSchemaDiff<'a>),
-    /// Schemas are different - diff is provided
-    NonEquivalent(DataSchemaDiff<'a>),
+    Equivalent { diff_orig: DataSchemaDiff<'a> },
+    /// Schemas are different
+    NonEquivalent {
+        diff_orig: DataSchemaDiff<'a>,
+        diff_non_equivalent: DataSchemaDiff<'a>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,34 +142,34 @@ pub struct DataSchemaCmpOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DataSchemaDiff<'a> {
-    pub lhs: &'a DataSchema,
-    pub rhs: &'a DataSchema,
     pub items: Vec<DataSchemaDiffItem<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DataSchemaDiffItem<'a> {
     SchemaAttributesChanged,
-    FieldAttributesChanged,
+    FieldAttributesChanged {
+        field_lhs: &'a DataField,
+        field_rhs: &'a DataField,
+    },
     FieldAdded {
         field_rhs: &'a DataField,
     },
-    FieldRemoved,
+    FieldRemoved {
+        field_lhs: &'a DataField,
+    },
     FieldReordered {
         index_lhs: usize,
         index_rhs: usize,
         field_lhs: &'a DataField,
         field_rhs: &'a DataField,
     },
-    FieldTypeChanged,
-    FieldBecameOptional,
-    FieldBecameRequired,
-    NestedFieldDiff {
+    FieldTypeChanged {
         field_lhs: &'a DataField,
         field_rhs: &'a DataField,
-        items: Vec<DataSchemaDiffItem<'a>>,
+        type_diff: Vec<DataTypeDiffItem<'a>>,
     },
 }
 
@@ -72,46 +177,124 @@ impl<'a> DataSchemaDiff<'a> {
     fn compare(self, opts: &DataSchemaCmpOptions) -> DataSchemaCmp<'a> {
         if self.items.is_empty() {
             DataSchemaCmp::Identical
-        } else if Self::is_equivalent_rec(&self.items, opts) {
-            DataSchemaCmp::Equivalent(self)
         } else {
-            DataSchemaCmp::NonEquivalent(self)
+            let non_eq = Self::filter_equivalent(&self.items, opts);
+
+            if non_eq.is_empty() {
+                DataSchemaCmp::Equivalent { diff_orig: self }
+            } else {
+                DataSchemaCmp::NonEquivalent {
+                    diff_non_equivalent: DataSchemaDiff { items: non_eq },
+                    diff_orig: self,
+                }
+            }
         }
     }
 
-    fn is_equivalent_rec(items: &Vec<DataSchemaDiffItem<'a>>, opts: &DataSchemaCmpOptions) -> bool {
-        for item in items {
-            #[allow(clippy::match_same_arms)]
-            match item {
-                DataSchemaDiffItem::SchemaAttributesChanged if !opts.ignore_attributes => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldAttributesChanged if !opts.ignore_attributes => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldAdded { .. } => return false,
-                DataSchemaDiffItem::FieldRemoved => return false,
-                DataSchemaDiffItem::FieldReordered { .. } if !opts.ignore_order => return false,
-                DataSchemaDiffItem::FieldTypeChanged => return false,
-                DataSchemaDiffItem::FieldBecameOptional if !opts.ignore_optionality => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldBecameRequired if !opts.ignore_optionality => {
-                    return false
-                }
-                DataSchemaDiffItem::NestedFieldDiff {
-                    items: items_nested,
-                    ..
-                } => {
-                    if !Self::is_equivalent_rec(items_nested, opts) {
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-        }
+    fn filter_equivalent(
+        items: &Vec<DataSchemaDiffItem<'a>>,
+        opts: &DataSchemaCmpOptions,
+    ) -> Vec<DataSchemaDiffItem<'a>> {
+        items
+            .iter()
+            .filter_map(|i| Self::filter_equivalent_item(i, opts))
+            .collect()
+    }
 
-        true
+    fn filter_equivalent_item(
+        item: &DataSchemaDiffItem<'a>,
+        opts: &DataSchemaCmpOptions,
+    ) -> Option<DataSchemaDiffItem<'a>> {
+        #[expect(clippy::match_same_arms)]
+        let eq = match item {
+            DataSchemaDiffItem::SchemaAttributesChanged => opts.ignore_attributes,
+            DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
+            DataSchemaDiffItem::FieldAdded { .. } => false,
+            DataSchemaDiffItem::FieldRemoved { .. } => false,
+            DataSchemaDiffItem::FieldReordered { .. } => opts.ignore_order,
+            DataSchemaDiffItem::FieldTypeChanged {
+                type_diff,
+                field_lhs,
+                field_rhs,
+            } => {
+                let type_diff = Self::filter_equivalent_type_items(type_diff, opts);
+                return if type_diff.is_empty() {
+                    None
+                } else {
+                    Some(DataSchemaDiffItem::FieldTypeChanged {
+                        field_lhs,
+                        field_rhs,
+                        type_diff,
+                    })
+                };
+            }
+        };
+
+        if eq {
+            None
+        } else {
+            Some(item.clone())
+        }
+    }
+
+    fn filter_equivalent_type_items(
+        type_diff: &Vec<DataTypeDiffItem<'a>>,
+        opts: &DataSchemaCmpOptions,
+    ) -> Vec<DataTypeDiffItem<'a>> {
+        type_diff
+            .iter()
+            .filter_map(|i| Self::filter_equivalent_type(i, opts))
+            .collect()
+    }
+
+    fn filter_equivalent_type(
+        type_diff: &DataTypeDiffItem<'a>,
+        opts: &DataSchemaCmpOptions,
+    ) -> Option<DataTypeDiffItem<'a>> {
+        #[expect(clippy::match_same_arms)]
+        let eq = match type_diff {
+            DataTypeDiffItem::Changed { .. } => false,
+            DataTypeDiffItem::BecameOptional { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::BecameRequired { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::StructDiff {
+                fields_diff,
+                lhs,
+                rhs,
+            } => {
+                let fields_diff = Self::filter_equivalent(fields_diff, opts);
+                return if fields_diff.is_empty() {
+                    None
+                } else {
+                    Some(DataTypeDiffItem::StructDiff {
+                        lhs,
+                        rhs,
+                        fields_diff,
+                    })
+                };
+            }
+            DataTypeDiffItem::ListDiff {
+                item_type_diff,
+                lhs,
+                rhs,
+            } => {
+                let item_type_diff = Self::filter_equivalent_type_items(item_type_diff, opts);
+                return if item_type_diff.is_empty() {
+                    None
+                } else {
+                    Some(DataTypeDiffItem::ListDiff {
+                        lhs,
+                        rhs,
+                        item_type_diff,
+                    })
+                };
+            }
+        };
+
+        if eq {
+            None
+        } else {
+            Some(type_diff.clone())
+        }
     }
 
     fn is_superset(&self, opts: &DataSchemaCmpOptions) -> bool {
@@ -119,38 +302,39 @@ impl<'a> DataSchemaDiff<'a> {
     }
 
     fn is_superset_rec(items: &Vec<DataSchemaDiffItem<'a>>, opts: &DataSchemaCmpOptions) -> bool {
-        for item in items {
-            #[expect(clippy::match_same_arms)]
-            match item {
-                DataSchemaDiffItem::SchemaAttributesChanged if !opts.ignore_attributes => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldAttributesChanged if !opts.ignore_attributes => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldAdded { .. } => return false,
-                DataSchemaDiffItem::FieldRemoved => {}
-                DataSchemaDiffItem::FieldReordered { .. } if !opts.ignore_order => return false,
-                DataSchemaDiffItem::FieldTypeChanged => return false,
-                DataSchemaDiffItem::FieldBecameOptional if !opts.ignore_optionality => {
-                    return false
-                }
-                DataSchemaDiffItem::FieldBecameRequired if !opts.ignore_optionality => {
-                    return false
-                }
-                DataSchemaDiffItem::NestedFieldDiff {
-                    items: items_nested,
-                    ..
-                } => {
-                    if !Self::is_superset_rec(items_nested, opts) {
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-        }
+        items.iter().all(|i| Self::is_superset_schema_diff(i, opts))
+    }
 
-        true
+    fn is_superset_schema_diff(item: &DataSchemaDiffItem<'a>, opts: &DataSchemaCmpOptions) -> bool {
+        #[expect(clippy::match_same_arms)]
+        match item {
+            DataSchemaDiffItem::SchemaAttributesChanged => opts.ignore_attributes,
+            DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
+            DataSchemaDiffItem::FieldAdded { .. } => false,
+            DataSchemaDiffItem::FieldRemoved { .. } => true, // !
+            DataSchemaDiffItem::FieldReordered { .. } => opts.ignore_order,
+            DataSchemaDiffItem::FieldTypeChanged { type_diff, .. } => type_diff
+                .iter()
+                .all(|i| Self::is_superset_type_diff(i, opts)),
+        }
+    }
+
+    fn is_superset_type_diff(
+        type_diff: &DataTypeDiffItem<'a>,
+        opts: &DataSchemaCmpOptions,
+    ) -> bool {
+        #[expect(clippy::match_same_arms)]
+        match type_diff {
+            DataTypeDiffItem::Changed { .. } => false,
+            DataTypeDiffItem::BecameOptional { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::BecameRequired { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::StructDiff { fields_diff, .. } => {
+                Self::is_superset_rec(fields_diff, opts)
+            }
+            DataTypeDiffItem::ListDiff { item_type_diff, .. } => item_type_diff
+                .iter()
+                .all(|i| Self::is_superset_type_diff(i, opts)),
+        }
     }
 }
 
@@ -181,11 +365,7 @@ impl DataSchema {
             extra_rhs.as_ref(),
         );
 
-        DataSchemaDiff {
-            lhs: self,
-            rhs: other,
-            items,
-        }
+        DataSchemaDiff { items }
     }
 
     fn diff_impl<'a>(
@@ -232,7 +412,7 @@ impl DataSchema {
                     }
                     fields_cmp.push((field_lhs, field_rhs));
                 } else {
-                    items.push(DataSchemaDiffItem::FieldRemoved);
+                    items.push(DataSchemaDiffItem::FieldRemoved { field_lhs });
                 }
             }
             for (_, field_rhs) in fields_rhs_map.values() {
@@ -246,42 +426,21 @@ impl DataSchema {
             assert_eq!(field_lhs.name, field_rhs.name);
 
             // Compare data types
-            let diff = match (&field_lhs.r#type, &field_rhs.r#type) {
-                (
-                    DataType::Struct(DataTypeStruct { fields: fields_lhs }),
-                    DataType::Struct(DataTypeStruct { fields: fields_rhs }),
-                ) => {
-                    let items = Self::diff_impl(fields_lhs, None, fields_rhs, None);
-                    if items.is_empty() {
-                        None
-                    } else {
-                        Some(DataSchemaDiffItem::NestedFieldDiff {
-                            field_lhs,
-                            field_rhs,
-                            items,
-                        })
-                    }
-                }
-                (type_lhs, type_rhs) if *type_lhs == *type_rhs => None,
-                (DataType::Option(DataTypeOption { inner: inner_lhs }), rhs)
-                    if **inner_lhs == *rhs =>
-                {
-                    Some(DataSchemaDiffItem::FieldBecameRequired)
-                }
-                (lhs, DataType::Option(DataTypeOption { inner: inner_rhs }))
-                    if *lhs == **inner_rhs =>
-                {
-                    Some(DataSchemaDiffItem::FieldBecameOptional)
-                }
-                (_, _) => Some(DataSchemaDiffItem::FieldTypeChanged),
-            };
+            let type_diff = DataType::diff(&field_lhs.r#type, &field_rhs.r#type).items;
 
-            if let Some(diff) = diff {
-                items.push(diff);
+            if !type_diff.is_empty() {
+                items.push(DataSchemaDiffItem::FieldTypeChanged {
+                    field_lhs,
+                    field_rhs,
+                    type_diff,
+                });
             }
 
             if field_lhs.extra != field_rhs.extra {
-                items.push(DataSchemaDiffItem::FieldAttributesChanged);
+                items.push(DataSchemaDiffItem::FieldAttributesChanged {
+                    field_lhs,
+                    field_rhs,
+                });
             }
         }
 
@@ -335,7 +494,7 @@ mod test {
                 ),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
         assert_matches!(
             DataSchema::compare(
@@ -349,7 +508,7 @@ mod test {
                     ..Default::default()
                 },
             ),
-            DataSchemaCmp::Equivalent(_)
+            DataSchemaCmp::Equivalent { .. }
         );
 
         // Identical: types
@@ -369,7 +528,7 @@ mod test {
                 &DataSchema::new(vec![DataField::u64("foo")]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
 
         // Different: names
@@ -379,7 +538,7 @@ mod test {
                 &DataSchema::new(vec![DataField::u32("bar")]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
 
         // Identical: attrs
@@ -411,7 +570,7 @@ mod test {
                 ),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
         assert_matches!(
             DataSchema::compare(
@@ -428,7 +587,7 @@ mod test {
                     ..Default::default()
                 },
             ),
-            DataSchemaCmp::Equivalent(_)
+            DataSchemaCmp::Equivalent { .. }
         );
 
         // Identical: nested types
@@ -448,7 +607,7 @@ mod test {
                 &DataSchema::new(vec![DataField::structure("foo", vec![DataField::u64("a")])]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
 
         // Different: nested names
@@ -458,7 +617,7 @@ mod test {
                 &DataSchema::new(vec![DataField::structure("foo", vec![DataField::u32("b")])]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
 
         // Different: nested attrs
@@ -474,7 +633,7 @@ mod test {
                 )]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
         assert_matches!(
             DataSchema::compare(
@@ -491,7 +650,7 @@ mod test {
                     ..Default::default()
                 },
             ),
-            DataSchemaCmp::Equivalent(_)
+            DataSchemaCmp::Equivalent { .. }
         );
 
         // Identical: optionality
@@ -511,7 +670,7 @@ mod test {
                 &DataSchema::new(vec![DataField::u32("foo").optional()]),
                 DataSchemaCmpOptions::default(),
             ),
-            DataSchemaCmp::NonEquivalent(_)
+            DataSchemaCmp::NonEquivalent { .. }
         );
         assert_matches!(
             DataSchema::compare(
@@ -522,7 +681,7 @@ mod test {
                     ..Default::default()
                 },
             ),
-            DataSchemaCmp::Equivalent(_)
+            DataSchemaCmp::Equivalent { .. }
         );
         assert_matches!(
             DataSchema::compare(
@@ -533,7 +692,7 @@ mod test {
                     ..Default::default()
                 },
             ),
-            DataSchemaCmp::Equivalent(_)
+            DataSchemaCmp::Equivalent { .. }
         );
     }
 
@@ -646,6 +805,100 @@ mod test {
                 DataSchemaDiffItem::FieldReordered { index_lhs: 0, index_rhs: 1, .. },
                 DataSchemaDiffItem::FieldAdded { field_rhs },
             ] if field_rhs.name == "bar"
+        );
+
+        // Struct field optionality changed
+        let lhs = DataSchema::new(vec![DataField::structure(
+            "foo",
+            vec![DataField::u32("a").optional()],
+        )]);
+        let rhs = DataSchema::new(vec![DataField::structure("foo", vec![DataField::u32("a")])]);
+        let diff = DataSchema::diff(&lhs, &rhs);
+
+        assert_matches!(
+            &diff.items[..],
+            [
+                DataSchemaDiffItem::FieldTypeChanged {
+                    field_lhs,
+                    field_rhs,
+                    type_diff,
+                }
+            ] if field_lhs.name == "foo"
+                && field_rhs.name == "foo"
+                && matches!(
+                    &type_diff[..],
+                    [DataTypeDiffItem::StructDiff { fields_diff, .. }]
+                    if matches!(
+                        &fields_diff[..],
+                        [
+                            DataSchemaDiffItem::FieldTypeChanged {
+                                field_lhs,
+                                field_rhs,
+                                type_diff,
+                            }
+                        ] if field_lhs.name == "a"
+                            && field_rhs.name == "a"
+                            && matches!(
+                                &type_diff[..],
+                                [DataTypeDiffItem::BecameRequired { .. }]
+                            )
+                    )
+                )
+        );
+
+        // List items optionality changed
+        let lhs = DataSchema::new(vec![DataField::list("foo", DataType::u32().optional())]);
+        let rhs = DataSchema::new(vec![DataField::list("foo", DataType::u32())]);
+        let diff = DataSchema::diff(&lhs, &rhs);
+
+        assert_matches!(
+            &diff.items[..],
+            [
+                DataSchemaDiffItem::FieldTypeChanged {
+                    field_lhs,
+                    field_rhs,
+                    type_diff,
+                }
+            ] if field_lhs.name == "foo"
+                && field_rhs.name == "foo"
+                && matches!(
+                    &type_diff[..],
+                    [
+                        DataTypeDiffItem::ListDiff { item_type_diff, .. }
+                    ] if matches!(
+                        &item_type_diff[..],
+                        [DataTypeDiffItem::BecameRequired { .. }]
+                    )
+                )
+        );
+
+        // Both list items optionality and optionality of list field itself changed
+        let lhs = DataSchema::new(vec![
+            DataField::list("foo", DataType::u32().optional()).optional()
+        ]);
+        let rhs = DataSchema::new(vec![DataField::list("foo", DataType::u32())]);
+        let diff = DataSchema::diff(&lhs, &rhs);
+
+        assert_matches!(
+            &diff.items[..],
+            [
+                DataSchemaDiffItem::FieldTypeChanged {
+                    field_lhs,
+                    field_rhs,
+                    type_diff,
+                }
+            ] if field_lhs.name == "foo"
+                && field_rhs.name == "foo"
+                && matches!(
+                    &type_diff[..],
+                    [
+                        DataTypeDiffItem::BecameRequired { .. },
+                        DataTypeDiffItem::ListDiff { item_type_diff, .. },
+                    ] if matches!(
+                        &item_type_diff[..],
+                        [DataTypeDiffItem::BecameRequired { .. }]
+                    )
+                )
         );
     }
 }

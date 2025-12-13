@@ -426,10 +426,20 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
                     .contains(&add_push_source.source_name);
 
                 if is_still_enabled {
-                    // SAFETY: block type verified
-                    let typed_block = block.clone().into_typed().unwrap();
-                    self.active_push_sources
-                        .push_front((hash.clone(), typed_block));
+                    // Push source can be overridden via another AddPushSource event without
+                    // disabling it first, so we skip if a source with same name
+                    // was already observed (i.e. keep the latest version)
+                    let is_overridden = self
+                        .active_push_sources
+                        .iter()
+                        .any(|(_, b)| b.event.source_name == add_push_source.source_name);
+
+                    if !is_overridden {
+                        // SAFETY: block type verified
+                        let typed_block = block.clone().into_typed().unwrap();
+                        self.active_push_sources
+                            .push_front((hash.clone(), typed_block));
+                    }
                 }
             }
             MetadataEvent::DisablePushSource(disable_push_source) => {

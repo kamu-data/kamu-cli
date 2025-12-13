@@ -331,66 +331,98 @@ impl MetadataChainVisitor for ValidateUnimplementedEventsVisitor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateAddPushSourceVisitor {
-    is_push_source_appended: bool,
+pub struct ValidateAddPushSourceVisitor<'a> {
+    new_source: &'a AddPushSource,
 }
 
-impl ValidateAddPushSourceVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
-        let is_push_source_appended = match &block.event {
+impl<'a> ValidateAddPushSourceVisitor<'a> {
+    // NOTE: Using the fact that Option<Visitor> implements Visitor
+    pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
+        match &block.event {
             MetadataEvent::AddPushSource(e) => {
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
                     validate_transform(&block.event, transform)?;
                 }
 
-                true
+                Ok(Some(Self { new_source: e }))
             }
-            _ => false,
-        };
-
-        Ok(Self {
-            is_push_source_appended,
-        })
+            _ => Ok(None),
+        }
     }
 }
 
-impl MetadataChainVisitor for ValidateAddPushSourceVisitor {
+impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
-        // TODO: Support source evolution
-        if self.is_push_source_appended {
-            MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_POLLING_SOURCE)
-        } else {
-            MetadataVisitorDecision::Stop
-        }
+        MetadataVisitorDecision::NextOfType(
+            MetadataEventTypeFlags::ADD_PUSH_SOURCE
+                | MetadataEventTypeFlags::DISABLE_PUSH_SOURCE
+                | MetadataEventTypeFlags::SET_POLLING_SOURCE
+                | MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
+        )
     }
 
+    // TODO: Support source evolution
     fn visit(
         &mut self,
         (_, block): HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error> {
-        let MetadataEvent::SetPollingSource(e) = &block.event else {
-            unreachable!()
-        };
-
-        invalid_event!(
-            e.clone(),
-            "Cannot add a push source while polling source is still active",
-        );
+        #[allow(clippy::match_same_arms)]
+        match &block.event {
+            MetadataEvent::AddPushSource(prev_source) => {
+                if prev_source.source_name == self.new_source.source_name {
+                    if *prev_source == *self.new_source {
+                        Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                            self.new_source.clone(),
+                            "New push source is identical to existing",
+                        )))
+                    } else {
+                        Ok(MetadataVisitorDecision::Stop)
+                    }
+                } else {
+                    Ok(MetadataVisitorDecision::NextOfType(
+                        MetadataEventTypeFlags::ADD_PUSH_SOURCE
+                            | MetadataEventTypeFlags::DISABLE_PUSH_SOURCE
+                            | MetadataEventTypeFlags::SET_POLLING_SOURCE
+                            | MetadataEventTypeFlags::DISABLE_POLLING_SOURCE,
+                    ))
+                }
+            }
+            MetadataEvent::DisablePushSource(_) => {
+                invalid_event!(
+                    self.new_source.clone(),
+                    "Source evolution is not yet fully supported",
+                );
+            }
+            MetadataEvent::SetPollingSource(_) => {
+                invalid_event!(
+                    self.new_source.clone(),
+                    "Cannot add a push source while polling source is still active",
+                );
+            }
+            MetadataEvent::DisablePollingSource(_) => {
+                invalid_event!(
+                    self.new_source.clone(),
+                    "Source evolution is not yet fully supported",
+                );
+            }
+            _ => unreachable!(),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSetPollingSourceVisitor {
-    is_set_polling_source_appended: bool,
+pub struct ValidateSetPollingSourceVisitor<'a> {
+    #[expect(unused)]
+    new_source: &'a SetPollingSource,
 }
 
-impl ValidateSetPollingSourceVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
-        let is_set_polling_source_appended = match &block.event {
+impl<'a> ValidateSetPollingSourceVisitor<'a> {
+    pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
+        match &block.event {
             MetadataEvent::SetPollingSource(e) => {
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
@@ -405,29 +437,21 @@ impl ValidateSetPollingSourceVisitor {
                     invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
                 }
 
-                true
+                Ok(Some(Self { new_source: e }))
             }
-            _ => false,
-        };
-
-        Ok(Self {
-            is_set_polling_source_appended,
-        })
+            _ => Ok(None),
+        }
     }
 }
 
-impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
+impl MetadataChainVisitor for ValidateSetPollingSourceVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
-        if self.is_set_polling_source_appended {
-            // TODO: Support source evolution
-            MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::ADD_PUSH_SOURCE)
-        } else {
-            MetadataVisitorDecision::Stop
-        }
+        MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::ADD_PUSH_SOURCE)
     }
 
+    // TODO: Support source evolution
     fn visit(
         &mut self,
         (_, block): HashedMetadataBlockRef,
@@ -541,25 +565,23 @@ impl MetadataChainVisitor for ValidateEventIsNotEmptyVisitor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateAddDataVisitor<'a> {
-    appended_add_data: Option<&'a AddData>,
+    new_add_data: &'a AddData,
     prev_schema: Option<SetDataSchema>,
     prev_add_data: Option<AddData>,
     next_block_flags: MetadataEventTypeFlags,
 }
 
 impl<'a> ValidateAddDataVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        let appended_add_data = match &block.event {
-            MetadataEvent::AddData(e) => Some(e),
+    pub fn new(block: &'a MetadataBlock) -> Option<Self> {
+        match &block.event {
+            MetadataEvent::AddData(e) => Some(Self {
+                new_add_data: e,
+                prev_schema: None,
+                prev_add_data: None,
+                next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
+                    | MetadataEventTypeFlags::ADD_DATA,
+            }),
             _ => None,
-        };
-
-        Self {
-            appended_add_data,
-            prev_schema: None,
-            prev_add_data: None,
-            next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
-                | MetadataEventTypeFlags::ADD_DATA,
         }
     }
 }
@@ -568,11 +590,7 @@ impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
-        if self.appended_add_data.is_some() {
-            MetadataVisitorDecision::NextOfType(self.next_block_flags)
-        } else {
-            MetadataVisitorDecision::Stop
-        }
+        MetadataVisitorDecision::NextOfType(self.next_block_flags)
     }
 
     fn visit(
@@ -596,19 +614,18 @@ impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
 
     fn finish(&self) -> Result<(), Self::Error> {
         let ValidateAddDataVisitor {
-            appended_add_data,
+            new_add_data,
             prev_schema,
             prev_add_data,
             ..
         } = self;
-        let Some(e) = appended_add_data else {
-            return Ok(());
-        };
+
+        let new_add_data = *new_add_data;
 
         // Validate schema was defined before adding any data
-        if prev_schema.is_none() && e.new_data.is_some() {
+        if prev_schema.is_none() && new_add_data.new_data.is_some() {
             invalid_event!(
-                (*e).clone(),
+                new_add_data.clone(),
                 "SetDataSchema event must be present before adding data",
             );
         }
@@ -625,21 +642,25 @@ impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
             .and_then(|v| v.new_source_state.as_ref());
 
         // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+        if new_add_data.prev_checkpoint.as_ref() != expected_prev_checkpoint {
             invalid_event!(
-                (*e).clone(),
+                new_add_data.clone(),
                 "Input checkpoint does not correspond to the last checkpoint in the chain",
             );
         }
 
         // Validate event advances some state
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-            && e.new_source_state.as_ref() == prev_source_state
+        if new_add_data.new_data.is_none()
+            && new_add_data
+                .new_checkpoint
+                .as_ref()
+                .map(|v| &v.physical_hash)
+                == new_add_data.prev_checkpoint.as_ref()
+            && new_add_data.new_watermark.as_ref() == prev_watermark
+            && new_add_data.new_source_state.as_ref() == prev_source_state
         {
             return Err(AppendValidationError::no_op_event(
-                (*e).clone(),
+                new_add_data.clone(),
                 "Event neither has data nor it advances checkpoint, watermark, or source state",
             ));
         }
@@ -651,7 +672,7 @@ impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateExecuteTransformVisitor<'a> {
-    appended_execute_transform: Option<&'a ExecuteTransform>,
+    new_transform: &'a ExecuteTransform,
     prev_transform: Option<SetTransform>,
     prev_schema: Option<SetDataSchema>,
     prev_query: Option<ExecuteTransform>,
@@ -659,20 +680,18 @@ pub struct ValidateExecuteTransformVisitor<'a> {
 }
 
 impl<'a> ValidateExecuteTransformVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Self {
-        let appended_execute_transform = match &block.event {
-            MetadataEvent::ExecuteTransform(e) => Some(e),
+    pub fn new(block: &'a MetadataBlock) -> Option<Self> {
+        match &block.event {
+            MetadataEvent::ExecuteTransform(e) => Some(Self {
+                new_transform: e,
+                prev_transform: None,
+                prev_schema: None,
+                prev_query: None,
+                next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
+                    | MetadataEventTypeFlags::SET_TRANSFORM
+                    | MetadataEventTypeFlags::EXECUTE_TRANSFORM,
+            }),
             _ => None,
-        };
-
-        Self {
-            appended_execute_transform,
-            prev_transform: None,
-            prev_schema: None,
-            prev_query: None,
-            next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
-                | MetadataEventTypeFlags::SET_TRANSFORM
-                | MetadataEventTypeFlags::EXECUTE_TRANSFORM,
         }
     }
 }
@@ -681,11 +700,7 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
-        if self.appended_execute_transform.is_some() {
-            MetadataVisitorDecision::NextOfType(self.next_block_flags)
-        } else {
-            MetadataVisitorDecision::Stop
-        }
+        MetadataVisitorDecision::NextOfType(self.next_block_flags)
     }
 
     fn visit(
@@ -718,27 +733,26 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
 
     fn finish(&self) -> Result<(), Self::Error> {
         let ValidateExecuteTransformVisitor {
-            appended_execute_transform,
+            new_transform,
             prev_transform,
             prev_schema,
             prev_query,
             ..
         } = self;
-        let Some(e) = appended_execute_transform else {
-            return Ok(());
-        };
+
+        let new_transform = *new_transform;
 
         // Validate schema was defined if we're adding data
-        if prev_schema.is_none() && e.new_data.is_some() {
+        if prev_schema.is_none() && new_transform.new_data.is_some() {
             invalid_event!(
-                (*e).clone(),
+                new_transform.clone(),
                 "SetDataSchema event must be present before adding data",
             );
         }
 
         // Validate inputs are listed in the same exact order as in SetTransform (or
         // through recursion, in previous ExecuteTransform)
-        let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
+        let actual_inputs = new_transform.query_inputs.iter().map(|i| &i.dataset_id);
         if let Some(prev_transform) = &prev_transform {
             if actual_inputs.ne(prev_transform
                 .inputs
@@ -746,7 +760,7 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
                 .map(|i| i.dataset_ref.id().unwrap()))
             {
                 invalid_event!(
-                    (*e).clone(),
+                    new_transform.clone(),
                     "Inputs must be listed in same order as initially declared in SetTransform \
                      event",
                 );
@@ -754,32 +768,36 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
         } else if let Some(prev_query) = &prev_query {
             if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
                 invalid_event!(
-                    (*e).clone(),
+                    new_transform.clone(),
                     "Inputs must be listed in same order as initially declared in SetTransform \
                      event",
                 );
             }
         } else {
             invalid_event!(
-                (*e).clone(),
+                new_transform.clone(),
                 "ExecuteTransform must be preceded by SetTransform event",
             );
         }
 
         // Validate input offset and block sequencing
         if let Some(prev_query) = &prev_query {
-            for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
+            for (prev, new) in prev_query
+                .query_inputs
+                .iter()
+                .zip(&new_transform.query_inputs)
+            {
                 if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash {
-                    invalid_event!((*e).clone(), "Invalid input block interval");
+                    invalid_event!(new_transform.clone(), "Invalid input block interval");
                 }
 
                 if new.new_offset.is_some() && new.new_offset == new.prev_offset {
-                    invalid_event!((*e).clone(), "Invalid input offset interval");
+                    invalid_event!(new_transform.clone(), "Invalid input offset interval");
                 }
 
                 if new.prev_block_hash.as_ref() != prev.last_block_hash() {
                     invalid_event!(
-                        (*e).clone(),
+                        new_transform.clone(),
                         "Input prevBlockHash does not correspond to the last block included in \
                          the previous query",
                     );
@@ -787,7 +805,7 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
 
                 if new.prev_offset != prev.last_offset() {
                     invalid_event!(
-                        (*e).clone(),
+                        new_transform.clone(),
                         "Input prevOffset hash does not correspond to the last offset included in \
                          the previous query",
                     );
@@ -795,7 +813,7 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
 
                 if new.new_offset.is_some() && new.new_block_hash.is_none() {
                     invalid_event!(
-                        (*e).clone(),
+                        new_transform.clone(),
                         "Input specifies a non-empty offset interval, but its block interval is \
                          empty",
                     );
@@ -810,9 +828,9 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
         let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
 
         // Validate input/output checkpoint sequencing
-        if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
+        if new_transform.prev_checkpoint.as_ref() != expected_prev_checkpoint {
             invalid_event!(
-                (*e).clone(),
+                new_transform.clone(),
                 "Input checkpoint does not correspond to the last checkpoint in the chain",
             );
         }
@@ -820,13 +838,20 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
         // Validate event advances some state
         // Note that there can be no data, checkpoint, or watermark in cases when all
         // inputs only had source state updates
-        if e.new_data.is_none()
-            && e.new_checkpoint.as_ref().map(|v| &v.physical_hash) == e.prev_checkpoint.as_ref()
-            && e.new_watermark.as_ref() == prev_watermark
-            && e.query_inputs.iter().all(|i| i.new_block_hash.is_none())
+        if new_transform.new_data.is_none()
+            && new_transform
+                .new_checkpoint
+                .as_ref()
+                .map(|v| &v.physical_hash)
+                == new_transform.prev_checkpoint.as_ref()
+            && new_transform.new_watermark.as_ref() == prev_watermark
+            && new_transform
+                .query_inputs
+                .iter()
+                .all(|i| i.new_block_hash.is_none())
         {
             return Err(AppendValidationError::no_op_event(
-                (*e).clone(),
+                new_transform.clone(),
                 "Event neither has data nor it advances inputs, checkpoint, or watermark",
             ));
         }
@@ -838,36 +863,41 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateSetDataSchemaVisitor<'a> {
-    new_schema: Option<&'a SetDataSchema>,
+    new_schema: &'a SetDataSchema,
     prev_schema: Option<SetDataSchema>,
     vocab: Option<DatasetVocabulary>,
 }
 
 impl<'a> ValidateSetDataSchemaVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<Self, AppendValidationError> {
-        let new_schema = match &block.event {
-            MetadataEvent::SetDataSchema(e) => Some(e),
-            _ => None,
-        };
-
-        Ok(Self {
-            new_schema,
-            prev_schema: None,
-            vocab: None,
-        })
+    pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
+        match &block.event {
+            MetadataEvent::SetDataSchema(new_schema) => Ok(Some(Self {
+                new_schema,
+                prev_schema: None,
+                vocab: None,
+            })),
+            _ => Ok(None),
+        }
     }
 
-    fn check_allowed_schema_migration(diff: &DataSchemaDiff<'_>) -> bool {
-        diff.items
-            .iter()
-            .all(Self::check_allowed_schema_migration_rec)
+    // TODO: Replace with visitor pattern
+    fn check_allowed_schema_migration(diff: &mut DataSchemaDiff<'_>) -> bool {
+        Self::check_allowed_schema_migration_items(&mut diff.items)
     }
 
-    fn check_allowed_schema_migration_rec(diff: &DataSchemaDiffItem<'_>) -> bool {
+    fn check_allowed_schema_migration_items(items: &mut Vec<DataSchemaDiffItem<'_>>) -> bool {
+        items.retain_mut(|i| !Self::check_allowed_schema_migration_item(i));
+        items.is_empty()
+    }
+
+    fn check_allowed_schema_migration_item(diff: &mut DataSchemaDiffItem<'_>) -> bool {
         #[expect(clippy::match_same_arms)]
         match diff {
             DataSchemaDiffItem::SchemaAttributesChanged => true,
-            DataSchemaDiffItem::FieldAttributesChanged => true,
+            DataSchemaDiffItem::FieldAttributesChanged {
+                field_lhs: _,
+                field_rhs: _,
+            } => true,
             DataSchemaDiffItem::FieldAdded { field_rhs } => {
                 if field_rhs.is_optional() {
                     // It's OK to introduce a new optional field as this maintains compatibility
@@ -877,24 +907,41 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
                     false
                 }
             }
-            DataSchemaDiffItem::FieldRemoved => false,
-            DataSchemaDiffItem::FieldReordered {
-                index_lhs: _,
-                index_rhs: _,
+            DataSchemaDiffItem::FieldRemoved { field_lhs: _ } => false,
+            DataSchemaDiffItem::FieldReordered { .. } => true,
+            DataSchemaDiffItem::FieldTypeChanged {
                 field_lhs: _,
                 field_rhs: _,
-            } => true,
-            DataSchemaDiffItem::FieldTypeChanged => false,
+                type_diff,
+            } => Self::check_allowed_schema_migration_type_items(type_diff),
+        }
+    }
+
+    fn check_allowed_schema_migration_type_items(items: &mut Vec<DataTypeDiffItem<'_>>) -> bool {
+        items.retain_mut(|i| !Self::check_allowed_schema_migration_type(i));
+        items.is_empty()
+    }
+
+    fn check_allowed_schema_migration_type(diff: &mut DataTypeDiffItem<'_>) -> bool {
+        #[expect(clippy::match_same_arms)]
+        match diff {
+            DataTypeDiffItem::Changed { lhs: _, rhs: _ } => false,
             // TODO: Field becoming optional is relaxing the schema and a compatibile change from
             // producer perspective, but it's a breaking change from consumer perspective and needs
             // to be cautioned about and communicated downstream
-            DataSchemaDiffItem::FieldBecameOptional => false,
-            DataSchemaDiffItem::FieldBecameRequired => false,
-            DataSchemaDiffItem::NestedFieldDiff {
-                field_lhs: _,
-                field_rhs: _,
-                items,
-            } => items.iter().all(Self::check_allowed_schema_migration_rec),
+            DataTypeDiffItem::BecameOptional { lhs: _, rhs: _ } => false,
+            // TODO: Support in future
+            DataTypeDiffItem::BecameRequired { lhs: _, rhs: _ } => false,
+            DataTypeDiffItem::StructDiff {
+                lhs: _,
+                rhs: _,
+                fields_diff,
+            } => Self::check_allowed_schema_migration_items(fields_diff),
+            DataTypeDiffItem::ListDiff {
+                lhs: _,
+                rhs: _,
+                item_type_diff,
+            } => Self::check_allowed_schema_migration_type_items(item_type_diff),
         }
     }
 }
@@ -903,13 +950,9 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
-        if self.new_schema.is_some() {
-            MetadataVisitorDecision::NextOfType(
-                MetadataEventTypeFlags::SET_DATA_SCHEMA | MetadataEventTypeFlags::SET_VOCAB,
-            )
-        } else {
-            MetadataVisitorDecision::Stop
-        }
+        MetadataVisitorDecision::NextOfType(
+            MetadataEventTypeFlags::SET_DATA_SCHEMA | MetadataEventTypeFlags::SET_VOCAB,
+        )
     }
 
     fn visit(
@@ -943,12 +986,9 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
     }
 
     fn finish(&self) -> Result<(), Self::Error> {
-        let Some(set_new_schema) = self.new_schema else {
-            return Ok(());
-        };
-        let Some(new_schema) = set_new_schema.schema.as_ref() else {
+        let Some(new_schema) = self.new_schema.schema.as_ref() else {
             // Don't validate legacy event type - those are used only in testing
-            assert!(set_new_schema.raw_arrow_schema.is_some());
+            assert!(self.new_schema.raw_arrow_schema.is_some());
             return Ok(());
         };
 
@@ -1020,13 +1060,16 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
             ) {
                 DataSchemaCmp::Identical => {
                     Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
-                        set_new_schema.clone(),
+                        self.new_schema.clone(),
                         "New schema is identical to the current",
                     )))
                 }
-                DataSchemaCmp::Equivalent(_) => Ok(()),
-                DataSchemaCmp::NonEquivalent(diff) => {
-                    if Self::check_allowed_schema_migration(&diff) {
+                DataSchemaCmp::Equivalent { diff_orig: _ } => Ok(()),
+                DataSchemaCmp::NonEquivalent {
+                    diff_orig: _,
+                    mut diff_non_equivalent,
+                } => {
+                    if Self::check_allowed_schema_migration(&mut diff_non_equivalent) {
                         Ok(())
                     } else {
                         let prev_yaml =
@@ -1035,10 +1078,11 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                             odf_data_utils::schema::format::format_schema_odf_yaml(new_schema);
 
                         invalid_event!(
-                            self.new_schema.unwrap().clone(),
+                            self.new_schema.clone(),
                             format!(
                                 "New schema is not compatible with the current schema.\nCurrent \
-                                 schema:\n{prev_yaml}\nNew schema:\n{new_yaml}"
+                                 schema:\n{prev_yaml}\nNew \
+                                 schema:\n{new_yaml}\nIncompatible:\n{diff_non_equivalent:#?}"
                             )
                         )
                     }
