@@ -1019,6 +1019,7 @@ impl DataWriter for DataWriterDataFusion {
             )?;
 
             // Coerce schema if needed
+            // TODO: Combine coercion and `validate_schema_compatible` into one operation
             let df = self.coerce_schema(df, dataset_schema_arrow.as_ref())?;
 
             // Validate schema matches the declared one

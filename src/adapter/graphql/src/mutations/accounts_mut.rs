@@ -66,7 +66,10 @@ impl AccountsMut {
         Ok(account_maybe.map(AccountMut::new))
     }
 
-    /// Returns mutable accounts by their IDs
+    /// Returns mutable accounts by their IDs.
+    ///
+    /// Order of results is guaranteed to match the inputs. Duplicate inputs
+    /// will results in duplicate results.
     #[tracing::instrument(level = "info", name = AccountsMut_by_ids, skip_all, fields(?account_ids, ?skip_missing))]
     async fn by_ids(
         &self,
@@ -92,7 +95,23 @@ impl AccountsMut {
             )));
         }
 
-        let account_muts = lookup.found.into_iter().map(AccountMut::new).collect();
+        let found_accounts: Vec<kamu_accounts::Account> = {
+            let found_accounts_map: std::collections::BTreeMap<
+                odf::AccountID,
+                kamu_accounts::Account,
+            > = lookup
+                .found
+                .into_iter()
+                .map(|a| (a.id.clone(), a))
+                .collect();
+
+            domain_account_ids
+                .iter()
+                .filter_map(|id| found_accounts_map.get(*id).cloned())
+                .collect()
+        };
+
+        let account_muts = found_accounts.into_iter().map(AccountMut::new).collect();
 
         Ok(account_muts)
     }
