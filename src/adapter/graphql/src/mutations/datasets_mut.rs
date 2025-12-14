@@ -102,7 +102,10 @@ impl DatasetsMut {
         }
     }
 
-    /// Returns mutable datasets by their IDs
+    /// Returns mutable datasets by their IDs.
+    ///
+    /// Order of results is guaranteed to match the inputs. Duplicate inputs
+    /// will results in duplicate results.
     #[tracing::instrument(level = "info", name = DatasetsMut_by_ids, skip_all, fields(?dataset_ids))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn by_ids(
@@ -134,10 +137,22 @@ impl DatasetsMut {
             return Err(GqlError::gql(error_msg));
         }
 
-        let dataset_muts = resolution
-            .allowed
+        // Reorder resolved handles to match the order of inputs
+        let accessible_dataset_handles: Vec<odf::DatasetHandle> = {
+            let resolved_handles_map: std::collections::BTreeMap<
+                odf::DatasetRef,
+                odf::DatasetHandle,
+            > = resolution.allowed.into_iter().collect();
+
+            dataset_refs
+                .iter()
+                .filter_map(|r| resolved_handles_map.get(r).cloned())
+                .collect()
+        };
+
+        let dataset_muts = accessible_dataset_handles
             .into_iter()
-            .map(|(_, dataset_handle)| {
+            .map(|dataset_handle| {
                 let dataset_request_state = DatasetRequestState::new(dataset_handle);
                 DatasetMut::new_access_checked(dataset_request_state)
             })
