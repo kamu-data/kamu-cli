@@ -27,8 +27,8 @@ pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
 pub const FIELD_HEADLINE: &str = "headline";
 pub const FIELD_BODY: &str = "body";
 pub const FIELD_ATTACHMENTS: &str = "attachments";
-pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
-pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
+pub const FIELD_ACCESS_LEVEL: &str = "access_level";
+pub const FIELD_CHANGE_BY: &str = "change_by";
 pub const FIELD_CATEGORIES: &str = "categories";
 pub const FIELD_TAGS: &str = "tags";
 

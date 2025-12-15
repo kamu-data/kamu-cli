@@ -82,7 +82,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         let mut record_iter = records.into_iter().peekable();
 
         while let Some(current) = record_iter.next() {
-            let (op, entry) = MoleculeDataRoomEntry::from_json(current, &vocab)?;
+            let (offset, op, entry) = MoleculeDataRoomEntry::from_json(current, &vocab)?;
 
             let activity_type = match op {
                 OperationType::Append => {
@@ -96,7 +96,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                     // TODO: extract use case based on common logic like
                     //       UpdateCollectionEntriesUseCaseImpl.
                     let is_file_updated_event = if let Some(next) = record_iter.peek() {
-                        let (next_op, next_entry) =
+                        let (_, next_op, next_entry) =
                             MoleculeDataRoomEntry::from_json(next.clone(), &vocab)?;
 
                         next_op == OperationType::Retract && entry.reference == next_entry.reference
@@ -122,6 +122,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
             nodes.push(MoleculeProjectActivity::DataRoomActivity(
                 MoleculeDataRoomActivity::from_data_room_operation(
+                    offset,
                     activity_type,
                     entry,
                     molecule_project.ipnft_uid.clone(),

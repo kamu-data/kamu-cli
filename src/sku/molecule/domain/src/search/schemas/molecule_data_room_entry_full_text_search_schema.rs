@@ -28,6 +28,7 @@ pub const FIELD_REFERENCE: &str = "reference";
 pub const FIELD_PATH: &str = "path";
 pub const FIELD_VERSION: &str = "version";
 pub const FIELD_ACCESS_LEVEL: &str = "access_level";
+pub const FIELD_CHANGE_BY: &str = "change_by";
 pub const FIELD_DESCRIPTION: &str = "description";
 pub const FIELD_CATEGORIES: &str = "categories";
 pub const FIELD_TAGS: &str = "tags";
@@ -65,6 +66,10 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_ACCESS_LEVEL,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CHANGE_BY,
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {

@@ -11,8 +11,10 @@ use chrono::{DateTime, Utc};
 use kamu_molecule_domain::{
     MoleculeAnnouncementPayloadRecord,
     MoleculeDataRoomEntry,
+    MoleculeGlobalActivity,
     MoleculeGlobalAnnouncement,
     MoleculeProject,
+    molecule_activity_full_text_search_schema as activity_schema,
     molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
@@ -78,6 +80,7 @@ pub(crate) fn index_data_room_entry_from_entity(
         data_room_entry_schema::FIELD_PATH: entry.path,
         data_room_entry_schema::FIELD_VERSION: entry.denormalized_latest_file_info.version,
         data_room_entry_schema::FIELD_ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
+        data_room_entry_schema::FIELD_CHANGE_BY: entry.denormalized_latest_file_info.change_by,
         data_room_entry_schema::FIELD_DESCRIPTION: entry.denormalized_latest_file_info.description,
         data_room_entry_schema::FIELD_CATEGORIES: entry.denormalized_latest_file_info.categories,
         data_room_entry_schema::FIELD_TAGS: entry.denormalized_latest_file_info.tags,
@@ -124,6 +127,38 @@ pub(crate) fn index_announcement_from_publication_record(
         announcement_schema::FIELD_CATEGORIES: announcement_record.categories,
         announcement_schema::FIELD_TAGS: announcement_record.tags,
     })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Activity records
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn index_activity_record(activity_record: &MoleculeGlobalActivity) -> serde_json::Value {
+    match activity_record {
+        MoleculeGlobalActivity::DataRoomActivity(activity) => serde_json::json!({
+            activity_schema::FIELD_CREATED_AT: activity.event_time,
+            activity_schema::FIELD_UPDATED_AT: activity.event_time,
+            activity_schema::FIELD_IPNFT_UID: activity.ipnft_uid,
+            activity_schema::FIELD_ENTRY_PATH: activity.path.to_string(),
+            activity_schema::FIELD_ENTRY_REF: activity.r#ref.to_string(),
+            activity_schema::FIELD_ACCESS_LEVEL: activity.access_level,
+            activity_schema::FIELD_CHANGE_BY: activity.change_by,
+            activity_schema::FIELD_DESCRIPTION: activity.description,
+            activity_schema::FIELD_TAGS: activity.tags,
+            activity_schema::FIELD_CATEGORIES: activity.categories,
+        }),
+        MoleculeGlobalActivity::Announcement(activity) => serde_json::json!({
+            activity_schema::FIELD_CREATED_AT: activity.announcement.system_time,
+            activity_schema::FIELD_UPDATED_AT: activity.announcement.system_time,
+            activity_schema::FIELD_IPNFT_UID: activity.ipnft_uid,
+            activity_schema::FIELD_ANNOUNCEMENT_ID: activity.announcement.announcement_id.to_string(),
+            activity_schema::FIELD_ACCESS_LEVEL: activity.announcement.access_level,
+            activity_schema::FIELD_CHANGE_BY: activity.announcement.change_by,
+            activity_schema::FIELD_DESCRIPTION: activity.announcement.headline,
+            activity_schema::FIELD_TAGS: activity.announcement.tags,
+            activity_schema::FIELD_CATEGORIES:  activity.announcement.categories,
+        }),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

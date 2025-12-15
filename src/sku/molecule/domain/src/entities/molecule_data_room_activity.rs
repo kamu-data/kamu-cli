@@ -28,6 +28,8 @@ pub enum MoleculeDataRoomFileActivityType {
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug)]
 pub struct MoleculeDataRoomActivity {
+    pub offset: u64, // We need this offset for identification
+
     pub system_time: DateTime<Utc>,
 
     pub event_time: DateTime<Utc>,
@@ -67,6 +69,7 @@ impl MoleculeDataRoomActivity {
         let r: MoleculeDataRoomActivityChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
+            offset: r.system_columns.offset,
             system_time: r.system_columns.system_time,
             event_time: r.system_columns.event_time,
             activity_type: r.payload.activity_type,
@@ -86,11 +89,13 @@ impl MoleculeDataRoomActivity {
     }
 
     pub fn from_data_room_operation(
+        offset: u64,
         activity_type: MoleculeDataRoomFileActivityType,
         entry: MoleculeDataRoomEntry,
         ipnft_uid: String,
     ) -> Self {
         Self {
+            offset,
             system_time: entry.system_time,
             event_time: entry.event_time,
             activity_type,

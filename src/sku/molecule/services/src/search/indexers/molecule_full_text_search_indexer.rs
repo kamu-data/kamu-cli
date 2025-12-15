@@ -14,8 +14,10 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesUseCase,
+    MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewGlobalAnnouncementsUseCase,
     MoleculeViewProjectsUseCase,
+    molecule_activity_full_text_search_schema as activity_schema,
     molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
@@ -32,6 +34,7 @@ pub(crate) struct MoleculeFullTextSearchIndexer {
     molecule_view_projects_uc: Arc<dyn MoleculeViewProjectsUseCase>,
     molecule_view_data_room_entries_uc: Arc<dyn MoleculeViewDataRoomEntriesUseCase>,
     molecule_view_global_announcements_uc: Arc<dyn MoleculeViewGlobalAnnouncementsUseCase>,
+    molecule_view_global_activities_uc: Arc<dyn MoleculeViewGlobalActivitiesUseCase>,
 }
 
 impl MoleculeFullTextSearchIndexer {
@@ -303,13 +306,78 @@ impl MoleculeFullTextSearchIndexer {
         Ok(total_documents_count)
     }
 
-    #[allow(clippy::unused_async)]
     pub(crate) async fn index_activities(
         &self,
-        _repo: &dyn FullTextSearchRepository,
+        repo: &dyn FullTextSearchRepository,
     ) -> Result<usize, InternalError> {
-        // TODO
-        Ok(0)
+        let organization_account = self.organization_account();
+
+        tracing::info!(
+            organization_account_name = organization_account.account_name.as_str(),
+            organization_account_id = organization_account.account_id.to_string(),
+            "Indexing global activities for Molecule organization account",
+        );
+
+        let mut total_documents_count = 0;
+        let mut operations = Vec::new();
+        let mut offset = 0;
+
+        loop {
+            // Load activities in pages aligned with bulk size
+            let activities_listing = self
+                .molecule_view_global_activities_uc
+                .execute(
+                    organization_account,
+                    None, /* no filters */
+                    Some(PaginationOpts {
+                        limit: Self::BULK_SIZE,
+                        offset,
+                    }),
+                )
+                .await
+                .int_err()?;
+
+            // Break if no more activities
+            if activities_listing.list.is_empty() {
+                break;
+            }
+
+            // Index each activity
+            for activity in activities_listing.list {
+                // Serialize activity into search document
+                let document = helpers::index_activity_record(&activity);
+
+                operations.push(FullTextUpdateOperation::Index {
+                    id: activity_schema::unique_id(&activity),
+                    doc: document,
+                });
+            }
+
+            // Bulk index the current page
+            if !operations.is_empty() {
+                let batch_count = operations.len();
+                tracing::debug!(
+                    documents_count = batch_count,
+                    "Bulk indexing activities batch",
+                );
+                repo.bulk_update(activity_schema::SCHEMA_NAME, operations)
+                    .await?;
+                total_documents_count += batch_count;
+                operations = Vec::new();
+            }
+
+            // Move to next page
+            offset += Self::BULK_SIZE;
+        }
+
+        tracing::info!(
+            organization_account_name = organization_account.account_name.as_str(),
+            organization_account_id = organization_account.account_id.to_string(),
+            indexed_documents_count = total_documents_count,
+            "Indexed global activities for Molecule organization account",
+        );
+
+        Ok(total_documents_count)
     }
 }
 
