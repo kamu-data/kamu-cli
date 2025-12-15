@@ -9,6 +9,7 @@
 
 mod collection_entry;
 mod collection_path;
+mod collection_path_v2;
 mod dataset_block;
 mod dataset_column;
 #[cfg(feature = "sqlx")]
@@ -24,6 +25,7 @@ mod versioned_file_entry;
 
 pub use collection_entry::*;
 pub use collection_path::*;
+pub use collection_path_v2::*;
 pub use dataset_block::*;
 pub use dataset_column::*;
 #[cfg(feature = "sqlx")]

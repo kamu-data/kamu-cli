@@ -10,16 +10,16 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
-
-use crate::domain::{
+use kamu_molecule_domain::{
     MoleculeProjectMessage,
     MoleculeProjectMessageCreated,
     MoleculeProjectMessageDisabled,
     MoleculeProjectMessageReenabled,
     molecule_project_full_text_search_schema as project_schema,
 };
+use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
+use messaging_outbox::{MessageConsumer, MessageConsumerT};
+
 use crate::search::molecule_full_text_search_schema_helpers as schema_helpers;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

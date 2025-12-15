@@ -1,0 +1,93 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: molecule-announcements
+  kind: Root
+  metadata:
+  - kind: SetDataSchema
+    schema:
+      fields:
+      - name: offset
+        type:
+          kind: Int64
+      - name: op
+        type:
+          kind: Int32
+      - name: system_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: event_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: ipnft_uid
+        type:
+          kind: String
+      - name: announcement_id
+        type:
+          kind: String
+      - name: headline
+        type:
+          kind: String
+      - name: body
+        type:
+          kind: String
+      - name: attachments
+        type:
+          kind: List
+          itemType:
+            kind: String
+      - name: molecule_access_level
+        type:
+          kind: String
+      - name: molecule_change_by
+        type:
+          kind: String
+      - name: categories
+        type:
+          kind: List
+          itemType:
+            kind: String
+      - name: tags
+        type:
+          kind: List
+          itemType:
+            kind: String
+  - kind: AddPushSource
+    sourceName: default
+    read:
+      kind: NdJson
+      schema:
+      - op INT NOT NULL
+      - ipnft_uid STRING NOT NULL
+      - announcement_id STRING NOT NULL
+      - headline STRING NOT NULL
+      - body STRING NOT NULL
+      - attachments Array<STRING> NOT NULL
+      - molecule_access_level STRING NOT NULL
+      - molecule_change_by STRING NOT NULL
+      - categories Array<STRING> NOT NULL
+      - tags Array<STRING> NOT NULL
+    merge:
+      kind: ChangelogStream
+      primaryKey:
+      - announcement_id
+  - kind: SetInfo
+    description: Projects announcements
+    keywords:
+    - DeSci
+    - BioTech
+    - Funding
+    - Crypto
+  - kind: SetAttachments
+    attachments:
+      kind: Embedded
+      items:
+      - path: README.md
+        content: |
+          # Announcements
+
+          Dataset automatically combines announcements from individual projects.

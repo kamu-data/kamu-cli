@@ -13,15 +13,15 @@ use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_core::KamuBackgroundCatalog;
-use kamu_search::*;
-
-use crate::MoleculeFullTextSearchIndexer;
-use crate::domain::{
+use kamu_molecule_domain::{
     molecule_activity_full_text_search_schema as activity_schema,
     molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
 };
+use kamu_search::*;
+
+use crate::MoleculeFullTextSearchIndexer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +47,7 @@ impl MoleculeFullTextSearchSchemaProvider {
         Fut: std::future::Future<Output = Result<usize, InternalError>>,
     {
         let mut total_indexed = 0;
-        for org_account_name in crate::domain::MOLECULE_ORG_ACCOUNTS {
+        for org_account_name in kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS {
             // Resolve organization account, if exists
             let maybe_org_account = self
                 .account_service

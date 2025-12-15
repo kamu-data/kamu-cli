@@ -329,7 +329,10 @@ type Accounts {
 	"""
 	byId(accountId: AccountID!): Account
 	"""
-	Returns accounts by their IDs
+	Returns accounts by their IDs.
+	
+	Order of results is guaranteed to match the inputs. Duplicate inputs
+	will results in duplicate results.
 	"""
 	byIds(		accountIds: [AccountID!]!,
 		"""
@@ -362,7 +365,10 @@ type AccountsMut {
 	"""
 	byId(accountId: AccountID!): AccountMut
 	"""
-	Returns mutable accounts by their IDs
+	Returns mutable accounts by their IDs.
+	
+	Order of results is guaranteed to match the inputs. Duplicate inputs
+	will results in duplicate results.
 	"""
 	byIds(		accountIds: [AccountID!]!,
 		"""
@@ -716,6 +722,8 @@ type CollectionMut {
 }
 
 scalar CollectionPath
+
+scalar CollectionPathV2
 
 type CollectionProjection {
 	"""
@@ -1670,7 +1678,10 @@ type Datasets {
 	"""
 	byId(datasetId: DatasetID!): Dataset
 	"""
-	Returns multiple datasets by their IDs
+	Returns multiple datasets by their IDs.
+	
+	Order of results is guaranteed to match the inputs. Duplicate inputs
+	will results in duplicate results.
 	"""
 	byIds(		datasetIds: [DatasetID!]!,
 		"""
@@ -1683,7 +1694,8 @@ type Datasets {
 	"""
 	byRef(datasetRef: DatasetRef!): Dataset
 	"""
-	Returns multiple datasets by their IDs or aliases
+	Returns multiple datasets by their IDs or aliases. Order of results is
+	guaranteed to match the inputs.
 	"""
 	byRefs(		datasetRefs: [DatasetRef!]!,
 		"""
@@ -1711,7 +1723,10 @@ type DatasetsMut {
 	"""
 	byId(datasetId: DatasetID!): DatasetMut
 	"""
-	Returns mutable datasets by their IDs
+	Returns mutable datasets by their IDs.
+	
+	Order of results is guaranteed to match the inputs. Duplicate inputs
+	will results in duplicate results.
 	"""
 	byIds(		datasetIds: [DatasetID!]!,
 		"""
@@ -3206,6 +3221,8 @@ type MoleculeActivityFileUpdatedV2 {
 
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
+	systemTime: DateTime!
+	eventTime: DateTime!
 	id: String!
 	headline: String!
 	body: String!
@@ -3292,7 +3309,7 @@ type MoleculeDataRoomEntry {
 	path: CollectionPath!
 	ref: DatasetID!
 	changeBy: String!
-	asVersionedFile: MoleculeVersionedFile
+	asVersionedFile: MoleculeVersionedFile!
 }
 
 type MoleculeDataRoomEntryConnection {
@@ -3341,11 +3358,11 @@ type MoleculeDataRoomMutV2 {
 		"""
 		Base64-encoded file content (url-safe, no padding)
 		"""
-		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPath,
+		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPathV2,
 		"""
 		Media type of content (e.g. application/pdf)
 		"""
-		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: String
+		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: MoleculeEncryptionMetadataInput
 	): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Starts the process of uploading a file to the data room.
@@ -3364,19 +3381,19 @@ type MoleculeDataRoomMutV2 {
 	Allows creating a file, upload a new version, and link a file into the
 	data room via a single transaction.
 	"""
-	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPath, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomFinishUploadFileResult!
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPathV2, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomFinishUploadFileResult!
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPath!, toPath: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
+	moveEntry(fromPath: CollectionPathV2!, toPath: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPath!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
+	removeEntry(path: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: String): MoleculeDataRoomUpdateFileMetadataResult!
+	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
 type MoleculeDataRoomProjection {
@@ -3406,6 +3423,12 @@ type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDa
 	message: String!
 }
 
+type MoleculeDataRoomUpdateFileMetadataResultFileNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
+}
+
 type MoleculeDataRoomUpdateFileMetadataResultSuccess implements MoleculeDataRoomUpdateFileMetadataResult {
 	entry: MoleculeDataRoomEntry!
 	isSuccess: Boolean!
@@ -3422,6 +3445,30 @@ type MoleculeDataRoomUpdateSuccess implements MoleculeDataRoomMoveEntryResult & 
 type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 	isSuccess: Boolean!
 	message: String!
+}
+
+type MoleculeEncryptionMetadata {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
+}
+
+input MoleculeEncryptionMetadataInput {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
 }
 
 type MoleculeMut {
@@ -3513,10 +3560,9 @@ type MoleculeProject {
 }
 
 input MoleculeProjectActivityFilters {
-	"""
-	This filter is provided as an example.
-	"""
-	byIpnftUids: [String!]
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
 }
 
 type MoleculeProjectConnection {
@@ -3792,7 +3838,18 @@ type MoleculeV2 {
 }
 
 type MoleculeVersionedFile {
+	"""
+	Returns the latest versioned file entry, regardless of data room version
+	"""
 	latest: MoleculeVersionedFileEntry
+	"""
+	Returns the versioned file entry that matches the data room entry
+	"""
+	matching: MoleculeVersionedFileEntry!
+	"""
+	Returns particular versioned file entry, regardless of data room version
+	"""
+	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry
 }
 
 type MoleculeVersionedFileEntry {
@@ -3808,7 +3865,7 @@ type MoleculeVersionedFileEntry {
 	categories: [String!]!
 	tags: [String!]!
 	contentText: String
-	encryptionMetadata: String
+	encryptionMetadata: MoleculeEncryptionMetadata
 	"""
 	Returns encoded content in-band. Should be used for small files only and
 	will return an error if called on large data.

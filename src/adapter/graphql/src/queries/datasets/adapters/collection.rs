@@ -105,7 +105,7 @@ impl CollectionProjection<'_> {
         let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
         let maybe_entry = find_collection_entries
             .execute_find_by_path(
-                ReadCheckedDataset(readable_dataset),
+                ReadCheckedDataset::from_ref(readable_dataset),
                 self.as_of.clone(),
                 path.into(),
             )
@@ -137,19 +137,27 @@ impl CollectionProjection<'_> {
         let view_collection_entries = from_catalog_n!(ctx, dyn ViewCollectionEntriesUseCase);
         let entries_listing = view_collection_entries
             .execute(
-                ReadCheckedDataset(readable_dataset),
+                ReadCheckedDataset::from_ref(readable_dataset),
                 self.as_of.clone(),
                 path_prefix.map(Into::into),
                 max_depth,
+                None,
                 Some(PaginationOpts {
                     offset: page * per_page,
                     limit: per_page,
                 }),
             )
             .await
-            .map_err(|e| match e {
-                ViewCollectionEntriesError::Access(e) => GqlError::Access(e),
-                e @ ViewCollectionEntriesError::Internal(_) => e.int_err().into(),
+            .map_err(|e| -> GqlError {
+                use ViewCollectionEntriesError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::UnknownExtraDataFieldFilterNames(_) => {
+                        // We do not use the filter
+                        unreachable!()
+                    }
+                    E::Internal(_) => e.int_err().into(),
+                }
             })?;
 
         let nodes = entries_listing
@@ -183,7 +191,7 @@ impl CollectionProjection<'_> {
         let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
         let entries = find_collection_entries
             .execute_find_multi_by_refs(
-                ReadCheckedDataset(readable_dataset),
+                ReadCheckedDataset::from_ref(readable_dataset),
                 self.as_of.clone(),
                 &odf_refs,
             )

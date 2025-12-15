@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-
-use crate::domain::{
+use kamu_molecule_domain::{
     MoleculeDataRoomEntry,
     MoleculeProject,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,

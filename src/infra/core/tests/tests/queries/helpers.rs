@@ -29,7 +29,7 @@ use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -147,7 +147,7 @@ pub(crate) async fn create_test_dataset(
 fn create_base_catalog(dataset_action_authorizer: MockDatasetActionAuthorizer) -> dill::Catalog {
     dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
+        .add::<SystemTimeSourceStub>()
         .add_value(TenancyConfig::SingleTenant)
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())

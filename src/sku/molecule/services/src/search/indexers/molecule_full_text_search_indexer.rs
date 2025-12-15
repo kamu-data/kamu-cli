@@ -11,10 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
-use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
-
-use super::super::molecule_full_text_search_schema_helpers as helpers;
-use crate::domain::{
+use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewProjectsUseCase,
     // molecule_activity_full_text_search_schema as activity_schema,
@@ -22,6 +19,9 @@ use crate::domain::{
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
 };
+use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
+
+use super::super::molecule_full_text_search_schema_helpers as helpers;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -153,6 +153,7 @@ impl MoleculeFullTextSearchIndexer {
                             None, /* latest */
                             None, /* all prefixes */
                             None, /* any depth */
+                            None, /* no filters */
                             None, /* no pagination */
                         )
                         .await

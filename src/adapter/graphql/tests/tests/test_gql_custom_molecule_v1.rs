@@ -1486,6 +1486,7 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add::<kamu_search_services::DummyFullTextSearchService>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
@@ -1518,9 +1519,8 @@ impl GraphQLMoleculeV1Harness {
     }
 
     pub async fn create_projects_dataset(&self) -> CreateDatasetResult {
-        let snapshot = kamu_adapter_graphql::molecule::Molecule::dataset_snapshot_projects_v1(
-            "molecule/projects".parse().unwrap(),
-        );
+        let snapshot =
+            kamu_molecule_domain::MoleculeDatasetSnapshots::projects("molecule".parse().unwrap());
 
         let create_dataset = self
             .catalog_authorized

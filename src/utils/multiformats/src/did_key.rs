@@ -56,9 +56,9 @@ impl DidKey {
 
     /// Creates DID from generated key pair using cryptographically secure RNG
     pub fn new_generated_ed25519() -> (ed25519::SigningKey, Self) {
-        use rand::rngs::OsRng;
+        use rand_core::OsRng;
 
-        let mut csprng = OsRng {};
+        let mut csprng = OsRng;
         let keypair = ed25519::SigningKey::generate(&mut csprng);
         let pub_key = keypair.verifying_key().to_bytes();
         let id = Self::new(Multicodec::Ed25519Pub, &pub_key).unwrap();

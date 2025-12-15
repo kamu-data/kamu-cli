@@ -16,6 +16,12 @@ use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
 
+use crate::{
+    MoleculeDataRoomCollectionReadError,
+    MoleculeDataRoomCollectionService,
+    MoleculeDataRoomCollectionWriteError,
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -89,7 +95,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
         match self
             .update_collection_entries
             .execute(
-                WriteCheckedDataset(&writable_data_room),
+                WriteCheckedDataset::from_ref(&writable_data_room),
                 source_event_time,
                 operations,
                 expected_head,
@@ -134,7 +140,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        // TODO: extra data filters
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError> {
         let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
@@ -142,18 +148,26 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         let entries_listing = self
             .view_collection_entries
             .execute(
-                ReadCheckedDataset(&readable_data_room),
+                ReadCheckedDataset::from_ref(&readable_data_room),
                 as_of,
                 path_prefix,
                 max_depth,
+                filters.and_then(|f| {
+                    molecule_extra_data_fields_filter(
+                        f.by_tags,
+                        f.by_categories,
+                        f.by_access_levels,
+                    )
+                }),
                 pagination,
             )
             .await
-            .map_err(|e| match e {
-                ViewCollectionEntriesError::Access(e) => {
-                    MoleculeDataRoomCollectionReadError::Access(e)
+            .map_err(|e| {
+                use ViewCollectionEntriesError as E;
+                match e {
+                    E::Access(e) => MoleculeDataRoomCollectionReadError::Access(e),
+                    E::UnknownExtraDataFieldFilterNames(_) | E::Internal(_) => e.int_err().into(),
                 }
-                e @ ViewCollectionEntriesError::Internal(_) => e.int_err().into(),
             })?;
 
         Ok(entries_listing)
@@ -175,7 +189,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
 
         let maybe_entry = self
             .find_collection_entries
-            .execute_find_by_path(ReadCheckedDataset(&readable_data_room), as_of, path)
+            .execute_find_by_path(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                path,
+            )
             .await
             .map_err(|e| match e {
                 e @ FindCollectionEntriesError::Internal(_) => e.int_err(),
@@ -200,7 +218,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
 
         let maybe_entry = self
             .find_collection_entries
-            .execute_find_by_ref(ReadCheckedDataset(&readable_data_room), as_of, &[r#ref])
+            .execute_find_by_ref(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                &[r#ref],
+            )
             .await
             .map_err(|e| match e {
                 e @ FindCollectionEntriesError::Internal(_) => e.int_err(),

@@ -9,9 +9,6 @@
 
 #![feature(iterator_try_collect)]
 
-// Re-exports
-pub use kamu_molecule_domain as domain;
-
 mod dependencies;
 mod search;
 mod services;

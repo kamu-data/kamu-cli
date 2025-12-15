@@ -52,6 +52,6 @@ odf = { workspace = true, default-features = true, features = ["testing"]}
 
 
 chrono = { version = "0.4", default-features = false }
-mockall = "0.13"
+mockall = "0.14"
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }

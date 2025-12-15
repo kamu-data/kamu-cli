@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use arrow::array::{Array, ArrowPrimitiveType, AsArray, RecordBatch};
-use arrow_schema::Field;
+use arrow_schema::{DataType, Field};
 use datafusion::catalog::TableProvider;
 use datafusion::common::DFSchema;
 use datafusion::config::{CsvOptions, JsonOptions, TableParquetOptions};
@@ -183,7 +183,10 @@ impl DataFrameExt {
     /// part of the schema and not of the data type. This function adds a
     /// runtime operator to ensure that specified column does not contain nulls
     /// and casts the result into a non-nullable field.
-    pub fn assert_collumns_not_null(self, selector: impl Fn(&Field) -> bool) -> Result<Self> {
+    ///
+    /// NOTE: This function works for top-level columns, but not for nested
+    /// types like lists and structs
+    pub fn assert_columns_not_null(self, selector: impl Fn(&Field) -> bool) -> Result<Self> {
         let mut select = Vec::new();
         for i in 0..self.schema().fields().len() {
             let (relation, field) = self.schema().qualified_field(i);
@@ -197,6 +200,76 @@ impl DataFrameExt {
 
             select.push(expr);
         }
+        self.select(select)
+    }
+
+    /// This function recursively traverses data types of the columns in the
+    /// data frame and coerces their nullability to match the provided schema.
+    /// A runtime operator is used to ensure that optional columns converted to
+    /// required do not contain nulls. Target schema should to be a superset of
+    /// the data frame schema. All extra columns in target shcema will be
+    /// ignored, columns that are missing in the target schema or have
+    /// incompatible types will be returned as-is.
+    pub fn coerce_columns_nullability(
+        self,
+        target: &datafusion::arrow::datatypes::Schema,
+    ) -> Result<Self> {
+        let target_fields: std::collections::HashMap<&str, &Field> = target
+            .fields()
+            .iter()
+            .map(|f| (f.name().as_str(), f.as_ref()))
+            .collect();
+
+        let mut select = Vec::new();
+
+        for i in 0..self.schema().fields().len() {
+            let (relation, field) = self.schema().qualified_field(i);
+            let col = Expr::Column(Column::from((relation, field)));
+
+            let Some(target_field) = target_fields.get(&field.name().as_str()) else {
+                select.push(col);
+                continue;
+            };
+
+            // Filed nullability
+            let expr = if field.is_nullable() && !target_field.is_nullable() {
+                crate::data::udf::assert_not_null()
+                    .call(vec![col])
+                    .alias(field.name())
+            } else {
+                col
+            };
+
+            // If field is a list - coerce items nullability
+            let expr = match field.data_type() {
+                DataType::List(items)
+                | DataType::ListView(items)
+                | DataType::FixedSizeList(items, _)
+                | DataType::LargeList(items)
+                | DataType::LargeListView(items) => match target_field.data_type() {
+                    DataType::List(target_items)
+                    | DataType::ListView(target_items)
+                    | DataType::FixedSizeList(target_items, _)
+                    | DataType::LargeList(target_items)
+                    | DataType::LargeListView(target_items) => {
+                        if items.is_nullable() && !target_items.is_nullable() {
+                            crate::data::udf::assert_list_elements_not_null()
+                                .call(vec![expr])
+                                .alias(field.name())
+                        } else {
+                            expr
+                        }
+                    }
+                    _ => expr,
+                },
+                _ => expr,
+            };
+
+            // TODO: Recursively coerce struct fields
+
+            select.push(expr);
+        }
+
         self.select(select)
     }
 

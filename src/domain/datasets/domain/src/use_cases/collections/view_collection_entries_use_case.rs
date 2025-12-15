@@ -9,6 +9,7 @@
 
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
+use nonempty::NonEmpty;
 
 use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
 
@@ -22,17 +23,45 @@ pub trait ViewCollectionEntriesUseCase: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
+        filter: Option<ExtraDataFieldsFilter>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Basic category filters.
+///
+/// Filters: ...
+/// ```
+/// [
+///   ExtraDataFieldFilter {
+///     field_name: "tags"
+///     values: ["tag1, "tag2"]
+///   },
+///   ExtraDataFieldFilter {
+///     field_name: "categories"
+///     values: ["category1, "category2"]
+///   }
+/// ]
+/// ```
+/// ... are read as:
+/// (`tag1` OR `tag2`) AND (`category1` OR `category2`).
+pub type ExtraDataFieldsFilter = NonEmpty<ExtraDataFieldFilter>;
+
+#[derive(Debug)]
+pub struct ExtraDataFieldFilter {
+    pub field_name: String,
+    // TODO: Support another types (e.g. INTs)
+    pub values: NonEmpty<String>,
+    pub is_array: bool,
+}
+
 pub type CollectionEntryListing = EntityPageListing<CollectionEntry>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ViewCollectionEntriesError {
     #[error(transparent)]
     Access(
@@ -42,7 +71,19 @@ pub enum ViewCollectionEntriesError {
     ),
 
     #[error(transparent)]
+    UnknownExtraDataFieldFilterNames(#[from] UnknownExtraDataFieldFilterNamesError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "Unknown extra data field filter names: {}",
+    format_utils::format_collection(field_names)
+)]
+pub struct UnknownExtraDataFieldFilterNamesError {
+    pub field_names: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

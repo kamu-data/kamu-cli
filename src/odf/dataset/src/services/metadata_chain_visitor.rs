@@ -240,6 +240,13 @@ where
             None => unreachable!(),
         }
     }
+
+    fn finish(&self) -> Result<(), Self::Error> {
+        match self {
+            Some(inner) => inner.finish(),
+            None => Ok(()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

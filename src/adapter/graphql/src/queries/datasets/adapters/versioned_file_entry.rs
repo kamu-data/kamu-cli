@@ -58,7 +58,7 @@ impl VersionedFileEntry {
 
     /// Media type of the file content
     pub async fn content_type(&self) -> &str {
-        &self.entity.content_type
+        self.entity.content_type.0.as_str()
     }
 
     /// Size of the content in bytes
@@ -94,7 +94,7 @@ impl VersionedFileEntry {
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content_url, skip_all)]
     pub async fn content_url(&self) -> Result<VersionedFileContentDownload> {
         let data_repo = self.file_dataset.as_data_repo();
-        let download = match data_repo
+        let download_data = match data_repo
             .get_external_download_url(
                 &self.entity.content_hash,
                 odf::storage::ExternalTransferOpts::default(),
@@ -108,18 +108,7 @@ impl VersionedFileEntry {
             Err(err) => return Err(err.int_err().into()),
         };
 
-        Ok(VersionedFileContentDownload {
-            url: download.url.to_string(),
-            headers: download
-                .header_map
-                .into_iter()
-                .map(|(k, v)| KeyValue {
-                    key: k.unwrap().to_string(),
-                    value: v.to_str().unwrap().to_string(),
-                })
-                .collect(),
-            expires_at: download.expires_at,
-        })
+        Ok(VersionedFileContentDownload::from(download_data))
     }
 }
 
@@ -143,6 +132,23 @@ pub struct VersionedFileContentDownload {
 
     /// Download URL expiration timestamp
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+impl From<odf::storage::GetExternalUrlResult> for VersionedFileContentDownload {
+    fn from(value: odf::storage::GetExternalUrlResult) -> Self {
+        Self {
+            url: value.url.to_string(),
+            headers: value
+                .header_map
+                .into_iter()
+                .map(|(k, v)| KeyValue {
+                    key: k.unwrap().to_string(),
+                    value: v.to_str().unwrap().to_string(),
+                })
+                .collect(),
+            expires_at: value.expires_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

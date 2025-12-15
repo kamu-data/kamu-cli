@@ -634,7 +634,7 @@ async fn test_data_writer_nullability_required_to_optional_incompatible() {
     assert_matches!(
         res,
         Err(WriteDataError::ExecutionError(err))
-        if err.to_string().contains("Column population contains 1 null values while none were expected")
+        if err.to_string().contains("Column `population` contains 1 null values while none were expected")
     );
 }
 
@@ -1629,6 +1629,379 @@ async fn test_data_writer_schema_evolution_from_legacy() {
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_schema_evolution_add_optional_field_merge_append() {
+    let mut harness = Harness::new(vec![]).await;
+
+    // Set explicit schema with extra attributes
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // 1: Write conforming data
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // 2: Add new optional field
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+                odf::schema::DataField::string("census_url")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new(
+                        "URL of the latest published census",
+                    )),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // 3: Write conforming data with new column
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population,census_url
+                A,1000,
+                B,2000,https://b.ca/census
+                C,3000,
+                D,4000,https://d.ca/census
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL, census_url STRING",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | offset | op | system_time          | event_time           | city | population | census_url          |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |                     |
+            | 4      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       | https://b.ca/census |
+            | 5      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |                     |
+            | 6      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       | https://d.ca/census |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_schema_evolution_add_optional_field_merge_ledger() {
+    let mut harness = Harness::new(vec![
+        odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                odf::metadata::ext::AttrDescription::new(
+                    "Date the census was done rounded to a year mark",
+                ),
+            ),
+            odf::schema::DataField::string("city")
+                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::i64("population").extra(
+                odf::metadata::ext::AttrDescription::new("Estimated population"),
+            ),
+        ]))
+        .into(),
+        MetadataFactory::add_push_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // 1: Write conforming data
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2021-01-01,A,1000
+                2021-01-01,B,2000
+                2021-01-01,C,3000
+                "#
+            ),
+            "event_time TIMESTAMP NOT NULL, city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2021-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2021-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // 2: Add new optional field
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+                odf::schema::DataField::string("census_url")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new(
+                        "URL of the latest published census",
+                    )),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // 3: Write conforming data with new column
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population,census_url
+                2021-01-01,A,1000,
+                2021-01-01,B,2000,https://b.ca/census
+                2021-01-01,C,3000,
+                2021-02-01,D,4000,https://d.ca/census
+                "#
+            ),
+            "event_time TIMESTAMP NOT NULL, city STRING NOT NULL, population BIGINT NOT NULL, \
+             census_url STRING",
+        )
+        .await
+        .unwrap();
+
+    // TODO: In future Ledger merge strategy should also compare non-primary columns
+    // for changes and recognize that `census_url` was populated for `B`
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | offset | op | system_time          | event_time           | city | population | census_url          |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2021-02-01T00:00:00Z | D    | 4000       | https://d.ca/census |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_schema_evolution_add_optional_field_merge_snapshot() {
+    let mut harness = Harness::new(vec![
+        odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+            odf::schema::DataField::i64("offset"),
+            odf::schema::DataField::i32("op"),
+            odf::schema::DataField::timestamp_millis_utc("system_time"),
+            odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                odf::metadata::ext::AttrDescription::new(
+                    "Date the census was done rounded to a year mark",
+                ),
+            ),
+            odf::schema::DataField::string("city")
+                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::i64("population").extra(
+                odf::metadata::ext::AttrDescription::new("Estimated population"),
+            ),
+        ]))
+        .into(),
+        MetadataFactory::add_push_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // 1: Write conforming data
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // 2: Add new optional field
+    harness
+        .commit_event(odf::metadata::SetDataSchema::new(
+            odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time").extra(
+                    odf::metadata::ext::AttrDescription::new(
+                        "Date the census was done rounded to a year mark",
+                    ),
+                ),
+                odf::schema::DataField::string("city")
+                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::i64("population").extra(
+                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                ),
+                odf::schema::DataField::string("census_url")
+                    .optional()
+                    .extra(odf::metadata::ext::AttrDescription::new(
+                        "URL of the latest published census",
+                    )),
+            ]),
+        ))
+        .await
+        .unwrap();
+
+    // 3: Write conforming data with new column
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population,census_url
+                A,1000,
+                B,2000,https://b.ca/census
+                C,3000,
+                D,4000,https://d.ca/census
+                "#
+            ),
+            "city STRING NOT NULL, population BIGINT NOT NULL, census_url STRING",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | offset | op | system_time          | event_time           | city | population | census_url          |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | 3      | 2  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |                     |
+            | 4      | 3  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       | https://b.ca/census |
+            | 5      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       | https://d.ca/census |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
             "#
         ),
     )

@@ -47,7 +47,7 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = "0.3"
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10", default-features = false, features = [ "rust_crypto" ] }
 secrecy = "0.10"
 serde = "1"
 serde_json = "1"
@@ -57,7 +57,7 @@ tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
 # Optional
-mockall = { optional = true, version = "0.13", default-features = false }
+mockall = { optional = true, version = "0.14", default-features = false }
 
 
 [dev-dependencies]
@@ -72,7 +72,7 @@ kamu-accounts-services = { workspace = true, default-features = false, features 
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 
-mockall = { version = "0.13", default-features = false }
+mockall = { version = "0.14", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }

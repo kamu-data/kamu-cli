@@ -64,10 +64,10 @@ serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 
 # Optional
-mockall = { optional = true, version = "0.13", default-features = false }
+mockall = { optional = true, version = "0.14", default-features = false }
 oso = { optional = true, version = "0.27", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false }
 
 
 [dev-dependencies]
-mockall = { version = "0.13", default-features = false }
+mockall = { version = "0.14", default-features = false }

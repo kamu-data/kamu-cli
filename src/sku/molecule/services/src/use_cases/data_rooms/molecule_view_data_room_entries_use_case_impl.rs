@@ -12,8 +12,9 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
+use kamu_molecule_domain::*;
 
-use crate::domain::*;
+use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +47,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        // TODO: filters
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
         let entries_listing = self
@@ -56,16 +57,15 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
                 as_of,
                 path_prefix,
                 max_depth,
+                filters,
                 pagination,
             )
             .await
-            .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeViewDataRoomEntriesError::Access(e)
-                }
-                MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeViewDataRoomEntriesError::Internal(e)
+            .map_err(|e| -> MoleculeViewDataRoomEntriesError {
+                use MoleculeDataRoomCollectionReadError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::DataRoomNotFound(_) | E::Internal(_) => e.int_err().into(),
                 }
             })?;
 

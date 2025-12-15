@@ -96,7 +96,7 @@ async fn create_random_file(root: &Path) -> (odf::Multihash, usize) {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut data);
+    rand::rng().fill_bytes(&mut data);
 
     std::fs::create_dir_all(root).unwrap();
 
@@ -127,7 +127,7 @@ async fn create_random_parquet_file(
     let mut column_a: Vec<u64> = Vec::with_capacity(num_records);
     let mut column_offset: Vec<u64> = Vec::with_capacity(num_records);
     for index in 0..num_records {
-        column_a.push(rand::thread_rng().next_u64());
+        column_a.push(rand::rng().next_u64());
         column_offset.push(start_offset + (index as u64));
     }
 

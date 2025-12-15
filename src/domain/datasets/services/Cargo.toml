@@ -41,7 +41,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
-mockall = { optional = true, version = "0.13" }
+mockall = { optional = true, version = "0.14" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -51,7 +51,9 @@ async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "50", default-features = false }
+datafusion = { version = "50", default-features = false, features = [
+    "nested_expressions"
+] }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
@@ -85,9 +87,10 @@ kamu-datasets-services = { workspace = true, features = ["testing"] }
 odf = { workspace = true, features = ["testing"] }
 
 indoc = "2"
-mockall = "0.13"
+mockall = "0.14"
 oop = "0.0.2"
-serde_json = "1"
 pretty_assertions = { version = "1" }
+rstest = { version = "0.26", default-features = false, features = [] }
+serde_json = "1"
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
