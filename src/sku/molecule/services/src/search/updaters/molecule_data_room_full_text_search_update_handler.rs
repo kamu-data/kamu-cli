@@ -50,7 +50,7 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![FullTextUpdateOperation::Index {
-                    id: data_room_entry_schema::unique_id(
+                    id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &created_message.ipnft_uid,
                         &created_message.data_room_entry.path,
                     ),
@@ -77,7 +77,7 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![FullTextUpdateOperation::Update {
-                    id: data_room_entry_schema::unique_id(
+                    id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &updated_message.ipnft_uid,
                         &updated_message.data_room_entry.path,
                     ),
@@ -100,13 +100,13 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![
                     FullTextUpdateOperation::Delete {
-                        id: data_room_entry_schema::unique_id(
+                        id: data_room_entry_schema::unique_id_for_data_room_entry(
                             &moved_message.ipnft_uid,
                             &moved_message.path_from,
                         ),
                     },
                     FullTextUpdateOperation::Index {
-                        id: data_room_entry_schema::unique_id(
+                        id: data_room_entry_schema::unique_id_for_data_room_entry(
                             &moved_message.ipnft_uid,
                             &moved_message.path_to,
                         ),
@@ -132,7 +132,7 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![FullTextUpdateOperation::Delete {
-                    id: data_room_entry_schema::unique_id(
+                    id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &removed_message.ipnft_uid,
                         &removed_message.path,
                     ),

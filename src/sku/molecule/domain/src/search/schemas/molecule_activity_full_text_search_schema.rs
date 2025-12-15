@@ -26,7 +26,6 @@ pub const FIELD_UPDATED_AT: &str = "updated_at";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
 pub const FIELD_ENTRY_PATH: &str = "entry_path";
 pub const FIELD_ENTRY_REF: &str = "entry_ref";
-pub const FIELD_ANNOUNCEMENT_ID: &str = "announcement_id";
 pub const FIELD_ACCESS_LEVEL: &str = "access_level";
 pub const FIELD_CHANGE_BY: &str = "change_by";
 pub const FIELD_DESCRIPTION: &str = "description";
@@ -54,10 +53,6 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_ENTRY_REF,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_ANNOUNCEMENT_ID,
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
@@ -97,15 +92,11 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn unique_id(activity: &crate::MoleculeGlobalActivity) -> String {
-    match activity {
-        crate::MoleculeGlobalActivity::DataRoomActivity(dr_activity) => {
-            format!("{}:{}", dr_activity.ipnft_uid, dr_activity.offset)
-        }
-        crate::MoleculeGlobalActivity::Announcement(announcement) => {
-            announcement.announcement.announcement_id.to_string()
-        }
-    }
+pub fn unique_id_for_data_room_activity(
+    molecule_account_id: &odf::AccountID,
+    offset: u64,
+) -> String {
+    format!("{molecule_account_id}:{offset}")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -101,7 +101,7 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn unique_id(ipnft_uid: &str, entry_path: &str) -> String {
+pub fn unique_id_for_data_room_entry(ipnft_uid: &str, entry_path: &str) -> String {
     format!("{ipnft_uid}:{entry_path}")
 }
 

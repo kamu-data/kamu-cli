@@ -13,6 +13,7 @@ use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_molecule_domain::{
+    MoleculeGlobalActivity,
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewGlobalAnnouncementsUseCase,
@@ -191,7 +192,10 @@ impl MoleculeFullTextSearchIndexer {
                         helpers::index_data_room_entry_from_entity(&project.ipnft_uid, &entry);
 
                     operations.push(FullTextUpdateOperation::Index {
-                        id: data_room_entry_schema::unique_id(&project.ipnft_uid, &entry.path),
+                        id: data_room_entry_schema::unique_id_for_data_room_entry(
+                            &project.ipnft_uid,
+                            &entry.path,
+                        ),
                         doc: document,
                     });
 
@@ -344,13 +348,22 @@ impl MoleculeFullTextSearchIndexer {
 
             // Index each activity
             for activity in activities_listing.list {
-                // Serialize activity into search document
-                let document = helpers::index_activity_record(&activity);
+                // Skip announcement activities
+                let data_room_activity = match activity {
+                    MoleculeGlobalActivity::DataRoomActivity(dr_activity) => dr_activity,
+                    MoleculeGlobalActivity::Announcement(_) => continue,
+                };
 
-                operations.push(FullTextUpdateOperation::Index {
-                    id: activity_schema::unique_id(&activity),
-                    doc: document,
-                });
+                // Serialize activity into search document
+                let document = helpers::index_data_room_activity(&data_room_activity);
+
+                // Generate unique ID using molecule_account_id and the activity's offset
+                let id = activity_schema::unique_id_for_data_room_activity(
+                    &organization_account.account_id,
+                    data_room_activity.offset,
+                );
+
+                operations.push(FullTextUpdateOperation::Index { id, doc: document });
             }
 
             // Bulk index the current page

@@ -18,6 +18,8 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeFullTextSearchSchemaProvider>();
     b.add::<MoleculeProjectFullTextSearchUpdateHandler>();
     b.add::<MoleculeDataRoomFullTextSearchUpdateHandler>();
+    b.add::<MoleculeAnnouncementFullTextSearchUpdateHandler>();
+    b.add::<MoleculeActivityFullTextSearchUpdateHandler>();
 
     b.add::<MoleculeDatasetAccessorFactory>();
 
