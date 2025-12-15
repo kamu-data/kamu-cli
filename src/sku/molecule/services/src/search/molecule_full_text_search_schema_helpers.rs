@@ -10,7 +10,9 @@
 use chrono::{DateTime, Utc};
 use kamu_molecule_domain::{
     MoleculeDataRoomEntry,
+    MoleculeGlobalAnnouncement,
     MoleculeProject,
+    molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
 };
@@ -78,6 +80,27 @@ pub(crate) fn index_data_room_entry_from_entity(
         data_room_entry_schema::FIELD_DESCRIPTION: entry.denormalized_latest_file_info.description,
         data_room_entry_schema::FIELD_CATEGORIES: entry.denormalized_latest_file_info.categories,
         data_room_entry_schema::FIELD_TAGS: entry.denormalized_latest_file_info.tags,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Announcements
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn index_global_announcement_from_entity(
+    global_announcement: &MoleculeGlobalAnnouncement,
+) -> serde_json::Value {
+    serde_json::json!({
+        announcement_schema::FIELD_CREATED_AT: global_announcement.announcement.system_time,
+        announcement_schema::FIELD_UPDATED_AT: global_announcement.announcement.system_time,
+        announcement_schema::FIELD_IPNFT_UID: global_announcement.ipnft_uid,
+        announcement_schema::FIELD_HEADLINE: global_announcement.announcement.headline,
+        announcement_schema::FIELD_BODY: global_announcement.announcement.body,
+        announcement_schema::FIELD_ATTACHMENTS: global_announcement.announcement.attachments,
+        announcement_schema::FIELD_ACCESS_LEVEL: global_announcement.announcement.access_level,
+        announcement_schema::FIELD_CHANGE_BY: global_announcement.announcement.change_by,
+        announcement_schema::FIELD_CATEGORIES: global_announcement.announcement.categories,
+        announcement_schema::FIELD_TAGS: global_announcement.announcement.tags,
     })
 }
 

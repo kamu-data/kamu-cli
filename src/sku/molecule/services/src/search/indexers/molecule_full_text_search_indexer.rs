@@ -9,13 +9,14 @@
 
 use std::sync::Arc;
 
+use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesUseCase,
+    MoleculeViewGlobalAnnouncementsUseCase,
     MoleculeViewProjectsUseCase,
-    // molecule_activity_full_text_search_schema as activity_schema,
-    // molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_announcement_full_text_search_schema as announcement_schema,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
     molecule_project_full_text_search_schema as project_schema,
 };
@@ -30,6 +31,7 @@ pub(crate) struct MoleculeFullTextSearchIndexer {
     current_account: CurrentAccountSubject,
     molecule_view_projects_uc: Arc<dyn MoleculeViewProjectsUseCase>,
     molecule_view_data_room_entries_uc: Arc<dyn MoleculeViewDataRoomEntriesUseCase>,
+    molecule_view_global_announcements_uc: Arc<dyn MoleculeViewGlobalAnnouncementsUseCase>,
 }
 
 impl MoleculeFullTextSearchIndexer {
@@ -227,13 +229,78 @@ impl MoleculeFullTextSearchIndexer {
         Ok(total_documents_count)
     }
 
-    #[allow(clippy::unused_async)]
     pub(crate) async fn index_announcements(
         &self,
-        _repo: &dyn FullTextSearchRepository,
+        repo: &dyn FullTextSearchRepository,
     ) -> Result<usize, InternalError> {
-        // TODO
-        Ok(0)
+        let organization_account = self.organization_account();
+
+        tracing::info!(
+            organization_account_name = organization_account.account_name.as_str(),
+            organization_account_id = organization_account.account_id.to_string(),
+            "Indexing global announcements for Molecule organization account",
+        );
+
+        let mut total_documents_count = 0;
+        let mut operations = Vec::new();
+        let mut offset = 0;
+
+        loop {
+            // Load announcements in pages aligned with bulk size
+            let announcements_listing = self
+                .molecule_view_global_announcements_uc
+                .execute(
+                    organization_account,
+                    None, /* no filters */
+                    Some(PaginationOpts {
+                        limit: Self::BULK_SIZE,
+                        offset,
+                    }),
+                )
+                .await
+                .int_err()?;
+
+            // Break if no more announcements
+            if announcements_listing.list.is_empty() {
+                break;
+            }
+
+            // Index each announcement
+            for global_announcement in announcements_listing.list {
+                // Serialize announcement into search document
+                let document = helpers::index_global_announcement_from_entity(&global_announcement);
+
+                operations.push(FullTextUpdateOperation::Index {
+                    id: global_announcement.announcement.announcement_id.to_string(),
+                    doc: document,
+                });
+            }
+
+            // Bulk index the current page
+            if !operations.is_empty() {
+                let batch_count = operations.len();
+                tracing::debug!(
+                    documents_count = batch_count,
+                    "Bulk indexing announcements batch",
+                );
+                repo.bulk_update(announcement_schema::SCHEMA_NAME, operations)
+                    .await?;
+                total_documents_count += batch_count;
+                operations = Vec::new();
+            }
+
+            // Move to next page
+            offset += Self::BULK_SIZE;
+        }
+
+        tracing::info!(
+            organization_account_name = organization_account.account_name.as_str(),
+            organization_account_id = organization_account.account_id.to_string(),
+            indexed_documents_count = total_documents_count,
+            "Indexed global announcements for Molecule organization account",
+        );
+
+        Ok(total_documents_count)
     }
 
     #[allow(clippy::unused_async)]

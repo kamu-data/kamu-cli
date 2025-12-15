@@ -61,9 +61,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_ATTACHMENTS,
-        role: FullTextSchemaFieldRole::Prose {
-            enable_positions: true,
-        },
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_ACCESS_LEVEL,
