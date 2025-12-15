@@ -268,7 +268,7 @@ impl MoleculeFullTextSearchIndexer {
             // Index each announcement
             for global_announcement in announcements_listing.list {
                 // Serialize announcement into search document
-                let document = helpers::index_global_announcement_from_entity(&global_announcement);
+                let document = helpers::index_announcement_from_global_entity(&global_announcement);
 
                 operations.push(FullTextUpdateOperation::Index {
                     id: global_announcement.announcement.announcement_id.to_string(),

@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_molecule_domain::{
+    MoleculeAnnouncementPayloadRecord,
     MoleculeDataRoomEntry,
     MoleculeGlobalAnnouncement,
     MoleculeProject,
@@ -87,7 +88,7 @@ pub(crate) fn index_data_room_entry_from_entity(
 // Announcements
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn index_global_announcement_from_entity(
+pub(crate) fn index_announcement_from_global_entity(
     global_announcement: &MoleculeGlobalAnnouncement,
 ) -> serde_json::Value {
     serde_json::json!({
@@ -101,6 +102,27 @@ pub(crate) fn index_global_announcement_from_entity(
         announcement_schema::FIELD_CHANGE_BY: global_announcement.announcement.change_by,
         announcement_schema::FIELD_CATEGORIES: global_announcement.announcement.categories,
         announcement_schema::FIELD_TAGS: global_announcement.announcement.tags,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn index_announcement_from_publication_record(
+    ipnft_uid: &str,
+    announcement_record: &MoleculeAnnouncementPayloadRecord,
+    system_time: DateTime<Utc>,
+) -> serde_json::Value {
+    serde_json::json!({
+        announcement_schema::FIELD_CREATED_AT: system_time,
+        announcement_schema::FIELD_UPDATED_AT: system_time,
+        announcement_schema::FIELD_IPNFT_UID: ipnft_uid,
+        announcement_schema::FIELD_HEADLINE: announcement_record.headline,
+        announcement_schema::FIELD_BODY: announcement_record.body,
+        announcement_schema::FIELD_ATTACHMENTS: announcement_record.attachments,
+        announcement_schema::FIELD_ACCESS_LEVEL: announcement_record.access_level,
+        announcement_schema::FIELD_CHANGE_BY: announcement_record.change_by,
+        announcement_schema::FIELD_CATEGORIES: announcement_record.categories,
+        announcement_schema::FIELD_TAGS: announcement_record.tags,
     })
 }
 
