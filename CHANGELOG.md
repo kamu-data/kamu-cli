@@ -11,6 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- Support for re-defining the `AddPushSource`
+### Changed
+- GQL: `byIds` and `byRefs` endpoints will return results in the same order as inputs (including duplicates) to allow `zip`'ing them on the client side
+- Schema nullability coercion now works for `List` field elements
+
+## [0.254.1] - 2025-12-08
+### Fixed
+- Fixed bug in applying projected offsets for flow states in a situation when delayed transaction
+   commits events with higher event IDs than later started transactions, and they all are in the same fetched bulk
+
 ## [0.254.0] - 2025-12-05
 ### Added
 - GQL: `set_trigger` allows to schedule `HARD_COMPACTION` flows

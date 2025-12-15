@@ -81,21 +81,29 @@ impl<'a> WriterSourceEventVisitor<'a> {
         &mut self,
         e: &odf::metadata::AddPushSource,
     ) -> Result<(), ScanMetadataError> {
-        if self.maybe_source_event.is_none() {
-            if self.maybe_source_name.is_none()
-                || self.maybe_source_name == Some(e.source_name.as_str())
-            {
-                self.maybe_source_event = Some(e.clone().into());
+        match &self.maybe_source_event {
+            None => {
+                if self.maybe_source_name.is_none()
+                    || self.maybe_source_name == Some(e.source_name.as_str())
+                {
+                    self.maybe_source_event = Some(e.clone().into());
+                }
             }
-        } else {
-            // Encountered another source - if `source_name` was not specified we
-            // return ambiguity error
-            if self.maybe_source_name.is_none() {
-                return Err(SourceNotFoundError::new(
-                    None::<&str>,
-                    "Explicit source name is required to pick between several active push sources",
-                )
-                .into());
+            Some(odf::MetadataEvent::AddPushSource(s)) if s.source_name == e.source_name => {
+                // Encountered previous definition of the same source - the
+                // one found first takes precedence
+            }
+            Some(_) => {
+                // Encountered another source - if `source_name` was not specified we
+                // return ambiguity error
+                if self.maybe_source_name.is_none() {
+                    return Err(SourceNotFoundError::new(
+                        None::<&str>,
+                        "Explicit source name is required to pick between several active push \
+                         sources",
+                    )
+                    .into());
+                }
             }
         }
 

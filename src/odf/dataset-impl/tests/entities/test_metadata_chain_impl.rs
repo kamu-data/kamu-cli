@@ -880,6 +880,8 @@ async fn test_append_execute_transform_must_be_preseeded_by_schema() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_append_set_data_schema_evolution() {
@@ -1072,7 +1074,7 @@ async fn test_append_set_data_schema_evolution() {
 
 #[test_log::test(tokio::test)]
 #[expect(deprecated)]
-async fn test_append_set_data_schema_legacy_upgrade() {
+async fn test_append_set_data_schema_legacy_upgrade_flat() {
     use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -1182,6 +1184,102 @@ async fn test_append_set_data_schema_legacy_upgrade() {
             AppendValidationError::InvalidEvent(..)
         ))
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[expect(deprecated)]
+async fn test_append_set_data_schema_legacy_upgrade_nested() {
+    use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Initial schema
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new_legacy_raw_arrow(&Schema::new(
+                vec![
+                    Field::new("offset", DataType::Int64, false),
+                    Field::new("op", DataType::Int32, true),
+                    Field::new(
+                        "system_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                        false,
+                    ),
+                    Field::new(
+                        "event_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                        true,
+                    ),
+                    Field::new("announcement_id", DataType::Utf8, true),
+                    Field::new(
+                        "attachments",
+                        DataType::List(Field::new_list_field(DataType::Utf8, true).into()),
+                        true,
+                    ),
+                ],
+            )))
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Should reject this one due to incompatible `attachments` list item type
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("announcement_id"),
+                odf::schema::DataField::list("attachments", odf::schema::DataType::u32()),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // During the first migration from legacy to new schema optionality differences
+    // are allowed. Here we are changing all columns to required. The `attachmets`
+    // field becomes required as well as this list's item type.
+    chain
+        .append(
+            MetadataFactory::metadata_block(SetDataSchema::new(DataSchema::new(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::timestamp_millis_utc("system_time"),
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("announcement_id"),
+                odf::schema::DataField::list("attachments", odf::schema::DataType::string()),
+            ])))
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1338,6 +1436,116 @@ async fn test_append_set_data_schema_validates_system_columns() {
         )
         .await
         .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_append_push_source_evolution() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // 0: Initial source
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepNdJson::default().into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // 1: Setting identical source should result in no-op error
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepNdJson::default().into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
+    );
+
+    // 2: Adding identical source under a different name is OK
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(AddPushSource {
+                source_name: "another".to_string(),
+                read: ReadStepNdJson::default().into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // 3: Replacing source wihtout disabling it is OK
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(vec!["foo STRING".to_string()]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 2)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // 4: Cannot mix push and polling sources
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
+                .prev(&head, 3)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

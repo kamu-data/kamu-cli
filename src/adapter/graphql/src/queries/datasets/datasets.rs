@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-
 use kamu_core::auth::{self, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
@@ -73,10 +71,22 @@ impl Datasets {
             )));
         }
 
-        let owner_names = resolution
-            .accessible_resolved_refs
+        // Reorder resolved handles to match the order of inputs
+        let accessible_dataset_handles: Vec<odf::DatasetHandle> = {
+            let resolved_handles_map: std::collections::BTreeMap<
+                odf::DatasetRef,
+                odf::DatasetHandle,
+            > = resolution.accessible_resolved_refs.into_iter().collect();
+
+            dataset_refs
+                .iter()
+                .filter_map(|r| resolved_handles_map.get(r).cloned())
+                .collect()
+        };
+
+        let owner_names = accessible_dataset_handles
             .iter()
-            .map(|(_, h)| current_account_subject.resolve_account_name_by_dataset_alias(&h.alias))
+            .map(|h| current_account_subject.resolve_account_name_by_dataset_alias(&h.alias))
             .collect::<Vec<_>>();
         let owner_names_refs = owner_names.iter().collect::<Vec<_>>();
         let owner_lookup = account_service
@@ -90,20 +100,19 @@ impl Datasets {
             )));
         }
 
-        let owners_map = owner_lookup
-            .found
-            .into_iter()
-            .fold(HashMap::new(), |mut acc, account| {
-                acc.insert(account.account_name.clone(), account);
-                acc
-            });
+        let owners_map: std::collections::BTreeMap<odf::AccountName, kamu_accounts::Account> =
+            owner_lookup
+                .found
+                .into_iter()
+                .map(|a| (a.account_name.clone(), a))
+                .collect();
 
-        let datasets = resolution
-            .accessible_resolved_refs
+        let datasets = accessible_dataset_handles
             .into_iter()
-            .map(|(_, dataset_handle)| {
+            .map(|dataset_handle| {
                 let owner_name = current_account_subject
                     .resolve_account_name_by_dataset_alias(&dataset_handle.alias);
+
                 let owner = owners_map
                     .get(&owner_name)
                     .unwrap_or_else(|| unreachable!("{owner_name} not found in {owners_map:?}"))
@@ -134,7 +143,10 @@ impl Datasets {
         Self::by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
     }
 
-    /// Returns multiple datasets by their IDs
+    /// Returns multiple datasets by their IDs.
+    ///
+    /// Order of results is guaranteed to match the inputs. Duplicate inputs
+    /// will results in duplicate results.
     #[tracing::instrument(level = "info", name = Datasets_by_ids, skip_all, fields(?dataset_ids, ?skip_missing))]
     async fn by_ids(
         &self,
@@ -162,7 +174,8 @@ impl Datasets {
         Self::by_dataset_ref(ctx, &dataset_ref).await
     }
 
-    /// Returns multiple datasets by their IDs or aliases
+    /// Returns multiple datasets by their IDs or aliases. Order of results is
+    /// guaranteed to match the inputs.
     #[tracing::instrument(level = "info", name = Datasets_by_refs, skip_all, fields(?dataset_refs, ?skip_missing))]
     async fn by_refs(
         &self,

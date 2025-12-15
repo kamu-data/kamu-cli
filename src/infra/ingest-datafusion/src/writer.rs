@@ -381,24 +381,21 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    fn coerce_schema(&self, df: DataFrameExt) -> Result<DataFrameExt, InternalError> {
+    fn coerce_schema(
+        &self,
+        df: DataFrameExt,
+        dataset_schema_arrow: Option<&SchemaRef>,
+    ) -> Result<DataFrameExt, InternalError> {
         if !self.coerce_schema {
             return Ok(df);
         }
-        let Some(orig_schema) = &self.meta.schema else {
+        let Some(dataset_schema_arrow) = dataset_schema_arrow else {
             return Ok(df);
         };
 
         // Currently only handling nullability coercion
-        let orig_non_null_columns: std::collections::HashSet<String> = orig_schema
-            .fields
-            .iter()
-            .filter(|f| !f.is_optional())
-            .map(|f| f.name.clone())
-            .collect();
-
         let df = df
-            .assert_collumns_not_null(|f| orig_non_null_columns.contains(f.name()))
+            .coerce_columns_nullability(dataset_schema_arrow)
             .int_err()?;
 
         Ok(df)
@@ -1022,7 +1019,8 @@ impl DataWriter for DataWriterDataFusion {
             )?;
 
             // Coerce schema if needed
-            let df = self.coerce_schema(df)?;
+            // TODO: Combine coercion and `validate_schema_compatible` into one operation
+            let df = self.coerce_schema(df, dataset_schema_arrow.as_ref())?;
 
             // Validate schema matches the declared one
             let new_slice_schema_arrow = SchemaRef::new(df.schema().into());

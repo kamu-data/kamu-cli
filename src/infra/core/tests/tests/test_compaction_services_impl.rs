@@ -1108,6 +1108,250 @@ async fn test_dataset_keep_metadata_only_compact() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_hard_compaction_with_schema_migration() {
+    use odf::metadata::*;
+
+    let harness = CompactTestHarness::new();
+
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    // 1: Ingest some data
+    let data_helper = harness.dataset_data_helper(&dataset_ref).await;
+
+    harness
+        .ingest_data(
+            indoc!(
+                r#"
+                date,city,population
+                2020-01-01,A,1000
+                2020-01-02,B,2000
+                2020-01-03,C,3000
+                "#
+            )
+            .to_string(),
+            target.clone(),
+        )
+        .await;
+
+    harness
+        .ingest_data(
+            indoc!(
+                r#"
+                date,city,population
+                2020-01-04,A,4000
+                2020-01-05,B,5000
+                2020-01-06,C,6000
+                "#
+            )
+            .to_string(),
+            target.clone(),
+        )
+        .await;
+
+    // 2: Migrate schema by adding optional `census_url` column
+    target
+        .commit_event(
+            SetDataSchema::new(DataSchema::new(vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("date"),
+                DataField::string("city").optional(), // Poor ingest inference
+                DataField::i64("population").optional(), // Poor ingest inference
+                DataField::string("census_url").optional(),
+            ]))
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(harness.current_date_time),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // 3: Update push source to match
+    target
+        .commit_event(
+            AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(
+                        [
+                            "date TIMESTAMP",
+                            "city STRING",
+                            "population BIGINT",
+                            "census_url STRING",
+                        ]
+                        .iter()
+                        .map(|s| (*s).to_string())
+                        .collect(),
+                    ),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                }
+                .into(),
+            }
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(harness.current_date_time),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // 4: Ingest more data with new column
+    harness
+        .ingest_data(
+            indoc!(
+                r#"
+                date,city,population,census_url
+                2020-01-07,A,7000,https://a.ca/census
+                2020-01-08,B,8000,
+                2020-01-09,C,9000,
+                "#
+            )
+            .to_string(),
+            target.clone(),
+        )
+        .await;
+
+    harness
+        .ingest_data(
+            indoc!(
+                r#"
+                date,city,population,census_url
+                2020-01-10,A,10000,https://a.ca/census
+                2020-01-11,B,11000,https://b.ca/census
+                2020-01-12,C,12000,https://c.ca/census
+                "#
+            )
+            .to_string(),
+            target.clone(),
+        )
+        .await;
+
+    // seed <- add_push_source <- set_vocab <- set_schema <- add_data(3r) <-
+    // add_data(3r) <- set_licence <- add_data(3r) <- add_data(3r)
+    let old_events: Vec<MetadataEvent> = harness
+        .get_dataset_blocks(&dataset_ref)
+        .await
+        .into_iter()
+        .rev()
+        .map(|b| b.event)
+        .collect();
+
+    assert_matches!(
+        harness
+            .compact_dataset(
+                target.clone(),
+                CompactionOptions::default(),
+            )
+            .await,
+        Ok(CompactionResult::Success {
+            new_head,
+            old_head,
+            new_num_blocks: 8,
+            old_num_blocks: 10
+        }) if new_head != old_head,
+    );
+    assert!(harness.verify_dataset(target).await);
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  REQUIRED INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                  OPTIONAL BYTE_ARRAY census_url (STRING);
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+------+------------+---------------------+
+                | offset | op | system_time          | date                 | city | population | census_url          |
+                +--------+----+----------------------+----------------------+------+------------+---------------------+
+                | 6      | 0  | 2050-01-01T12:00:00Z | 2020-01-07T00:00:00Z | A    | 7000       | https://a.ca/census |
+                | 7      | 0  | 2050-01-01T12:00:00Z | 2020-01-08T00:00:00Z | B    | 8000       |                     |
+                | 8      | 0  | 2050-01-01T12:00:00Z | 2020-01-09T00:00:00Z | C    | 9000       |                     |
+                | 9      | 0  | 2050-01-01T12:00:00Z | 2020-01-10T00:00:00Z | A    | 10000      | https://a.ca/census |
+                | 10     | 0  | 2050-01-01T12:00:00Z | 2020-01-11T00:00:00Z | B    | 11000      | https://b.ca/census |
+                | 11     | 0  | 2050-01-01T12:00:00Z | 2020-01-12T00:00:00Z | C    | 12000      | https://c.ca/census |
+                +--------+----+----------------------+----------------------+------+------------+---------------------+
+                "#
+            ),
+        )
+        .await;
+
+    let new_events: Vec<MetadataEvent> = harness
+        .get_dataset_blocks(&dataset_ref)
+        .await
+        .into_iter()
+        .rev()
+        .map(|b| b.event)
+        .collect();
+
+    assert_matches!(
+        &old_events[..],
+        [
+            MetadataEvent::Seed(_),
+            MetadataEvent::AddPushSource(_),
+            MetadataEvent::SetVocab(_),
+            MetadataEvent::SetDataSchema(_), // inferred
+            MetadataEvent::AddData(_),
+            MetadataEvent::AddData(_),
+            MetadataEvent::SetDataSchema(_), // migration
+            MetadataEvent::AddPushSource(_), // updated source
+            MetadataEvent::AddData(_),
+            MetadataEvent::AddData(_),
+        ]
+    );
+
+    // TODO: Consider if hard compaction should've merged the two slices together
+    // while applying the migration
+    assert_matches!(
+        &new_events[..],
+        [
+            MetadataEvent::Seed(_),
+            MetadataEvent::AddPushSource(_),
+            MetadataEvent::SetVocab(_),
+            MetadataEvent::SetDataSchema(_), // inferred
+            MetadataEvent::AddData(AddData {
+                new_data: Some(DataSlice {
+                    offset_interval: OffsetInterval { start: 0, end: 5 },
+                    ..
+                }),
+                ..
+            }),
+            MetadataEvent::SetDataSchema(_), // migration
+            MetadataEvent::AddPushSource(_), // updated source
+            MetadataEvent::AddData(AddData {
+                new_data: Some(DataSlice {
+                    offset_interval: OffsetInterval { start: 6, end: 11 },
+                    ..
+                }),
+                ..
+            }),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     did_generator: Arc<dyn DidGenerator>,

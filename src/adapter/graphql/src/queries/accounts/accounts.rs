@@ -54,7 +54,10 @@ impl Accounts {
         Ok(maybe_account.map(Account::from_account))
     }
 
-    /// Returns accounts by their IDs
+    /// Returns accounts by their IDs.
+    ///
+    /// Order of results is guaranteed to match the inputs. Duplicate inputs
+    /// will results in duplicate results.
     #[tracing::instrument(level = "info", name = Accounts_by_ids, skip_all, fields(?account_ids, ?skip_missing))]
     async fn by_ids(
         &self,
@@ -82,8 +85,24 @@ impl Accounts {
             )));
         }
 
-        let accounts = lookup
-            .found
+        // Reorder resolved accounts to match the order of inputs
+        let found_accounts: Vec<kamu_accounts::Account> = {
+            let found_accounts_map: std::collections::BTreeMap<
+                odf::AccountID,
+                kamu_accounts::Account,
+            > = lookup
+                .found
+                .into_iter()
+                .map(|a| (a.id.clone(), a))
+                .collect();
+
+            domain_account_ids
+                .iter()
+                .filter_map(|id| found_accounts_map.get(*id).cloned())
+                .collect()
+        };
+
+        let accounts = found_accounts
             .into_iter()
             .map(Account::from_account)
             .collect();
@@ -133,8 +152,24 @@ impl Accounts {
             )));
         }
 
-        let accounts = lookup
-            .found
+        // Reorder resolved accounts to match the order of inputs
+        let found_accounts: Vec<kamu_accounts::Account> = {
+            let found_accounts_map: std::collections::BTreeMap<
+                odf::AccountName,
+                kamu_accounts::Account,
+            > = lookup
+                .found
+                .into_iter()
+                .map(|a| (a.account_name.clone(), a))
+                .collect();
+
+            domain_account_names
+                .iter()
+                .filter_map(|name| found_accounts_map.get(*name).cloned())
+                .collect()
+        };
+
+        let accounts = found_accounts
             .into_iter()
             .map(Account::from_account)
             .collect();
