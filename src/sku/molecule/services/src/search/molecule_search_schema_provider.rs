@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
-use kamu_accounts::{AccountService, CurrentAccountSubject};
+use kamu_accounts::{AccountService, CurrentAccountSubject, LoggedAccount};
 use kamu_core::KamuBackgroundCatalog;
 use kamu_molecule_domain::{
     molecule_activity_full_text_search_schema as activity_schema,
@@ -21,19 +21,24 @@ use kamu_molecule_domain::{
 };
 use kamu_search::*;
 
-use crate::MoleculeFullTextSearchIndexer;
+use crate::search::indexers::{
+    index_activities,
+    index_announcements,
+    index_data_room_entries,
+    index_projects,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
-pub struct MoleculeFullTextSearchSchemaProvider {
+pub struct MoleculeSearchSchemaProvider {
     background_catalog: Arc<KamuBackgroundCatalog>,
     account_service: Arc<dyn AccountService>,
 }
 
 #[common_macros::method_names_consts]
-impl MoleculeFullTextSearchSchemaProvider {
+impl MoleculeSearchSchemaProvider {
     /// Common template for indexing entities across all molecule organization
     /// accounts. Takes a callback that performs the actual indexing for a
     /// specific entity type.
@@ -43,7 +48,7 @@ impl MoleculeFullTextSearchSchemaProvider {
         index_fn: F,
     ) -> Result<usize, InternalError>
     where
-        F: Fn(Arc<MoleculeFullTextSearchIndexer>, Arc<dyn FullTextSearchRepository>) -> Fut,
+        F: Fn(LoggedAccount, dill::Catalog, Arc<dyn FullTextSearchRepository>) -> Fut,
         Fut: std::future::Future<Output = Result<usize, InternalError>>,
     {
         let mut total_indexed = 0;
@@ -63,6 +68,11 @@ impl MoleculeFullTextSearchSchemaProvider {
                 continue;
             };
 
+            let logged_account = LoggedAccount {
+                account_id: org_account.id.clone(),
+                account_name: org_account.account_name.clone(),
+            };
+
             // Create catalog scoped to organization account
             let org_account_catalog =
                 dill::CatalogBuilder::new_chained(self.background_catalog.catalog())
@@ -70,7 +80,6 @@ impl MoleculeFullTextSearchSchemaProvider {
                         org_account.id,
                         org_account.account_name,
                     ))
-                    .add::<MoleculeFullTextSearchIndexer>()
                     .build();
 
             // Run indexing on behalf of organization account under a dedicated transaction
@@ -78,12 +87,8 @@ impl MoleculeFullTextSearchSchemaProvider {
                 .transactional(|transaction_catalog| {
                     let index_fn = &index_fn;
                     let repo = repo.clone();
-                    async move {
-                        let indexer = transaction_catalog
-                            .get_one::<MoleculeFullTextSearchIndexer>()
-                            .unwrap();
-                        index_fn(indexer, repo).await
-                    }
+                    let logged_account = logged_account.clone();
+                    async move { index_fn(logged_account, transaction_catalog, repo).await }
                 })
                 .await?;
 
@@ -95,60 +100,60 @@ impl MoleculeFullTextSearchSchemaProvider {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFullTextSearchSchemaProvider_index_projects,
+        name = MoleculeSearchSchemaProvider_index_projects,
         skip_all,
     )]
     async fn index_projects(
         &self,
         repo: Arc<dyn FullTextSearchRepository>,
     ) -> Result<usize, InternalError> {
-        self.index_across_organizations(repo, |indexer, repo| async move {
-            indexer.index_projects(&*repo).await
+        self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
+            index_projects(&logged_account, &catalog, &*repo).await
         })
         .await
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFullTextSearchSchemaProvider_index_data_room_entries,
+        name = MoleculeSearchSchemaProvider_index_data_room_entries,
         skip_all,
     )]
     async fn index_data_room_entries(
         &self,
         repo: Arc<dyn FullTextSearchRepository>,
     ) -> Result<usize, InternalError> {
-        self.index_across_organizations(repo, |indexer, repo| async move {
-            indexer.index_data_room_entries(&*repo).await
+        self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
+            index_data_room_entries(&logged_account, &catalog, &*repo).await
         })
         .await
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFullTextSearchSchemaProvider_index_announcements,
+        name = MoleculeSearchSchemaProvider_index_announcements,
         skip_all,
     )]
     async fn index_announcements(
         &self,
         repo: Arc<dyn FullTextSearchRepository>,
     ) -> Result<usize, InternalError> {
-        self.index_across_organizations(repo, |indexer, repo| async move {
-            indexer.index_announcements(&*repo).await
+        self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
+            index_announcements(&logged_account, &catalog, &*repo).await
         })
         .await
     }
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeFullTextSearchSchemaProvider_index_activities,
+        name = MoleculeSearchSchemaProvider_index_activities,
         skip_all,
     )]
     async fn index_activities(
         &self,
         repo: Arc<dyn FullTextSearchRepository>,
     ) -> Result<usize, InternalError> {
-        self.index_across_organizations(repo, |indexer, repo| async move {
-            indexer.index_activities(&*repo).await
+        self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
+            index_activities(&logged_account, &catalog, &*repo).await
         })
         .await
     }
@@ -157,7 +162,7 @@ impl MoleculeFullTextSearchSchemaProvider {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu_search::FullTextSearchEntitySchemaProvider for MoleculeFullTextSearchSchemaProvider {
+impl kamu_search::FullTextSearchEntitySchemaProvider for MoleculeSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
         "xyz.molecule.kamu.MoleculeFullTextSearchSchemaProvider"
     }

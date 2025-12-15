@@ -11,45 +11,59 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_molecule_domain::{
-    MoleculeAnnouncementMessage,
-    MoleculeAnnouncementMessagePublished,
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    MESSAGE_CONSUMER_MOLECULE_ACTIVITY_SEARCH_UPDATER,
+    MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
+    MoleculeActivityMessage,
+    MoleculeActivityMessagePublished,
+    molecule_activity_full_text_search_schema as activity_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
+use messaging_outbox::*;
 
-use crate::search::molecule_full_text_search_schema_helpers as schema_helpers;
+use crate::search::indexers::index_activity_from_data_room_publication_record;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MessageConsumer)]
-#[dill::interface(dyn MessageConsumerT<MoleculeAnnouncementMessage>)]
-pub struct MoleculeAnnouncementFullTextSearchUpdateHandler {
+#[dill::interface(dyn MessageConsumerT<MoleculeActivityMessage>)]
+#[dill::meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_MOLECULE_ACTIVITY_SEARCH_UPDATER,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
+    ],
+    delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
+})]
+pub struct MoleculeActivitySearchUpdater {
     full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MoleculeAnnouncementFullTextSearchUpdateHandler {
+impl MoleculeActivitySearchUpdater {
     async fn handle_published_message(
         &self,
         ctx: FullTextSearchContext<'_>,
-        published_message: &MoleculeAnnouncementMessagePublished,
+        published_message: &MoleculeActivityMessagePublished,
     ) -> Result<(), InternalError> {
-        let announcement_document = schema_helpers::index_announcement_from_publication_record(
-            &published_message.ipnft_uid,
-            &published_message.announcement_record,
-            published_message.event_time, // consider propagating ingest time instead
+        let activity_document = index_activity_from_data_room_publication_record(
+            &published_message.activity_record,
+            published_message.event_time,
+        );
+
+        let id = activity_schema::unique_id_for_data_room_activity(
+            &published_message.molecule_account_id,
+            published_message.offset,
         );
 
         self.full_text_search_service
             .bulk_update(
                 ctx,
-                announcement_schema::SCHEMA_NAME,
+                activity_schema::SCHEMA_NAME,
                 vec![FullTextUpdateOperation::Index {
-                    id: published_message.ipnft_uid.clone(),
-                    doc: announcement_document,
+                    id,
+                    doc: activity_document,
                 }],
             )
             .await?;
@@ -60,32 +74,30 @@ impl MoleculeAnnouncementFullTextSearchUpdateHandler {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for MoleculeAnnouncementFullTextSearchUpdateHandler {}
+impl MessageConsumer for MoleculeActivitySearchUpdater {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<MoleculeAnnouncementMessage>
-    for MoleculeAnnouncementFullTextSearchUpdateHandler
-{
+impl MessageConsumerT<MoleculeActivityMessage> for MoleculeActivitySearchUpdater {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "MoleculeAnnouncementFullTextSearchUpdateHandler[MoleculeAnnouncementMessage]"
+        name = "MoleculeActivitySearchUpdater[MoleculeActivityMessage]"
     )]
     async fn consume_message(
         &self,
         target_catalog: &dill::Catalog,
-        message: &MoleculeAnnouncementMessage,
+        message: &MoleculeActivityMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received Molecule announcement message");
+        tracing::debug!(received_message = ?message, "Received Molecule activity message");
 
         let ctx = FullTextSearchContext {
             catalog: target_catalog,
         };
 
         match message {
-            MoleculeAnnouncementMessage::Published(published_message) => {
+            MoleculeActivityMessage::Published(published_message) => {
                 self.handle_published_message(ctx, published_message)
                     .await?;
             }

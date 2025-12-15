@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_molecule_domain::{
+    MESSAGE_CONSUMER_MOLECULE_PROJECT_SEARCH_UPDATER,
+    MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
     MoleculeProjectMessage,
     MoleculeProjectMessageCreated,
     MoleculeProjectMessageDisabled,
@@ -18,28 +20,39 @@ use kamu_molecule_domain::{
     molecule_project_full_text_search_schema as project_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
+use messaging_outbox::*;
 
-use crate::search::molecule_full_text_search_schema_helpers as schema_helpers;
+use crate::search::indexers::{
+    index_project_from_parts,
+    partial_update_project_when_ban_status_changed,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MessageConsumer)]
 #[dill::interface(dyn MessageConsumerT<MoleculeProjectMessage>)]
-pub struct MoleculeProjectFullTextSearchUpdateHandler {
+#[dill::meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_MOLECULE_PROJECT_SEARCH_UPDATER,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+    ],
+    delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
+})]
+pub struct MoleculeProjectSearchUpdater {
     full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MoleculeProjectFullTextSearchUpdateHandler {
+impl MoleculeProjectSearchUpdater {
     async fn handle_created_message(
         &self,
         ctx: FullTextSearchContext<'_>,
         created_message: &MoleculeProjectMessageCreated,
     ) -> Result<(), InternalError> {
-        let project_document = schema_helpers::index_project_from_parts(
+        let project_document = index_project_from_parts(
             &created_message.ipnft_uid,
             &created_message.ipnft_symbol,
             &created_message.project_account_id,
@@ -65,10 +78,8 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
         ctx: FullTextSearchContext<'_>,
         disabled_message: &MoleculeProjectMessageDisabled,
     ) -> Result<(), InternalError> {
-        let partial_update = schema_helpers::partial_update_project_when_ban_status_changed(
-            true,
-            disabled_message.event_time,
-        );
+        let partial_update =
+            partial_update_project_when_ban_status_changed(true, disabled_message.event_time);
         self.full_text_search_service
             .bulk_update(
                 ctx,
@@ -88,10 +99,8 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
         ctx: FullTextSearchContext<'_>,
         reenabled_message: &MoleculeProjectMessageReenabled,
     ) -> Result<(), InternalError> {
-        let partial_update = schema_helpers::partial_update_project_when_ban_status_changed(
-            false,
-            reenabled_message.event_time,
-        );
+        let partial_update =
+            partial_update_project_when_ban_status_changed(false, reenabled_message.event_time);
         self.full_text_search_service
             .bulk_update(
                 ctx,
@@ -109,16 +118,16 @@ impl MoleculeProjectFullTextSearchUpdateHandler {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for MoleculeProjectFullTextSearchUpdateHandler {}
+impl MessageConsumer for MoleculeProjectSearchUpdater {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectFullTextSearchUpdateHandler {
+impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectSearchUpdater {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "MoleculeProjectFullTextSearchUpdateHandler[MoleculeProjectMessage]"
+        name = "MoleculeProjectSearchUpdater[MoleculeProjectMessage]"
     )]
     async fn consume_message(
         &self,

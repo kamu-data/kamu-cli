@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_molecule_domain::{
+    MESSAGE_CONSUMER_MOLECULE_DATA_ROOM_SEARCH_UPDATER,
+    MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
     MoleculeDataRoomMessage,
     MoleculeDataRoomMessageEntryCreated,
     MoleculeDataRoomMessageEntryMoved,
@@ -19,28 +21,36 @@ use kamu_molecule_domain::{
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
+use messaging_outbox::*;
 
-use crate::search::molecule_full_text_search_schema_helpers as schema_helpers;
+use crate::search::indexers::index_data_room_entry_from_entity;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MessageConsumer)]
 #[dill::interface(dyn MessageConsumerT<MoleculeDataRoomMessage>)]
-pub struct MoleculeDataRoomFullTextSearchUpdateHandler {
+#[dill::meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_MOLECULE_DATA_ROOM_SEARCH_UPDATER,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
+    ],
+    delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
+})]
+pub struct MoleculeDataRoomSearchUpdater {
     full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MoleculeDataRoomFullTextSearchUpdateHandler {
+impl MoleculeDataRoomSearchUpdater {
     async fn handle_created_message(
         &self,
         ctx: FullTextSearchContext<'_>,
         created_message: &MoleculeDataRoomMessageEntryCreated,
     ) -> Result<(), InternalError> {
-        let data_room_entry_document = schema_helpers::index_data_room_entry_from_entity(
+        let data_room_entry_document = index_data_room_entry_from_entity(
             &created_message.ipnft_uid,
             &created_message.data_room_entry,
         );
@@ -67,7 +77,7 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
         ctx: FullTextSearchContext<'_>,
         updated_message: &MoleculeDataRoomMessageEntryUpdated,
     ) -> Result<(), InternalError> {
-        let data_room_entry_document = schema_helpers::index_data_room_entry_from_entity(
+        let data_room_entry_document = index_data_room_entry_from_entity(
             &updated_message.ipnft_uid,
             &updated_message.data_room_entry,
         );
@@ -110,7 +120,7 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
                             &moved_message.ipnft_uid,
                             &moved_message.path_to,
                         ),
-                        doc: schema_helpers::index_data_room_entry_from_entity(
+                        doc: index_data_room_entry_from_entity(
                             &moved_message.ipnft_uid,
                             &moved_message.data_room_entry,
                         ),
@@ -146,16 +156,16 @@ impl MoleculeDataRoomFullTextSearchUpdateHandler {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for MoleculeDataRoomFullTextSearchUpdateHandler {}
+impl MessageConsumer for MoleculeDataRoomSearchUpdater {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<MoleculeDataRoomMessage> for MoleculeDataRoomFullTextSearchUpdateHandler {
+impl MessageConsumerT<MoleculeDataRoomMessage> for MoleculeDataRoomSearchUpdater {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "MoleculeDataRoomFullTextSearchUpdateHandler[MoleculeDataRoomMessage]"
+        name = "MoleculeDataRoomSearchUpdater[MoleculeDataRoomMessage]"
     )]
     async fn consume_message(
         &self,

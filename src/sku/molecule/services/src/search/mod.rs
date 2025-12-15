@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_full_text_search_schema_helpers;
-mod molecule_full_text_search_schema_provider;
+mod molecule_search_schema_provider;
 
 mod indexers;
 mod updaters;
 
-pub(crate) use indexers::*;
-pub use molecule_full_text_search_schema_provider::*;
+pub use molecule_search_schema_provider::*;
 pub use updaters::*;

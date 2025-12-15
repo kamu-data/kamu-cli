@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod molecule_full_text_search_indexer;
+mod molecule_activity_search_indexer;
+mod molecule_announcement_search_indexer;
+mod molecule_data_room_entry_search_indexer;
+mod molecule_project_search_indexer;
 
-pub(crate) use molecule_full_text_search_indexer::*;
+pub(crate) use molecule_activity_search_indexer::*;
+pub(crate) use molecule_announcement_search_indexer::*;
+pub(crate) use molecule_data_room_entry_search_indexer::*;
+pub(crate) use molecule_project_search_indexer::*;
