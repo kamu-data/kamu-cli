@@ -19,6 +19,8 @@ use kamu_accounts::{
 };
 use kamu_datasets::DatasetStatisticsService;
 
+use crate::quota_defaults_config::QuotaDefaultsConfig;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -26,6 +28,7 @@ use kamu_datasets::DatasetStatisticsService;
 pub struct QuotaCheckerStorageImpl {
     quota_store: Arc<dyn AccountQuotaEventStore>,
     dataset_stats: Arc<dyn DatasetStatisticsService>,
+    quota_defaults_config: QuotaDefaultsConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,14 +44,18 @@ impl AccountQuotaStorageChecker for QuotaCheckerStorageImpl {
         account_id: &odf::AccountID,
         incoming_bytes: u64,
     ) -> Result<(), QuotaExceededError> {
-        let quota = match self
+        let quota_payload_value = match self
             .quota_store
             .get_quota_by_account_id(account_id, QuotaType::storage_space())
             .await
         {
-            Ok(quota) => quota,
-            // If quota is not configured - allow the operation
-            Err(GetAccountQuotaError::NotFound(_)) => return Ok(()),
+            Ok(quota) => {
+                if quota.quota_payload.units != QuotaUnit::Bytes {
+                    return Err(QuotaExceededError::NotConfigured);
+                }
+                quota.quota_payload.value
+            }
+            Err(GetAccountQuotaError::NotFound(_)) => self.quota_defaults_config.storage,
             Err(GetAccountQuotaError::Internal(e)) => return Err(QuotaExceededError::Internal(e)),
         };
 
@@ -61,17 +68,11 @@ impl AccountQuotaStorageChecker for QuotaCheckerStorageImpl {
             Err(e) => return Err(QuotaExceededError::Internal(e)),
         };
 
-        if quota.quota_payload.units != QuotaUnit::Bytes {
-            return Err(QuotaExceededError::NotConfigured);
-        }
-
-        let limit = quota.quota_payload.value;
-
-        if used + incoming_bytes > limit {
+        if used + incoming_bytes > quota_payload_value {
             Err(QuotaExceededError::Limit(kamu_accounts::LimitError {
                 used,
                 incoming: incoming_bytes,
-                limit,
+                limit: quota_payload_value,
             }))
         } else {
             Ok(())

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{Account, AccountQuotaService, GetAccountQuotaError};
+use kamu_accounts::{Account, AccountQuotaService, GetAccountQuotaError, QuotaType};
 
 use crate::prelude::*;
 
@@ -67,7 +67,7 @@ impl<'a> AccountQuotasUsageStorage<'a> {
         let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
 
         let quota = quota_service
-            .get_account_storage_quota(&self.account.id)
+            .get_account_quota(&self.account.id, QuotaType::storage_space())
             .await
             .map_err(map_get_quota_error)?;
 

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountQuotaChecker, AccountQuotaStorageChecker, CurrentAccountSubject};
+use kamu_accounts::{AccountQuotaStorageChecker, CurrentAccountSubject};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -34,18 +34,20 @@ pub struct PushIngestExecutorImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
     account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
+    current_account_subject: CurrentAccountSubject,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-impl AccountQuotaChecker for PushIngestExecutorImpl {
+impl PushIngestExecutorImpl {
     async fn ensure_quota(
         &self,
         incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaExceededError> {
-        let account_id = CurrentAccountSubject::get_maybe()
-            .and_then(|s| s.get_maybe_logged_account_id().cloned())
+        let account_id = self
+            .current_account_subject
+            .get_maybe_logged_account_id()
+            .cloned()
             .ok_or_else(|| InternalError::new("Cannot resolve current account for quota check"))
             .int_err()?;
 
@@ -55,11 +57,7 @@ impl AccountQuotaChecker for PushIngestExecutorImpl {
 
         Ok(())
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl PushIngestExecutorImpl {
     async fn do_ingest(
         &self,
         target: ResolvedDataset,
@@ -67,7 +65,6 @@ impl PushIngestExecutorImpl {
         source: DataSource,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        let dataset_handle = target.get_handle().clone();
         let ctx: SessionContext = ingest_common::new_session_context(
             &self.ingest_config_datafusion,
             self.object_store_registry.clone(),
@@ -82,14 +79,7 @@ impl PushIngestExecutorImpl {
         listener.begin();
 
         match self
-            .do_ingest_inner(
-                dataset_handle,
-                plan.args,
-                source,
-                data_writer,
-                ctx,
-                listener.clone(),
-            )
+            .do_ingest_inner(plan.args, source, data_writer, ctx, listener.clone())
             .await
         {
             Ok(res) => {
@@ -114,7 +104,6 @@ impl PushIngestExecutorImpl {
     )]
     async fn do_ingest_inner(
         &self,
-        dataset_handle: odf::DatasetHandle,
         args: PushIngestArgs,
         source: DataSource,
         mut data_writer: DataWriterDataFusion,
@@ -179,8 +168,7 @@ impl PushIngestExecutorImpl {
         match stage_result {
             Ok(staged) => {
                 let estimated_size = Self::estimate_staged_size(&staged)?;
-                self.ensure_quota(&dataset_handle, estimated_size).await?;
-
+                self.ensure_quota(estimated_size).await?;
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let system_time = staged.system_time;

@@ -16,6 +16,7 @@ mod env;
 mod graph;
 mod odf;
 mod quota_checker_storage_impl;
+pub mod quota_defaults_config;
 mod refs;
 mod statistics;
 
@@ -28,5 +29,6 @@ pub use env::*;
 pub use graph::*;
 pub use odf::*;
 pub use quota_checker_storage_impl::*;
+pub use quota_defaults_config::*;
 pub use refs::*;
 pub use statistics::*;

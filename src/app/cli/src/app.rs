@@ -25,6 +25,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_datasets_services::QuotaDefaultsConfig;
 use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
@@ -740,6 +741,13 @@ pub fn register_config_in_catalog(
 ) -> Result<(), CLIError> {
     // Extra
     catalog_builder.add_value(config.extra.as_ref().unwrap().graphql.clone());
+    catalog_builder.add_value(QuotaDefaultsConfig {
+        storage: config
+            .quota_defaults
+            .as_ref()
+            .and_then(|q| q.storage)
+            .unwrap_or_default(),
+    });
 
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 

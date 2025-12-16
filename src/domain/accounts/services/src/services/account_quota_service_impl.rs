@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use event_sourcing::{Aggregate, TryLoadError};
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::{
     AccountQuotaAdded,
@@ -18,7 +19,7 @@ use kamu_accounts::{
     AccountQuotaPayload,
     AccountQuotaQuery,
     AccountQuotaService,
-    GetAccountQuotaError,
+    AccountQuotaState,
     QuotaType,
     QuotaUnit,
     SetAccountQuotaError,
@@ -39,52 +40,65 @@ pub struct AccountQuotaServiceImpl {
 
 #[async_trait::async_trait]
 impl AccountQuotaService for AccountQuotaServiceImpl {
-    async fn set_account_storage_quota(
+    async fn set_account_quota(
         &self,
         account_id: &odf::AccountID,
-        limit_bytes: u64,
+        limit: u64,
+        quota_type: QuotaType,
     ) -> Result<(), SetAccountQuotaError> {
         let query = AccountQuotaQuery {
             account_id: account_id.clone(),
-            quota_type: QuotaType::storage_space(),
+            quota_type: quota_type.clone(),
         };
 
         let now = self.time_source.now();
 
-        let maybe_current = self
-            .account_quota_store
-            .get_quota_by_account_id(account_id, QuotaType::storage_space())
-            .await;
-
-        let prev_event_id = self
-            .account_quota_store
-            .last_event_id(&query)
+        let (maybe_current, prev_event_id) =
+            match Aggregate::<AccountQuotaState, dyn AccountQuotaEventStore>::try_load(
+                &query,
+                self.account_quota_store.as_ref(),
+            )
             .await
-            .map_err(|e| SetAccountQuotaError::Internal(e.int_err()))?;
+            {
+                Ok(Some(agg)) => {
+                    let prev_event_id = agg.last_stored_event_id();
+                    let state = agg.into_state();
+                    let maybe_current = if state.quota.active {
+                        Some(state.quota)
+                    } else {
+                        None
+                    };
+                    (maybe_current, prev_event_id)
+                }
+                Ok(None) => (None, None),
+                Err(TryLoadError::ProjectionError(err)) => {
+                    return Err(SetAccountQuotaError::Internal(err.int_err()));
+                }
+                Err(TryLoadError::Internal(err)) => {
+                    return Err(SetAccountQuotaError::Internal(err));
+                }
+            };
 
         let payload = AccountQuotaPayload {
             units: QuotaUnit::Bytes,
-            value: limit_bytes,
+            value: limit,
         };
 
         let event = match maybe_current {
-            Ok(quota) => AccountQuotaEvent::AccountQuotaModified(AccountQuotaModified {
+            Some(quota) => AccountQuotaEvent::AccountQuotaModified(AccountQuotaModified {
                 event_time: now,
                 quota_id: quota.id,
                 account_id: account_id.clone(),
-                quota_type: QuotaType::storage_space(),
+                quota_type: quota_type.clone(),
                 quota_payload: payload,
             }),
-            Err(GetAccountQuotaError::NotFound(_)) => {
-                AccountQuotaEvent::AccountQuotaAdded(AccountQuotaAdded {
-                    event_time: now,
-                    quota_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
-                    quota_type: QuotaType::storage_space(),
-                    quota_payload: payload,
-                })
-            }
-            Err(e) => return Err(SetAccountQuotaError::Internal(e.int_err())),
+            None => AccountQuotaEvent::AccountQuotaAdded(AccountQuotaAdded {
+                event_time: now,
+                quota_id: Uuid::new_v4(),
+                account_id: account_id.clone(),
+                quota_type: quota_type.clone(),
+                quota_payload: payload,
+            }),
         };
 
         self.account_quota_store
@@ -94,12 +108,13 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
         Ok(())
     }
 
-    async fn get_account_storage_quota(
+    async fn get_account_quota(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<kamu_accounts::AccountQuota, GetAccountQuotaError> {
+        quota_type: QuotaType,
+    ) -> Result<kamu_accounts::AccountQuota, kamu_accounts::GetAccountQuotaError> {
         self.account_quota_store
-            .get_quota_by_account_id(account_id, QuotaType::storage_space())
+            .get_quota_by_account_id(account_id, quota_type)
             .await
     }
 }

@@ -6840,6 +6840,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "event-sourcing",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",

@@ -25,7 +25,7 @@ use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_core::auth;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::{DatasetStatisticsServiceImpl, QuotaCheckerStorageImpl};
+use kamu_datasets_services::{DatasetStatisticsServiceImpl, QuotaCheckerStorageImpl, QuotaDefaultsConfig};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -1167,6 +1167,7 @@ impl CompactTestHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
+            .add_value(QuotaDefaultsConfig::with_defaults())
             .add::<QuotaCheckerStorageImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DummyOutboxImpl>()

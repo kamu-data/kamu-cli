@@ -13,15 +13,17 @@ use crate::{AccountQuota, GetAccountQuotaError, SaveAccountQuotaError};
 
 #[async_trait::async_trait]
 pub trait AccountQuotaService: Sync + Send {
-    async fn set_account_storage_quota(
+    async fn set_account_quota(
         &self,
         account_id: &odf::AccountID,
         limit_bytes: u64,
+        quota_type: crate::QuotaType,
     ) -> Result<(), SetAccountQuotaError>;
 
-    async fn get_account_storage_quota(
+    async fn get_account_quota(
         &self,
         account_id: &odf::AccountID,
+        quota_type: crate::QuotaType,
     ) -> Result<AccountQuota, GetAccountQuotaError>;
 }
 
@@ -55,14 +57,6 @@ pub trait AccountQuotaStorageChecker: Sync + Send {
         &self,
         account_id: &odf::AccountID,
         incoming_bytes: u64,
-    ) -> Result<(), QuotaExceededError>;
-}
-
-#[async_trait::async_trait]
-pub trait AccountQuotaChecker: Sync + Send {
-    async fn ensure_quota(
-        &self,
-        incoming_size: u64,
     ) -> Result<(), QuotaExceededError>;
 }
 

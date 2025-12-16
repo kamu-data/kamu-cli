@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{Account, AccountQuotaService, SetAccountQuotaError};
+use kamu_accounts::{Account, AccountQuotaService, QuotaType, SetAccountQuotaError};
 
 use crate::prelude::*;
 
@@ -41,7 +41,7 @@ impl<'a> AccountQuotasMut<'a> {
             .ok_or_else(|| GqlError::gql("storage.limitTotalBytes is required"))?;
 
         quota_service
-            .set_account_storage_quota(&account_id, limit_total_bytes)
+            .set_account_quota(&account_id, limit_total_bytes, QuotaType::storage_space())
             .await
             .map_err(map_set_quota_error)?;
 

@@ -97,7 +97,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
         if let AccountLifecycleMessage::Deleted(message) = message {
             self.handle_account_lifecycle_deleted_message(message)
                 .await
-                .map_err(|e| e.int_err())?;
+                .map_err(ErrorIntoInternal::int_err)?;
         }
 
         Ok(())
@@ -115,7 +115,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
         if let DatasetLifecycleMessage::Deleted(message) = message {
             self.handle_dataset_lifecycle_deleted_message(message)
                 .await
-                .map_err(|e| e.int_err())?;
+                .map_err(ErrorIntoInternal::int_err)?;
         }
 
         Ok(())

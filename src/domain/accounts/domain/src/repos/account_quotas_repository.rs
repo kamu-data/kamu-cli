@@ -74,22 +74,6 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
         maybe_prev_event_id: Option<EventID>,
         events: Vec<AccountQuotaEvent>,
     ) -> Result<EventID, SaveAccountQuotaError>;
-
-    async fn last_event_id(
-        &self,
-        query: &AccountQuotaQuery,
-    ) -> Result<Option<EventID>, GetAccountQuotaError> {
-        match Aggregate::<AccountQuotaState, Self>::try_load(query, self).await {
-            Ok(Some(agg)) => Ok(agg.last_stored_event_id()),
-            Ok(None) => Ok(None),
-            Err(event_sourcing::TryLoadError::ProjectionError(err)) => {
-                Err(GetAccountQuotaError::Internal(err.int_err()))
-            }
-            Err(event_sourcing::TryLoadError::Internal(err)) => {
-                Err(GetAccountQuotaError::Internal(err))
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
