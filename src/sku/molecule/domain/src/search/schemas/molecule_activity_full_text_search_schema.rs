@@ -24,6 +24,7 @@ const SCHEMA_VERSION: u32 = 1;
 pub const FIELD_CREATED_AT: &str = "created_at";
 pub const FIELD_UPDATED_AT: &str = "updated_at";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
+pub const FIELD_ACTIVITY_TYPE: &str = "activity_type";
 pub const FIELD_ENTRY_PATH: &str = "entry_path";
 pub const FIELD_ENTRY_REF: &str = "entry_ref";
 pub const FIELD_ACCESS_LEVEL: &str = "access_level";
@@ -45,6 +46,10 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_IPNFT_UID,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_ACTIVITY_TYPE,
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
