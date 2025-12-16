@@ -46,6 +46,7 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
+        content_text: Option<&str>,
     ) -> Result<MoleculeDataRoomEntry, MoleculeCreateDataRoomEntryError> {
         let entry = self
             .data_room_collection_service
@@ -89,6 +90,7 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
                     molecule_project.account_id.clone(),
                     molecule_project.ipnft_uid.clone(),
                     data_room_entry.clone(),
+                    content_text.map(ToOwned::to_owned),
                 ),
             )
             .await

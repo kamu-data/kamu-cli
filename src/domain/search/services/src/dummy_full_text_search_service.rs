@@ -43,6 +43,15 @@ impl FullTextSearchService for DummyFullTextSearchService {
         })
     }
 
+    async fn find_document_by_id(
+        &self,
+        _ctx: FullTextSearchContext<'_>,
+        _schema_name: FullTextEntitySchemaName,
+        _id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        Ok(None)
+    }
+
     async fn bulk_update(
         &self,
         _ctx: FullTextSearchContext<'_>,

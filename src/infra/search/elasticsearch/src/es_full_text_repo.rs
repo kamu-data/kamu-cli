@@ -304,6 +304,21 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         })
     }
 
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_find_document_by_id, skip_all, fields(schema_name, id))]
+    async fn find_document_by_id(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        let client = self.es_client().await?;
+        let index_name = self.resolve_read_index_alias(client, schema_name)?;
+        let doc = client
+            .find_document_by_id(&index_name, id)
+            .await
+            .int_err()?;
+        Ok(doc)
+    }
+
     #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
     async fn bulk_update(
         &self,

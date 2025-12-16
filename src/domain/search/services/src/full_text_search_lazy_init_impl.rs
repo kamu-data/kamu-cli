@@ -84,6 +84,16 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
         inner.search(ctx, req).await
     }
 
+    async fn find_document_by_id(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        let inner = self.inner(ctx.catalog).await?;
+        inner.find_document_by_id(ctx, schema_name, id).await
+    }
+
     async fn bulk_update(
         &self,
         ctx: FullTextSearchContext<'_>,

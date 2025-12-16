@@ -142,6 +142,28 @@ impl ElasticSearchClient {
         Ok(search_response)
     }
 
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_find_document_by_id, skip_all, fields(index_name, id))]
+    pub async fn find_document_by_id(
+        &self,
+        index_name: &str,
+        id: &str,
+    ) -> Result<Option<serde_json::Value>, ElasticSearchClientError> {
+        use elasticsearch::GetParts;
+        let response = self
+            .client
+            .get(GetParts::IndexId(index_name, id))
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+        let body: es_client::GetDocumentByIdResponse = response.json().await?;
+        if body.found {
+            Ok(body.source)
+        } else {
+            Ok(None)
+        }
+    }
+
     #[tracing::instrument(level = "info", name = ElasticSearchClient_create_index, skip_all, fields(index_name))]
     pub async fn create_index(
         &self,

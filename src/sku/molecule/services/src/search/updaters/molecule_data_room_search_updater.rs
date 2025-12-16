@@ -53,6 +53,7 @@ impl MoleculeDataRoomSearchUpdater {
         let data_room_entry_document = index_data_room_entry_from_entity(
             &created_message.ipnft_uid,
             &created_message.data_room_entry,
+            created_message.content_text.as_ref(),
         );
 
         self.full_text_search_service
@@ -80,6 +81,7 @@ impl MoleculeDataRoomSearchUpdater {
         let data_room_entry_document = index_data_room_entry_from_entity(
             &updated_message.ipnft_uid,
             &updated_message.data_room_entry,
+            updated_message.content_text.as_ref(),
         );
 
         self.full_text_search_service
@@ -104,26 +106,40 @@ impl MoleculeDataRoomSearchUpdater {
         ctx: FullTextSearchContext<'_>,
         moved_message: &MoleculeDataRoomMessageEntryMoved,
     ) -> Result<(), InternalError> {
+        let old_id = data_room_entry_schema::unique_id_for_data_room_entry(
+            &moved_message.ipnft_uid,
+            &moved_message.path_from,
+        );
+
+        let maybe_existing_document = self
+            .full_text_search_service
+            .find_document_by_id(ctx, data_room_entry_schema::SCHEMA_NAME, &old_id)
+            .await?;
+
+        let Some(existing_document) = maybe_existing_document else {
+            tracing::warn!(
+                ipnft_uid = moved_message.ipnft_uid.as_str(),
+                path_from = moved_message.path_from.as_str(),
+                "Could not find document for moved data room entry at its old location. Skipping \
+                 move handling.",
+            );
+            return Ok(());
+        };
+
+        let new_id = data_room_entry_schema::unique_id_for_data_room_entry(
+            &moved_message.ipnft_uid,
+            &moved_message.path_to,
+        );
+
         self.full_text_search_service
             .bulk_update(
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![
-                    FullTextUpdateOperation::Delete {
-                        id: data_room_entry_schema::unique_id_for_data_room_entry(
-                            &moved_message.ipnft_uid,
-                            &moved_message.path_from,
-                        ),
-                    },
+                    FullTextUpdateOperation::Delete { id: old_id },
                     FullTextUpdateOperation::Index {
-                        id: data_room_entry_schema::unique_id_for_data_room_entry(
-                            &moved_message.ipnft_uid,
-                            &moved_message.path_to,
-                        ),
-                        doc: index_data_room_entry_from_entity(
-                            &moved_message.ipnft_uid,
-                            &moved_message.data_room_entry,
-                        ),
+                        id: new_id,
+                        doc: existing_document,
                     },
                 ],
             )

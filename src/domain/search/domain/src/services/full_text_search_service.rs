@@ -32,6 +32,13 @@ pub trait FullTextSearchService: Send + Sync {
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
 
+    async fn find_document_by_id(
+        &self,
+        ctx: FullTextSearchContext<'_>,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError>;
+
     async fn bulk_update(
         &self,
         ctx: FullTextSearchContext<'_>,
@@ -42,6 +49,7 @@ pub trait FullTextSearchService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Copy)]
 pub struct FullTextSearchContext<'a> {
     pub catalog: &'a dill::Catalog,
 }

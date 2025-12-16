@@ -32,6 +32,7 @@ pub const FIELD_VERSION: &str = "version";
 pub const FIELD_CONTENT_TYPE: &str = "content_type";
 pub const FIELD_CONTENT_HASH: &str = "content_hash";
 pub const FIELD_CONTENT_LENGTH: &str = "content_length";
+pub const FIELD_CONTENT_TEXT: &str = "content_text";
 pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
 pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
 pub const FIELD_DESCRIPTION: &str = "description";
@@ -84,6 +85,12 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
         path: FIELD_CONTENT_LENGTH,
         role: FullTextSchemaFieldRole::Integer,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_TEXT,
+        role: FullTextSchemaFieldRole::Prose {
+            enable_positions: true,
+        },
     },
     FullTextSchemaField {
         path: FIELD_ACCESS_LEVEL,
