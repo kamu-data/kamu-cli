@@ -23,7 +23,7 @@ pub trait MoleculeSearchUseCase: Send + Sync {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError>;
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,15 +46,15 @@ pub enum MoleculeSearchType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MoleculeSearchFoundItemsListing = EntityPageListing<MoleculeSearchFoundItem>;
+pub type MoleculeSearchHitsListing = EntityPageListing<MoleculeSearchHit>;
 
 #[derive(Debug)]
-pub enum MoleculeSearchFoundItem {
+pub enum MoleculeSearchHit {
     DataRoomActivity(MoleculeDataRoomActivity),
     Announcement(MoleculeGlobalAnnouncement),
 }
 
-impl MoleculeSearchFoundItem {
+impl MoleculeSearchHit {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             Self::DataRoomActivity(entity) => entity.event_time,

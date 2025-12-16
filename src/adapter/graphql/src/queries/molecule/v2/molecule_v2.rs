@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
     MoleculeGlobalActivity,
     MoleculeProjectListing,
     MoleculeSearchError,
-    MoleculeSearchFoundItem,
+    MoleculeSearchHit,
     MoleculeSearchUseCase,
     MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesUseCase,
@@ -263,7 +263,7 @@ impl MoleculeV2 {
         filters: Option<MoleculeSemanticSearchFilters>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeSemanticSearchFoundItemConnection> {
+    ) -> Result<MoleculeSemanticSearchHitConnection> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let (search_uc, molecule_view_projects_uc) = from_catalog_n!(
@@ -300,16 +300,16 @@ impl MoleculeV2 {
         let nodes = listing
             .list
             .into_iter()
-            .map(|found_item| {
-                let ipnft_uid = found_item.ipnft_uid();
+            .map(|search_hit| {
+                let ipnft_uid = search_hit.ipnft_uid();
                 let Some(project) = projects_mapping.get(ipnft_uid) else {
                     return Err(GqlError::gql(format!(
                         "Project [{ipnft_uid}] unexpectedly not found",
                     )));
                 };
 
-                match found_item {
-                    MoleculeSearchFoundItem::DataRoomActivity(data_room_activity) => {
+                match search_hit {
+                    MoleculeSearchHit::DataRoomActivity(data_room_activity) => {
                         let data_room_entry =
                             MoleculeDataRoomEntry::new_from_data_room_activity_entity(
                                 project,
@@ -323,20 +323,20 @@ impl MoleculeV2 {
                             is_latest,
                         );
 
-                        Ok(MoleculeSemanticSearchFoundItem::file(entry))
+                        Ok(MoleculeSemanticSearchHit::file(entry))
                     }
-                    MoleculeSearchFoundItem::Announcement(announcement) => {
+                    MoleculeSearchHit::Announcement(announcement) => {
                         let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
                             project,
                             announcement,
                         );
-                        Ok(MoleculeSemanticSearchFoundItem::announcement(entry))
+                        Ok(MoleculeSemanticSearchHit::announcement(entry))
                     }
                 }
             })
             .collect::<Result<_, _>>()?;
 
-        Ok(MoleculeSemanticSearchFoundItemConnection::new(
+        Ok(MoleculeSemanticSearchHitConnection::new(
             nodes,
             page,
             per_page,
@@ -389,12 +389,12 @@ impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType 
 }
 
 #[derive(Union)]
-pub enum MoleculeSemanticSearchFoundItem {
+pub enum MoleculeSemanticSearchHit {
     File(MoleculeSemanticSearchFoundFile),
     Announcement(MoleculeSemanticSearchFoundAnnouncement),
 }
 
-impl MoleculeSemanticSearchFoundItem {
+impl MoleculeSemanticSearchHit {
     pub fn announcement(entry: MoleculeAnnouncementEntry) -> Self {
         Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { entry })
     }
@@ -415,9 +415,9 @@ pub struct MoleculeSemanticSearchFoundAnnouncement {
 }
 
 page_based_connection!(
-    MoleculeSemanticSearchFoundItem,
-    MoleculeSemanticSearchFoundItemConnection,
-    MoleculeSemanticSearchFoundItemEdge
+    MoleculeSemanticSearchHit,
+    MoleculeSemanticSearchHitConnection,
+    MoleculeSemanticSearchHitEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

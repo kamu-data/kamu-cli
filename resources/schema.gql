@@ -3763,13 +3763,13 @@ type MoleculeSemanticSearchFoundFile {
 	entry: MoleculeVersionedFile!
 }
 
-union MoleculeSemanticSearchFoundItem = MoleculeSemanticSearchFoundFile | MoleculeSemanticSearchFoundAnnouncement
+union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundFile | MoleculeSemanticSearchFoundAnnouncement
 
-type MoleculeSemanticSearchFoundItemConnection {
+type MoleculeSemanticSearchHitConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeSemanticSearchFoundItem!]!
+	nodes: [MoleculeSemanticSearchHit!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3778,11 +3778,11 @@ type MoleculeSemanticSearchFoundItemConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeSemanticSearchFoundItemEdge!]!
+	edges: [MoleculeSemanticSearchHitEdge!]!
 }
 
-type MoleculeSemanticSearchFoundItemEdge {
-	node: MoleculeSemanticSearchFoundItem!
+type MoleculeSemanticSearchHitEdge {
+	node: MoleculeSemanticSearchHit!
 }
 
 type MoleculeV1 {
@@ -3822,7 +3822,7 @@ type MoleculeV2 {
 	- specific categories and tags
 	- only returning files or announcements
 	"""
-	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchFoundItemConnection!
+	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchHitConnection!
 }
 
 type MoleculeVersionedFile {

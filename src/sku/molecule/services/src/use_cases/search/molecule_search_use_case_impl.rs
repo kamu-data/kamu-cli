@@ -32,14 +32,14 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         use MoleculeSearchType as Type;
 
         match utils::get_search_result_type(filters.as_ref()) {
             Type::OnlyDataRoomActivities | Type::DataRoomActivitiesAndAnnouncements => {
                 /* continue */
             }
-            Type::OnlyAnnouncements => return Ok(MoleculeSearchFoundItemsListing::default()),
+            Type::OnlyAnnouncements => return Ok(MoleculeSearchHitsListing::default()),
         }
 
         // Get read access to global activities dataset
@@ -52,7 +52,7 @@ impl MoleculeSearchUseCaseImpl {
 
             // No activities dataset yet is fine, just return an empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeSearchFoundItemsListing::default());
+                return Ok(MoleculeSearchHitsListing::default());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
@@ -67,7 +67,7 @@ impl MoleculeSearchUseCaseImpl {
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeSearchFoundItemsListing::default());
+            return Ok(MoleculeSearchHitsListing::default());
         };
 
         // Filtering
@@ -99,11 +99,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeDataRoomActivity::from_json(record)?;
-                Ok(MoleculeSearchFoundItem::DataRoomActivity(entity))
+                Ok(MoleculeSearchHit::DataRoomActivity(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeSearchFoundItemsListing { list, total_count })
+        Ok(MoleculeSearchHitsListing { list, total_count })
     }
 
     async fn get_global_announcement_activities_listing(
@@ -111,12 +111,12 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         use MoleculeSearchType as Type;
 
         match utils::get_search_result_type(filters.as_ref()) {
             Type::OnlyAnnouncements | Type::DataRoomActivitiesAndAnnouncements => { /* continue */ }
-            Type::OnlyDataRoomActivities => return Ok(MoleculeSearchFoundItemsListing::default()),
+            Type::OnlyDataRoomActivities => return Ok(MoleculeSearchHitsListing::default()),
         }
 
         // Get read access to global announcements dataset
@@ -129,7 +129,7 @@ impl MoleculeSearchUseCaseImpl {
 
             // No announcements dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeSearchFoundItemsListing::default());
+                return Ok(MoleculeSearchHitsListing::default());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
@@ -143,7 +143,7 @@ impl MoleculeSearchUseCaseImpl {
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeSearchFoundItemsListing::default());
+            return Ok(MoleculeSearchHitsListing::default());
         };
 
         // Filtering
@@ -179,11 +179,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeGlobalAnnouncement::from_json(record)?;
-                Ok(MoleculeSearchFoundItem::Announcement(entity))
+                Ok(MoleculeSearchHit::Announcement(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeSearchFoundItemsListing { list, total_count })
+        Ok(MoleculeSearchHitsListing { list, total_count })
     }
 }
 
@@ -199,7 +199,7 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
                 self.get_global_data_room_activities_listing(
                     molecule_subject,
@@ -231,7 +231,7 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
             list.truncate(pagination.limit);
         }
 
-        Ok(MoleculeSearchFoundItemsListing { list, total_count })
+        Ok(MoleculeSearchHitsListing { list, total_count })
     }
 }
 
