@@ -44,6 +44,7 @@ impl PushIngestExecutorImpl {
         &self,
         incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaExceededError> {
+        // Unauthenticated accounts cannot ingest due to lack of quota context
         let account_id = self
             .current_account_subject
             .get_maybe_logged_account_id()
