@@ -450,7 +450,7 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
+// #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_upload_content_type_not_specified() {
     let harness = DataIngestHarness::new().await;

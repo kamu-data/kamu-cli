@@ -78,7 +78,7 @@ impl TransformTestHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add_value(QuotaDefaultsConfig::with_defaults())
+            .add_value(QuotaDefaultsConfig::default())
             .add::<QuotaCheckerStorageImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()

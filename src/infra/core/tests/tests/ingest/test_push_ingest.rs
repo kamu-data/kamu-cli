@@ -1262,7 +1262,7 @@ impl IngestTestHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add_value(QuotaDefaultsConfig::with_defaults())
+            .add_value(QuotaDefaultsConfig::default())
             .add::<QuotaCheckerStorageImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()

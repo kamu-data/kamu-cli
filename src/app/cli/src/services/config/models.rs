@@ -16,6 +16,7 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets_services::QuotaDefaultsConfig;
 use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
 use merge::Merge;
 use merge::option::overwrite_none;
@@ -189,11 +190,21 @@ impl ExtraConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
 pub struct QuotaDefaults {
     pub storage: Option<u64>,
+}
+
+impl Default for QuotaDefaults {
+    fn default() -> Self {
+        let defaults = QuotaDefaultsConfig::default();
+
+        Self {
+            storage: Some(defaults.storage),
+        }
+    }
 }
 
 impl QuotaDefaults {

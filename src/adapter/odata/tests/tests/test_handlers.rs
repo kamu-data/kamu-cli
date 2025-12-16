@@ -447,6 +447,7 @@ impl TestHarness {
                 .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<QuotaCheckerStorageImpl>()
+                .add_value(QuotaDefaultsConfig::default())
                 .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);

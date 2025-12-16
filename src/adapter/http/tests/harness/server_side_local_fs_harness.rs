@@ -182,6 +182,7 @@ impl ServerSideLocalFsHarness {
                 .add::<QuotaCheckerStorageImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
+                .add_value(QuotaDefaultsConfig::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)

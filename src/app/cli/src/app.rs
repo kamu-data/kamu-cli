@@ -741,13 +741,6 @@ pub fn register_config_in_catalog(
 ) -> Result<(), CLIError> {
     // Extra
     catalog_builder.add_value(config.extra.as_ref().unwrap().graphql.clone());
-    catalog_builder.add_value(QuotaDefaultsConfig {
-        storage: config
-            .quota_defaults
-            .as_ref()
-            .and_then(|q| q.storage)
-            .unwrap_or_default(),
-    });
 
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
@@ -942,6 +935,16 @@ pub fn register_config_in_catalog(
     } else {
         warn!("Did secret keys will not be stored");
     }
+    //
+
+    // Quotas limits configuration
+    catalog_builder.add_value(QuotaDefaultsConfig {
+        storage: config
+            .quota_defaults
+            .as_ref()
+            .and_then(|q| q.storage)
+            .unwrap_or_default(),
+    });
     //
 
     // Authentication configuration

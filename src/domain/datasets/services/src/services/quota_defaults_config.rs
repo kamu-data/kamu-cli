@@ -7,17 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#[derive(Debug, Clone, Default)]
+pub const DEFAULT_STORAGE_QUOTA_BYTES: u64 = 1_000_000_000;
+
+#[derive(Debug, Clone)]
 pub struct QuotaDefaultsConfig {
     pub storage: u64,
 }
 
-impl QuotaDefaultsConfig {
-    pub const DEFAULT_STORAGE_BYTES: u64 = 1_000_000_000;
-
-    pub fn with_defaults() -> Self {
+impl Default for QuotaDefaultsConfig {
+    fn default() -> Self {
         Self {
-            storage: Self::DEFAULT_STORAGE_BYTES,
+            storage: DEFAULT_STORAGE_QUOTA_BYTES,
         }
     }
 }

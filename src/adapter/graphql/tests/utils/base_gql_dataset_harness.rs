@@ -94,6 +94,7 @@ impl BaseGQLDatasetHarness {
                 .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<QuotaCheckerStorageImpl>()
+                .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {

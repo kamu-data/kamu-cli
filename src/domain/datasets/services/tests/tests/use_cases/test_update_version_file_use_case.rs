@@ -186,7 +186,7 @@ impl UpdateVersionFileCaseHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add_value(kamu_datasets_services::QuotaDefaultsConfig::with_defaults())
+            .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
             .add::<QuotaCheckerStorageImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()

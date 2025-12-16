@@ -284,7 +284,7 @@ impl TestHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add_value(QuotaDefaultsConfig::with_defaults())
+            .add_value(QuotaDefaultsConfig::default())
             .add::<QuotaCheckerStorageImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
