@@ -48,7 +48,6 @@ pub struct MoleculeV2;
 
 impl MoleculeV2 {
     async fn get_molecule_projects_listing(
-        &self,
         ctx: &Context<'_>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing> {
@@ -66,6 +65,35 @@ impl MoleculeV2 {
             })?;
 
         Ok(listing)
+    }
+
+    async fn get_molecule_projects_mapping(
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
+    ) -> Result<HashMap<String, Arc<MoleculeProjectV2>>, GqlError> {
+        let listing = molecule_view_projects_uc
+            .execute(&molecule_subject, None)
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeViewProjectsError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::NoProjectsDataset(_) | E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let map = listing
+            .list
+            .into_iter()
+            .map(|project| {
+                (
+                    project.ipnft_uid.clone(),
+                    Arc::new(MoleculeProjectV2::new(project)),
+                )
+            })
+            .collect();
+
+        Ok(map)
     }
 }
 
@@ -112,15 +140,14 @@ impl MoleculeV2 {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let listing = self
-            .get_molecule_projects_listing(
-                ctx,
-                Some(PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                }),
-            )
-            .await?;
+        let listing = Self::get_molecule_projects_listing(
+            ctx,
+            Some(PaginationOpts {
+                offset: page * per_page,
+                limit: per_page,
+            }),
+        )
+        .await?;
 
         let nodes = listing
             .list
@@ -172,29 +199,11 @@ impl MoleculeV2 {
                 }
             })?;
 
-        let projects_mapping: HashMap<_, _> = {
-            let listing = molecule_view_projects_uc
-                .execute(&molecule_subject, None)
-                .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeViewProjectsError as E;
-                    match e {
-                        E::Access(e) => e.into(),
-                        E::NoProjectsDataset(_) | E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
-
-            listing
-                .list
-                .into_iter()
-                .map(|project| {
-                    (
-                        project.ipnft_uid.clone(),
-                        Arc::new(MoleculeProjectV2::new(project)),
-                    )
-                })
-                .collect()
-        };
+        let projects_mapping = Self::get_molecule_projects_mapping(
+            &molecule_subject,
+            molecule_view_projects_uc.as_ref(),
+        )
+        .await?;
 
         let nodes = listing
             .list
@@ -282,29 +291,11 @@ impl MoleculeV2 {
                 }
             })?;
 
-        let projects_mapping: HashMap<_, _> = {
-            let listing = molecule_view_projects_uc
-                .execute(&molecule_subject, None)
-                .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeViewProjectsError as E;
-                    match e {
-                        E::Access(e) => e.into(),
-                        E::NoProjectsDataset(_) | E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
-
-            listing
-                .list
-                .into_iter()
-                .map(|project| {
-                    (
-                        project.ipnft_uid.clone(),
-                        Arc::new(MoleculeProjectV2::new(project)),
-                    )
-                })
-                .collect()
-        };
+        let projects_mapping = Self::get_molecule_projects_mapping(
+            &molecule_subject,
+            molecule_view_projects_uc.as_ref(),
+        )
+        .await?;
 
         let nodes = listing
             .list
