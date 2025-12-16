@@ -17,7 +17,6 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, produ
     b.add::<AccessTokenServiceImpl>();
     b.add::<AccountServiceImpl>();
     b.add::<AccountQuotaServiceImpl>();
-    b.add::<QuotaCheckerStorageImpl>();
     b.add::<AuthenticationServiceImpl>();
     b.add::<LoginPasswordAuthProvider>();
     b.add::<PredefinedAccountsRegistrator>();
@@ -28,8 +27,6 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, produ
     b.add::<ModifyAccountPasswordUseCaseImpl>();
 
     b.add::<utils::AccountAuthorizationHelperImpl>();
-
-    b.add::<DidSecretService>();
 
     if needs_indexing {
         b.add::<OAuthDeviceCodeServiceImpl>();

@@ -15,7 +15,6 @@ use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryDidSecretKeyRe
 use kamu_accounts_services::{
     AccountQuotaServiceImpl,
     CreateAccountUseCaseImpl,
-    QuotaCheckerStorageImpl,
     UpdateAccountUseCaseImpl,
 };
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
@@ -25,7 +24,7 @@ use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{InMemoryDatasetStatisticsRepository, *};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::{DatasetStatisticsServiceImpl, *};
+use kamu_datasets_services::{DatasetStatisticsServiceImpl, QuotaCheckerStorageImpl, *};
 use messaging_outbox::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;

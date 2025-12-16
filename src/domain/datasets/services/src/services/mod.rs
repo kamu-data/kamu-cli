@@ -15,6 +15,7 @@ mod entry;
 mod env;
 mod graph;
 mod odf;
+mod quota_checker_storage_impl;
 mod refs;
 mod statistics;
 
@@ -26,5 +27,6 @@ pub use entry::*;
 pub use env::*;
 pub use graph::*;
 pub use odf::*;
+pub use quota_checker_storage_impl::*;
 pub use refs::*;
 pub use statistics::*;

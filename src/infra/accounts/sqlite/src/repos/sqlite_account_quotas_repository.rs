@@ -27,7 +27,7 @@ pub struct SqliteAccountQuotaEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SqliteAccountQuotaEventStore {
-    fn quota_type_to_db(quota_type: QuotaType) -> String {
+    fn quota_type_to_db(quota_type: &QuotaType) -> String {
         quota_type.to_string()
     }
 
@@ -63,7 +63,7 @@ impl SqliteAccountQuotaEventStore {
         use odf::metadata::AsStackString;
 
         let account_id = query.account_id.as_stack_string().to_string();
-        let quota_type = Self::quota_type_to_db(query.quota_type);
+        let quota_type = Self::quota_type_to_db(&query.quota_type);
         let account_id_str = account_id.as_str();
         let quota_type_str = quota_type.as_str();
 
@@ -141,7 +141,7 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
             use odf::metadata::AsStackString;
 
             let account_id = query.account_id.as_stack_string().to_string();
-            let quota_type = Self::quota_type_to_db(query.quota_type);
+            let quota_type = Self::quota_type_to_db(&query.quota_type);
             let from = opts.from.map(EventID::into_inner).unwrap_or(i64::MIN);
             let to = opts.to.map(EventID::into_inner).unwrap_or(i64::MAX);
             let account_id_str = account_id.as_str();
@@ -202,7 +202,7 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
         use odf::metadata::AsStackString;
 
         let account_id = query.account_id.as_stack_string().to_string();
-        let quota_type = Self::quota_type_to_db(query.quota_type);
+        let quota_type = Self::quota_type_to_db(&query.quota_type);
         let account_id_str = account_id.as_str();
         let quota_type_str = quota_type.as_str();
         let mut last_event_id = None;

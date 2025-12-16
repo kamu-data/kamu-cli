@@ -46,14 +46,14 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
     ) -> Result<(), SetAccountQuotaError> {
         let query = AccountQuotaQuery {
             account_id: account_id.clone(),
-            quota_type: QuotaType::Space,
+            quota_type: QuotaType::storage_space(),
         };
 
         let now = self.time_source.now();
 
         let maybe_current = self
             .account_quota_store
-            .get_quota_by_account_id(account_id, QuotaType::Space)
+            .get_quota_by_account_id(account_id, QuotaType::storage_space())
             .await;
 
         let prev_event_id = self
@@ -72,7 +72,7 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
                 event_time: now,
                 quota_id: quota.id,
                 account_id: account_id.clone(),
-                quota_type: QuotaType::Space,
+                quota_type: QuotaType::storage_space(),
                 quota_payload: payload,
             }),
             Err(GetAccountQuotaError::NotFound(_)) => {
@@ -80,7 +80,7 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
                     event_time: now,
                     quota_id: Uuid::new_v4(),
                     account_id: account_id.clone(),
-                    quota_type: QuotaType::Space,
+                    quota_type: QuotaType::storage_space(),
                     quota_payload: payload,
                 })
             }
@@ -99,7 +99,7 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
         account_id: &odf::AccountID,
     ) -> Result<kamu_accounts::AccountQuota, GetAccountQuotaError> {
         self.account_quota_store
-            .get_quota_by_account_id(account_id, QuotaType::Space)
+            .get_quota_by_account_id(account_id, QuotaType::storage_space())
             .await
     }
 }

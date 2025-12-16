@@ -8,15 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::{
+    Aggregate,
     ConcurrentModificationError,
     EventID,
     EventStore,
-    GetEventsError,
-    GetEventsOpts,
-    Projection,
     SaveEventsError,
 };
-use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
@@ -30,24 +27,33 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
         &self,
         query: &AccountQuotaQuery,
     ) -> Result<AccountQuota, GetAccountQuotaError> {
-        let mut stream = self.get_events(query, GetEventsOpts::default());
-        let mut state: Option<AccountQuotaState> = None;
+        let aggregate = Aggregate::<AccountQuotaState, Self>::load(query, self).await;
 
-        while let Some(next_event) = stream.try_next().await.map_err(map_get_events_error)? {
-            let (_, event) = next_event;
-            state = Some(AccountQuotaState::apply(state, event).map_err(InternalError::new)?);
+        match aggregate {
+            Ok(agg) => {
+                let quota = agg.into_state().quota;
+                if quota.active {
+                    Ok(quota)
+                } else {
+                    Err(GetAccountQuotaError::NotFound(AccountQuotaNotFoundError {
+                        account_id: query.account_id.clone(),
+                        quota_type: query.quota_type.clone(),
+                    }))
+                }
+            }
+            Err(event_sourcing::LoadError::NotFound(_)) => {
+                Err(GetAccountQuotaError::NotFound(AccountQuotaNotFoundError {
+                    account_id: query.account_id.clone(),
+                    quota_type: query.quota_type.clone(),
+                }))
+            }
+            Err(event_sourcing::LoadError::ProjectionError(err)) => {
+                Err(GetAccountQuotaError::Internal(err.int_err()))
+            }
+            Err(event_sourcing::LoadError::Internal(err)) => {
+                Err(GetAccountQuotaError::Internal(err))
+            }
         }
-
-        if let Some(projection) = state
-            && let Some(quota) = projection.quota
-        {
-            return Ok(quota);
-        }
-
-        Err(GetAccountQuotaError::NotFound(AccountQuotaNotFoundError {
-            account_id: query.account_id.clone(),
-            quota_type: query.quota_type,
-        }))
     }
 
     async fn get_quota_by_account_id(
@@ -73,15 +79,16 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
         &self,
         query: &AccountQuotaQuery,
     ) -> Result<Option<EventID>, GetAccountQuotaError> {
-        let mut stream = self.get_events(query, GetEventsOpts::default());
-        let mut last_event_id: Option<EventID> = None;
-
-        while let Some(next_event) = stream.try_next().await.map_err(map_get_events_error)? {
-            let (event_id, _) = next_event;
-            last_event_id = Some(event_id);
+        match Aggregate::<AccountQuotaState, Self>::try_load(query, self).await {
+            Ok(Some(agg)) => Ok(agg.last_stored_event_id()),
+            Ok(None) => Ok(None),
+            Err(event_sourcing::TryLoadError::ProjectionError(err)) => {
+                Err(GetAccountQuotaError::Internal(err.int_err()))
+            }
+            Err(event_sourcing::TryLoadError::Internal(err)) => {
+                Err(GetAccountQuotaError::Internal(err))
+            }
         }
-
-        Ok(last_event_id)
     }
 }
 
@@ -127,13 +134,3 @@ impl From<SaveEventsError> for SaveAccountQuotaError {
         }
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_get_events_error(e: GetEventsError) -> GetAccountQuotaError {
-    match e {
-        GetEventsError::Internal(err) => GetAccountQuotaError::Internal(err),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

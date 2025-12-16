@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountQuotaChecker, AccountQuotaStorageChecker, AccountService};
+use kamu_accounts::{AccountQuotaChecker, AccountQuotaStorageChecker, CurrentAccountSubject};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -33,7 +33,6 @@ pub struct PushIngestExecutorImpl {
     data_format_registry: Arc<dyn DataFormatRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
-    account_service: Arc<dyn AccountService>,
     account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
 }
 
@@ -43,21 +42,15 @@ pub struct PushIngestExecutorImpl {
 impl AccountQuotaChecker for PushIngestExecutorImpl {
     async fn ensure_quota(
         &self,
-        dataset_handle: &odf::DatasetHandle,
-        incoming_bytes: u64,
+        incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaExceededError> {
-        let Some(account_name) = dataset_handle.alias.account_name.as_ref() else {
-            return Ok(());
-        };
-
-        let account = self
-            .account_service
-            .get_account_by_name(account_name)
-            .await
+        let account_id = CurrentAccountSubject::get_maybe()
+            .and_then(|s| s.get_maybe_logged_account_id().cloned())
+            .ok_or_else(|| InternalError::new("Cannot resolve current account for quota check"))
             .int_err()?;
 
         self.account_quota_storage_checker
-            .ensure_within_quota(&account.id, incoming_bytes)
+            .ensure_within_quota(&account_id, incoming_size)
             .await?;
 
         Ok(())

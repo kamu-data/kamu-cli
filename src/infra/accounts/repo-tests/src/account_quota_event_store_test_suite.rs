@@ -37,13 +37,13 @@ pub async fn test_quota_added_and_fetched(catalog: &Catalog) {
         event_time,
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(10),
     });
 
     let query = AccountQuotaQuery {
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
     };
 
     assert_matches!(
@@ -52,7 +52,7 @@ pub async fn test_quota_added_and_fetched(catalog: &Catalog) {
     );
 
     let quota = store
-        .get_quota_by_account_id(&account_id, QuotaType::Space)
+        .get_quota_by_account_id(&account_id, QuotaType::storage_space())
         .await
         .unwrap();
 
@@ -71,14 +71,14 @@ pub async fn test_quota_modified(catalog: &Catalog) {
 
     let query = AccountQuotaQuery {
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
     };
 
     let added = AccountQuotaEvent::AccountQuotaAdded(AccountQuotaAdded {
         event_time,
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(5),
     });
 
@@ -91,7 +91,7 @@ pub async fn test_quota_modified(catalog: &Catalog) {
         event_time: event_time + chrono::Duration::seconds(1),
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(20),
     });
 
@@ -101,7 +101,7 @@ pub async fn test_quota_modified(catalog: &Catalog) {
         .unwrap();
 
     let quota = store
-        .get_quota_by_account_id(&account_id, QuotaType::Space)
+        .get_quota_by_account_id(&account_id, QuotaType::storage_space())
         .await
         .unwrap();
 
@@ -119,14 +119,14 @@ pub async fn test_quota_removed(catalog: &Catalog) {
 
     let query = AccountQuotaQuery {
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
     };
 
     let added = AccountQuotaEvent::AccountQuotaAdded(AccountQuotaAdded {
         event_time,
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(15),
     });
 
@@ -139,7 +139,7 @@ pub async fn test_quota_removed(catalog: &Catalog) {
         event_time: event_time + chrono::Duration::seconds(1),
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
     });
 
     store
@@ -149,7 +149,7 @@ pub async fn test_quota_removed(catalog: &Catalog) {
 
     assert_matches!(
         store
-            .get_quota_by_account_id(&account_id, QuotaType::Space)
+            .get_quota_by_account_id(&account_id, QuotaType::storage_space())
             .await,
         Err(kamu_accounts::GetAccountQuotaError::NotFound(_))
     );
@@ -166,14 +166,14 @@ pub async fn test_concurrent_modification_rejected(catalog: &Catalog) {
 
     let query = AccountQuotaQuery {
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
     };
 
     let added = AccountQuotaEvent::AccountQuotaAdded(AccountQuotaAdded {
         event_time,
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(30),
     });
 
@@ -186,7 +186,7 @@ pub async fn test_concurrent_modification_rejected(catalog: &Catalog) {
         event_time: event_time + chrono::Duration::seconds(1),
         quota_id,
         account_id: account_id.clone(),
-        quota_type: QuotaType::Space,
+        quota_type: QuotaType::storage_space(),
         quota_payload: super::quota_payload(35),
     });
 

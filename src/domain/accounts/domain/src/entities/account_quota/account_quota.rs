@@ -15,17 +15,47 @@ use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum QuotaType {
-    Space,
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct QuotaType(String);
+
+impl QuotaType {
+    pub const STORAGE_SPACE: &'static str = "dev.kamu.quota.storage.space";
+
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn storage_space() -> Self {
+        Self::new(Self::STORAGE_SPACE)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
 impl Display for QuotaType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            QuotaType::Space => write!(f, "SPACE"),
-        }
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for QuotaType {
+    fn from(value: &str) -> Self {
+        QuotaType::new(value)
+    }
+}
+
+impl From<String> for QuotaType {
+    fn from(value: String) -> Self {
+        QuotaType::new(value)
+    }
+}
+
+impl AsRef<str> for QuotaType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -53,6 +83,7 @@ pub struct AccountQuota {
     pub account_id: odf::AccountID,
     pub quota_type: QuotaType,
     pub quota_payload: AccountQuotaPayload,
+    pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -85,68 +116,6 @@ pub enum AccountQuotaEvent {
 impl event_sourcing::ProjectionEvent<AccountQuotaQuery> for AccountQuotaEvent {
     fn matches_query(&self, query: &AccountQuotaQuery) -> bool {
         self.account_id() == query.account_id && self.quota_type() == query.quota_type
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct AccountQuotaState {
-    pub quota: Option<AccountQuota>,
-}
-
-#[async_trait::async_trait]
-impl event_sourcing::Projection for AccountQuotaState {
-    type Query = AccountQuotaQuery;
-    type Event = AccountQuotaEvent;
-
-    fn apply(
-        state: Option<Self>,
-        event: Self::Event,
-    ) -> Result<Self, event_sourcing::ProjectionError<Self>> {
-        let mut state = state.unwrap_or_default();
-
-        match event {
-            AccountQuotaEvent::AccountQuotaAdded(e) => {
-                if state.quota.is_some() {
-                    return Err(event_sourcing::ProjectionError::new(
-                        Some(state.clone()),
-                        AccountQuotaEvent::AccountQuotaAdded(e),
-                    ));
-                }
-
-                state.quota = Some(AccountQuota {
-                    id: e.quota_id,
-                    account_id: e.account_id,
-                    quota_type: e.quota_type,
-                    quota_payload: e.quota_payload,
-                    created_at: e.event_time,
-                    updated_at: e.event_time,
-                });
-            }
-            AccountQuotaEvent::AccountQuotaModified(e) => {
-                if let Some(quota) = &mut state.quota {
-                    if quota.id != e.quota_id {
-                        return Err(event_sourcing::ProjectionError::new(
-                            Some(state.clone()),
-                            AccountQuotaEvent::AccountQuotaModified(e),
-                        ));
-                    }
-                    quota.quota_payload = e.quota_payload;
-                    quota.updated_at = e.event_time;
-                } else {
-                    return Err(event_sourcing::ProjectionError::new(
-                        None,
-                        AccountQuotaEvent::AccountQuotaModified(e),
-                    ));
-                }
-            }
-            AccountQuotaEvent::AccountQuotaRemoved(_) => {
-                state.quota = None;
-            }
-        }
-
-        Ok(state)
     }
 }
 
@@ -197,9 +166,9 @@ impl AccountQuotaEvent {
 
     pub fn quota_type(&self) -> QuotaType {
         match self {
-            AccountQuotaEvent::AccountQuotaAdded(e) => e.quota_type,
-            AccountQuotaEvent::AccountQuotaModified(e) => e.quota_type,
-            AccountQuotaEvent::AccountQuotaRemoved(e) => e.quota_type,
+            AccountQuotaEvent::AccountQuotaAdded(e) => e.quota_type.clone(),
+            AccountQuotaEvent::AccountQuotaModified(e) => e.quota_type.clone(),
+            AccountQuotaEvent::AccountQuotaRemoved(e) => e.quota_type.clone(),
         }
     }
 

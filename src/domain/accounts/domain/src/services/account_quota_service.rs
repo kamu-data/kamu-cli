@@ -62,8 +62,7 @@ pub trait AccountQuotaStorageChecker: Sync + Send {
 pub trait AccountQuotaChecker: Sync + Send {
     async fn ensure_quota(
         &self,
-        dataset_handle: &odf::DatasetHandle,
-        incoming_bytes: u64,
+        incoming_size: u64,
     ) -> Result<(), QuotaExceededError>;
 }
 

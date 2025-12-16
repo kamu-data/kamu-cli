@@ -43,7 +43,7 @@ impl AccountQuotaStorageChecker for QuotaCheckerStorageImpl {
     ) -> Result<(), QuotaExceededError> {
         let quota = match self
             .quota_store
-            .get_quota_by_account_id(account_id, QuotaType::Space)
+            .get_quota_by_account_id(account_id, QuotaType::storage_space())
             .await
         {
             Ok(quota) => quota,

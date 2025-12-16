@@ -28,7 +28,7 @@ pub struct PostgresAccountQuotaEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PostgresAccountQuotaEventStore {
-    fn quota_type_to_db(quota_type: QuotaType) -> String {
+    fn quota_type_to_db(quota_type: &QuotaType) -> String {
         quota_type.to_string()
     }
 
@@ -74,7 +74,7 @@ impl PostgresAccountQuotaEventStore {
             LIMIT 1
             "#,
             account_id.as_str(),
-            Self::quota_type_to_db(query.quota_type),
+            Self::quota_type_to_db(&query.quota_type),
         )
         .fetch_optional(connection)
         .await
@@ -154,7 +154,7 @@ impl EventStore<AccountQuotaState> for PostgresAccountQuotaEventStore {
                 ORDER BY id
                 "#,
                 account_id.as_str(),
-                Self::quota_type_to_db(query.quota_type),
+                Self::quota_type_to_db(&query.quota_type),
                 opts.from.map(EventID::into_inner),
                 opts.to.map(EventID::into_inner),
             )
@@ -192,7 +192,7 @@ impl EventStore<AccountQuotaState> for PostgresAccountQuotaEventStore {
         use odf::metadata::AsStackString;
 
         let account_id = query.account_id.as_stack_string();
-        let quota_type = Self::quota_type_to_db(query.quota_type);
+        let quota_type = Self::quota_type_to_db(&query.quota_type);
         let mut last_event_id = None;
 
         for event in events {
