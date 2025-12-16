@@ -3741,10 +3741,25 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
+input MoleculeSearchTypeInput @oneOf {
+	onlyFiles: MoleculeSearchTypeInputInner
+	onlyAnnouncements: MoleculeSearchTypeInputInner
+	filesAndAnnouncements: MoleculeSearchTypeInputInner
+}
+
+input MoleculeSearchTypeInputInner {
+	"""
+	Not required to be filled out and is only needed for the declaration.
+	"""
+	dummy: String
+}
+
 input MoleculeSemanticSearchFilters {
 	byIpnftUids: [String!]
-	byCategories: [String!]
 	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byType: MoleculeSearchTypeInput
 }
 
 type MoleculeSemanticSearchFoundAnnouncement {
