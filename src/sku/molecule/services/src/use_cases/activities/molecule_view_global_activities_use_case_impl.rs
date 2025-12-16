@@ -40,7 +40,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         {
             Ok(reader) => Ok(reader),
 
-            // No activities dataset yet is fine, just return empty listing
+            // No activities dataset yet is fine, just return an empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
                 return Ok(MoleculeGlobalActivityListing::default());
             }
@@ -61,9 +61,9 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             return Ok(MoleculeGlobalActivityListing::default());
         };
 
-        // Apply filters, if presnet
+        // Apply filters, if present
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
         });
 
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
@@ -127,7 +127,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         };
 
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+            utils::molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
         });
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
