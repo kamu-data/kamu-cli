@@ -58,9 +58,10 @@ impl MoleculeSearchUseCaseImpl {
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
         }?;
 
-        // Load raw ledger DF
+        // NOTE: We present the dataset as a projection so that
+        //       we only have actual data for all data rooms.
         let maybe_df = data_room_activities_reader
-            .raw_ledger_data_frame()
+            .changelog_projection_data_frame_by("path")
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>)?;
 
