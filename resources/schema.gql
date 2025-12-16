@@ -3741,17 +3741,10 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
-input MoleculeSearchTypeInput @oneOf {
-	onlyFiles: MoleculeSearchTypeInputInner
-	onlyAnnouncements: MoleculeSearchTypeInputInner
-	filesAndAnnouncements: MoleculeSearchTypeInputInner
-}
-
-input MoleculeSearchTypeInputInner {
-	"""
-	Not required to be filled out and is only needed for the declaration.
-	"""
-	dummy: String
+enum MoleculeSearchTypeInput {
+	ONLY_FILES
+	ONLY_ANNOUNCEMENTS
+	FILES_AND_ANNOUNCEMENTS
 }
 
 input MoleculeSemanticSearchFilters {

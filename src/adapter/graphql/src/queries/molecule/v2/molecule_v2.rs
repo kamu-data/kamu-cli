@@ -72,7 +72,7 @@ impl MoleculeV2 {
         molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
     ) -> Result<HashMap<String, Arc<MoleculeProjectV2>>, GqlError> {
         let listing = molecule_view_projects_uc
-            .execute(&molecule_subject, None)
+            .execute(molecule_subject, None)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeViewProjectsError as E;
@@ -368,17 +368,11 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
     }
 }
 
-#[derive(OneofObject, Debug)]
+#[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MoleculeSearchTypeInput {
-    OnlyFiles(MoleculeSearchTypeInputInner),
-    OnlyAnnouncements(MoleculeSearchTypeInputInner),
-    FilesAndAnnouncements(MoleculeSearchTypeInputInner),
-}
-
-#[derive(InputObject, Debug)]
-pub struct MoleculeSearchTypeInputInner {
-    /// Not required to be filled out and is only needed for the declaration.
-    _dummy: Option<String>,
+    OnlyFiles,
+    OnlyAnnouncements,
+    FilesAndAnnouncements,
 }
 
 impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType {
@@ -387,9 +381,9 @@ impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType 
         use kamu_molecule_domain::MoleculeSearchType as Domain;
 
         match value {
-            Gql::OnlyFiles(..) => Domain::OnlyDataRoomActivities,
-            Gql::OnlyAnnouncements(..) => Domain::OnlyAnnouncements,
-            Gql::FilesAndAnnouncements(..) => Domain::DataRoomActivitiesAndAnnouncements,
+            Gql::OnlyFiles => Domain::OnlyDataRoomActivities,
+            Gql::OnlyAnnouncements => Domain::OnlyAnnouncements,
+            Gql::FilesAndAnnouncements => Domain::DataRoomActivitiesAndAnnouncements,
         }
     }
 }
