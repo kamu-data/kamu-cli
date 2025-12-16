@@ -9,10 +9,10 @@
 
 mod molecule_announcements_service;
 mod molecule_data_room_collection_service;
-mod molecule_global_activities_service;
+mod molecule_global_data_room_activities_service;
 mod molecule_projects_service;
 
 pub use molecule_announcements_service::*;
 pub use molecule_data_room_collection_service::*;
-pub use molecule_global_activities_service::*;
+pub use molecule_global_data_room_activities_service::*;
 pub use molecule_projects_service::*;

@@ -14,7 +14,7 @@ use crate::{MoleculeDatasetReader, MoleculeDatasetWriter};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeGlobalActivitiesService: Send + Sync {
+pub trait MoleculeGlobalDataRoomActivitiesService: Send + Sync {
     async fn reader(
         &self,
         molecule_account_name: &odf::AccountName,

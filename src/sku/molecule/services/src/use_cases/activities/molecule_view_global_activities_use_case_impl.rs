@@ -15,14 +15,14 @@ use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
-use crate::{MoleculeAnnouncementsService, MoleculeGlobalActivitiesService};
+use crate::{MoleculeAnnouncementsService, MoleculeGlobalDataRoomActivitiesService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
 pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
-    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
@@ -33,8 +33,8 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         // Get read access to global activities dataset
-        let activities_reader = match self
-            .global_activities_service
+        let data_room_activities_reader = match self
+            .global_data_room_activities_service
             .reader(&molecule_subject.account_name)
             .await
         {
@@ -51,7 +51,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         }?;
 
         // Load raw ledger DF
-        let maybe_df = activities_reader
+        let maybe_df = data_room_activities_reader
             .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
