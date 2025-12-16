@@ -13,6 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     MoleculeDataRoomEntry,
+    MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewProjectsUseCase,
     molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
@@ -33,12 +34,16 @@ pub(crate) fn index_data_room_entry_from_entity(
     entry: &MoleculeDataRoomEntry,
 ) -> serde_json::Value {
     serde_json::json!({
-        data_room_entry_schema::FIELD_CREATED_AT: entry.system_time,
-        data_room_entry_schema::FIELD_UPDATED_AT: entry.system_time,
+        data_room_entry_schema::FIELD_EVENT_TIME: entry.event_time,
+        data_room_entry_schema::FIELD_SYSTEM_TIME: entry.system_time,
         data_room_entry_schema::FIELD_IPNFT_UID: ipnft_uid,
-        data_room_entry_schema::FIELD_REFERENCE: entry.reference,
+        data_room_entry_schema::FIELD_REF: entry.reference,
         data_room_entry_schema::FIELD_PATH: entry.path,
+        data_room_entry_schema::FIELD_DEPTH: entry.path.depth(),
         data_room_entry_schema::FIELD_VERSION: entry.denormalized_latest_file_info.version,
+        data_room_entry_schema::FIELD_CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
+        data_room_entry_schema::FIELD_CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
+        data_room_entry_schema::FIELD_CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
         data_room_entry_schema::FIELD_ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
         data_room_entry_schema::FIELD_CHANGE_BY: entry.denormalized_latest_file_info.change_by,
         data_room_entry_schema::FIELD_DESCRIPTION: entry.denormalized_latest_file_info.description,
@@ -94,7 +99,7 @@ pub(crate) async fn index_data_room_entries(
                 let result = view_uc
                     .execute(
                         &project_clone,
-                        None, /* latest */
+                        MoleculeViewDataRoomEntriesMode::LatestFromCollection,
                         None, /* all prefixes */
                         None, /* any depth */
                         None, /* no filters */

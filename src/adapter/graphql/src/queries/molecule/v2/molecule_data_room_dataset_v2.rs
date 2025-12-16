@@ -18,6 +18,7 @@ use kamu_molecule_domain::{
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
     MoleculeViewDataRoomEntriesError,
+    MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
 };
 
@@ -90,6 +91,7 @@ impl MoleculeDataRoomProjection<'_> {
         per_page: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
     ) -> Result<MoleculeDataRoomEntryConnection> {
+        // TODO: enforce max per_page limit
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
         let page = page.unwrap_or(0);
 
@@ -99,7 +101,10 @@ impl MoleculeDataRoomProjection<'_> {
         let molecule_entries_listing = view_data_room_entries_uc
             .execute(
                 &self.project.entity,
-                self.as_of.clone(),
+                match self.as_of {
+                    Some(ref hash) => MoleculeViewDataRoomEntriesMode::AsOf(hash.clone()),
+                    None => MoleculeViewDataRoomEntriesMode::Latest,
+                },
                 path_prefix.map(Into::into),
                 max_depth,
                 filters.map(Into::into),

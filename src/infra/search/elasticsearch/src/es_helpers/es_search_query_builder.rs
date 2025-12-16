@@ -75,10 +75,71 @@ impl ElasticSearchQueryBuilder {
                         }
                     })
                 }
+
+                FullTextSearchFilterOp::Ne(value) => {
+                    serde_json::json!({
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    *field: value
+                                }
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Lt(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "lt": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Lte(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "lte": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Gt(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "gt": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Gte(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "gte": value
+                            }
+                        }
+                    })
+                }
+
                 FullTextSearchFilterOp::In(values) => {
                     serde_json::json!({
                         "terms": {
                             *field: values
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Prefix(prefix) => {
+                    serde_json::json!({
+                        "prefix": {
+                            *field: prefix
                         }
                     })
                 }

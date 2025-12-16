@@ -26,6 +26,7 @@ default = []
 
 
 [dependencies]
+database-common = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true }
 

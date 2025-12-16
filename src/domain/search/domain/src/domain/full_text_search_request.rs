@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
+
 use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const MAX_SEARCH_PAGE_SIZE: usize = 10000;
+pub const DEFAULT_SEARCH_PAGE_SIZE: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,10 +75,31 @@ pub struct FullTextPageSpec {
     pub offset: usize,
 }
 
+impl FullTextPageSpec {
+    pub fn max(offset: usize) -> Self {
+        Self {
+            limit: MAX_SEARCH_PAGE_SIZE,
+            offset,
+        }
+    }
+}
+
+impl From<Option<PaginationOpts>> for FullTextPageSpec {
+    fn from(pagination: Option<PaginationOpts>) -> Self {
+        match pagination {
+            Some(p) => Self {
+                limit: p.limit,
+                offset: p.offset,
+            },
+            None => Self::max(0),
+        }
+    }
+}
+
 impl Default for FullTextPageSpec {
     fn default() -> Self {
         Self {
-            limit: 10,
+            limit: DEFAULT_SEARCH_PAGE_SIZE,
             offset: 0,
         }
     }

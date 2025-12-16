@@ -10,9 +10,13 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::CollectionPath;
-use kamu_molecule_domain::*;
+use kamu_molecule_domain::{
+    molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
+    *,
+};
+use kamu_search::*;
 
 use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionService};
 
@@ -21,27 +25,15 @@ use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionServi
 #[dill::component]
 #[dill::interface(dyn MoleculeViewDataRoomEntriesUseCase)]
 pub struct MoleculeViewDataRoomEntriesUseCaseImpl {
+    catalog: dill::Catalog,
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
+    full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseImpl {
-    #[tracing::instrument(
-        level = "debug",
-        name = MoleculeViewDataRoomEntriesUseCaseImpl_execute,
-        skip_all,
-        fields(
-            ipnft_uid = %molecule_project.ipnft_uid,
-            as_of = ?as_of,
-            path_prefix = ?path_prefix,
-            max_depth = ?max_depth,
-            pagination = ?pagination
-        )
-    )]
-    async fn execute(
+impl MoleculeViewDataRoomEntriesUseCaseImpl {
+    async fn list_entries_via_collection(
         &self,
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
@@ -79,6 +71,185 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
             total_count: entries_listing.total_count,
             list: molecule_entries,
         })
+    }
+
+    async fn list_latest_entries_via_search(
+        &self,
+        molecule_project: &MoleculeProject,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
+        let ctx = FullTextSearchContext {
+            catalog: &self.catalog,
+        };
+
+        let filter = Self::prepare_full_text_search_filter(
+            &molecule_project.ipnft_uid,
+            path_prefix.as_ref(),
+            max_depth,
+            filters.as_ref(),
+        );
+
+        let search_results = self
+            .full_text_search_service
+            .search(
+                ctx,
+                FullTextSearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas: vec![data_room_entry_schema::SCHEMA_NAME],
+                    source: FullTextSearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: sort!(data_room_entry_schema::FIELD_PATH),
+                    page: pagination.into(),
+                    options: FullTextSearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeDataRoomEntriesListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| MoleculeDataRoomEntry::from_payload_record_json(hit.source))
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
+
+    fn prepare_full_text_search_filter(
+        ipnft_uid: &str,
+        path_prefix: Option<&CollectionPath>,
+        max_depth: Option<usize>,
+        filters: Option<&MoleculeDataRoomEntriesFilters>,
+    ) -> FullTextSearchFilterExpr {
+        let mut and_clauses = vec![];
+
+        // ipnft_uid equality
+        and_clauses.push(field_eq_str(
+            data_room_entry_schema::FIELD_IPNFT_UID,
+            ipnft_uid,
+        ));
+
+        // path prefix
+        if let Some(path_prefix) = path_prefix {
+            and_clauses.push(field_prefix(
+                data_room_entry_schema::FIELD_PATH,
+                path_prefix.as_str(),
+            ));
+        }
+
+        // max depth
+        if let Some(max_depth) = max_depth {
+            and_clauses.push(field_lte_num(
+                data_room_entry_schema::FIELD_DEPTH,
+                i64::try_from(max_depth).unwrap(),
+            ));
+        }
+
+        // filters by categories, tags, access levels
+        if let Some(filters) = filters {
+            if let Some(by_access_levels) = filters.by_access_levels.as_ref()
+                && !by_access_levels.is_empty()
+            {
+                and_clauses.push(field_in_str(
+                    data_room_entry_schema::FIELD_ACCESS_LEVEL,
+                    &by_access_levels
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>(),
+                ));
+            }
+
+            if let Some(by_categories) = filters.by_categories.as_ref()
+                && !by_categories.is_empty()
+            {
+                and_clauses.push(field_in_str(
+                    data_room_entry_schema::FIELD_CATEGORIES,
+                    &by_categories.iter().map(String::as_str).collect::<Vec<_>>(),
+                ));
+            }
+
+            if let Some(by_tags) = filters.by_tags.as_ref()
+                && !by_tags.is_empty()
+            {
+                and_clauses.push(field_in_str(
+                    data_room_entry_schema::FIELD_TAGS,
+                    &by_tags.iter().map(String::as_str).collect::<Vec<_>>(),
+                ));
+            }
+        }
+
+        FullTextSearchFilterExpr::and_clauses(and_clauses)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseImpl {
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeViewDataRoomEntriesUseCaseImpl_execute,
+        skip_all,
+        fields(
+            ipnft_uid = %molecule_project.ipnft_uid,
+            mode = ?mode,
+            path_prefix = ?path_prefix,
+            max_depth = ?max_depth,
+            pagination = ?pagination
+        )
+    )]
+    async fn execute(
+        &self,
+        molecule_project: &MoleculeProject,
+        mode: MoleculeViewDataRoomEntriesMode,
+        path_prefix: Option<CollectionPath>,
+        max_depth: Option<usize>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
+        match mode {
+            // When historical view is requested, use slower collection-based method
+            MoleculeViewDataRoomEntriesMode::AsOf(as_of) => {
+                self.list_entries_via_collection(
+                    molecule_project,
+                    Some(as_of),
+                    path_prefix,
+                    max_depth,
+                    filters,
+                    pagination,
+                )
+                .await
+            }
+
+            // Latest snapshot, but it is requested to be read via collections explicitly
+            MoleculeViewDataRoomEntriesMode::LatestFromCollection => {
+                self.list_entries_via_collection(
+                    molecule_project,
+                    None,
+                    path_prefix,
+                    max_depth,
+                    filters,
+                    pagination,
+                )
+                .await
+            }
+
+            // As for the latest snapshot, use faster search-based method
+            MoleculeViewDataRoomEntriesMode::Latest => {
+                self.list_latest_entries_via_search(
+                    molecule_project,
+                    path_prefix,
+                    max_depth,
+                    filters,
+                    pagination,
+                )
+                .await
+            }
+        }
     }
 }
 

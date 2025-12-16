@@ -21,14 +21,19 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+// Note: key names should match MoleculeDataRoomEntry fields
+pub const FIELD_EVENT_TIME: &str = "event_time";
+pub const FIELD_SYSTEM_TIME: &str = "system_time";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
-pub const FIELD_REFERENCE: &str = "reference";
+pub const FIELD_REF: &str = "ref";
 pub const FIELD_PATH: &str = "path";
+pub const FIELD_DEPTH: &str = "depth";
 pub const FIELD_VERSION: &str = "version";
-pub const FIELD_ACCESS_LEVEL: &str = "access_level";
-pub const FIELD_CHANGE_BY: &str = "change_by";
+pub const FIELD_CONTENT_TYPE: &str = "content_type";
+pub const FIELD_CONTENT_HASH: &str = "content_hash";
+pub const FIELD_CONTENT_LENGTH: &str = "content_length";
+pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
+pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
 pub const FIELD_DESCRIPTION: &str = "description";
 pub const FIELD_CATEGORIES: &str = "categories";
 pub const FIELD_TAGS: &str = "tags";
@@ -37,11 +42,11 @@ pub const FIELD_TAGS: &str = "tags";
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
-        path: FIELD_CREATED_AT,
+        path: FIELD_EVENT_TIME,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: FIELD_SYSTEM_TIME,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
@@ -49,7 +54,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
-        path: FIELD_REFERENCE,
+        path: FIELD_REF,
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
@@ -61,8 +66,24 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
         },
     },
     FullTextSchemaField {
+        path: FIELD_DEPTH,
+        role: FullTextSchemaFieldRole::Integer,
+    },
+    FullTextSchemaField {
         path: FIELD_VERSION,
         role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_TYPE,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_HASH,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_LENGTH,
+        role: FullTextSchemaFieldRole::Integer,
     },
     FullTextSchemaField {
         path: FIELD_ACCESS_LEVEL,

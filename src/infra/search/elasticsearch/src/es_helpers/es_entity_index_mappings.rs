@@ -156,6 +156,10 @@ impl ElasticSearchIndexMappings {
                     "type": "boolean"
                 }),
 
+                FullTextSchemaFieldRole::Integer => serde_json::json!({
+                    "type": "integer"
+                }),
+
                 FullTextSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
                     "enabled": false

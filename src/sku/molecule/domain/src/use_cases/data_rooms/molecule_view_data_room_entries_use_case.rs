@@ -20,12 +20,21 @@ pub trait MoleculeViewDataRoomEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
-        as_of: Option<odf::Multihash>,
+        mode: MoleculeViewDataRoomEntriesMode,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum MoleculeViewDataRoomEntriesMode {
+    Latest,
+    LatestFromCollection,
+    AsOf(odf::Multihash),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -50,7 +50,7 @@ impl MoleculeDataRoomEntry {
         }
     }
 
-    pub fn from_json(
+    pub fn from_changelog_entry_json(
         mut value: serde_json::Value,
         vocab: &odf::metadata::DatasetVocabulary,
     ) -> Result<(u64, odf::metadata::OperationType, Self), InternalError> {
@@ -71,6 +71,13 @@ impl MoleculeDataRoomEntry {
         let data_room_entry = Self::from_collection_entry(collection_entity);
 
         Ok((offset, op, data_room_entry))
+    }
+
+    pub fn from_payload_record_json(value: serde_json::Value) -> Result<Self, InternalError> {
+        let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
+        let data_room_entry = Self::from_collection_entry(collection_entity);
+
+        Ok(data_room_entry)
     }
 }
 
