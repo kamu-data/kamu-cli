@@ -46,11 +46,16 @@ impl DatasetSnapshots {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
                 schema: Some(
-                    ["op INT", "path STRING", "ref STRING"]
-                        .into_iter()
-                        .map(str::to_string)
-                        .chain(extra_columns_ddl)
-                        .collect(),
+                    [
+                        "op INT",
+                        "event_time TIMESTAMP",
+                        "path STRING",
+                        "ref STRING",
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                    .chain(extra_columns_ddl)
+                    .collect(),
                 ),
                 ..Default::default()
             }),
@@ -114,6 +119,7 @@ impl DatasetSnapshots {
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
                 schema: Some(
                     [
+                        "event_time TIMESTAMP",
                         "version INT",
                         "content_hash STRING",
                         "content_length BIGINT",
