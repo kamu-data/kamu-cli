@@ -320,6 +320,7 @@ impl MoleculeDatasetSnapshots {
                         schema: Some(
                             [
                                 "op INT NOT NULL",
+                                "event_time TIMESTAMP",
                                 "ipnft_uid STRING NOT NULL",
                                 "announcement_id STRING NOT NULL",
                                 "headline STRING NOT NULL",
