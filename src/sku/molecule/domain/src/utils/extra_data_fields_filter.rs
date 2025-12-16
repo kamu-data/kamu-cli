@@ -11,7 +11,7 @@ use nonempty::NonEmpty;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn molecule_extra_data_fields_filter(
+pub fn molecule_fields_filter(
     by_ipnft_uids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,

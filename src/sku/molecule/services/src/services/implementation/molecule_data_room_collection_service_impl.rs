@@ -153,7 +153,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 path_prefix,
                 max_depth,
                 filters.and_then(|f| {
-                    utils::molecule_extra_data_fields_filter(
+                    utils::molecule_fields_filter(
                         None,
                         f.by_tags,
                         f.by_categories,
