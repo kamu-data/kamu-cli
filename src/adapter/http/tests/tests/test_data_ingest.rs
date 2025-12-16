@@ -24,7 +24,7 @@ use crate::harness::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
+// #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_handler() {
     let harness = DataIngestHarness::new().await;
@@ -43,6 +43,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .json(&json!(
                         [
                             {
@@ -140,6 +141,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .json(&json!(
                         [
                             {
@@ -160,6 +162,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .query(&[("sourceName", "source2")])
                     .json(&json!(
                         [
@@ -207,6 +210,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .query(&[("sourceName", "source3")])
                     .json(&json!(
                         [
@@ -228,6 +232,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
                     .query(&[("sourceName", "source1")])
                     .header("Content-Type", "text/csv")
                     .body("2020-01-04T00:00:00,D,400")
