@@ -246,7 +246,6 @@ impl PushIngestDataUseCaseHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::with_defaults())
             .add::<QuotaCheckerStorageImpl>()
-            .add::<QuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();

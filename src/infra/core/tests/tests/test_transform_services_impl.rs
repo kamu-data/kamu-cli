@@ -80,7 +80,6 @@ impl TransformTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::with_defaults())
             .add::<QuotaCheckerStorageImpl>()
-            .add::<QuotaCheckerStorageImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())

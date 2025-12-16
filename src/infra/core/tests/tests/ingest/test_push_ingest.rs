@@ -1264,7 +1264,6 @@ impl IngestTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::with_defaults())
             .add::<QuotaCheckerStorageImpl>()
-            .add::<QuotaCheckerStorageImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())

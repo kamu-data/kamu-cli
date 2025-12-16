@@ -27,11 +27,6 @@ use kamu::{
 };
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
-use kamu_datasets_services::{
-    DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
-    UpdateVersionedFileUseCaseImpl,
-};
 use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{
     ContentArgs,
@@ -42,6 +37,11 @@ use kamu_datasets::{
     WriteCheckedDataset,
 };
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    DatasetStatisticsServiceImpl,
+    QuotaCheckerStorageImpl,
+    UpdateVersionedFileUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};
