@@ -49,6 +49,8 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeFindProjectAnnouncementUseCaseImpl>();
     b.add::<MoleculeViewProjectAnnouncementsUseCaseImpl>();
 
+    b.add::<MoleculeSearchUseCaseImpl>();
+
     register_message_dispatcher::<MoleculeProjectMessage>(
         b,
         MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,

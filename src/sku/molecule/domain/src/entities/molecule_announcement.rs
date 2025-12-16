@@ -12,7 +12,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MoleculeAnnouncement {
     /// System time when this announcement was created/updated
     pub system_time: DateTime<Utc>,
@@ -60,7 +60,7 @@ impl MoleculeAnnouncement {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MoleculeGlobalAnnouncement {
     pub ipnft_uid: String,
     pub announcement: MoleculeAnnouncement,

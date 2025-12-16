@@ -154,6 +154,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 max_depth,
                 filters.and_then(|f| {
                     utils::molecule_extra_data_fields_filter(
+                        None,
                         f.by_tags,
                         f.by_categories,
                         f.by_access_levels,

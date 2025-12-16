@@ -7,16 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod activities;
-mod announcements;
-mod data_rooms;
-mod projects;
-mod search;
-mod versioned_files;
+mod molecule_search_use_case_impl;
 
-pub use activities::*;
-pub use announcements::*;
-pub use data_rooms::*;
-pub use projects::*;
-pub use search::*;
-pub use versioned_files::*;
+pub use molecule_search_use_case_impl::*;

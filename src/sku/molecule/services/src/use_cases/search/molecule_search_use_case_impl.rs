@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
+use datafusion::logical_expr::{col, lit};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
@@ -20,18 +20,28 @@ use crate::{MoleculeAnnouncementsService, MoleculeGlobalActivitiesService};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
-pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
+#[dill::interface(dyn MoleculeSearchUseCase)]
+pub struct MoleculeSearchUseCaseImpl {
     global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
-impl MoleculeViewGlobalActivitiesUseCaseImpl {
+impl MoleculeSearchUseCaseImpl {
     async fn get_global_data_room_activities_listing(
         &self,
-        molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeActivitiesFilters>,
-    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
+    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
+        use MoleculeSearchResultType as Type;
+
+        match utils::get_search_result_type(filters.as_ref()) {
+            Type::OnlyDataRoomActivities | Type::DataRoomEntriesAndAnnouncements => {
+                /* continue */
+            }
+            Type::OnlyAnnouncements => return Ok(MoleculeSearchFoundItemsListing::default()),
+        }
+
         // Get read access to global activities dataset
         let activities_reader = match self
             .global_activities_service
@@ -42,29 +52,27 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
             // No activities dataset yet is fine, just return an empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeGlobalActivityListing::default());
+                return Ok(MoleculeSearchFoundItemsListing::default());
             }
 
-            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
-                MoleculeViewGlobalActivitiesError,
-            >(e)),
+            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
         }?;
 
         // Load raw ledger DF
         let maybe_df = activities_reader
             .raw_ledger_data_frame()
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>)?;
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeGlobalActivityListing::default());
+            return Ok(MoleculeSearchFoundItemsListing::default());
         };
 
-        // Apply filters, if present
+        // Filtering
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
             utils::molecule_extra_data_fields_filter(
-                None,
+                f.by_ipnft_uids,
                 f.by_tags,
                 f.by_categories,
                 f.by_access_levels,
@@ -80,6 +88,10 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         } else {
             df
         };
+
+        use datafusion::logical_expr::{col, lit};
+
+        let df = df.filter(col("description").ilike(lit(prompt))).int_err()?;
 
         // Sorting will be done after merge
         let records = df.collect_json_aos().await.int_err()?;
@@ -90,18 +102,26 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeDataRoomActivity::from_json(record)?;
-                Ok(MoleculeGlobalActivity::DataRoomActivity(entity))
+                Ok(MoleculeSearchFoundItem::DataRoomActivity(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeGlobalActivityListing { list, total_count })
+        Ok(MoleculeSearchFoundItemsListing { list, total_count })
     }
 
     async fn get_global_announcement_activities_listing(
         &self,
-        molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeActivitiesFilters>,
-    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
+    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
+        use MoleculeSearchResultType as Type;
+
+        match utils::get_search_result_type(filters.as_ref()) {
+            Type::OnlyAnnouncements | Type::DataRoomEntriesAndAnnouncements => { /* continue */ }
+            Type::OnlyDataRoomActivities => return Ok(MoleculeSearchFoundItemsListing::default()),
+        }
+
         // Get read access to global announcements dataset
         let announcements_reader = match self
             .announcements_service
@@ -112,33 +132,33 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
             // No announcements dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeGlobalActivityListing::default());
+                return Ok(MoleculeSearchFoundItemsListing::default());
             }
 
-            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
-                MoleculeViewGlobalActivitiesError,
-            >(e)),
+            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
         }?;
 
         // Load raw ledger DF
         let maybe_df = announcements_reader
             .raw_ledger_data_frame()
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>)?;
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeGlobalActivityListing::default());
+            return Ok(MoleculeSearchFoundItemsListing::default());
         };
 
+        // Filtering
         let maybe_extra_data_fields_filter = filters.and_then(|f| {
             utils::molecule_extra_data_fields_filter(
-                None,
+                f.by_ipnft_uids,
                 f.by_tags,
                 f.by_categories,
                 f.by_access_levels,
             )
         });
+
         let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
                 df,
@@ -149,6 +169,15 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             df
         };
 
+        let df = df
+            .filter(
+                col("headline")
+                    .ilike(lit(prompt))
+                    .or(col("body"))
+                    .ilike(lit(prompt)),
+            )
+            .int_err()?;
+
         // Sorting will be done after merge
         let records = df.collect_json_aos().await.int_err()?;
         let total_count = records.len();
@@ -157,11 +186,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeGlobalAnnouncement::from_json(record)?;
-                Ok(MoleculeGlobalActivity::Announcement(entity))
+                Ok(MoleculeSearchFoundItem::Announcement(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeGlobalActivityListing { list, total_count })
+        Ok(MoleculeSearchFoundItemsListing { list, total_count })
     }
 }
 
@@ -169,18 +198,23 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeViewGlobalActivitiesUseCase for MoleculeViewGlobalActivitiesUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeViewGlobalActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
+impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeSearchUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
-        molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeActivitiesFilters>,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
+    ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
-            self.get_global_data_room_activities_listing(molecule_subject, filters.clone()),
-            self.get_global_announcement_activities_listing(molecule_subject, filters),
-        )?;
+                self.get_global_data_room_activities_listing(
+                    molecule_subject,
+                    prompt,
+                    filters.clone(),
+                ),
+                self.get_global_announcement_activities_listing(molecule_subject, prompt, filters),
+            )?;
 
         // Get the total count before pagination
         let total_count =
@@ -204,7 +238,7 @@ impl MoleculeViewGlobalActivitiesUseCase for MoleculeViewGlobalActivitiesUseCase
             list.truncate(pagination.limit);
         }
 
-        Ok(MoleculeGlobalActivityListing { list, total_count })
+        Ok(MoleculeSearchFoundItemsListing { list, total_count })
     }
 }
 
