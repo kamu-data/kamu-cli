@@ -11,6 +11,8 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::MoleculeDataRoomEntry;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
@@ -21,9 +23,11 @@ pub enum MoleculeDataRoomFileActivityType {
     Removed,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug)]
-pub struct MoleculeDataRoomActivityEntity {
+pub struct MoleculeDataRoomActivity {
     pub system_time: DateTime<Utc>,
 
     pub event_time: DateTime<Utc>,
@@ -58,60 +62,58 @@ pub struct MoleculeDataRoomActivityEntity {
     pub tags: Vec<String>,
 }
 
-impl MoleculeDataRoomActivityEntity {
+impl MoleculeDataRoomActivity {
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
-        let r: MoleculeDataRoomActivityRecord = serde_json::from_value(record).int_err()?;
+        let r: MoleculeDataRoomActivityChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
             system_time: r.system_columns.system_time,
             event_time: r.system_columns.event_time,
-            activity_type: r.record.activity_type,
-            ipnft_uid: r.record.ipnft_uid,
-            path: r.record.path,
-            r#ref: r.record.r#ref,
-            version: r.record.version,
-            change_by: r.record.change_by,
-            access_level: r.record.access_level,
-            content_type: r.record.content_type,
-            content_length: r.record.content_length,
-            content_hash: r.record.content_hash,
-            description: r.record.description,
-            categories: r.record.categories,
-            tags: r.record.tags,
+            activity_type: r.payload.activity_type,
+            ipnft_uid: r.payload.ipnft_uid,
+            path: r.payload.path,
+            r#ref: r.payload.r#ref,
+            version: r.payload.version,
+            change_by: r.payload.change_by,
+            access_level: r.payload.access_level,
+            content_type: r.payload.content_type,
+            content_length: r.payload.content_length,
+            content_hash: r.payload.content_hash,
+            description: r.payload.description,
+            categories: r.payload.categories,
+            tags: r.payload.tags,
         })
     }
 
-    pub fn into_insert_record(self) -> MoleculeDataRoomActivityRecord {
-        MoleculeDataRoomActivityRecord {
-            system_columns: odf::serde::DatasetDefaultVocabularySystemColumns {
-                offset: None,
-                op: odf::metadata::OperationType::Append,
-                system_time: self.system_time,
-                event_time: self.event_time,
-            },
-            record: MoleculeDataRoomActivityDataRecord {
-                activity_type: self.activity_type,
-                ipnft_uid: self.ipnft_uid,
-                path: self.path,
-                r#ref: self.r#ref,
-                version: self.version,
-                change_by: self.change_by,
-                access_level: self.access_level,
-                content_type: self.content_type,
-                content_length: self.content_length,
-                content_hash: self.content_hash,
-                description: self.description,
-                categories: self.categories,
-                tags: self.tags,
-            },
+    pub fn from_data_room_operation(
+        activity_type: MoleculeDataRoomFileActivityType,
+        entry: MoleculeDataRoomEntry,
+        ipnft_uid: String,
+    ) -> Self {
+        Self {
+            system_time: entry.system_time,
+            event_time: entry.event_time,
+            activity_type,
+            ipnft_uid,
+            path: entry.path,
+            r#ref: entry.reference,
+            version: entry.denormalized_latest_file_info.version,
+            change_by: entry.denormalized_latest_file_info.change_by,
+            access_level: entry.denormalized_latest_file_info.access_level,
+            content_type: Some(entry.denormalized_latest_file_info.content_type),
+            content_length: entry.denormalized_latest_file_info.content_length,
+            content_hash: entry.denormalized_latest_file_info.content_hash,
+            description: entry.denormalized_latest_file_info.description,
+            categories: entry.denormalized_latest_file_info.categories,
+            tags: entry.denormalized_latest_file_info.tags,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct MoleculeDataRoomActivityDataRecord {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeDataRoomActivityPayloadRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 
     pub ipnft_uid: String,
@@ -143,7 +145,14 @@ pub struct MoleculeDataRoomActivityDataRecord {
     pub tags: Vec<String>,
 }
 
-pub type MoleculeDataRoomActivityRecord =
-    odf::serde::DatasetDefaultVocabularyRecord<MoleculeDataRoomActivityDataRecord>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MoleculeDataRoomActivityChangelogEntry =
+    odf::serde::DatasetDefaultVocabularyChangelogEntry<MoleculeDataRoomActivityPayloadRecord>;
+
+pub type MoleculeDataRoomActivityChangelogInsertionRecord =
+    odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<
+        MoleculeDataRoomActivityPayloadRecord,
+    >;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

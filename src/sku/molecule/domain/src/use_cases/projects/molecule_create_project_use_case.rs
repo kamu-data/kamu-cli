@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
@@ -19,6 +20,7 @@ pub trait MoleculeCreateProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,

@@ -11,7 +11,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use async_graphql::dataloader::DataLoader;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::DatasetRegistry;
@@ -57,9 +57,8 @@ pub fn dataset_handle_data_loader(catalog: &dill::Catalog) -> DatasetHandleDataL
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(clippy::needless_pass_by_value)]
 pub fn data_loader_error_mapper(e: Arc<InternalError>) -> InternalError {
-    e.reason().int_err()
+    InternalError::new(e)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -28,8 +28,8 @@ impl IDFactory {
         // TODO: create more readable IDs like docker does
         let mut name = String::with_capacity(20);
         name.extend(
-            rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
+            rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
                 .take(20)
                 .map(char::from),
         );

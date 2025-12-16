@@ -92,7 +92,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.27", features = ["url"] }
+tokio-tungstenite = { version = "0.28", features = ["url"] }
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
@@ -125,5 +125,5 @@ tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tower-http = { version = "0.6", features = ["trace", "cors"] }
-rand = "0.8"
-mockall = "0.13"
+rand = "0.9"
+mockall = "0.14"

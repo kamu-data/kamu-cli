@@ -72,29 +72,29 @@ async fn setup(
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123_127_986_998);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     pk1.append_slice(&buf[orig_range]);
     new_pk1.append_slice(&buf[new_range.clone()]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     pk2.append_slice(&buf[orig_range]);
     new_pk2.append_slice(&buf[new_range.clone()]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     cmp1.append_slice(&buf[orig_range]);
-    rng.try_fill(&mut buf[changed_range.clone()]).unwrap();
+    rng.fill(&mut buf[changed_range.clone()]);
     new_cmp1.append_slice(&buf[new_range.clone()]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     cmp2.append_slice(&buf[orig_range]);
-    rng.try_fill(&mut buf[changed_range.clone()]).unwrap();
+    rng.fill(&mut buf[changed_range.clone()]);
     new_cmp2.append_slice(&buf[new_range.clone()]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     aux1.append_slice(&buf[orig_range]);
     new_aux1.append_slice(&buf[new_range.clone()]);
 
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     aux2.append_slice(&buf[orig_range]);
     new_aux2.append_slice(&buf[new_range.clone()]);
 

@@ -17,13 +17,6 @@ pub struct Molecule {
     v1: v1::MoleculeV1,
 }
 
-impl Molecule {
-    // Public only for tests
-    pub fn dataset_snapshot_projects_v1(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
-        v1::MoleculeV1::dataset_snapshot_projects(alias)
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]

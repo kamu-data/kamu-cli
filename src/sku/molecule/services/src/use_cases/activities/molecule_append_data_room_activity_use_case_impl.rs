@@ -10,18 +10,20 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::auth;
+use internal_error::ResultIntoInternal;
+use kamu_core::PushIngestResult;
+use kamu_molecule_domain::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::domain::*;
+use crate::MoleculeGlobalActivitiesService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
-    push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
+    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,46 +42,49 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        activity: MoleculeDataRoomActivityEntity,
+        activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
-        let data_room_activity_dataset = self
-            .molecule_dataset_service
-            .get_global_data_room_activity_dataset(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Write,
-                // TODO: try to create once as start-up job?
-                true,
-            )
+        // Gain write access to global activities dataset
+        let global_activities_writer = self
+            .global_activities_service
+            .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
-            .map_err(|e| -> MoleculeAppendDataRoomActivityError {
-                use MoleculeGetDatasetError as E;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
-                match e {
-                    MoleculeGetDatasetError::NotFound(_) => {
-                        unreachable!()
-                    }
-                    MoleculeGetDatasetError::Access(e) => e.into(),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        // Append new activity record
+        let new_changelog_record = MoleculeDataRoomActivityChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: activity_record,
+        };
 
-        let data_record = activity.into_insert_record();
-
-        self.push_ingest_use_case
-            .execute(
-                data_room_activity_dataset,
-                kamu_core::DataSource::Buffer(data_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        let push_res = global_activities_writer
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
+
+        // Check commit status
+        match push_res {
+            PushIngestResult::UpToDate => {
+                unreachable!("We just created a new announcement, it cannot be up-to-date")
+            }
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
+                        MoleculeActivityMessage::published(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            new_changelog_record.payload,
+                        ),
+                    )
+                    .await
+                    .int_err()?;
+            }
+        }
 
         Ok(())
     }

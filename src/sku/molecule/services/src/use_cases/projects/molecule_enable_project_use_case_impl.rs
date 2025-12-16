@@ -9,22 +9,21 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
-use kamu_core::PushIngestDataUseCase;
-use kamu_core::auth::DatasetAction;
+use kamu_core::PushIngestResult;
+use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
-use odf::metadata::OperationType;
 
-use crate::domain::*;
+use crate::MoleculeProjectsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeEnableProjectUseCase)]
 pub struct MoleculeEnableProjectUseCaseImpl {
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
-    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
+    projects_service: Arc<dyn MoleculeProjectsService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -42,16 +41,27 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
         ipnft_uid: String,
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
-        let (projects_dataset, df_opt) = self
-            .molecule_dataset_service
-            .get_projects_raw_ledger_data_frame(molecule_subject, DatasetAction::Write, false)
-            .await?;
+        // Gain write access to projects dataset
+        let projects_writer = self
+            .projects_service
+            .writer(&molecule_subject.account_name, false)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
 
-        let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = df_opt else {
+        // Observe raw ledger DF to find the project
+        let maybe_raw_ledger_df = projects_writer
+            .as_reader()
+            .raw_ledger_data_frame()
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeEnableProjectError>)?;
+
+        // No records at all yet?
+        let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = maybe_raw_ledger_df else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
                     ipnft_uid: ipnft_uid.clone(),
@@ -59,6 +69,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
+        // Find the latest ledger record for the given ipnft_uid
         let df = ledger_df
             .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
             .int_err()?
@@ -68,6 +79,9 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             .int_err()?;
 
         let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
+        assert!(records.len() <= 1);
+
+        // No record found?
         let Some(record) = records.into_iter().next() else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
@@ -76,64 +90,58 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             ));
         };
 
-        let op = record
-            .get("op")
-            .and_then(serde_json::Value::as_u64)
-            .and_then(|value| u8::try_from(value).ok())
-            .and_then(|value| OperationType::try_from(value).ok());
+        // Reconstruct last changelog entry available
+        let last_changelog_entry = MoleculeProjectChangelogEntry::from_json(record).int_err()?;
 
-        let Some(op) = op else {
-            return Err(MoleculeEnableProjectError::ProjectNotFound(
-                ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.clone(),
-                },
-            ));
-        };
-
-        let mut project = MoleculeProject::from_json(record).int_err()?;
-        project.ipnft_symbol.make_ascii_lowercase();
-
-        if !matches!(op, OperationType::Retract) {
-            return Ok(project);
+        // Idempotent handling: if already enabled, return as is
+        if last_changelog_entry.system_columns.op != odf::metadata::OperationType::Retract {
+            // Project is already enabled
+            return Ok(MoleculeProject::from_payload(
+                last_changelog_entry.payload,
+                last_changelog_entry.system_columns.system_time,
+                last_changelog_entry.system_columns.event_time,
+            )?);
         }
 
-        let now = chrono::Utc::now();
-        project.system_time = now;
-        project.event_time = now;
+        // Add Append record to re-enable the project
+        let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: last_changelog_entry.payload,
+        };
 
-        let changelog_record = project.as_changelog_record(u8::from(OperationType::Append));
-
-        self.push_ingest_use_case
-            .execute(
-                projects_dataset,
-                kamu_core::DataSource::Buffer(changelog_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        let push_res = projects_writer
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
-                MoleculeProjectMessage::reenabled(
-                    now,
-                    molecule_subject.account_id.clone(),
-                    project.account_id.clone(),
-                    project.ipnft_uid.clone(),
-                    project.ipnft_symbol.clone(),
-                ),
-            )
-            .await
-            .int_err()?;
+        match push_res {
+            PushIngestResult::UpToDate => unreachable!(),
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
+                        MoleculeProjectMessage::reenabled(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            new_changelog_record.payload.account_id.clone(),
+                            new_changelog_record.payload.ipnft_uid.clone(),
+                            new_changelog_record.payload.ipnft_symbol.clone(),
+                        ),
+                    )
+                    .await
+                    .int_err()?;
 
-        Ok(project)
+                Ok(MoleculeProject::from_payload(
+                    new_changelog_record.payload,
+                    insertion_system_time,
+                    source_event_time.unwrap_or(insertion_system_time),
+                )?)
+            }
+        }
     }
 }
 

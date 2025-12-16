@@ -37,6 +37,6 @@ dill = { version = "0.14", default-features = false }
 futures = "0.3"
 password-hash = { version = "0.5", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
-rand = "0.8"
+rand = "0.9"
 uuid = "1"
 event-sourcing = { workspace = true }

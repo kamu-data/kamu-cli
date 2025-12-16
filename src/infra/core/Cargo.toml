@@ -28,6 +28,7 @@ ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
+query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
@@ -83,7 +84,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "gzip",
     "brotli",
     "deflate",
-    "json",
+    "json"
 ] }
 ringbuf = "0.4"
 zip = "3"
@@ -110,7 +111,7 @@ futures = "0.3"
 glob = "0.3" # Used for glob fetch
 indoc = { version = "2" }
 itertools = "0.14"
-rand = "0.8"
+rand = "0.9"
 regex = "1"
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = ["std"] }
@@ -125,7 +126,7 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-auth-rebac-services = { optional = true, workspace = true }
 
-alloy = { optional = true, version = "1.0", default-features = false, features = [
+alloy = { optional = true, version = "1.1", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -144,7 +145,7 @@ datafusion-ethers = { optional = true, version = "50" }
 datafusion-functions-json = { optional = true, version = "0.50" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
-mockall = { optional = true, version = "0.13", default-features = false }
+mockall = { optional = true, version = "0.14", default-features = false }
 oop = { optional = true, version = "0.0.2" }
 
 
@@ -170,14 +171,14 @@ odf = { workspace = true, default-features = false, features = ["testing"] }
 test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
-criterion = { version = "0.7", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 datafusion = { version = "50", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"
 fs_extra = "1.3"
 indoc = "2"
-mockall = { version = "0.13", default-features = false }
+mockall = { version = "0.14", default-features = false }
 nanoid = "0.4.0"
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }

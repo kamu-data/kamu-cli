@@ -69,7 +69,7 @@ async fn test_update_versioned_file_use_case() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
             None,
             Some(content_args),
             None,
@@ -86,7 +86,7 @@ async fn test_update_versioned_file_use_case() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
             None,
             Some(content_args),
             None,
@@ -118,7 +118,7 @@ async fn test_update_versioned_file_use_case_errors() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
             None,
             Some(content_args),
             Some(seed_bloch_hash),
@@ -135,7 +135,7 @@ async fn test_update_versioned_file_use_case_errors() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
             None,
             Some(content_args),
             Some(old_head),

@@ -15,6 +15,7 @@ use kamu_molecule_domain::{
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
 };
+use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v1;
@@ -60,10 +61,15 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let disable_project_uc = from_catalog_n!(ctx, dyn MoleculeDisableProjectUseCase);
+        let (time_source, disable_project_uc) =
+            from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeDisableProjectUseCase);
 
         let project = disable_project_uc
-            .execute(&molecule_subject, ipnft_uid.clone())
+            .execute(
+                &molecule_subject,
+                Some(time_source.now()),
+                ipnft_uid.clone(),
+            )
             .await
             .map_err(|err| map_disable_error(err, &ipnft_uid))?;
 
@@ -81,10 +87,15 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
     ) -> Result<MoleculeProjectMutationResultV2> {
         let molecule_subject = molecule_subject(ctx)?;
-        let enable_project_uc = from_catalog_n!(ctx, dyn MoleculeEnableProjectUseCase);
+        let (time_source, enable_project_uc) =
+            from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeEnableProjectUseCase);
 
         let project = enable_project_uc
-            .execute(&molecule_subject, ipnft_uid.clone())
+            .execute(
+                &molecule_subject,
+                Some(time_source.now()),
+                ipnft_uid.clone(),
+            )
             .await
             .map_err(|err| map_enable_error(err, &ipnft_uid))?;
 

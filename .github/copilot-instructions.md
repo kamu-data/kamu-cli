@@ -4,11 +4,12 @@
 
 This project uses Rust with Clippy for linting and code quality checks. When performing any code analysis, validation, or after making code changes, you should:
 
-1. **Always run Clippy** using `make clippy` to check for linting issues
-2. Run Clippy before and after making code changes to ensure no new warnings are introduced
-3. If Clippy reports warnings or errors, address them as part of the code changes
-4. Use `cargo check` for basic compilation checks when needed
-5. The project follows strict linting standards - treat Clippy warnings as errors that need to be fixed
+1. **Always run formatting first** using `cargo fmt` before running any linting checks
+2. **Always run Clippy** using `make clippy` to check for linting issues
+3. Run Clippy before and after making code changes to ensure no new warnings are introduced
+4. If Clippy reports warnings or errors, address them as part of the code changes
+5. Use `cargo check` for basic compilation checks when needed
+6. The project follows strict linting standards - treat Clippy warnings as errors that need to be fixed
 
 ## Code Style
 - Follow the project's existing code style and formatting
@@ -30,4 +31,12 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - Document each event type with comments explaining its usage and context.
 - Prefer using separate structs for event data rather than inline data in the enum to enhance clarity and maintainability.
 
-Remember: **Always run `make clippy` as part of your validation process when working with this codebase.**
+## Changelog
+
+When completing a full PR (not incremental local changes), update the `CHANGELOG.md` file:
+- Add entries to the `[Unreleased]` section at the top of the file
+- Use the appropriate subsection: `### Added` for new features, `### Changed` for modifications, `### Fixed` for bug fixes
+- Write a brief, high-level summary of the change from an end-user perspective
+- This only applies to full PRs, not to incremental work done via local IDE Copilot
+
+Remember: **Always run `cargo fmt` followed by `make clippy` as part of your validation process when working with this codebase.**

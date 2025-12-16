@@ -9,14 +9,14 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::auth;
-use kamu_datasets::ResolvedDataset;
-use odf::serde::DatasetDefaultVocabularySystemColumns;
+use chrono::{DateTime, Utc};
+use internal_error::ResultIntoInternal;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::{PushIngestResult, auth};
+use kamu_molecule_domain::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::domain::*;
+use crate::MoleculeAnnouncementsService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,21 +24,21 @@ use crate::domain::*;
 #[dill::interface(dyn MoleculeCreateAnnouncementUseCase)]
 pub struct MoleculeCreateAnnouncementUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    molecule_dataset_service: Arc<dyn MoleculeDatasetService>,
-    push_ingest_use_case: Arc<dyn kamu_core::PushIngestDataUseCase>,
+    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    outbox: Arc<dyn Outbox>,
 }
 
 impl MoleculeCreateAnnouncementUseCaseImpl {
     async fn validate_attachments(
         &self,
-        announcement_data_record: &MoleculeGlobalAnnouncementDataRecord,
+        announcement: &MoleculeAnnouncementPayloadRecord,
     ) -> Result<(), MoleculeCreateAnnouncementError> {
-        if announcement_data_record.attachments.is_empty() {
+        if announcement.attachments.is_empty() {
             // Nothing to validate
             return Ok(());
         }
 
-        let dataset_refs = announcement_data_record
+        let dataset_refs = announcement
             .attachments
             .iter()
             .map(odf::DatasetID::as_local_ref)
@@ -66,25 +66,6 @@ impl MoleculeCreateAnnouncementUseCaseImpl {
 
         Ok(())
     }
-
-    async fn get_project_announcements_dataset(
-        &self,
-        molecule_project: &MoleculeProject,
-    ) -> Result<ResolvedDataset, MoleculeCreateAnnouncementError> {
-        self.rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(
-                &molecule_project.announcements_dataset_id.as_local_ref(),
-                auth::DatasetAction::Write,
-            )
-            .await
-            .map_err(|e| {
-                use RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::Access(e) => e.into(),
-                    E::NotFound(_) | E::Internal(_) => e.int_err().into(),
-                }
-            })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,96 +82,78 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
-        mut global_announcement: MoleculeGlobalAnnouncementDataRecord,
+        source_event_time: Option<DateTime<Utc>>,
+        announcement: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError> {
-        // TODO: Align timestamps with ingest
-        let now = Utc::now();
+        let new_announcement_id = announcement.announcement_id;
 
-        // 1. Resolve global announcements dataset
+        // 1. Validate input data
 
-        let global_announcements_dataset = self
-            .molecule_dataset_service
-            .get_global_announcements_dataset(
-                &molecule_subject.account_name,
-                auth::DatasetAction::Write,
-                // TODO: try to create once as start-up job?
-                true,
-            )
-            .await
-            .map_err(|e| -> MoleculeCreateAnnouncementError {
-                use MoleculeGetDatasetError as E;
+        self.validate_attachments(&announcement).await?;
 
-                match e {
-                    MoleculeGetDatasetError::NotFound(_) => {
-                        unreachable!()
-                    }
-                    MoleculeGetDatasetError::Access(e) => e.into(),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        // 2. Store global announcement
 
-        // 2. Validate input data
-
-        self.validate_attachments(&global_announcement).await?;
-
-        // 3. Store global announcements
-
-        let new_announcement_id = uuid::Uuid::new_v4();
-
-        global_announcement.announcement_id = Some(new_announcement_id);
-
-        let global_announcement_record = MoleculeGlobalAnnouncementRecord {
-            system_columns: DatasetDefaultVocabularySystemColumns {
-                offset: None,
-                op: odf::metadata::OperationType::Append,
-                system_time: now,
-                event_time: now,
+        let global_announcement_record = MoleculeGlobalAnnouncementChangelogInsertionRecord {
+            op: odf::metadata::OperationType::Append,
+            payload: MoleculeGlobalAnnouncementPayloadRecord {
+                ipnft_uid: molecule_project.ipnft_uid.clone(),
+                announcement,
             },
-            record: global_announcement,
         };
-        let project_announcement_record =
-            global_announcement_record.as_project_announcement_record();
 
-        self.push_ingest_use_case
-            .execute(
-                global_announcements_dataset,
-                kamu_core::DataSource::Buffer(global_announcement_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
+        let global_announcements_writer = self
+            .announcements_service
+            .global_writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
-            .int_err()?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
-        // 4. Store project announcements
-        let project_announcements_dataset = self
-            .get_project_announcements_dataset(molecule_project)
+        let push_res = global_announcements_writer
+            .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
             .await?;
 
-        self.push_ingest_use_case
-            .execute(
-                project_announcements_dataset,
-                kamu_core::DataSource::Buffer(project_announcement_record.to_bytes()),
-                kamu_core::PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
-                    expected_head: None,
-                },
-                None,
-            )
-            .await
-            .int_err()?;
+        assert!(matches!(push_res, PushIngestResult::Updated { .. }));
 
-        Ok(MoleculeCreateAnnouncementResult {
-            new_announcement_id,
-        })
+        // 3. Store project announcement
+
+        let project_announcement_record = global_announcement_record.into_announcement_record();
+
+        let project_announcements_writer = self
+            .announcements_service
+            .project_writer(molecule_project)
+            .await
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
+
+        let push_res = project_announcements_writer
+            .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
+            .await?;
+
+        match push_res {
+            PushIngestResult::UpToDate => {
+                unreachable!("We just created a new announcement, it cannot be up-to-date")
+            }
+            PushIngestResult::Updated {
+                system_time: insertion_system_time,
+                ..
+            } => {
+                // 4. Notify external listeners
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
+                        MoleculeAnnouncementMessage::published(
+                            insertion_system_time,
+                            molecule_subject.account_id.clone(),
+                            molecule_project.ipnft_uid.clone(),
+                            project_announcement_record.payload,
+                        ),
+                    )
+                    .await
+                    .int_err()?;
+
+                Ok(MoleculeCreateAnnouncementResult {
+                    new_announcement_id,
+                })
+            }
+        }
     }
 }
 

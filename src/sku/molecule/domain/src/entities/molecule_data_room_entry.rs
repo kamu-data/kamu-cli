@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,6 +49,26 @@ impl MoleculeDataRoomEntry {
             denormalized_latest_file_info,
         }
     }
+
+    pub fn from_json(
+        mut value: serde_json::Value,
+        vocab: &odf::metadata::DatasetVocabulary,
+    ) -> Result<(odf::metadata::OperationType, Self), InternalError> {
+        let Some(obj) = value.as_object_mut() else {
+            unreachable!()
+        };
+        let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
+            unreachable!()
+        };
+
+        let op =
+            odf::metadata::OperationType::try_from(u8::try_from(raw_op).int_err()?).int_err()?;
+
+        let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
+        let data_room_entry = Self::from_collection_entry(collection_entity);
+
+        Ok((op, data_room_entry))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +77,7 @@ impl MoleculeDataRoomEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeDenormalizeFileToDataRoom {
     pub version: FileVersion,
-    pub content_type: String,
+    pub content_type: MediaType,
     pub content_length: usize,
     pub content_hash: odf::Multihash,
 
@@ -72,7 +94,7 @@ impl Default for MoleculeDenormalizeFileToDataRoom {
     fn default() -> Self {
         Self {
             version: 0,
-            content_type: String::new(),
+            content_type: MediaType::OCTET_STREAM.to_owned(),
             content_length: 0,
             content_hash: odf::Multihash::from_digest_sha3_256(b""),
             access_level: String::new(),
@@ -98,6 +120,15 @@ impl MoleculeDenormalizeFileToDataRoom {
 
         kamu_datasets::ExtraDataFields::new(json_map)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct MoleculeDataRoomEntriesFilters {
+    pub by_tags: Option<Vec<String>>,
+    pub by_categories: Option<Vec<String>>,
+    pub by_access_levels: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

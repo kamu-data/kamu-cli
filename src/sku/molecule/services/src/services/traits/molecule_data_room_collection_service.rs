@@ -11,9 +11,11 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
+use kamu_molecule_domain::{MoleculeDataRoomEntriesFilters, MoleculeUpdateDataRoomEntryResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: hide inside service implementations
 #[async_trait::async_trait]
 pub trait MoleculeDataRoomCollectionService: Send + Sync {
     async fn get_data_room_collection_entries(
@@ -22,7 +24,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
-        // TODO: extra data filters
+        filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, MoleculeDataRoomCollectionReadError>;
 
@@ -65,26 +67,6 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         path: CollectionPath,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub enum MoleculeUpdateDataRoomEntryResult {
-    Success(MoleculeUpdateDataRoomEntrySuccess),
-    UpToDate,
-    EntryNotFound(CollectionPath),
-}
-
-#[derive(Debug)]
-pub struct MoleculeUpdateDataRoomEntrySuccess {
-    pub old_head: odf::Multihash,
-    pub new_head: odf::Multihash,
-    pub inserted_records: Vec<(
-        odf::metadata::OperationType,
-        kamu_datasets::CollectionEntryRecord,
-    )>,
-    pub system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

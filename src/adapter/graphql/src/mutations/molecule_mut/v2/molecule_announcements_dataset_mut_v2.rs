@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use kamu_molecule_domain::{
-    MoleculeCreateAnnouncementUseCase,
-    MoleculeGlobalAnnouncementDataRecord,
-};
+use kamu_molecule_domain::{MoleculeAnnouncementPayloadRecord, MoleculeCreateAnnouncementUseCase};
+use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v1;
@@ -49,12 +47,16 @@ impl MoleculeAnnouncementsDatasetMutV2 {
     ) -> Result<v1::CreateAnnouncementResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let molecule_create_announcement_use_case =
-            from_catalog_n!(ctx, dyn MoleculeCreateAnnouncementUseCase);
+        let (time_source, molecule_create_announcement_use_case) = from_catalog_n!(
+            ctx,
+            dyn SystemTimeSource,
+            dyn MoleculeCreateAnnouncementUseCase
+        );
 
-        let global_announcement = MoleculeGlobalAnnouncementDataRecord {
-            announcement_id: None,
-            ipnft_uid: self.project.entity.ipnft_uid.clone(),
+        let event_time = time_source.now();
+
+        let announcement_record = MoleculeAnnouncementPayloadRecord {
+            announcement_id: uuid::Uuid::new_v4(),
             headline,
             body,
             attachments: attachments
@@ -71,7 +73,12 @@ impl MoleculeAnnouncementsDatasetMutV2 {
         use kamu_molecule_domain::MoleculeCreateAnnouncementError as E;
 
         match molecule_create_announcement_use_case
-            .execute(&molecule_subject, &self.project.entity, global_announcement)
+            .execute(
+                &molecule_subject,
+                &self.project.entity,
+                Some(event_time),
+                announcement_record,
+            )
             .await
         {
             Ok(create_res) => Ok(v1::CreateAnnouncementResult::Success(

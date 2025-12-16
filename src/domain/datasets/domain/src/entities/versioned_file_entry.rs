@@ -38,7 +38,7 @@ pub struct VersionedFileEntry {
     pub version: FileVersion,
 
     /// Media type of the file content
-    pub content_type: String,
+    pub content_type: MediaType,
 
     /// Size of the content in bytes
     pub content_length: usize,
@@ -73,8 +73,7 @@ impl VersionedFileEntry {
             content_length,
             content_type: content_type
                 .map(Into::into)
-                .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
-                .to_string(),
+                .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned()),
             content_hash,
             extra_data,
         }
@@ -133,7 +132,7 @@ struct VersionedFileEvent {
 struct VersionedFileRecord {
     pub version: FileVersion,
 
-    pub content_type: String,
+    pub content_type: MediaType,
 
     pub content_length: usize,
 

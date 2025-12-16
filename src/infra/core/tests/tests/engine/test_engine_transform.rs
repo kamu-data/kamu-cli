@@ -143,7 +143,7 @@ impl DatasetHelper {
         let new_checkpoint_hash = {
             use rand::RngCore;
             let mut checkpoint_data = [0u8; 128];
-            rand::thread_rng().fill_bytes(&mut checkpoint_data);
+            rand::rng().fill_bytes(&mut checkpoint_data);
 
             self.dataset
                 .as_checkpoint_repo()

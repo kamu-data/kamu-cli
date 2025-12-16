@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::{MoleculeGlobalAnnouncementDataRecord, MoleculeProject};
+use crate::{MoleculeAnnouncementPayloadRecord, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +20,8 @@ pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
-        global_announcement: MoleculeGlobalAnnouncementDataRecord,
+        source_event_time: Option<DateTime<Utc>>,
+        announcement_record: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }
 

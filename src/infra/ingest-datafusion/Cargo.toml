@@ -59,10 +59,10 @@ tracing = "0.1"
 [dev-dependencies]
 odf = { workspace = true, features = ["testing"] }
 
-criterion = { version = "0.7", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 indoc = "2"
 pretty_assertions = "1"
-rand = "0.8"
+rand = "0.9"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = "3"

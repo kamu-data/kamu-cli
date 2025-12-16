@@ -1047,8 +1047,172 @@ async fn test_ingest_push_with_predefined_data_schema() {
     assert_matches!(
         res,
         Err(PushIngestError::ExecutionError(err))
-        if err.to_string().contains("Column population contains 1 null values while none were expected")
+        if err.to_string().contains("Column `population` contains 1 null values while none were expected")
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_schema_and_source_evolution() {
+    use odf::metadata::*;
+
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(odf::DatasetKind::Root)
+        .push_event(SetDataSchema::new(DataSchema {
+            fields: vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("event_time"),
+                DataField::string("city"),
+                DataField::i64("population"),
+            ],
+            extra: None,
+        }))
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_string(),
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..Default::default()
+                })
+                .merge(MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    // 1: Initial data
+    let data = std::io::Cursor::new(indoc!(
+        r#"
+        { "event_time": "2020-01-01", "city": "A", "population": 1000 }
+        { "event_time": "2020-01-02", "city": "B", "population": 2000 }
+        { "event_time": "2020-01-03", "city": "C", "population": 3000 }
+        "#
+    ));
+
+    harness
+        .ingest_from(
+            target.clone(),
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_records_eq(indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ))
+        .await;
+
+    // 2: Migrate schema by adding optional `census_url` column
+    target
+        .commit_event(
+            SetDataSchema::new(DataSchema::new(vec![
+                DataField::i64("offset"),
+                DataField::i32("op"),
+                DataField::timestamp_millis_utc("system_time"),
+                DataField::timestamp_millis_utc("event_time"),
+                DataField::string("city"),
+                DataField::i64("population"),
+                DataField::string("census_url").optional(),
+            ]))
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(harness.time_source.now()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // 3: Update push source to match
+    target
+        .commit_event(
+            AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_string(),
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                        "census_url STRING".to_string(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_string(), "city".to_string()],
+                }
+                .into(),
+            }
+            .into(),
+            odf::dataset::CommitOpts {
+                system_time: Some(harness.time_source.now()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // 4: Ingest new data
+    let data = std::io::Cursor::new(indoc!(
+        r#"
+        { "event_time": "2020-01-04", "city": "A", "population": 2000 }
+        { "event_time": "2020-01-05", "city": "B", "population": 3000, "census_url": null }
+        { "event_time": "2020-01-06", "city": "C", "population": 4000, "census_url": "https://c.ca/census" }
+        "#
+    ));
+
+    harness
+        .ingest_from(
+            target.clone(),
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_records_eq(indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | offset | op | system_time          | event_time           | city | population | census_url          |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            | 3      | 0  | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | A    | 2000       |                     |
+            | 4      | 0  | 2050-01-01T12:00:00Z | 2020-01-05T00:00:00Z | B    | 3000       |                     |
+            | 5      | 0  | 2050-01-01T12:00:00Z | 2020-01-06T00:00:00Z | C    | 4000       | https://c.ca/census |
+            +--------+----+----------------------+----------------------+------+------------+---------------------+
+            "#
+        ))
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

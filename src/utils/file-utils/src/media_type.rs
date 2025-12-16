@@ -32,6 +32,7 @@ impl MediaType {
     /// See: <https://www.iana.org/assignments/media-types/application/vnd.shp>
     /// See: <https://en.wikipedia.org/wiki/Shapefile>
     pub const ESRI_SHAPEFILE: MediaTypeRef<'static> = MediaTypeRef("application/vnd.shp");
+    pub const OCTET_STREAM: MediaTypeRef<'static> = MediaTypeRef("application/octet-stream");
 }
 
 impl MediaTypeRef<'_> {

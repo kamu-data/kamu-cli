@@ -231,6 +231,7 @@ impl DataWriterDataFusion {
     async fn get_all_previous_data(
         &self,
         prev_data_slices: &[odf::Multihash],
+        dataset_schema: Option<&SchemaRef>,
     ) -> Result<Option<DataFrameExt>, InternalError> {
         if prev_data_slices.is_empty() {
             return Ok(None);
@@ -251,7 +252,7 @@ impl DataWriterDataFusion {
                 prev_data_paths,
                 ParquetReadOptions {
                     // TODO: Specify schema
-                    schema: None,
+                    schema: dataset_schema.map(Arc::as_ref),
                     file_extension: "",
                     // TODO: PERF: Possibly speed up by specifying `offset`
                     file_sort_order: Vec::new(),
@@ -380,24 +381,21 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    fn coerce_schema(&self, df: DataFrameExt) -> Result<DataFrameExt, InternalError> {
+    fn coerce_schema(
+        &self,
+        df: DataFrameExt,
+        dataset_schema_arrow: Option<&SchemaRef>,
+    ) -> Result<DataFrameExt, InternalError> {
         if !self.coerce_schema {
             return Ok(df);
         }
-        let Some(orig_schema) = &self.meta.schema else {
+        let Some(dataset_schema_arrow) = dataset_schema_arrow else {
             return Ok(df);
         };
 
         // Currently only handling nullability coercion
-        let orig_non_null_columns: std::collections::HashSet<String> = orig_schema
-            .fields
-            .iter()
-            .filter(|f| !f.is_optional())
-            .map(|f| f.name.clone())
-            .collect();
-
         let df = df
-            .assert_collumns_not_null(|f| orig_non_null_columns.contains(f.name()))
+            .coerce_columns_nullability(dataset_schema_arrow)
             .int_err()?;
 
         Ok(df)
@@ -981,6 +979,15 @@ impl DataWriter for DataWriterDataFusion {
         opts: WriteDataOpts,
     ) -> Result<StageDataResult, StageDataError> {
         let (add_data, new_schema, data_file) = if let Some(new_data) = new_data {
+            let dataset_schema_arrow = self
+                .meta
+                .schema
+                .as_ref()
+                .map(|s| s.to_arrow(&odf::metadata::ToArrowSettings::default()))
+                .transpose()
+                .int_err()?
+                .map(Arc::new);
+
             self.validate_input(&new_data)?;
 
             // Normalize timestamps
@@ -988,7 +995,9 @@ impl DataWriter for DataWriterDataFusion {
 
             // Merge step
             // TODO: PERF: We could likely benefit from checkpointing here
-            let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
+            let prev = self
+                .get_all_previous_data(&self.meta.data_slices, dataset_schema_arrow.as_ref())
+                .await?;
 
             // Populate event time with nulls if missing, using matching type to prev data
             let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrameExt::schema))?;
@@ -1010,25 +1019,20 @@ impl DataWriter for DataWriterDataFusion {
             )?;
 
             // Coerce schema if needed
-            let df = self.coerce_schema(df)?;
+            // TODO: Combine coercion and `validate_schema_compatible` into one operation
+            let df = self.coerce_schema(df, dataset_schema_arrow.as_ref())?;
 
             // Validate schema matches the declared one
-            let new_schema_arrow = SchemaRef::new(df.schema().into());
-            tracing::info!(schema = ?new_schema_arrow, "Final output schema");
+            let new_slice_schema_arrow = SchemaRef::new(df.schema().into());
+            tracing::info!(?new_slice_schema_arrow, "Final output schema");
 
-            if let Some(prev_schema) = &self.meta.schema {
-                let prev_schema_arrow = Arc::new(
-                    prev_schema
-                        .to_arrow(&odf::metadata::ToArrowSettings::default())
-                        .int_err()?,
-                );
-
-                Self::validate_schema_compatible(&prev_schema_arrow, &new_schema_arrow)?;
+            if let Some(dataset_schema_arrow) = &dataset_schema_arrow {
+                Self::validate_schema_compatible(dataset_schema_arrow, &new_slice_schema_arrow)?;
             }
 
             // NOTE: We strip encoding to store only logical representation of schema in the
             // event
-            let new_schema = odf::schema::DataSchema::new_from_arrow(&new_schema_arrow)
+            let new_schema = odf::schema::DataSchema::new_from_arrow(&new_slice_schema_arrow)
                 .int_err()?
                 .strip_encoding();
 

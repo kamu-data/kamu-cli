@@ -45,7 +45,7 @@ impl ViewVersionedFileHistoryUseCase for ViewVersionedFileHistoryUseCaseImpl {
 
         let query_res = self
             .query_svc
-            .get_data(file_dataset.clone(), GetDataOptions::default())
+            .get_data(file_dataset.into_inner(), GetDataOptions::default())
             .await
             .int_err()?;
 

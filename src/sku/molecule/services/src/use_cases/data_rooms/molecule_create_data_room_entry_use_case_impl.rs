@@ -13,9 +13,10 @@ use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
+use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::domain::*;
+use crate::{MoleculeDataRoomCollectionService, MoleculeDataRoomCollectionWriteError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
