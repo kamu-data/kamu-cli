@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -272,7 +273,7 @@ impl MoleculeDataRoomEntry {
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<MoleculeVersionedFile<'_>> {
         Ok(MoleculeVersionedFile::new(
-            &self.entity,
+            Cow::Borrowed(&self.entity),
             self.is_latest_data_room_entry,
         ))
     }

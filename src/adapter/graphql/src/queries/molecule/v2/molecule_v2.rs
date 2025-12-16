@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -17,6 +18,9 @@ use kamu_molecule_domain::{
     MoleculeFindProjectUseCase,
     MoleculeGlobalActivity,
     MoleculeProjectListing,
+    MoleculeSearchError,
+    MoleculeSearchFoundItem,
+    MoleculeSearchUseCase,
     MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewProjectsError,
@@ -29,12 +33,10 @@ use crate::queries::molecule::v2::{
     MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntry,
-    MoleculeCategory,
     MoleculeDataRoomEntry,
     MoleculeProjectActivityFilters,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
-    MoleculeTag,
     MoleculeVersionedFile,
 };
 
@@ -74,6 +76,7 @@ impl MoleculeV2 {
 impl MoleculeV2 {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+    const DEFAULT_SEARCH_RESULTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
     #[tracing::instrument(level = "info", name = MoleculeV2_project, skip_all, fields(?ipnft_uid))]
@@ -246,23 +249,107 @@ impl MoleculeV2 {
     #[tracing::instrument(level = "info", name = MoleculeV2_search, skip_all)]
     async fn search(
         &self,
-        _ctx: &Context<'_>,
-        // TODO: update types
+        ctx: &Context<'_>,
         prompt: String,
         filters: Option<MoleculeSemanticSearchFilters>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MoleculeSemanticSearchFoundItemConnection> {
-        let _ = prompt;
-        let _ = filters;
-        let _ = page;
-        let _ = per_page;
-        // TODO: implement
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let (search_uc, molecule_view_projects_uc) = from_catalog_n!(
+            ctx,
+            dyn MoleculeSearchUseCase,
+            dyn MoleculeViewProjectsUseCase
+        );
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_SEARCH_RESULTS_PER_PAGE);
+
+        let listing = search_uc
+            .execute(
+                &molecule_subject,
+                prompt.as_str(),
+                filters.map(Into::into),
+                Some(PaginationOpts::from_page(page, per_page)),
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeSearchError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let projects_mapping: HashMap<_, _> = {
+            let listing = molecule_view_projects_uc
+                .execute(&molecule_subject, None)
+                .await
+                .map_err(|e| -> GqlError {
+                    use MoleculeViewProjectsError as E;
+                    match e {
+                        E::Access(e) => e.into(),
+                        E::NoProjectsDataset(_) | E::Internal(_) => e.int_err().into(),
+                    }
+                })?;
+
+            listing
+                .list
+                .into_iter()
+                .map(|project| {
+                    (
+                        project.ipnft_uid.clone(),
+                        Arc::new(MoleculeProjectV2::new(project)),
+                    )
+                })
+                .collect()
+        };
+
+        let nodes = listing
+            .list
+            .into_iter()
+            .map(|found_item| {
+                let ipnft_uid = found_item.ipnft_uid();
+                let Some(project) = projects_mapping.get(ipnft_uid) else {
+                    return Err(GqlError::gql(format!(
+                        "Project [{ipnft_uid}] unexpectedly not found",
+                    )));
+                };
+
+                match found_item {
+                    MoleculeSearchFoundItem::DataRoomActivity(data_room_activity) => {
+                        let data_room_entry =
+                            MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                                project,
+                                data_room_activity,
+                            );
+                        // NOTE: We return data from the projection, therefore,
+                        //       it is always the latest.
+                        let is_latest = true;
+                        let entry = MoleculeVersionedFile::new(
+                            Cow::Owned(data_room_entry.entity),
+                            is_latest,
+                        );
+
+                        Ok(MoleculeSemanticSearchFoundItem::file(entry))
+                    }
+                    MoleculeSearchFoundItem::Announcement(announcement) => {
+                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
+                            project,
+                            announcement,
+                        );
+                        Ok(MoleculeSemanticSearchFoundItem::announcement(entry))
+                    }
+                }
+            })
+            .collect::<Result<_, _>>()?;
+
         Ok(MoleculeSemanticSearchFoundItemConnection::new(
-            vec![],
-            0,
-            0,
-            0,
+            nodes,
+            page,
+            per_page,
+            listing.total_count,
         ))
     }
 }
@@ -271,17 +358,65 @@ impl MoleculeV2 {
 
 #[derive(InputObject)]
 pub struct MoleculeSemanticSearchFilters {
-    // TODO: replace w/ real filters.
-    // These filters are provided as an example.
     by_ipnft_uids: Option<Vec<String>>,
-    by_categories: Option<Vec<MoleculeCategory>>,
-    by_tags: Option<Vec<MoleculeTag>>,
+    by_tags: Option<Vec<String>>,
+    by_categories: Option<Vec<String>>,
+    by_access_levels: Option<Vec<String>>,
+    by_type: Option<MoleculeSearchTypeInput>,
+}
+
+impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearchFilters {
+    fn from(value: MoleculeSemanticSearchFilters) -> Self {
+        kamu_molecule_domain::MoleculeSearchFilters {
+            by_ipnft_uids: value.by_ipnft_uids,
+            by_tags: value.by_tags,
+            by_categories: value.by_categories,
+            by_access_levels: value.by_access_levels,
+            by_type: value.by_type.map(Into::into),
+        }
+    }
+}
+
+#[derive(OneofObject, Debug)]
+pub enum MoleculeSearchTypeInput {
+    OnlyFiles(MoleculeSearchTypeInputInner),
+    OnlyAnnouncements(MoleculeSearchTypeInputInner),
+    FilesAndAnnouncements(MoleculeSearchTypeInputInner),
+}
+
+#[derive(InputObject, Debug)]
+pub struct MoleculeSearchTypeInputInner {
+    /// Not required to be filled out and is only needed for the declaration.
+    _dummy: Option<String>,
+}
+
+impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType {
+    fn from(value: MoleculeSearchTypeInput) -> Self {
+        use MoleculeSearchTypeInput as Gql;
+        use kamu_molecule_domain::MoleculeSearchType as Domain;
+
+        match value {
+            Gql::OnlyFiles(..) => Domain::OnlyDataRoomActivities,
+            Gql::OnlyAnnouncements(..) => Domain::OnlyAnnouncements,
+            Gql::FilesAndAnnouncements(..) => Domain::DataRoomActivitiesAndAnnouncements,
+        }
+    }
 }
 
 #[derive(Union)]
 pub enum MoleculeSemanticSearchFoundItem {
     File(MoleculeSemanticSearchFoundFile),
     Announcement(MoleculeSemanticSearchFoundAnnouncement),
+}
+
+impl MoleculeSemanticSearchFoundItem {
+    pub fn announcement(entry: MoleculeAnnouncementEntry) -> Self {
+        Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { entry })
+    }
+
+    pub fn file(entry: MoleculeVersionedFile<'static>) -> Self {
+        Self::File(MoleculeSemanticSearchFoundFile { entry })
+    }
 }
 
 #[derive(SimpleObject)]

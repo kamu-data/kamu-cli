@@ -34,14 +34,14 @@ pub struct MoleculeSearchFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
-    pub by_type: Option<MoleculeSearchResultType>,
+    pub by_type: Option<MoleculeSearchType>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum MoleculeSearchResultType {
+pub enum MoleculeSearchType {
     OnlyDataRoomActivities,
     OnlyAnnouncements,
-    DataRoomEntriesAndAnnouncements,
+    DataRoomActivitiesAndAnnouncements,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{MoleculeSearchFilters, MoleculeSearchResultType};
+use crate::{MoleculeSearchFilters, MoleculeSearchType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_search_result_type(filters: Option<&MoleculeSearchFilters>) -> MoleculeSearchResultType {
+pub fn get_search_result_type(filters: Option<&MoleculeSearchFilters>) -> MoleculeSearchType {
     filters
         .and_then(|f| f.by_type)
-        .unwrap_or(MoleculeSearchResultType::DataRoomEntriesAndAnnouncements)
+        .unwrap_or(MoleculeSearchType::DataRoomActivitiesAndAnnouncements)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

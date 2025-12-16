@@ -33,10 +33,10 @@ impl MoleculeSearchUseCaseImpl {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
     ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
-        use MoleculeSearchResultType as Type;
+        use MoleculeSearchType as Type;
 
         match utils::get_search_result_type(filters.as_ref()) {
-            Type::OnlyDataRoomActivities | Type::DataRoomEntriesAndAnnouncements => {
+            Type::OnlyDataRoomActivities | Type::DataRoomActivitiesAndAnnouncements => {
                 /* continue */
             }
             Type::OnlyAnnouncements => return Ok(MoleculeSearchFoundItemsListing::default()),
@@ -111,10 +111,10 @@ impl MoleculeSearchUseCaseImpl {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
     ) -> Result<MoleculeSearchFoundItemsListing, MoleculeSearchError> {
-        use MoleculeSearchResultType as Type;
+        use MoleculeSearchType as Type;
 
         match utils::get_search_result_type(filters.as_ref()) {
-            Type::OnlyAnnouncements | Type::DataRoomEntriesAndAnnouncements => { /* continue */ }
+            Type::OnlyAnnouncements | Type::DataRoomActivitiesAndAnnouncements => { /* continue */ }
             Type::OnlyDataRoomActivities => return Ok(MoleculeSearchFoundItemsListing::default()),
         }
 
