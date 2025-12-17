@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -37,7 +36,6 @@ use crate::queries::molecule::v2::{
     MoleculeProjectActivityFilters,
     MoleculeProjectV2,
     MoleculeProjectV2Connection,
-    MoleculeVersionedFile,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -310,20 +308,11 @@ impl MoleculeV2 {
 
                 match search_hit {
                     MoleculeSearchHit::DataRoomActivity(data_room_activity) => {
-                        let data_room_entry =
-                            MoleculeDataRoomEntry::new_from_data_room_activity_entity(
-                                project,
-                                data_room_activity,
-                            );
-                        // NOTE: We return data from the projection, therefore,
-                        //       it is always the latest.
-                        let is_latest = true;
-                        let entry = MoleculeVersionedFile::new(
-                            Cow::Owned(data_room_entry.entity),
-                            is_latest,
+                        let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                            project,
+                            data_room_activity,
                         );
-
-                        Ok(MoleculeSemanticSearchHit::file(entry))
+                        Ok(MoleculeSemanticSearchHit::data_room_entry(entry))
                     }
                     MoleculeSearchHit::Announcement(announcement) => {
                         let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
@@ -390,7 +379,7 @@ impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType 
 
 #[derive(Union)]
 pub enum MoleculeSemanticSearchHit {
-    File(MoleculeSemanticSearchFoundFile),
+    DataRoomEntry(MoleculeSemanticSearchFoundDataRoomEntry),
     Announcement(MoleculeSemanticSearchFoundAnnouncement),
 }
 
@@ -399,14 +388,14 @@ impl MoleculeSemanticSearchHit {
         Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { entry })
     }
 
-    pub fn file(entry: MoleculeVersionedFile<'static>) -> Self {
-        Self::File(MoleculeSemanticSearchFoundFile { entry })
+    pub fn data_room_entry(entry: MoleculeDataRoomEntry) -> Self {
+        Self::DataRoomEntry(MoleculeSemanticSearchFoundDataRoomEntry { entry })
     }
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeSemanticSearchFoundFile {
-    pub entry: MoleculeVersionedFile<'static>,
+pub struct MoleculeSemanticSearchFoundDataRoomEntry {
+    pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]

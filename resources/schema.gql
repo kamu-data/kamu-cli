@@ -3759,11 +3759,11 @@ type MoleculeSemanticSearchFoundAnnouncement {
 	entry: MoleculeAnnouncementEntry!
 }
 
-type MoleculeSemanticSearchFoundFile {
-	entry: MoleculeVersionedFile!
+type MoleculeSemanticSearchFoundDataRoomEntry {
+	entry: MoleculeDataRoomEntry!
 }
 
-union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundFile | MoleculeSemanticSearchFoundAnnouncement
+union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundDataRoomEntry | MoleculeSemanticSearchFoundAnnouncement
 
 type MoleculeSemanticSearchHitConnection {
 	"""
