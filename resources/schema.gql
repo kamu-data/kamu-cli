@@ -3742,8 +3742,8 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
-enum MoleculeSearchTypeInput {
-	DATA_ROOM_ENTRY
+enum MoleculeSearchEntityKindInput {
+	FILE
 	ANNOUNCEMENT
 }
 
@@ -3752,7 +3752,7 @@ input MoleculeSemanticSearchFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
-	byTypes: [MoleculeSearchTypeInput!]
+	byKinds: [MoleculeSearchEntityKindInput!]
 }
 
 type MoleculeSemanticSearchFoundAnnouncement {
