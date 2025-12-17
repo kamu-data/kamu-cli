@@ -851,7 +851,7 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // See: https://github.com/apache/datafusion/issues/7460
-#[test_group::group(engine, ingest, datafusion)]
+// #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_sql_case_sensitivity() {
     let harness = IngestTestHarness::new();

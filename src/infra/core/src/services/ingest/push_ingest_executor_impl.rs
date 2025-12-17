@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountQuotaStorageChecker, AccountService, CurrentAccountSubject};
+use kamu_accounts::{AccountQuotaStorageChecker, AccountService};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -35,7 +35,6 @@ pub struct PushIngestExecutorImpl {
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
     account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
     account_service: Arc<dyn AccountService>,
-    current_account_subject: CurrentAccountSubject,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,9 +45,11 @@ impl PushIngestExecutorImpl {
         target: &ResolvedDataset,
         incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaError> {
-        let account_name = self
-            .current_account_subject
-            .resolve_account_name_by_dataset_alias(target.get_alias());
+        // In single-tenant mode aliases does not carry account names; skip quota check
+        // in that case
+        let Some(account_name) = target.get_alias().account_name.clone() else {
+            return Ok(());
+        };
 
         let account = self
             .account_service
