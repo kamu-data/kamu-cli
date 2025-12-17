@@ -18,7 +18,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeDatasetAccessorFactory>();
 
     b.add::<MoleculeDataRoomCollectionServiceImpl>();
-    b.add::<MoleculeGlobalActivitiesServiceImpl>();
+    b.add::<MoleculeGlobalDataRoomActivitiesServiceImpl>();
     b.add::<MoleculeAnnouncementsServiceImpl>();
     b.add::<MoleculeProjectsServiceImpl>();
     b.add::<MoleculeVersionedFileContentProviderImpl>();
@@ -48,6 +48,8 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
     b.add::<MoleculeFindProjectAnnouncementUseCaseImpl>();
     b.add::<MoleculeViewProjectAnnouncementsUseCaseImpl>();
+
+    b.add::<MoleculeSearchUseCaseImpl>();
 
     register_message_dispatcher::<MoleculeProjectMessage>(
         b,

@@ -3289,6 +3289,7 @@ type MoleculeDataRoomEntry {
 	path: CollectionPath!
 	ref: DatasetID!
 	changeBy: String!
+	accessLevel: String!
 	asVersionedFile: MoleculeVersionedFile!
 }
 
@@ -3741,27 +3742,34 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
+enum MoleculeSearchEntityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
 input MoleculeSemanticSearchFilters {
 	byIpnftUids: [String!]
-	byCategories: [String!]
 	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byKinds: [MoleculeSearchEntityKindInput!]
 }
 
 type MoleculeSemanticSearchFoundAnnouncement {
 	entry: MoleculeAnnouncementEntry!
 }
 
-type MoleculeSemanticSearchFoundFile {
-	entry: MoleculeVersionedFile!
+type MoleculeSemanticSearchFoundDataRoomEntry {
+	entry: MoleculeDataRoomEntry!
 }
 
-union MoleculeSemanticSearchFoundItem = MoleculeSemanticSearchFoundFile | MoleculeSemanticSearchFoundAnnouncement
+union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundDataRoomEntry | MoleculeSemanticSearchFoundAnnouncement
 
-type MoleculeSemanticSearchFoundItemConnection {
+type MoleculeSemanticSearchHitConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeSemanticSearchFoundItem!]!
+	nodes: [MoleculeSemanticSearchHit!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3770,11 +3778,11 @@ type MoleculeSemanticSearchFoundItemConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeSemanticSearchFoundItemEdge!]!
+	edges: [MoleculeSemanticSearchHitEdge!]!
 }
 
-type MoleculeSemanticSearchFoundItemEdge {
-	node: MoleculeSemanticSearchFoundItem!
+type MoleculeSemanticSearchHitEdge {
+	node: MoleculeSemanticSearchHit!
 }
 
 type MoleculeV1 {
@@ -3814,7 +3822,7 @@ type MoleculeV2 {
 	- specific categories and tags
 	- only returning files or announcements
 	"""
-	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchFoundItemConnection!
+	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchHitConnection!
 }
 
 type MoleculeVersionedFile {

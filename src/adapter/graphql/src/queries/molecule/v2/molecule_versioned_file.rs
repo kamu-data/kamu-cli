@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
@@ -29,13 +31,13 @@ use crate::queries::molecule::v2::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeVersionedFile<'a> {
-    data_room_entry: &'a kamu_molecule_domain::MoleculeDataRoomEntry,
+    data_room_entry: Cow<'a, kamu_molecule_domain::MoleculeDataRoomEntry>,
     is_latest_data_room_entry: bool,
 }
 
 impl<'a> MoleculeVersionedFile<'a> {
     pub fn new(
-        data_room_entry: &'a kamu_molecule_domain::MoleculeDataRoomEntry,
+        data_room_entry: Cow<'a, kamu_molecule_domain::MoleculeDataRoomEntry>,
         is_latest_data_room_entry: bool,
     ) -> MoleculeVersionedFile<'a> {
         MoleculeVersionedFile {
@@ -57,7 +59,9 @@ impl MoleculeVersionedFile<'_> {
         //  it makes sense to rely on already loaded denormalized info
         if self.is_latest_data_room_entry {
             Ok(Some(
-                MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry),
+                MoleculeVersionedFileEntry::new_matching_data_room_entry(
+                    self.data_room_entry.as_ref(),
+                ),
             ))
         } else {
             // If as_of is specified on the data room entry, we don't know if that is the
@@ -83,7 +87,7 @@ impl MoleculeVersionedFile<'_> {
 
     /// Returns the versioned file entry that matches the data room entry
     pub async fn matching(&self) -> MoleculeVersionedFileEntry<'_> {
-        MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry)
+        MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry.as_ref())
     }
 
     /// Returns particular versioned file entry, regardless of data room version

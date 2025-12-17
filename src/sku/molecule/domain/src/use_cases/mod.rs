@@ -11,10 +11,12 @@ mod activities;
 mod announcements;
 mod data_rooms;
 mod projects;
+mod search;
 mod versioned_files;
 
 pub use activities::*;
 pub use announcements::*;
 pub use data_rooms::*;
 pub use projects::*;
+pub use search::*;
 pub use versioned_files::*;
