@@ -36,17 +36,17 @@ pub struct MoleculeSearchFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
-    pub by_types: Option<Vec<MoleculeSearchType>>,
+    pub by_kinds: Option<Vec<MoleculeSearchEntityKind>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum MoleculeSearchType {
+pub enum MoleculeSearchEntityKind {
     DataRoomActivity,
     Announcement,
 }
 
-impl MoleculeSearchType {
-    pub fn default_types() -> HashSet<MoleculeSearchType> {
+impl MoleculeSearchEntityKind {
+    pub fn default_kinds() -> HashSet<MoleculeSearchEntityKind> {
         [Self::DataRoomActivity, Self::Announcement].into()
     }
 }

@@ -9,18 +9,20 @@
 
 use std::collections::HashSet;
 
-use crate::{MoleculeSearchFilters, MoleculeSearchType};
+use crate::{MoleculeSearchEntityKind, MoleculeSearchFilters};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_search_types(filters: Option<&MoleculeSearchFilters>) -> HashSet<MoleculeSearchType> {
+pub fn get_search_entity_kinds(
+    filters: Option<&MoleculeSearchFilters>,
+) -> HashSet<MoleculeSearchEntityKind> {
     filters
         .and_then(|f| {
-            f.by_types
+            f.by_kinds
                 .as_ref()
-                .map(|types_as_vec| types_as_vec.iter().copied().collect())
+                .map(|kinds_as_vec| kinds_as_vec.iter().copied().collect())
         })
-        .unwrap_or_else(MoleculeSearchType::default_types)
+        .unwrap_or_else(MoleculeSearchEntityKind::default_kinds)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -342,7 +342,7 @@ pub struct MoleculeSemanticSearchFilters {
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
-    by_types: Option<Vec<MoleculeSearchTypeInput>>,
+    by_kinds: Option<Vec<MoleculeSearchEntityKindInput>>,
 }
 
 impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearchFilters {
@@ -352,26 +352,26 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
-            by_types: value
-                .by_types
-                .map(|types| types.into_iter().map(Into::into).collect()),
+            by_kinds: value
+                .by_kinds
+                .map(|kinds| kinds.into_iter().map(Into::into).collect()),
         }
     }
 }
 
 #[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MoleculeSearchTypeInput {
-    DataRoomEntry,
+pub enum MoleculeSearchEntityKindInput {
+    File,
     Announcement,
 }
 
-impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType {
-    fn from(value: MoleculeSearchTypeInput) -> Self {
-        use MoleculeSearchTypeInput as Gql;
-        use kamu_molecule_domain::MoleculeSearchType as Domain;
+impl From<MoleculeSearchEntityKindInput> for kamu_molecule_domain::MoleculeSearchEntityKind {
+    fn from(value: MoleculeSearchEntityKindInput) -> Self {
+        use MoleculeSearchEntityKindInput as Gql;
+        use kamu_molecule_domain::MoleculeSearchEntityKind as Domain;
 
         match value {
-            Gql::DataRoomEntry => Domain::DataRoomActivity,
+            Gql::File => Domain::DataRoomActivity,
             Gql::Announcement => Domain::Announcement,
         }
     }

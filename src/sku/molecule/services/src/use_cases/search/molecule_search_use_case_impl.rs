@@ -68,9 +68,9 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-        search_types: &HashSet<MoleculeSearchType>,
+        search_entity_kinds: &HashSet<MoleculeSearchEntityKind>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        if !search_types.contains(&MoleculeSearchType::DataRoomActivity) {
+        if !search_entity_kinds.contains(&MoleculeSearchEntityKind::DataRoomActivity) {
             return Ok(MoleculeSearchHitsListing::empty());
         }
 
@@ -143,9 +143,9 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-        search_types: &HashSet<MoleculeSearchType>,
+        search_entity_kinds: &HashSet<MoleculeSearchEntityKind>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        if !search_types.contains(&MoleculeSearchType::Announcement) {
+        if !search_entity_kinds.contains(&MoleculeSearchEntityKind::Announcement) {
             return Ok(MoleculeSearchHitsListing::empty());
         }
 
@@ -230,20 +230,20 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        let search_types = utils::get_search_types(filters.as_ref());
+        let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
 
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
             self.get_global_data_room_activities_listing(
                 molecule_subject,
                 prompt,
                 filters.clone(),
-                &search_types
+                &search_entity_kinds
             ),
             self.get_global_announcement_activities_listing(
                 molecule_subject,
                 prompt,
                 filters,
-                &search_types
+                &search_entity_kinds
             ),
         )?;
 

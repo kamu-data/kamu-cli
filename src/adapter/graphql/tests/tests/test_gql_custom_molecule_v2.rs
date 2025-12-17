@@ -8709,14 +8709,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: [DATA_ROOM_ENTRY]
+    // Filters: byKind: [FILE]
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byTypes": ["DATA_ROOM_ENTRY"],
+                    "byKinds": ["FILE"],
                 }
             })),
         )
@@ -8736,14 +8736,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: ANNOUNCEMENT
+    // Filters: byKind: ANNOUNCEMENT
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byTypes": ["ANNOUNCEMENT"],
+                    "byKinds": ["ANNOUNCEMENT"],
                 }
             })),
         )
@@ -8763,14 +8763,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: [ANNOUNCEMENT, DATA_ROOM_ENTRY]
+    // Filters: byKind: [ANNOUNCEMENT, FILE]
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byTypes": ["ANNOUNCEMENT", "DATA_ROOM_ENTRY"],
+                    "byKinds": ["ANNOUNCEMENT", "FILE"],
                 }
             })),
         )
@@ -9044,7 +9044,7 @@ async fn test_molecule_v2_search() {
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
-                    "byTypes": ["ANNOUNCEMENT"],
+                    "byKinds": ["ANNOUNCEMENT"],
                 }
             })),
         )
