@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountQuotaStorageChecker, CurrentAccountSubject};
+use kamu_accounts::{AccountQuotaStorageChecker, AccountService, CurrentAccountSubject};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -34,23 +34,30 @@ pub struct PushIngestExecutorImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
     account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
+    account_service: Arc<dyn AccountService>,
     current_account_subject: CurrentAccountSubject,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PushIngestExecutorImpl {
-    async fn ensure_quota(&self, incoming_size: u64) -> Result<(), kamu_accounts::QuotaError> {
-        // Unauthenticated accounts cannot ingest due to lack of quota context
-        let account_id = self
+    async fn ensure_quota(
+        &self,
+        target: &ResolvedDataset,
+        incoming_size: u64,
+    ) -> Result<(), kamu_accounts::QuotaError> {
+        let account_name = self
             .current_account_subject
-            .get_maybe_logged_account_id()
-            .cloned()
-            .ok_or_else(|| InternalError::new("Cannot resolve current account for quota check"))
+            .resolve_account_name_by_dataset_alias(target.get_alias());
+
+        let account = self
+            .account_service
+            .get_account_by_name(&account_name)
+            .await
             .int_err()?;
 
         self.account_quota_storage_checker
-            .ensure_within_quota(&account_id, incoming_size)
+            .ensure_within_quota(&account.id, incoming_size)
             .await?;
 
         Ok(())
@@ -77,7 +84,14 @@ impl PushIngestExecutorImpl {
         listener.begin();
 
         match self
-            .do_ingest_inner(plan.args, source, data_writer, ctx, listener.clone())
+            .do_ingest_inner(
+                target,
+                plan.args,
+                source,
+                data_writer,
+                ctx,
+                listener.clone(),
+            )
             .await
         {
             Ok(res) => {
@@ -102,6 +116,7 @@ impl PushIngestExecutorImpl {
     )]
     async fn do_ingest_inner(
         &self,
+        target: ResolvedDataset,
         args: PushIngestArgs,
         source: DataSource,
         mut data_writer: DataWriterDataFusion,
@@ -166,7 +181,7 @@ impl PushIngestExecutorImpl {
         match stage_result {
             Ok(staged) => {
                 let estimated_size = Self::estimate_staged_size(&staged)?;
-                self.ensure_quota(estimated_size).await?;
+                self.ensure_quota(&target, estimated_size).await?;
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let system_time = staged.system_time;

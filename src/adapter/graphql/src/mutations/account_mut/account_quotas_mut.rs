@@ -35,17 +35,24 @@ impl<'a> AccountQuotasMut<'a> {
         let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
         let account_id = self.account.id.clone();
 
-        let limit_total_bytes = quotas
-            .storage
-            .and_then(|s| s.limit_total_bytes)
-            .ok_or_else(|| GqlError::gql("storage.limitTotalBytes is required"))?;
+        let Some(limit_total_bytes) = quotas.storage.and_then(|s| s.limit_total_bytes) else {
+            return Ok(SetAccountQuotasResult::InvalidInput(
+                SetAccountQuotasResultInvalidInput {
+                    message: "storage.limitTotalBytes is required".to_string(),
+                },
+            ));
+        };
 
         quota_service
             .set_account_quota(&account_id, limit_total_bytes, QuotaType::storage_space())
             .await
             .map_err(map_set_quota_error)?;
 
-        Ok(SetAccountQuotasResult { success: true })
+        Ok(SetAccountQuotasResult::Success(
+            SetAccountQuotasResultSuccess {
+                message: String::new(),
+            },
+        ))
     }
 }
 
@@ -61,9 +68,38 @@ pub struct SetAccountQuotasStorageInput {
     pub limit_total_bytes: Option<u64>,
 }
 
+#[derive(Interface, Debug)]
+#[graphql(
+    field(name = "success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum SetAccountQuotasResult {
+    Success(SetAccountQuotasResultSuccess),
+    InvalidInput(SetAccountQuotasResultInvalidInput),
+}
+
 #[derive(SimpleObject, Debug)]
-pub struct SetAccountQuotasResult {
-    success: bool,
+pub struct SetAccountQuotasResultSuccess {
+    message: String,
+}
+
+#[ComplexObject]
+impl SetAccountQuotasResultSuccess {
+    pub async fn success(&self) -> bool {
+        true
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct SetAccountQuotasResultInvalidInput {
+    message: String,
+}
+
+#[ComplexObject]
+impl SetAccountQuotasResultInvalidInput {
+    pub async fn success(&self) -> bool {
+        false
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

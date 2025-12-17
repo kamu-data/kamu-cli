@@ -750,6 +750,14 @@ type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
 	message: String!
 }
 
+type CollectionUpdateErrorQuotaExceeded implements CollectionUpdateResult {
+	used: Int
+	incoming: Int
+	limit: Int
+	isSuccess: Boolean!
+	message: String!
+}
+
 input CollectionUpdateInput {
 	"""
 	Inserts a new entry under the specified path. If an entry at the target
@@ -3737,6 +3745,14 @@ type MoleculeProjectV2Edge {
 	node: MoleculeProjectV2!
 }
 
+type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult & MoleculeDataRoomUpdateFileMetadataResult {
+	used: Int
+	incoming: Int
+	limit: Int
+	isSuccess: Boolean!
+	message: String!
+}
+
 input MoleculeSemanticSearchFilters {
 	byIpnftUids: [String!]
 	byCategories: [String!]
@@ -4541,8 +4557,17 @@ input SetAccountQuotasInput {
 	storage: SetAccountQuotasStorageInput
 }
 
-type SetAccountQuotasResult {
+interface SetAccountQuotasResult {
 	success: Boolean!
+	message: String!
+}
+
+type SetAccountQuotasResultInvalidInput implements SetAccountQuotasResult {
+	message: String!
+}
+
+type SetAccountQuotasResultSuccess implements SetAccountQuotasResult {
+	message: String!
 }
 
 input SetAccountQuotasStorageInput {
@@ -5047,6 +5072,14 @@ type UpdateVersionErrorCasFailed implements UpdateVersionResult & MoleculeDataRo
 type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResult {
 	message: String!
 	isSuccess: Boolean!
+}
+
+type UpdateVersionErrorQuotaExceeded implements UpdateVersionResult {
+	used: Int
+	incoming: Int
+	limit: Int
+	isSuccess: Boolean!
+	message: String!
 }
 
 interface UpdateVersionResult {
