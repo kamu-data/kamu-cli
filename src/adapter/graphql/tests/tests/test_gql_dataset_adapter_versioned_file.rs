@@ -679,6 +679,10 @@ async fn test_versioned_file_extra_data() {
 async fn test_versioned_file_quota_exceeded() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
         .build()
         .await;
 
@@ -805,6 +809,8 @@ impl GraphQLDatasetsHarness {
     pub async fn new(
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        #[builder(default = PredefinedAccountOpts::default())]
+        predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
@@ -838,7 +844,7 @@ impl GraphQLDatasetsHarness {
             .build();
 
         let (_catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&base_catalog, PredefinedAccountOpts::default()).await;
+            authentication_catalogs(&base_catalog, predefined_account_opts).await;
 
         Self {
             base_gql_harness,

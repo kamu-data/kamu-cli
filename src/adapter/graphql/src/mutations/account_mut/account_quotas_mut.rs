@@ -27,6 +27,7 @@ impl<'a> AccountQuotasMut<'a> {
 
     /// Setting quotas at the account level.
     #[tracing::instrument(level = "info", name = AccountQuotasMut_set_account_quotas, skip_all)]
+    #[graphql(guard = "AdminGuard::new()")]
     pub async fn set_account_quotas(
         &self,
         ctx: &Context<'_>,

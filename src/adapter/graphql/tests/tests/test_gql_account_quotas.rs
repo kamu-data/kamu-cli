@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
+use bon::bon;
 use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
@@ -26,8 +27,13 @@ struct GraphQLAccountQuotasHarness {
     catalog_authorized: dill::Catalog,
 }
 
+#[bon]
 impl GraphQLAccountQuotasHarness {
-    pub async fn new() -> Self {
+    #[builder]
+    pub async fn new(
+        #[builder(default = PredefinedAccountOpts::default())]
+        predefined_account_opts: PredefinedAccountOpts,
+    ) -> Self {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -60,7 +66,7 @@ impl GraphQLAccountQuotasHarness {
             .build();
 
         let (_, catalog_authorized) =
-            authentication_catalogs(&catalog, PredefinedAccountOpts::default()).await;
+            authentication_catalogs(&catalog, predefined_account_opts).await;
 
         Self {
             schema: kamu_adapter_graphql::schema_quiet(),
@@ -87,7 +93,13 @@ impl GraphQLAccountQuotasHarness {
 
 #[test_log::test(tokio::test)]
 async fn test_set_and_get_account_quota() {
-    let harness = GraphQLAccountQuotasHarness::new().await;
+    let harness = GraphQLAccountQuotasHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
+        .build()
+        .await;
 
     // Set quota for default user
     let set_res = harness

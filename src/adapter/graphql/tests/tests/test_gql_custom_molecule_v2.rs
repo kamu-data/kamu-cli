@@ -21,7 +21,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
-use crate::utils::GraphQLQueryRequest;
+use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -878,6 +878,10 @@ async fn test_molecule_v2_data_room_quota_exceeded() {
 
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
         .build()
         .await;
 
@@ -3466,6 +3470,10 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
 
     let harness = GraphQLMoleculeV1Harness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
         .build()
         .await;
 
