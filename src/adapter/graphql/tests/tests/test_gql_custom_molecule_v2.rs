@@ -100,6 +100,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                 entry {
                   path
                   ref
+                  accessLevel
                   changeBy
                 }
               }
@@ -108,6 +109,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                 entry {
                   path
                   ref
+                  accessLevel
                   changeBy
                 }
               }
@@ -116,6 +118,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                 entry {
                   path
                   ref
+                  accessLevel
                   changeBy
                 }
               }
@@ -153,6 +156,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                   entry {
                     path
                     ref
+                    accessLevel
                     changeBy
                   }
                 }
@@ -161,6 +165,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                   entry {
                     path
                     ref
+                    accessLevel
                     changeBy
                   }
                 }
@@ -169,6 +174,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                   entry {
                     path
                     ref
+                    accessLevel
                     changeBy
                   }
                 }
@@ -1056,6 +1062,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1244,6 +1251,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1252,6 +1260,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1415,6 +1424,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1423,6 +1433,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1431,6 +1442,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1714,6 +1726,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -1722,6 +1735,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1730,6 +1744,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -1738,6 +1753,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2085,6 +2101,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -2093,6 +2110,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -2101,6 +2119,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2109,6 +2128,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2117,6 +2137,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2955,6 +2976,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2963,6 +2985,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -2971,6 +2994,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -2979,6 +3003,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2987,6 +3012,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -2995,6 +3021,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -3122,7 +3149,7 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "ref": file_1_did,
-                "accessLevel": "holder",
+                "accessLevel": "holders",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "description": "Plain text file that was updated... again",
                 "categories": ["test-category-1", "test-category-2"],
@@ -3181,7 +3208,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                     "asVersionedFile": {
                         "latest": {
-                            "accessLevel": "holder",
+                            "accessLevel": "holders",
                             "contentType": "text/plain",
                             "version": 3,
                             "description": "Plain text file that was updated... again",
@@ -3239,7 +3266,7 @@ async fn test_molecule_v2_data_room_operations() {
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
             "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1-updated\",\"accessControlConditions\":\"EM2-updated\",\"encryptedBy\":\"EM3-updated\",\"encryptedAt\":\"EM4-updated\",\"chain\":\"EM5-updated\",\"litSdkVersion\":\"EM6-updated\",\"litNetwork\":\"EM7-updated\",\"templateName\":\"EM8-updated\",\"contractVersion\":\"EM9-updated\"}",
-            "molecule_access_level": "holder",
+            "molecule_access_level": "holders",
             "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
         })
@@ -3253,6 +3280,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                     }
                 },
@@ -3261,6 +3289,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -3269,6 +3298,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -3277,6 +3307,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -3285,6 +3316,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
+                        "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -3293,6 +3325,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -3301,6 +3334,7 @@ async fn test_molecule_v2_data_room_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -3844,6 +3878,7 @@ async fn test_molecule_v2_announcements_operations() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                     }
                 },
@@ -3852,6 +3887,7 @@ async fn test_molecule_v2_announcements_operations() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     }
                 },
@@ -4810,6 +4846,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -4818,6 +4855,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -4958,6 +4996,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -4966,6 +5005,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -4974,6 +5014,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -4982,6 +5023,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5061,6 +5103,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5069,6 +5112,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5077,6 +5121,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5085,6 +5130,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5093,6 +5139,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5202,6 +5249,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5210,6 +5258,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5218,6 +5267,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5226,6 +5276,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5234,6 +5285,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5317,6 +5369,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5341,6 +5394,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5349,6 +5403,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5357,6 +5412,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5365,6 +5421,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5373,6 +5430,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5453,6 +5511,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5461,6 +5520,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5485,6 +5545,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5493,6 +5554,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5501,6 +5563,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5509,6 +5572,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
+                        "accessLevel": "holders",
                         "changeBy": USER_2,
                     }
                 },
@@ -5517,6 +5581,7 @@ async fn test_molecule_v2_activity() {
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
                         "changeBy": USER_1,
                     }
                 },
@@ -5685,6 +5750,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5693,6 +5759,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5717,6 +5784,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5725,6 +5793,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5733,6 +5802,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5741,6 +5811,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5749,6 +5820,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5784,6 +5856,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5792,6 +5865,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5816,6 +5890,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5824,6 +5899,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5832,6 +5908,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5840,6 +5917,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
                 "changeBy": USER_2,
             }
         },
@@ -5848,6 +5926,7 @@ async fn test_molecule_v2_activity() {
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
                 "changeBy": USER_1,
             }
         },
@@ -5948,6 +6027,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -5956,6 +6036,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -5980,6 +6061,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -5988,6 +6070,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -5996,6 +6079,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6004,6 +6088,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6012,6 +6097,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6050,6 +6136,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6058,6 +6145,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6082,6 +6170,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6090,6 +6179,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6098,6 +6188,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6106,6 +6197,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6114,6 +6206,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6152,6 +6245,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6160,6 +6254,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6184,6 +6279,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6192,6 +6288,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6200,6 +6297,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6208,6 +6306,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6216,6 +6315,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6356,6 +6456,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6364,6 +6465,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6388,6 +6490,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6396,6 +6499,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6404,6 +6508,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6412,6 +6517,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6420,6 +6526,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6458,6 +6565,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6466,6 +6574,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6490,6 +6599,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6498,6 +6608,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6506,6 +6617,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6514,6 +6626,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6522,6 +6635,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6560,6 +6674,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6568,6 +6683,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6592,6 +6708,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6600,6 +6717,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6608,6 +6726,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6616,6 +6735,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6624,6 +6744,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
+                                        "accessLevel": "public",
                                         "changeBy": USER_1,
                                     }
                                 },
@@ -6662,6 +6783,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6670,6 +6792,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6694,6 +6817,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6702,6 +6826,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6710,6 +6835,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6718,6 +6844,7 @@ async fn test_molecule_v2_activity() {
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
                                         "changeBy": USER_2,
                                     }
                                 },
@@ -6726,6 +6853,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6766,7 +6894,7 @@ async fn test_molecule_v2_activity() {
         })
     );
 
-    // Filters combination: [test-tag1] AND [test-category-1] AND [holders]
+    // Filters combination: [test-tag1] AND [test-category-1] AND [public]
     assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
@@ -6793,6 +6921,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6801,6 +6930,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6825,6 +6955,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6833,6 +6964,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6841,6 +6973,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6849,6 +6982,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
+                                //         "accessLevel": "holders",
                                 //         "changeBy": USER_2,
                                 //     }
                                 // },
@@ -6857,6 +6991,7 @@ async fn test_molecule_v2_activity() {
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
@@ -6960,6 +7095,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -6968,6 +7104,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -6992,6 +7129,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7000,6 +7138,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7008,6 +7147,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7016,6 +7156,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7024,6 +7165,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7072,6 +7214,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7080,6 +7223,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7104,6 +7248,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7112,6 +7257,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7120,6 +7266,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7128,6 +7275,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7136,6 +7284,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7184,6 +7333,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7192,6 +7342,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7216,6 +7367,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7224,6 +7376,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7232,6 +7385,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7240,6 +7394,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7248,6 +7403,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7296,6 +7452,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7304,6 +7461,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7328,6 +7486,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7336,6 +7495,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7344,6 +7504,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7352,6 +7513,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7360,6 +7522,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7408,6 +7571,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7416,6 +7580,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7440,6 +7605,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7448,6 +7614,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7456,6 +7623,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7464,6 +7632,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7472,6 +7641,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7520,6 +7690,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7528,6 +7699,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7552,6 +7724,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7560,6 +7733,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7568,6 +7742,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7576,6 +7751,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7584,6 +7760,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7632,6 +7809,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7640,6 +7818,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7664,6 +7843,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7672,6 +7852,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7680,6 +7861,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7688,6 +7870,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7696,6 +7879,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
+                                    "accessLevel": "public",
                                     "changeBy": USER_1,
                                 }
                             },
@@ -7744,6 +7928,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7752,6 +7937,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7776,6 +7962,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7784,6 +7971,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7792,6 +7980,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7800,6 +7989,7 @@ async fn test_molecule_v2_activity() {
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
                                     "changeBy": USER_2,
                                 }
                             },
@@ -7808,6 +7998,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7882,6 +8073,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7890,6 +8082,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7914,6 +8107,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7922,6 +8116,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7930,6 +8125,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
@@ -7938,6 +8134,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
+                            //         "accessLevel": "holders",
                             //         "changeBy": USER_2,
                             //     }
                             // },
@@ -7946,6 +8143,7 @@ async fn test_molecule_v2_activity() {
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
                             //         "changeBy": USER_1,
                             //     }
                             // },
