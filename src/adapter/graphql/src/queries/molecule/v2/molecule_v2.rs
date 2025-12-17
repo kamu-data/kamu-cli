@@ -359,9 +359,9 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
 
 #[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MoleculeSearchTypeInput {
-    OnlyFiles,
+    OnlyDataRoomEntries,
     OnlyAnnouncements,
-    FilesAndAnnouncements,
+    DataRoomEntriesAndAnnouncements,
 }
 
 impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType {
@@ -370,9 +370,9 @@ impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType 
         use kamu_molecule_domain::MoleculeSearchType as Domain;
 
         match value {
-            Gql::OnlyFiles => Domain::OnlyDataRoomActivities,
+            Gql::OnlyDataRoomEntries => Domain::OnlyDataRoomActivities,
             Gql::OnlyAnnouncements => Domain::OnlyAnnouncements,
-            Gql::FilesAndAnnouncements => Domain::DataRoomActivitiesAndAnnouncements,
+            Gql::DataRoomEntriesAndAnnouncements => Domain::DataRoomActivitiesAndAnnouncements,
         }
     }
 }

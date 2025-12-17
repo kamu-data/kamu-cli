@@ -3289,6 +3289,7 @@ type MoleculeDataRoomEntry {
 	path: CollectionPath!
 	ref: DatasetID!
 	changeBy: String!
+	accessLevel: String!
 	asVersionedFile: MoleculeVersionedFile!
 }
 
@@ -3742,9 +3743,9 @@ type MoleculeProjectV2Edge {
 }
 
 enum MoleculeSearchTypeInput {
-	ONLY_FILES
+	ONLY_DATA_ROOM_ENTRIES
 	ONLY_ANNOUNCEMENTS
-	FILES_AND_ANNOUNCEMENTS
+	DATA_ROOM_ENTRIES_AND_ANNOUNCEMENTS
 }
 
 input MoleculeSemanticSearchFilters {
