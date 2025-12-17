@@ -8376,7 +8376,7 @@ async fn test_molecule_v2_search() {
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                 "contentType": "text/plain",
                 "changeBy": USER_2,
-                "accessLevel": "public",
+                "accessLevel": "holders",
                 "description": "Plain te-x-t test file (baz)",
                 "categories": ["test-category-1"],
                 "tags": ["test-tag2"],
@@ -8481,13 +8481,13 @@ async fn test_molecule_v2_search() {
     let project_2_file_1_dataset_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
         "entry": {
-            "accessLevel": "public",
+            "accessLevel": "holders",
             "asDataset": {
                 "id": project_2_file_1_dataset_id
             },
             "asVersionedFile": {
                 "matching": {
-                    "accessLevel": "public",
+                    "accessLevel": "holders",
                     "categories": ["test-category-1"],
                     "changeBy": USER_2,
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
@@ -8949,6 +8949,87 @@ async fn test_molecule_v2_search() {
                 // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 1
+        })
+    );
+
+    // Filters: byAccessLevels: ["public"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byAccessLevels": ["public"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+
+    // Filters: byAccessLevels: ["holders"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byAccessLevels": ["holders"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+
+    // Filters: byAccessLevels: ["holders", "public"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byAccessLevels": ["holders", "public"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 4
         })
     );
 }
