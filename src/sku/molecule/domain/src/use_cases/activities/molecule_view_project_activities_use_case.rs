@@ -25,9 +25,18 @@ pub trait MoleculeViewProjectActivitiesUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
+        mode: MoleculeViewProjectActivitiesMode,
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum MoleculeViewProjectActivitiesMode {
+    LatestProjection,
+    LatestSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -148,9 +148,7 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
             list: search_results
                 .hits
                 .into_iter()
-                .map(|hit| {
-                    MoleculeGlobalAnnouncement::from_global_announcement_json(hit.id, hit.source)
-                })
+                .map(|hit| MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source))
                 .collect::<Result<Vec<_>, InternalError>>()?,
         })
     }

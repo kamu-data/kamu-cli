@@ -81,7 +81,7 @@ impl MoleculeAnnouncement {
 
         let record = serde_json::from_value::<AnnouncementRecord>(record).int_err()?;
 
-        Ok(MoleculeAnnouncement {
+        Ok(Self {
             system_time: record.timestamp_columns.system_time,
             event_time: record.timestamp_columns.event_time,
             announcement_id: announcement_uuid,
@@ -126,7 +126,7 @@ impl MoleculeGlobalAnnouncement {
         })
     }
 
-    pub fn from_global_announcement_json(
+    pub fn from_search_index_json(
         announcement_id: String,
         mut record: serde_json::Value,
     ) -> Result<Self, InternalError> {
@@ -152,7 +152,7 @@ impl MoleculeGlobalAnnouncement {
 
         let record = serde_json::from_value::<GlobalAnnouncementRecord>(record).int_err()?;
 
-        Ok(MoleculeGlobalAnnouncement {
+        Ok(Self {
             ipnft_uid: record.ipnft_uid,
             announcement: MoleculeAnnouncement {
                 system_time: record.timestamp_columns.system_time,

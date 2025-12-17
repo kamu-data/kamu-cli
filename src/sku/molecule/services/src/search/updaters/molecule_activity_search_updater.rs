@@ -48,8 +48,10 @@ impl MoleculeActivitySearchUpdater {
         published_message: &MoleculeActivityMessagePublished,
     ) -> Result<(), InternalError> {
         let activity_document = index_activity_from_data_room_publication_record(
+            &published_message.molecule_account_id,
             &published_message.activity_record,
             published_message.event_time,
+            published_message.offset,
         );
 
         let id = activity_schema::unique_id_for_data_room_activity(

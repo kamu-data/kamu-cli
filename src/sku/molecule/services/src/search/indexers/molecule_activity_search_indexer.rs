@@ -15,6 +15,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomActivity,
     MoleculeDataRoomActivityPayloadRecord,
     MoleculeGlobalActivity,
+    MoleculeViewGlobalActivitiesMode,
     MoleculeViewGlobalActivitiesUseCase,
     molecule_activity_full_text_search_schema as activity_schema,
 };
@@ -28,14 +29,23 @@ const BULK_SIZE: usize = 500;
 // Helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn index_data_room_activity(activity: &MoleculeDataRoomActivity) -> serde_json::Value {
+pub(crate) fn index_data_room_activity(
+    molecule_account_id: &odf::AccountID,
+    activity: &MoleculeDataRoomActivity,
+) -> serde_json::Value {
     serde_json::json!({
-        activity_schema::FIELD_CREATED_AT: activity.event_time,
-        activity_schema::FIELD_UPDATED_AT: activity.event_time,
+        activity_schema::FIELD_EVENT_TIME: activity.event_time,
+        activity_schema::FIELD_SYSTEM_TIME: activity.system_time,
+        activity_schema::FIELD_OFFSET: activity.offset,
+        activity_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id,
         activity_schema::FIELD_IPNFT_UID: activity.ipnft_uid,
         activity_schema::FIELD_ACTIVITY_TYPE: activity.activity_type,
-        activity_schema::FIELD_ENTRY_PATH: activity.path.to_string(),
-        activity_schema::FIELD_ENTRY_REF: activity.r#ref.to_string(),
+        activity_schema::FIELD_PATH: activity.path.to_string(),
+        activity_schema::FIELD_REF: activity.r#ref.to_string(),
+        activity_schema::FIELD_VERSION: activity.version,
+        activity_schema::FIELD_CONTENT_TYPE: activity.content_type,
+        activity_schema::FIELD_CONTENT_HASH: activity.content_hash,
+        activity_schema::FIELD_CONTENT_LENGTH: activity.content_length,
         activity_schema::FIELD_ACCESS_LEVEL: activity.access_level,
         activity_schema::FIELD_CHANGE_BY: activity.change_by,
         activity_schema::FIELD_DESCRIPTION: activity.description,
@@ -47,16 +57,24 @@ pub(crate) fn index_data_room_activity(activity: &MoleculeDataRoomActivity) -> s
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn index_activity_from_data_room_publication_record(
+    molecule_account_id: &odf::AccountID,
     activity_record: &MoleculeDataRoomActivityPayloadRecord,
     event_time: DateTime<Utc>,
+    offset: u64,
 ) -> serde_json::Value {
     serde_json::json!({
-        activity_schema::FIELD_CREATED_AT: event_time,
-        activity_schema::FIELD_UPDATED_AT: event_time,
+        activity_schema::FIELD_EVENT_TIME: event_time,
+        activity_schema::FIELD_SYSTEM_TIME: event_time,
+        activity_schema::FIELD_OFFSET: offset,
+        activity_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id,
         activity_schema::FIELD_IPNFT_UID: activity_record.ipnft_uid,
         activity_schema::FIELD_ACTIVITY_TYPE: activity_record.activity_type,
-        activity_schema::FIELD_ENTRY_PATH: activity_record.path.to_string(),
-        activity_schema::FIELD_ENTRY_REF: activity_record.r#ref.to_string(),
+        activity_schema::FIELD_PATH: activity_record.path.to_string(),
+        activity_schema::FIELD_REF: activity_record.r#ref.to_string(),
+        activity_schema::FIELD_VERSION: activity_record.version,
+        activity_schema::FIELD_CONTENT_TYPE: activity_record.content_type,
+        activity_schema::FIELD_CONTENT_HASH: activity_record.content_hash,
+        activity_schema::FIELD_CONTENT_LENGTH: activity_record.content_length,
         activity_schema::FIELD_ACCESS_LEVEL: activity_record.access_level,
         activity_schema::FIELD_CHANGE_BY: activity_record.change_by,
         activity_schema::FIELD_DESCRIPTION: activity_record.description,
@@ -93,6 +111,7 @@ pub(crate) async fn index_activities(
         let activities_listing = molecule_view_global_activities_uc
             .execute(
                 organization_account,
+                MoleculeViewGlobalActivitiesMode::LatestSource,
                 None, /* no filters */
                 Some(PaginationOpts {
                     limit: BULK_SIZE,
@@ -116,7 +135,8 @@ pub(crate) async fn index_activities(
             };
 
             // Serialize activity into search document
-            let document = index_data_room_activity(&data_room_activity);
+            let document =
+                index_data_room_activity(&organization_account.account_id, &data_room_activity);
 
             // Generate unique ID using molecule_account_id and the activity's offset
             let id = activity_schema::unique_id_for_data_room_activity(

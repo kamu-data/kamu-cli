@@ -10,22 +10,67 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_molecule_domain::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_molecule_domain::{
+    molecule_activity_full_text_search_schema as activity_schema,
+    molecule_announcement_full_text_search_schema as announcement_schema,
+    *,
+};
+use kamu_search::*;
 
-use crate::MoleculeDatasetAccessorFactory;
+use crate::{MoleculeDatasetAccessorFactory, map_molecule_activities_filters_to_search};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectActivitiesUseCase)]
 pub struct MoleculeViewProjectActivitiesUseCaseImpl {
+    catalog: dill::Catalog,
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
     view_project_announcements_uc: Arc<dyn MoleculeViewProjectAnnouncementsUseCase>,
+    full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 impl MoleculeViewProjectActivitiesUseCaseImpl {
-    async fn get_data_room_activities_listing(
+    async fn project_activities_from_source(
+        &self,
+        molecule_project: &MoleculeProject,
+        filters: Option<MoleculeActivitiesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+            self.data_room_activities_listing_from_source(molecule_project, filters.clone()),
+            self.announcement_activities_listing_from_source(molecule_project, filters),
+        )?;
+
+        // Get the total count before pagination
+        let total_count =
+            data_room_listing.total_count + announcement_activities_listing.total_count;
+
+        // Merge lists
+        let mut list = {
+            let mut v = Vec::with_capacity(total_count);
+            v.append(&mut data_room_listing.list);
+            v.append(&mut announcement_activities_listing.list);
+            v
+        };
+
+        // Sort by event time descending
+        list.sort_unstable_by_key(|item: &MoleculeProjectActivity| {
+            std::cmp::Reverse(item.event_time())
+        });
+
+        // Pagination
+        if let Some(pagination) = pagination {
+            let safe_offset = pagination.offset.min(total_count);
+            list.drain(..safe_offset);
+            list.truncate(pagination.limit);
+        }
+
+        Ok(MoleculeProjectActivityListing { list, total_count })
+    }
+
+    async fn data_room_activities_listing_from_source(
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
@@ -137,7 +182,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         })
     }
 
-    async fn get_announcement_activities_listing(
+    async fn announcement_activities_listing_from_source(
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
@@ -146,7 +191,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             .view_project_announcements_uc
             .execute(
                 molecule_project,
-                MoleculeViewProjectAnnouncementsMode::LatestProjection, /* LatestSource */
+                MoleculeViewProjectAnnouncementsMode::LatestSource,
                 filters.map(|filters| MoleculeAnnouncementsFilters {
                     by_tags: filters.by_tags,
                     by_categories: filters.by_categories,
@@ -174,6 +219,78 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             total_count: announcements_listing.total_count,
         })
     }
+
+    async fn project_activities_from_search(
+        &self,
+        molecule_project: &MoleculeProject,
+        filters: Option<MoleculeActivitiesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let ctx = FullTextSearchContext {
+            catalog: &self.catalog,
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // ipnft_uid equality
+            and_clauses.push(field_eq_str(
+                activity_schema::FIELD_IPNFT_UID,
+                &molecule_project.ipnft_uid,
+            ));
+
+            // filters by categories, tags, access levels
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_activities_filters_to_search(filters));
+            }
+
+            FullTextSearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .full_text_search_service
+            .search(
+                ctx,
+                FullTextSearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas: vec![
+                        // Query simultaneously both activities and announcements.
+                        // This should give mixed-type listing sorted by time desc
+                        announcement_schema::SCHEMA_NAME,
+                        activity_schema::SCHEMA_NAME,
+                    ],
+                    source: FullTextSearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    // this sorting field is available in both schemas
+                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    page: pagination.into(),
+                    options: FullTextSearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeProjectActivityListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| match hit.schema_name {
+                    activity_schema::SCHEMA_NAME => {
+                        MoleculeDataRoomActivity::from_search_index_json(hit.source)
+                            .map(MoleculeProjectActivity::DataRoomActivity)
+                    }
+                    announcement_schema::SCHEMA_NAME => {
+                        MoleculeAnnouncement::from_search_index_json(hit.id, hit.source)
+                            .map(MoleculeProjectActivity::Announcement)
+                    }
+                    _ => Err(InternalError::new(format!(
+                        "Unknown schema name: {schema_name}",
+                        schema_name = hit.schema_name
+                    ))),
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,39 +302,21 @@ impl MoleculeViewProjectActivitiesUseCase for MoleculeViewProjectActivitiesUseCa
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
+        mode: MoleculeViewProjectActivitiesMode,
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
-            self.get_data_room_activities_listing(molecule_project, filters.clone()),
-            self.get_announcement_activities_listing(molecule_project, filters),
-        )?;
+        match mode {
+            MoleculeViewProjectActivitiesMode::LatestSource => {
+                self.project_activities_from_source(molecule_project, filters, pagination)
+                    .await
+            }
 
-        // Get the total count before pagination
-        let total_count =
-            data_room_listing.total_count + announcement_activities_listing.total_count;
-
-        // Merge lists
-        let mut list = {
-            let mut v = Vec::with_capacity(total_count);
-            v.append(&mut data_room_listing.list);
-            v.append(&mut announcement_activities_listing.list);
-            v
-        };
-
-        // Sort by event time descending
-        list.sort_unstable_by_key(|item: &MoleculeProjectActivity| {
-            std::cmp::Reverse(item.event_time())
-        });
-
-        // Pagination
-        if let Some(pagination) = pagination {
-            let safe_offset = pagination.offset.min(total_count);
-            list.drain(..safe_offset);
-            list.truncate(pagination.limit);
+            MoleculeViewProjectActivitiesMode::LatestProjection => {
+                self.project_activities_from_search(molecule_project, filters, pagination)
+                    .await
+            }
         }
-
-        Ok(MoleculeProjectActivityListing { list, total_count })
     }
 }
 

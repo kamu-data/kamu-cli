@@ -15,6 +15,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomFileActivityType,
     MoleculeProjectActivity,
     MoleculeViewDataRoomActivitiesError,
+    MoleculeViewProjectActivitiesMode,
     MoleculeViewProjectActivitiesUseCase,
 };
 
@@ -146,6 +147,7 @@ impl MoleculeProjectV2 {
         let listing = view_project_activities_uc
             .execute(
                 &self.entity,
+                MoleculeViewProjectActivitiesMode::LatestProjection,
                 filters.map(Into::into),
                 Some(PaginationOpts {
                     limit: per_page,

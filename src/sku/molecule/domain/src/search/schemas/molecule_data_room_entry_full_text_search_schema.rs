@@ -72,7 +72,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     },
     FullTextSchemaField {
         path: FIELD_VERSION,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: FullTextSchemaFieldRole::Integer,
     },
     FullTextSchemaField {
         path: FIELD_CONTENT_TYPE,

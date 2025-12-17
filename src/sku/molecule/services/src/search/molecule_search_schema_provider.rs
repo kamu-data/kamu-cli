@@ -169,10 +169,10 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for MoleculeSearchSchemaPro
 
     fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
         &[
-            activity_schema::SCHEMA,
-            announcement_schema::SCHEMA,
-            data_room_entry_schema::SCHEMA,
             project_schema::SCHEMA,
+            data_room_entry_schema::SCHEMA,
+            announcement_schema::SCHEMA,
+            activity_schema::SCHEMA,
         ]
     }
 

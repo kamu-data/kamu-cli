@@ -21,14 +21,20 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+pub const FIELD_EVENT_TIME: &str = "event_time";
+pub const FIELD_SYSTEM_TIME: &str = "system_time";
+pub const FIELD_OFFSET: &str = "offset";
+pub const FIELD_MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
 pub const FIELD_ACTIVITY_TYPE: &str = "activity_type";
-pub const FIELD_ENTRY_PATH: &str = "entry_path";
-pub const FIELD_ENTRY_REF: &str = "entry_ref";
-pub const FIELD_ACCESS_LEVEL: &str = "access_level";
-pub const FIELD_CHANGE_BY: &str = "change_by";
+pub const FIELD_PATH: &str = "path";
+pub const FIELD_REF: &str = "ref";
+pub const FIELD_VERSION: &str = "version";
+pub const FIELD_CONTENT_TYPE: &str = "content_type";
+pub const FIELD_CONTENT_HASH: &str = "content_hash";
+pub const FIELD_CONTENT_LENGTH: &str = "content_length";
+pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
+pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
 pub const FIELD_DESCRIPTION: &str = "description";
 pub const FIELD_TAGS: &str = "tags";
 pub const FIELD_CATEGORIES: &str = "categories";
@@ -37,12 +43,20 @@ pub const FIELD_CATEGORIES: &str = "categories";
 
 const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
     FullTextSchemaField {
-        path: FIELD_CREATED_AT,
+        path: FIELD_EVENT_TIME,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: FIELD_SYSTEM_TIME,
         role: FullTextSchemaFieldRole::DateTime,
+    },
+    FullTextSchemaField {
+        path: FIELD_OFFSET,
+        role: FullTextSchemaFieldRole::Integer,
+    },
+    FullTextSchemaField {
+        path: FIELD_MOLECULE_ACCOUNT_ID,
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_IPNFT_UID,
@@ -53,12 +67,28 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
-        path: FIELD_ENTRY_PATH,
+        path: FIELD_PATH,
         role: FullTextSchemaFieldRole::Keyword, // Not identifier in this index, filters only
     },
     FullTextSchemaField {
-        path: FIELD_ENTRY_REF,
+        path: FIELD_REF,
         role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_VERSION,
+        role: FullTextSchemaFieldRole::Integer,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_TYPE,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_HASH,
+        role: FullTextSchemaFieldRole::Keyword,
+    },
+    FullTextSchemaField {
+        path: FIELD_CONTENT_LENGTH,
+        role: FullTextSchemaFieldRole::Integer,
     },
     FullTextSchemaField {
         path: FIELD_ACCESS_LEVEL,
@@ -91,7 +121,7 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
-    title_field: "_id", // Questionable
+    title_field: "_id",
     enable_banning: false,
 };
 
