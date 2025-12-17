@@ -26,9 +26,9 @@ use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
     DatasetKeyValueServiceSysEnv,
     DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
     QuotaDefaultsConfig,
 };
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -285,7 +285,7 @@ impl TestHarness {
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()

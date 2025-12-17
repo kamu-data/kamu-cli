@@ -38,8 +38,8 @@ use kamu_datasets::{
 };
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
     UpdateVersionedFileUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -187,7 +187,7 @@ impl UpdateVersionFileCaseHarness {
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))

@@ -59,11 +59,11 @@ pub trait AccountQuotaEventStore: EventStore<AccountQuotaState> {
     async fn get_quota_by_account_id(
         &self,
         account_id: &odf::AccountID,
-        quota_type: QuotaType,
+        quota_type: &QuotaType,
     ) -> Result<AccountQuota, GetAccountQuotaError> {
         self.get_quota(&AccountQuotaQuery {
             account_id: account_id.clone(),
-            quota_type,
+            quota_type: quota_type.clone(),
         })
         .await
     }
@@ -117,4 +117,19 @@ impl From<SaveEventsError> for SaveAccountQuotaError {
             SaveEventsError::Internal(err) => SaveAccountQuotaError::Internal(err),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Shared DB Row
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+#[derive(sqlx::FromRow)]
+pub struct AccountQuotaEventRow {
+    pub id: i64,
+    pub account_id: String,
+    pub quota_type: String,
+    pub event_type: String,
+    pub event_payload: serde_json::Value,
+    pub event_time: chrono::DateTime<chrono::Utc>,
 }

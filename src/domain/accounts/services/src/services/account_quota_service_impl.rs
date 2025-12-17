@@ -114,7 +114,7 @@ impl AccountQuotaService for AccountQuotaServiceImpl {
         quota_type: QuotaType,
     ) -> Result<kamu_accounts::AccountQuota, kamu_accounts::GetAccountQuotaError> {
         self.account_quota_store
-            .get_quota_by_account_id(account_id, quota_type)
+            .get_quota_by_account_id(account_id, &quota_type)
             .await
     }
 }

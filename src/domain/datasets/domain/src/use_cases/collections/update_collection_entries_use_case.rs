@@ -125,7 +125,7 @@ pub enum UpdateCollectionEntriesUseCaseError {
     QuotaExceeded(
         #[from]
         #[backtrace]
-        kamu_accounts::QuotaExceededError,
+        kamu_accounts::QuotaError,
     ),
 
     #[error(transparent)]

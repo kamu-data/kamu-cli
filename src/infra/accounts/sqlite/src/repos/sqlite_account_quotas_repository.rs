@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
 use dill::{component, interface};
 use event_sourcing::{EventID, EventStore, GetEventsOpts, SaveEventsError};
@@ -34,7 +33,8 @@ impl SqliteAccountQuotaEventStore {
     fn parse_event(
         row: &AccountQuotaEventRow,
     ) -> Result<(EventID, AccountQuotaEvent), InternalError> {
-        let event: AccountQuotaEvent = serde_json::from_str(&row.event_payload).int_err()?;
+        let event: AccountQuotaEvent =
+            serde_json::from_value(row.event_payload.clone()).int_err()?;
 
         Ok((EventID::new(row.id), event))
     }
@@ -278,21 +278,4 @@ impl AccountQuotaEventStore for SqliteAccountQuotaEventStore {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(sqlx::FromRow)]
-struct AccountQuotaEventRow {
-    #[allow(dead_code)]
-    pub id: i64,
-    #[allow(dead_code)]
-    pub account_id: String,
-    #[allow(dead_code)]
-    pub quota_type: String,
-    #[allow(dead_code)]
-    pub event_type: String,
-    pub event_payload: String,
-    #[allow(dead_code)]
-    pub event_time: DateTime<Utc>,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

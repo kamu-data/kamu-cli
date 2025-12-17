@@ -40,10 +40,7 @@ pub struct PushIngestExecutorImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PushIngestExecutorImpl {
-    async fn ensure_quota(
-        &self,
-        incoming_size: u64,
-    ) -> Result<(), kamu_accounts::QuotaExceededError> {
+    async fn ensure_quota(&self, incoming_size: u64) -> Result<(), kamu_accounts::QuotaError> {
         // Unauthenticated accounts cannot ingest due to lack of quota context
         let account_id = self
             .current_account_subject

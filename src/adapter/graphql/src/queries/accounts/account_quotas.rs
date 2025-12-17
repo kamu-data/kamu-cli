@@ -71,7 +71,7 @@ impl<'a> AccountQuotasUsageStorage<'a> {
             .await
             .map_err(map_get_quota_error)?;
 
-        Ok(quota.quota_payload.value as u64)
+        Ok(quota.quota_payload.value)
     }
 }
 

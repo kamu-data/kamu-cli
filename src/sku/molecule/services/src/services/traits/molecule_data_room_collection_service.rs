@@ -97,7 +97,7 @@ pub enum MoleculeDataRoomCollectionWriteError {
     Access(#[from] odf::AccessError),
 
     #[error(transparent)]
-    QuotaExceeded(#[from] kamu_accounts::QuotaExceededError),
+    QuotaExceeded(#[from] kamu_accounts::QuotaError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

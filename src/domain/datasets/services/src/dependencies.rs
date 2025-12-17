@@ -45,7 +45,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool)
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();
-    b.add::<QuotaCheckerStorageImpl>();
+    b.add::<AccountQuotaCheckerStorageImpl>();
     b.add::<kamu_core::DidSecretService>();
 
     b.add::<DatasetAliasUpdateHandler>();

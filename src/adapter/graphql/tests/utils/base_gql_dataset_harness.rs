@@ -24,7 +24,7 @@ use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{InMemoryDatasetStatisticsRepository, *};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::{DatasetStatisticsServiceImpl, QuotaCheckerStorageImpl, *};
+use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -93,7 +93,7 @@ impl BaseGQLDatasetHarness {
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
-                .add::<QuotaCheckerStorageImpl>()
+                .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));
 

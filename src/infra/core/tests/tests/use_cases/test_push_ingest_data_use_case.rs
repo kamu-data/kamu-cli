@@ -20,8 +20,8 @@ use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
     QuotaDefaultsConfig,
 };
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
@@ -245,7 +245,7 @@ impl PushIngestDataUseCaseHarness {
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();

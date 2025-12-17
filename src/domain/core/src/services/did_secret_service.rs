@@ -88,16 +88,24 @@ impl MessageConsumer for DidSecretService {}
 
 #[async_trait::async_trait]
 impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DidSecretService[AccountLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &dill::Catalog,
         message: &AccountLifecycleMessage,
     ) -> Result<(), InternalError> {
-        if let AccountLifecycleMessage::Deleted(message) = message {
-            self.handle_account_lifecycle_deleted_message(message)
+        match message {
+            AccountLifecycleMessage::Deleted(message) => self
+                .handle_account_lifecycle_deleted_message(message)
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .map_err(ErrorIntoInternal::int_err)?,
+            AccountLifecycleMessage::Renamed(_)
+            | AccountLifecycleMessage::Created(_)
+            | AccountLifecycleMessage::PasswordChanged(_) => {}
         }
 
         Ok(())
@@ -106,16 +114,23 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DidSecretService[DatasetLifecycleMessage]"
+    )]
     async fn consume_message(
         &self,
         _: &dill::Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        if let DatasetLifecycleMessage::Deleted(message) = message {
-            self.handle_dataset_lifecycle_deleted_message(message)
-                .await
-                .map_err(ErrorIntoInternal::int_err)?;
+        match message {
+            DatasetLifecycleMessage::Deleted(message) => {
+                self.handle_dataset_lifecycle_deleted_message(message)
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?;
+            }
+            DatasetLifecycleMessage::Renamed(_) | DatasetLifecycleMessage::Created(_) => {}
         }
 
         Ok(())

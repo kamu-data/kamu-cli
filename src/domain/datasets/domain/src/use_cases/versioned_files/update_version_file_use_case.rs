@@ -68,7 +68,7 @@ pub enum UpdateVersionFileUseCaseError {
     QuotaExceeded(
         #[from]
         #[backtrace]
-        kamu_accounts::QuotaExceededError,
+        kamu_accounts::QuotaError,
     ),
 
     #[error(transparent)]

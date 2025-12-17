@@ -750,10 +750,12 @@ async fn test_versioned_file_quota_exceeded() {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
                                 uploadNewVersion(content: $content) {
-                                    ... on UpdateVersionSuccess {
-                                        newVersion
-                                        contentHash
-                                        newHead
+                                    isSuccess
+                                    message
+                                    ... on UpdateVersionErrorQuotaExceeded {
+                                        used
+                                        incoming
+                                        limit
                                     }
                                 }
                             }
@@ -769,11 +771,21 @@ async fn test_versioned_file_quota_exceeded() {
         )
         .await;
 
-    assert!(second_upload.is_err(), "{second_upload:#?}");
-    let msg = &second_upload.errors[0].message;
+    assert!(second_upload.is_ok(), "{second_upload:#?}");
+    let upload_result = second_upload.data.into_json().unwrap()["datasets"]["byId"]
+        ["asVersionedFile"]["uploadNewVersion"]
+        .clone();
+    assert_eq!(upload_result["isSuccess"], json!(false));
+    let msg = upload_result["message"].as_str().unwrap();
     assert!(
         msg.contains("Quota exceeded"),
         "unexpected error message: {msg}"
+    );
+    assert_eq!(upload_result["used"], json!(2900));
+    assert_eq!(upload_result["limit"], json!(3000));
+    assert!(
+        upload_result["incoming"].as_u64().unwrap() > 0,
+        "expected positive incoming size"
     );
 }
 

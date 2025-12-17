@@ -6869,6 +6869,7 @@ dependencies = [
  "reusable",
  "secrecy",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.27.2",

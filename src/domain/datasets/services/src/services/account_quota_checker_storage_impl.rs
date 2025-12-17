@@ -13,7 +13,7 @@ use kamu_accounts::{
     AccountQuotaEventStore,
     AccountQuotaStorageChecker,
     GetAccountQuotaError,
-    QuotaExceededError,
+    QuotaError,
     QuotaType,
     QuotaUnit,
 };
@@ -25,7 +25,7 @@ use crate::quota_defaults_config::QuotaDefaultsConfig;
 
 #[dill::component]
 #[dill::interface(dyn AccountQuotaStorageChecker)]
-pub struct QuotaCheckerStorageImpl {
+pub struct AccountQuotaCheckerStorageImpl {
     quota_store: Arc<dyn AccountQuotaEventStore>,
     dataset_stats: Arc<dyn DatasetStatisticsService>,
     quota_defaults_config: QuotaDefaultsConfig,
@@ -33,30 +33,32 @@ pub struct QuotaCheckerStorageImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl QuotaCheckerStorageImpl {}
+impl AccountQuotaCheckerStorageImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AccountQuotaStorageChecker for QuotaCheckerStorageImpl {
+impl AccountQuotaStorageChecker for AccountQuotaCheckerStorageImpl {
     async fn ensure_within_quota(
         &self,
         account_id: &odf::AccountID,
         incoming_bytes: u64,
-    ) -> Result<(), QuotaExceededError> {
+    ) -> Result<(), QuotaError> {
+        let quota_type = QuotaType::storage_space();
+
         let quota_payload_value = match self
             .quota_store
-            .get_quota_by_account_id(account_id, QuotaType::storage_space())
+            .get_quota_by_account_id(account_id, &quota_type)
             .await
         {
             Ok(quota) => {
                 if quota.quota_payload.units != QuotaUnit::Bytes {
-                    return Err(QuotaExceededError::NotConfigured);
+                    return Err(QuotaError::NotConfigured);
                 }
                 quota.quota_payload.value
             }
             Err(GetAccountQuotaError::NotFound(_)) => self.quota_defaults_config.storage,
-            Err(GetAccountQuotaError::Internal(e)) => return Err(QuotaExceededError::Internal(e)),
+            Err(GetAccountQuotaError::Internal(e)) => return Err(QuotaError::Internal(e)),
         };
 
         let used = match self
@@ -65,11 +67,11 @@ impl AccountQuotaStorageChecker for QuotaCheckerStorageImpl {
             .await
         {
             Ok(stat) => stat.get_size_summary(),
-            Err(e) => return Err(QuotaExceededError::Internal(e)),
+            Err(e) => return Err(QuotaError::Internal(e)),
         };
 
         if used + incoming_bytes > quota_payload_value {
-            Err(QuotaExceededError::Limit(kamu_accounts::LimitError {
+            Err(QuotaError::Exceeded(kamu_accounts::QuotaExceededError {
                 used,
                 incoming: incoming_bytes,
                 limit: quota_payload_value,

@@ -22,8 +22,8 @@ use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
     QuotaDefaultsConfig,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -79,7 +79,7 @@ impl TransformTestHarness {
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())

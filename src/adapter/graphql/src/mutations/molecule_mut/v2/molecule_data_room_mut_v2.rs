@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, QuotaError};
 use kamu_datasets::ContentArgs;
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
@@ -149,7 +149,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Add the file to the data room.
 
-        let data_room_entry = create_data_room_entry_uc
+        let data_room_entry = match create_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
@@ -159,16 +159,21 @@ impl MoleculeDataRoomMutV2 {
                 versioned_file_entry.to_denormalized(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeCreateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeCreateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                MoleculeCreateDataRoomEntryError::QuotaExceeded(e) => {
-                    GqlError::gql(format!("Quota exceeded: {e}"))
-                }
-                e @ MoleculeCreateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeCreateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeCreateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeCreateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeCreateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
@@ -280,7 +285,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        let updated_data_room_entry = update_data_room_entry_uc
+        let updated_data_room_entry = match update_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
@@ -290,16 +295,21 @@ impl MoleculeDataRoomMutV2 {
                 versioned_file_entry.to_denormalized(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
-                    GqlError::gql(format!("Quota exceeded: {e}"))
-                }
-                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeUpdateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
@@ -675,7 +685,9 @@ impl MoleculeDataRoomMutV2 {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
             Err(MoleculeMoveDataRoomEntryError::QuotaExceeded(e)) => {
-                Err(GqlError::gql(format!("Quota exceeded: {e}")))
+                Ok(MoleculeDataRoomMoveEntryResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ))
             }
             Err(e @ MoleculeMoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -739,7 +751,9 @@ impl MoleculeDataRoomMutV2 {
                 Err(GqlError::gql("Data room linking: CAS failed"))
             }
             Err(MoleculeRemoveDataRoomEntryError::QuotaExceeded(e)) => {
-                Err(GqlError::gql(format!("Quota exceeded: {e}")))
+                Ok(MoleculeDataRoomRemoveEntryResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ))
             }
             Err(e @ MoleculeRemoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -838,7 +852,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 2. Update the file state in the data room.
 
-        let updated_data_room_entry = update_data_room_entry_uc
+        let updated_data_room_entry = match update_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
@@ -848,16 +862,21 @@ impl MoleculeDataRoomMutV2 {
                 new_denormalized_file_info.clone(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                MoleculeUpdateDataRoomEntryError::QuotaExceeded(e) => {
-                    GqlError::gql(format!("Quota exceeded: {e}"))
-                }
-                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeUpdateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 3. Log the activity.
         // TODO: asynchronous write of activity log
@@ -916,6 +935,7 @@ impl MoleculeDataRoomMutV2 {
 )]
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -946,6 +966,7 @@ pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
     EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -1004,6 +1025,7 @@ impl MoleculeDataRoomUpdateUpToDate {
 pub enum MoleculeDataRoomRemoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
     EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1020,6 +1042,7 @@ pub enum MoleculeDataRoomUpdateFileMetadataResult {
     FileNotFound(MoleculeDataRoomUpdateFileMetadataResultFileNotFound),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -1072,3 +1095,63 @@ impl MoleculeDataRoomUpdateFileMetadataResultFileNotFound {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeQuotaExceeded {
+    pub used: Option<u64>,
+    pub incoming: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+impl From<QuotaExceededDetails> for MoleculeQuotaExceeded {
+    fn from(value: QuotaExceededDetails) -> Self {
+        Self {
+            used: value.used,
+            incoming: value.incoming,
+            limit: value.limit,
+        }
+    }
+}
+
+#[ComplexObject]
+impl MoleculeQuotaExceeded {
+    async fn is_success(&self) -> bool {
+        false
+    }
+
+    async fn message(&self) -> String {
+        quota_exceeded_message(self.used, self.incoming, self.limit)
+    }
+}
+
+struct QuotaExceededDetails {
+    used: Option<u64>,
+    incoming: Option<u64>,
+    limit: Option<u64>,
+}
+
+fn quota_result(err: QuotaError) -> Result<QuotaExceededDetails, GqlError> {
+    match err {
+        QuotaError::Exceeded(e) => Ok(QuotaExceededDetails {
+            used: Some(e.used),
+            incoming: Some(e.incoming),
+            limit: Some(e.limit),
+        }),
+        QuotaError::NotConfigured => Ok(QuotaExceededDetails {
+            used: None,
+            incoming: None,
+            limit: None,
+        }),
+        QuotaError::Internal(e) => Err(e.into()),
+    }
+}
+
+fn quota_exceeded_message(used: Option<u64>, incoming: Option<u64>, limit: Option<u64>) -> String {
+    match (used, incoming, limit) {
+        (Some(used), Some(incoming), Some(limit)) => {
+            format!("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")
+        }
+        _ => "Quota exceeded".to_string(),
+    }
+}

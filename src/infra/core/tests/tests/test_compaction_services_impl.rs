@@ -26,8 +26,8 @@ use kamu_core::auth;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
-    QuotaCheckerStorageImpl,
     QuotaDefaultsConfig,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -1413,7 +1413,7 @@ impl CompactTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
@@ -1479,7 +1479,7 @@ impl CompactTestHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add::<QuotaCheckerStorageImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()

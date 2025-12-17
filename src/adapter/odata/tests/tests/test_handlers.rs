@@ -40,7 +40,7 @@ use kamu_auth_rebac_services::{
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::{DatasetStatisticsServiceImpl, QuotaCheckerStorageImpl, *};
+use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -446,7 +446,7 @@ impl TestHarness {
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
-                .add::<QuotaCheckerStorageImpl>()
+                .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(DidSecretEncryptionConfig::sample());
 

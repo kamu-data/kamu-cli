@@ -179,7 +179,7 @@ impl ServerSideLocalFsHarness {
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
-                .add::<QuotaCheckerStorageImpl>()
+                .add::<AccountQuotaCheckerStorageImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(QuotaDefaultsConfig::default())

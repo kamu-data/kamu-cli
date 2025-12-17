@@ -162,7 +162,7 @@ pub enum PushIngestError {
     QuotaExceeded(
         #[from]
         #[backtrace]
-        kamu_accounts::QuotaExceededError,
+        kamu_accounts::QuotaError,
     ),
 
     #[error(transparent)]

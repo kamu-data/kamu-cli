@@ -32,9 +32,9 @@ pub trait AccountQuotaService: Sync + Send {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum QuotaExceededError {
+pub enum QuotaError {
     #[error(transparent)]
-    Limit(#[from] LimitError),
+    Exceeded(#[from] QuotaExceededError),
 
     #[error("Quota not configured")]
     NotConfigured,
@@ -45,7 +45,7 @@ pub enum QuotaExceededError {
 
 #[derive(Debug, thiserror::Error)]
 #[error("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")]
-pub struct LimitError {
+pub struct QuotaExceededError {
     pub used: u64,
     pub incoming: u64,
     pub limit: u64,
@@ -57,7 +57,7 @@ pub trait AccountQuotaStorageChecker: Sync + Send {
         &self,
         account_id: &odf::AccountID,
         incoming_bytes: u64,
-    ) -> Result<(), QuotaExceededError>;
+    ) -> Result<(), QuotaError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
