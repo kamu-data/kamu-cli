@@ -56,16 +56,22 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             df
         };
 
-        // For any data room update, we always have two entries: -C and +C.
-        // We can ignore all -C entries.
+        //
+
         use datafusion::logical_expr::{col, lit};
         use odf::metadata::OperationType;
 
         let vocab = odf::metadata::DatasetVocabulary::default();
         let df = df
             .filter(
-                col(vocab.operation_type_column.as_str())
-                    .not_eq(lit(OperationType::CorrectFrom as i32)),
+                // We ignore all records with `molecule_access_level == null` as those are pre
+                // V2 migration
+                col("molecule_access_level").is_not_null().and(
+                    // For any data room update, we always have two entries: -C and +C.
+                    // We can ignore all -C entries.
+                    col(vocab.operation_type_column.as_str())
+                        .not_eq(lit(OperationType::CorrectFrom as i32)),
+                ),
             )
             .int_err()?;
 
