@@ -8377,7 +8377,7 @@ async fn test_molecule_v2_search() {
                 "contentType": "text/plain",
                 "changeBy": USER_2,
                 "accessLevel": "public",
-                "description": "Plain te-x-t file (baz)",
+                "description": "Plain te-x-t test file (baz)",
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello foo",
@@ -8493,7 +8493,7 @@ async fn test_molecule_v2_search() {
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                     "contentText": "hello foo",
                     "contentType": "text/plain",
-                    "description": "Plain te-x-t file (baz)",
+                    "description": "Plain te-x-t test file (baz)",
                     "encryptionMetadata": null,
                     "tags": ["test-tag1", "test-tag2"],
                     "version": 1
@@ -8532,12 +8532,12 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Prompt: "text" (files + announcement (body))
+    // Prompt: "tEXt" (files + announcement (body))
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
-                "prompt": "text",
+                "prompt": "tEXt",
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -8551,6 +8551,30 @@ async fn test_molecule_v2_search() {
                 project_2_announcement_1_id_search_hit_node,
                 project_1_announcement_1_id_search_hit_node,
                 project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 3
+        })
+    );
+
+    // Prompt: "tESt" (files + announcement (headline))
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "tESt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                // project_1_file_1_dataset_id_search_hit_node,
             ],
             "totalCount": 3
         })
