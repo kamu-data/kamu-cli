@@ -301,30 +301,42 @@ const SEARCH_QUERY: &str = indoc!(
           search(prompt: $prompt, filters: $filters) {
             totalCount
             nodes {
-              ... on MoleculeSemanticSearchFoundFile {
+              ... on MoleculeSemanticSearchFoundDataRoomEntry {
                 __typename
                 entry {
-                  matching {
-                    version
-                    contentType
-                    accessLevel
-                    changeBy
-                    description
-                    categories
-                    tags
-                    contentText
-                    encryptionMetadata {
-                      dataToEncryptHash
-                      accessControlConditions
-                      encryptedBy
-                      encryptedAt
-                      chain
-                      litSdkVersion
-                      litNetwork
-                      templateName
-                      contractVersion
+                  project {
+                    ipnftUid
+                  }
+                  asDataset {
+                    id
+                  }
+                  path
+                  ref
+                  changeBy
+                  accessLevel
+                  asVersionedFile {
+                    matching {
+                      version
+                      contentType
+                      accessLevel
+                      changeBy
+                      description
+                      categories
+                      tags
+                      contentText
+                      encryptionMetadata {
+                        dataToEncryptHash
+                        accessControlConditions
+                        encryptedBy
+                        encryptedAt
+                        chain
+                        litSdkVersion
+                        litNetwork
+                        templateName
+                        contractVersion
+                      }
+                      content
                     }
-                    content
                   }
                 }
               }
@@ -8363,7 +8375,7 @@ async fn test_molecule_v2_search() {
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                 "contentType": "text/plain",
-                "changeBy": USER_1,
+                "changeBy": USER_2,
                 "accessLevel": "public",
                 "description": "Plain text file (baz)",
                 "categories": ["test-category"],
@@ -8421,20 +8433,32 @@ async fn test_molecule_v2_search() {
         json!({
             "nodes": [
                 {
-                    "__typename": "MoleculeSemanticSearchFoundFile",
+                    "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
                     "entry": {
-                        "matching": {
-                            "accessLevel": "public",
-                            "categories": ["test-category"],
-                            "changeBy": USER_1,
-                            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
-                            "contentText": "hello foo",
-                            "contentType": "text/plain",
-                            "description": "Plain text file (baz)",
-                            "encryptionMetadata": null,
-                            "tags": ["test-tag1", "test-tag2"],
-                            "version": 1
-                        }
+                        "accessLevel": "public",
+                        "asDataset": {
+                            "id": project_2_file_1_dataset_id
+                        },
+                        "asVersionedFile": {
+                            "matching": {
+                                "accessLevel": "public",
+                                "categories": ["test-category"],
+                                "changeBy": USER_2,
+                                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
+                                "contentText": "hello foo",
+                                "contentType": "text/plain",
+                                "description": "Plain text file (baz)",
+                                "encryptionMetadata": null,
+                                "tags": ["test-tag1", "test-tag2"],
+                                "version": 1
+                            }
+                        },
+                        "changeBy": USER_2,
+                        "path": "/foo.txt",
+                        "project": {
+                            "ipnftUid": PROJECT_2_UID,
+                        },
+                        "ref": project_2_file_1_dataset_id,
                     }
                 },
                 {
@@ -8470,20 +8494,32 @@ async fn test_molecule_v2_search() {
                     }
                 },
                 {
-                    "__typename": "MoleculeSemanticSearchFoundFile",
+                    "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
                     "entry": {
-                        "matching": {
-                            "accessLevel": "public",
-                            "categories": ["test-category"],
-                            "changeBy": USER_1,
-                            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
-                            "contentText": null,
-                            "contentType": "application/octet-stream",
-                            "description": "Plain text file (foo) -- updated",
-                            "encryptionMetadata": null,
-                            "tags": ["test-tag1", "test-tag2"],
-                            "version": 2
-                        }
+                        "accessLevel": "public",
+                        "asDataset": {
+                            "id": project_1_file_1_dataset_id
+                        },
+                        "asVersionedFile": {
+                            "matching": {
+                                "accessLevel": "public",
+                                "categories": ["test-category"],
+                                "changeBy": USER_1,
+                                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
+                                "contentText": null,
+                                "contentType": "application/octet-stream",
+                                "description": "Plain text file (foo) -- updated",
+                                "encryptionMetadata": null,
+                                "tags": ["test-tag1", "test-tag2"],
+                                "version": 2
+                            }
+                        },
+                        "changeBy": USER_1,
+                        "path": "/foo_renamed.txt",
+                        "project": {
+                            "ipnftUid": PROJECT_1_UID,
+                        },
+                        "ref": project_1_file_1_dataset_id,
                     }
                 }
             ],

@@ -29,7 +29,7 @@ pub struct MoleculeSearchUseCaseImpl {
 }
 
 impl MoleculeSearchUseCaseImpl {
-    async fn project_global_data_room_activities(
+    fn project_global_data_room_activities(
         ledger: DataFrameExt,
     ) -> Result<DataFrameExt, DataFusionError> {
         // TODO: PERF: Re-assess implementation as it may be sub-optimal
@@ -120,9 +120,7 @@ impl MoleculeSearchUseCaseImpl {
             df
         };
 
-        let df = Self::project_global_data_room_activities(df)
-            .await
-            .int_err()?;
+        let df = Self::project_global_data_room_activities(df).int_err()?;
 
         let pattern = lit(format!("%{prompt}%"));
         let df = df.filter(col("description").ilike(pattern)).int_err()?;
