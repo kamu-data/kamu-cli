@@ -8234,7 +8234,7 @@ async fn test_molecule_v2_search() {
             async_graphql::Variables::from_value(value!({
                 "ipnftUid": PROJECT_1_UID,
                 "headline": "Test announcement 1",
-                "body": "Blah blah 1",
+                "body": "Blah blah 1 text",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
                 "moleculeAccessLevel": "public",
                 "moleculeChangeBy": USER_1,
@@ -8330,7 +8330,7 @@ async fn test_molecule_v2_search() {
             async_graphql::Variables::from_value(value!({
                 "ipnftUid": PROJECT_2_UID,
                 "headline": "Test announcement 2",
-                "body": "Blah blah 2",
+                "body": "Blah blah 2 text",
                 "attachments": [],
                 "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": USER_2,
@@ -8377,7 +8377,7 @@ async fn test_molecule_v2_search() {
                 "contentType": "text/plain",
                 "changeBy": USER_2,
                 "accessLevel": "public",
-                "description": "Plain text file (baz)",
+                "description": "Plain te-x-t file (baz)",
                 "categories": ["test-category"],
                 "tags": ["test-tag1", "test-tag2"],
                 "contentText": "hello foo",
@@ -8417,6 +8417,97 @@ async fn test_molecule_v2_search() {
     // Search //
     ////////////
 
+    let project_1_file_1_dataset_id_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
+        "entry": {
+            "accessLevel": "public",
+            "asDataset": {
+                "id": project_1_file_1_dataset_id
+            },
+            "asVersionedFile": {
+                "matching": {
+                    "accessLevel": "public",
+                    "categories": ["test-category"],
+                    "changeBy": USER_1,
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
+                    "contentText": null,
+                    "contentType": "application/octet-stream",
+                    "description": "Plain text file (foo) -- updated",
+                    "encryptionMetadata": null,
+                    "tags": ["test-tag1", "test-tag2"],
+                    "version": 2
+                }
+            },
+            "changeBy": USER_1,
+            "path": "/foo_renamed.txt",
+            "project": {
+                "ipnftUid": PROJECT_1_UID,
+            },
+            "ref": project_1_file_1_dataset_id,
+        }
+    });
+    let project_1_announcement_1_id_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+        "entry": {
+            "accessLevel": "public",
+            "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+            "body": "Blah blah 1 text",
+            "categories": ["test-category-1"],
+            "changeBy": USER_1,
+            "headline": "Test announcement 1",
+            "id": project_1_announcement_1_id,
+            "project": {
+                "ipnftUid": PROJECT_1_UID,
+            },
+            "tags": ["test-tag1", "test-tag2"]
+        }
+    });
+    let project_2_announcement_1_id_search_hit_node = json!({
+            "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+            "entry": {
+                "accessLevel": "holders",
+                "attachments": [],
+                "body": "Blah blah 2 text",
+                "categories": ["test-category-1", "test-category-2"],
+                "changeBy": USER_2,
+                "headline": "Test announcement 2",
+                "id": project_2_announcement_1_id,
+                "project": {
+                    "ipnftUid": PROJECT_2_UID,
+                },
+                "tags": ["test-tag2"]
+            }
+    });
+    let project_2_file_1_dataset_id_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
+        "entry": {
+            "accessLevel": "public",
+            "asDataset": {
+                "id": project_2_file_1_dataset_id
+            },
+            "asVersionedFile": {
+                "matching": {
+                    "accessLevel": "public",
+                    "categories": ["test-category"],
+                    "changeBy": USER_2,
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
+                    "contentText": "hello foo",
+                    "contentType": "text/plain",
+                    "description": "Plain te-x-t file (baz)",
+                    "encryptionMetadata": null,
+                    "tags": ["test-tag1", "test-tag2"],
+                    "version": 1
+                }
+            },
+            "changeBy": USER_2,
+            "path": "/foo.txt",
+            "project": {
+                "ipnftUid": PROJECT_2_UID,
+            },
+            "ref": project_2_file_1_dataset_id,
+        }
+    });
+
     // Empty prompt
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -8432,98 +8523,36 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                {
-                    "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
-                    "entry": {
-                        "accessLevel": "public",
-                        "asDataset": {
-                            "id": project_2_file_1_dataset_id
-                        },
-                        "asVersionedFile": {
-                            "matching": {
-                                "accessLevel": "public",
-                                "categories": ["test-category"],
-                                "changeBy": USER_2,
-                                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
-                                "contentText": "hello foo",
-                                "contentType": "text/plain",
-                                "description": "Plain text file (baz)",
-                                "encryptionMetadata": null,
-                                "tags": ["test-tag1", "test-tag2"],
-                                "version": 1
-                            }
-                        },
-                        "changeBy": USER_2,
-                        "path": "/foo.txt",
-                        "project": {
-                            "ipnftUid": PROJECT_2_UID,
-                        },
-                        "ref": project_2_file_1_dataset_id,
-                    }
-                },
-                {
-                    "__typename": "MoleculeSemanticSearchFoundAnnouncement",
-                    "entry": {
-                        "accessLevel": "holders",
-                        "attachments": [],
-                        "body": "Blah blah 2",
-                        "categories": ["test-category-1", "test-category-2"],
-                        "changeBy": USER_2,
-                        "headline": "Test announcement 2",
-                        "id": project_2_announcement_1_id,
-                        "project": {
-                            "ipnftUid": PROJECT_2_UID,
-                        },
-                        "tags": ["test-tag2"]
-                    }
-                },
-                {
-                    "__typename": "MoleculeSemanticSearchFoundAnnouncement",
-                    "entry": {
-                        "accessLevel": "public",
-                        "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
-                        "body": "Blah blah 1",
-                        "categories": ["test-category-1"],
-                        "changeBy": USER_1,
-                        "headline": "Test announcement 1",
-                        "id": project_1_announcement_1_id,
-                        "project": {
-                            "ipnftUid": PROJECT_1_UID,
-                        },
-                        "tags": ["test-tag1", "test-tag2"]
-                    }
-                },
-                {
-                    "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
-                    "entry": {
-                        "accessLevel": "public",
-                        "asDataset": {
-                            "id": project_1_file_1_dataset_id
-                        },
-                        "asVersionedFile": {
-                            "matching": {
-                                "accessLevel": "public",
-                                "categories": ["test-category"],
-                                "changeBy": USER_1,
-                                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
-                                "contentText": null,
-                                "contentType": "application/octet-stream",
-                                "description": "Plain text file (foo) -- updated",
-                                "encryptionMetadata": null,
-                                "tags": ["test-tag1", "test-tag2"],
-                                "version": 2
-                            }
-                        },
-                        "changeBy": USER_1,
-                        "path": "/foo_renamed.txt",
-                        "project": {
-                            "ipnftUid": PROJECT_1_UID,
-                        },
-                        "ref": project_1_file_1_dataset_id,
-                    }
-                }
+                project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                project_1_file_1_dataset_id_search_hit_node,
             ],
             "totalCount": 4
+        })
+    );
+
+    // Prompt: "text" (files + announcement (body))
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "text",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 3
         })
     );
 }
