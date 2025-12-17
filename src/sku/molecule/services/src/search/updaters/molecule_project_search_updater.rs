@@ -53,10 +53,12 @@ impl MoleculeProjectSearchUpdater {
         created_message: &MoleculeProjectMessageCreated,
     ) -> Result<(), InternalError> {
         let project_document = index_project_from_parts(
+            &created_message.molecule_account_id,
             &created_message.ipnft_uid,
             &created_message.ipnft_symbol,
             &created_message.project_account_id,
             created_message.event_time,
+            created_message.system_time,
         );
 
         self.full_text_search_service
@@ -78,8 +80,11 @@ impl MoleculeProjectSearchUpdater {
         ctx: FullTextSearchContext<'_>,
         disabled_message: &MoleculeProjectMessageDisabled,
     ) -> Result<(), InternalError> {
-        let partial_update =
-            partial_update_project_when_ban_status_changed(true, disabled_message.event_time);
+        let partial_update = partial_update_project_when_ban_status_changed(
+            true,
+            disabled_message.event_time,
+            disabled_message.system_time,
+        );
         self.full_text_search_service
             .bulk_update(
                 ctx,
@@ -99,8 +104,11 @@ impl MoleculeProjectSearchUpdater {
         ctx: FullTextSearchContext<'_>,
         reenabled_message: &MoleculeProjectMessageReenabled,
     ) -> Result<(), InternalError> {
-        let partial_update =
-            partial_update_project_when_ban_status_changed(false, reenabled_message.event_time);
+        let partial_update = partial_update_project_when_ban_status_changed(
+            false,
+            reenabled_message.event_time,
+            reenabled_message.system_time,
+        );
         self.full_text_search_service
             .bulk_update(
                 ctx,

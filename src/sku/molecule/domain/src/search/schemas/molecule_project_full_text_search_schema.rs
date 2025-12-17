@@ -21,22 +21,27 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+pub const FIELD_EVENT_TIME: &str = "event_time";
+pub const FIELD_SYSTEM_TIME: &str = "system_time";
+pub const FIELD_MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
 pub const FIELD_IPNFT_SYMBOL: &str = "ipnft_symbol";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
-pub const FIELD_ACCOUNT_ID: &str = "account_id";
+pub const FIELD_PROJECT_ACCOUNT_ID: &str = "project_account_id";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
-        path: FIELD_CREATED_AT,
+        path: FIELD_EVENT_TIME,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: FIELD_SYSTEM_TIME,
         role: FullTextSchemaFieldRole::DateTime,
+    },
+    FullTextSchemaField {
+        path: FIELD_MOLECULE_ACCOUNT_ID,
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_IPNFT_SYMBOL,
@@ -51,7 +56,7 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
         role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
-        path: FIELD_ACCOUNT_ID,
+        path: FIELD_PROJECT_ACCOUNT_ID,
         role: FullTextSchemaFieldRole::Keyword,
     },
 ];

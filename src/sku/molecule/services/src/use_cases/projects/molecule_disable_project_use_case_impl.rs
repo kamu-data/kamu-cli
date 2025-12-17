@@ -92,6 +92,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
                     .post_message(
                         MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
                         MoleculeProjectMessage::disabled(
+                            source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
                             new_changelog_record.payload.account_id.clone(),
