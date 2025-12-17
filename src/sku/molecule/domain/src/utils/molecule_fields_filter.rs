@@ -11,13 +11,21 @@ use nonempty::NonEmpty;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn molecule_extra_data_fields_filter(
+pub fn molecule_fields_filter(
+    by_ipnft_uids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
 ) -> Option<kamu_datasets::ExtraDataFieldsFilter> {
     use kamu_datasets::ExtraDataFieldFilter as Filter;
 
+    let maybe_ipnft_uids_filter = by_ipnft_uids.and_then(|values| {
+        NonEmpty::from_vec(values).map(|values| Filter {
+            field_name: "ipnft_uid".to_string(),
+            values,
+            is_array: false,
+        })
+    });
     let maybe_tags_filter = by_tags.and_then(|values| {
         NonEmpty::from_vec(values).map(|values| Filter {
             field_name: "tags".to_string(),
@@ -40,8 +48,9 @@ pub fn molecule_extra_data_fields_filter(
         })
     });
 
-    let filters = maybe_tags_filter
+    let filters = maybe_ipnft_uids_filter
         .into_iter()
+        .chain(maybe_tags_filter)
         .chain(maybe_categories_filter)
         .chain(maybe_access_levels_filter)
         .collect::<Vec<_>>();

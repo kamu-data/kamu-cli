@@ -46,15 +46,12 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             return Ok(MoleculeProjectActivityListing::default());
         };
 
-        let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+        let maybe_filter = filters.and_then(|f| {
+            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
         });
-        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
-                df,
-                extra_data_fields_filter,
-            )
-            .int_err()?
+        let df = if let Some(filter) = maybe_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
+                .int_err()?
         } else {
             df
         };

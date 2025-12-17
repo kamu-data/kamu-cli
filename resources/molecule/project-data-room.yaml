@@ -96,6 +96,7 @@ content:
       kind: NdJson
       schema:
       - op INT
+      - event_time TIMESTAMP
       - path STRING
       - ref STRING
       - molecule_change_by STRING

@@ -16,14 +16,14 @@ use crate::{
     MoleculeDatasetAccessorFactory,
     MoleculeDatasetReader,
     MoleculeDatasetWriter,
-    MoleculeGlobalActivitiesService,
+    MoleculeGlobalDataRoomActivitiesService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeGlobalActivitiesService)]
-pub struct MoleculeGlobalActivitiesServiceImpl {
+#[dill::interface(dyn MoleculeGlobalDataRoomActivitiesService)]
+pub struct MoleculeGlobalDataRoomActivitiesServiceImpl {
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
 }
 
@@ -31,10 +31,10 @@ pub struct MoleculeGlobalActivitiesServiceImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl MoleculeGlobalActivitiesService for MoleculeGlobalActivitiesServiceImpl {
+impl MoleculeGlobalDataRoomActivitiesService for MoleculeGlobalDataRoomActivitiesServiceImpl {
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeGlobalActivitiesServiceImpl_reader,
+        name = MoleculeGlobalDataRoomActivitiesServiceImpl_reader,
         skip_all,
         fields(molecule_account_name)
     )]
@@ -53,7 +53,7 @@ impl MoleculeGlobalActivitiesService for MoleculeGlobalActivitiesServiceImpl {
 
     #[tracing::instrument(
         level = "debug",
-        name = MoleculeGlobalActivitiesServiceImpl_writer,
+        name = MoleculeGlobalDataRoomActivitiesServiceImpl_writer,
         skip_all,
         fields(molecule_account_name, create_if_not_exist)
     )]

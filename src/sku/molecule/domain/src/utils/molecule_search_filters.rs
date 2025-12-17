@@ -7,24 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
+use std::collections::HashSet;
 
-use crate::{MoleculeDatasetReader, MoleculeDatasetWriter};
+use crate::{MoleculeSearchEntityKind, MoleculeSearchFilters};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait MoleculeGlobalActivitiesService: Send + Sync {
-    async fn reader(
-        &self,
-        molecule_account_name: &odf::AccountName,
-    ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError>;
-
-    async fn writer(
-        &self,
-        molecule_account_name: &odf::AccountName,
-        create_if_not_exist: bool,
-    ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError>;
+pub fn get_search_entity_kinds(
+    filters: Option<&MoleculeSearchFilters>,
+) -> HashSet<MoleculeSearchEntityKind> {
+    filters
+        .and_then(|f| {
+            f.by_kinds
+                .as_ref()
+                .map(|kinds_as_vec| kinds_as_vec.iter().copied().collect())
+        })
+        .unwrap_or_else(MoleculeSearchEntityKind::default_kinds)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
