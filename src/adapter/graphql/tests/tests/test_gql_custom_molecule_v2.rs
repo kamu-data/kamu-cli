@@ -8708,6 +8708,87 @@ async fn test_molecule_v2_search() {
             "totalCount": 4
         })
     );
+
+    // Filters: byType: ONLY_DATA_ROOM_ENTRIES
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byType": "ONLY_DATA_ROOM_ENTRIES",
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_id_search_hit_node,
+                // project_2_announcement_1_id_search_hit_node,
+                // project_1_announcement_1_id_search_hit_node,
+                project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+
+    // Filters: byType: ONLY_ANNOUNCEMENTS
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byType": "ONLY_ANNOUNCEMENTS",
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                // project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+
+    // Filters: byType: DATA_ROOM_ENTRIES_AND_ANNOUNCEMENTS
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byType": "DATA_ROOM_ENTRIES_AND_ANNOUNCEMENTS",
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 4
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
