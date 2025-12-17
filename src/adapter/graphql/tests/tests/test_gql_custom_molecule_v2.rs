@@ -8709,14 +8709,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: ONLY_DATA_ROOM_ENTRIES
+    // Filters: byType: [DATA_ROOM_ENTRY]
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byType": "ONLY_DATA_ROOM_ENTRIES",
+                    "byTypes": ["DATA_ROOM_ENTRY"],
                 }
             })),
         )
@@ -8736,14 +8736,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: ONLY_ANNOUNCEMENTS
+    // Filters: byType: ANNOUNCEMENT
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byType": "ONLY_ANNOUNCEMENTS",
+                    "byTypes": ["ANNOUNCEMENT"],
                 }
             })),
         )
@@ -8763,14 +8763,14 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters: byType: DATA_ROOM_ENTRIES_AND_ANNOUNCEMENTS
+    // Filters: byType: [ANNOUNCEMENT, DATA_ROOM_ENTRY]
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
             async_graphql::Variables::from_json(json!({
                 "prompt": "",
                 "filters": {
-                    "byType": "DATA_ROOM_ENTRIES_AND_ANNOUNCEMENTS",
+                    "byTypes": ["ANNOUNCEMENT", "DATA_ROOM_ENTRY"],
                 }
             })),
         )
@@ -9044,7 +9044,7 @@ async fn test_molecule_v2_search() {
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
-                    "byType": "ONLY_ANNOUNCEMENTS",
+                    "byTypes": ["ANNOUNCEMENT"],
                 }
             })),
         )

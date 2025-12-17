@@ -342,7 +342,7 @@ pub struct MoleculeSemanticSearchFilters {
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
-    by_type: Option<MoleculeSearchTypeInput>,
+    by_types: Option<Vec<MoleculeSearchTypeInput>>,
 }
 
 impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearchFilters {
@@ -352,16 +352,17 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
-            by_type: value.by_type.map(Into::into),
+            by_types: value
+                .by_types
+                .map(|types| types.into_iter().map(Into::into).collect()),
         }
     }
 }
 
 #[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MoleculeSearchTypeInput {
-    OnlyDataRoomEntries,
-    OnlyAnnouncements,
-    DataRoomEntriesAndAnnouncements,
+    DataRoomEntry,
+    Announcement,
 }
 
 impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType {
@@ -370,9 +371,8 @@ impl From<MoleculeSearchTypeInput> for kamu_molecule_domain::MoleculeSearchType 
         use kamu_molecule_domain::MoleculeSearchType as Domain;
 
         match value {
-            Gql::OnlyDataRoomEntries => Domain::OnlyDataRoomActivities,
-            Gql::OnlyAnnouncements => Domain::OnlyAnnouncements,
-            Gql::DataRoomEntriesAndAnnouncements => Domain::DataRoomActivitiesAndAnnouncements,
+            Gql::DataRoomEntry => Domain::DataRoomActivity,
+            Gql::Announcement => Domain::Announcement,
         }
     }
 }

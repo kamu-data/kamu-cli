@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -67,14 +68,10 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
+        search_types: &HashSet<MoleculeSearchType>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        use MoleculeSearchType as Type;
-
-        match utils::get_search_result_type(filters.as_ref()) {
-            Type::OnlyDataRoomActivities | Type::DataRoomActivitiesAndAnnouncements => {
-                /* continue */
-            }
-            Type::OnlyAnnouncements => return Ok(MoleculeSearchHitsListing::default()),
+        if !search_types.contains(&MoleculeSearchType::DataRoomActivity) {
+            return Ok(MoleculeSearchHitsListing::empty());
         }
 
         // Get read access to global activities dataset
@@ -87,7 +84,7 @@ impl MoleculeSearchUseCaseImpl {
 
             // No activities dataset yet is fine, just return an empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeSearchHitsListing::default());
+                return Ok(MoleculeSearchHitsListing::empty());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
@@ -101,7 +98,7 @@ impl MoleculeSearchUseCaseImpl {
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeSearchHitsListing::default());
+            return Ok(MoleculeSearchHitsListing::empty());
         };
 
         // Filtering
@@ -146,12 +143,10 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
+        search_types: &HashSet<MoleculeSearchType>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        use MoleculeSearchType as Type;
-
-        match utils::get_search_result_type(filters.as_ref()) {
-            Type::OnlyAnnouncements | Type::DataRoomActivitiesAndAnnouncements => { /* continue */ }
-            Type::OnlyDataRoomActivities => return Ok(MoleculeSearchHitsListing::default()),
+        if !search_types.contains(&MoleculeSearchType::Announcement) {
+            return Ok(MoleculeSearchHitsListing::empty());
         }
 
         // Get read access to global announcements dataset
@@ -164,7 +159,7 @@ impl MoleculeSearchUseCaseImpl {
 
             // No announcements dataset yet is fine, just return empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeSearchHitsListing::default());
+                return Ok(MoleculeSearchHitsListing::empty());
             }
 
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
@@ -178,7 +173,7 @@ impl MoleculeSearchUseCaseImpl {
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeSearchHitsListing::default());
+            return Ok(MoleculeSearchHitsListing::empty());
         };
 
         // Filtering
@@ -235,14 +230,22 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
+        let search_types = utils::get_search_types(filters.as_ref());
+
         let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
-                self.get_global_data_room_activities_listing(
-                    molecule_subject,
-                    prompt,
-                    filters.clone(),
-                ),
-                self.get_global_announcement_activities_listing(molecule_subject, prompt, filters),
-            )?;
+            self.get_global_data_room_activities_listing(
+                molecule_subject,
+                prompt,
+                filters.clone(),
+                &search_types
+            ),
+            self.get_global_announcement_activities_listing(
+                molecule_subject,
+                prompt,
+                filters,
+                &search_types
+            ),
+        )?;
 
         // Get the total count before pagination
         let total_count =

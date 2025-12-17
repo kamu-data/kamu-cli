@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
@@ -34,14 +36,19 @@ pub struct MoleculeSearchFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
-    pub by_type: Option<MoleculeSearchType>,
+    pub by_types: Option<Vec<MoleculeSearchType>>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MoleculeSearchType {
-    OnlyDataRoomActivities,
-    OnlyAnnouncements,
-    DataRoomActivitiesAndAnnouncements,
+    DataRoomActivity,
+    Announcement,
+}
+
+impl MoleculeSearchType {
+    pub fn default_types() -> HashSet<MoleculeSearchType> {
+        [Self::DataRoomActivity, Self::Announcement].into()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
