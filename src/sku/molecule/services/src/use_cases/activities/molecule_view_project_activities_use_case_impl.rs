@@ -146,6 +146,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             .view_project_announcements_uc
             .execute(
                 molecule_project,
+                MoleculeViewProjectAnnouncementsMode::LatestProjection, /* LatestSource */
                 filters.map(|filters| MoleculeAnnouncementsFilters {
                     by_tags: filters.by_tags,
                     by_categories: filters.by_categories,

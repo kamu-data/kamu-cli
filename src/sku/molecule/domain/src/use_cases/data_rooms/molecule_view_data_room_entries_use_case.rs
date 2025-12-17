@@ -32,9 +32,9 @@ pub trait MoleculeViewDataRoomEntriesUseCase: Send + Sync {
 
 #[derive(Debug)]
 pub enum MoleculeViewDataRoomEntriesMode {
-    Latest,
-    LatestFromCollection,
-    AsOf(odf::Multihash),
+    LatestProjection,
+    LatestSource,
+    Historical(odf::Multihash),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

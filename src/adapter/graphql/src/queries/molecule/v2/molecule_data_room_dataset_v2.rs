@@ -102,8 +102,8 @@ impl MoleculeDataRoomProjection<'_> {
             .execute(
                 &self.project.entity,
                 match self.as_of {
-                    Some(ref hash) => MoleculeViewDataRoomEntriesMode::AsOf(hash.clone()),
-                    None => MoleculeViewDataRoomEntriesMode::Latest,
+                    Some(ref hash) => MoleculeViewDataRoomEntriesMode::Historical(hash.clone()),
+                    None => MoleculeViewDataRoomEntriesMode::LatestProjection, /* LatestSource */
                 },
                 path_prefix.map(Into::into),
                 max_depth,

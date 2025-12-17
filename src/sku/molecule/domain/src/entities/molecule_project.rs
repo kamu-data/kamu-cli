@@ -57,8 +57,8 @@ impl MoleculeProject {
             .map_err(|e| InternalError::new(format!("Invalid BigInt: {e}")))?;
 
         Ok(Self {
-            system_time: entry.system_columns.system_time,
-            event_time: entry.system_columns.event_time,
+            system_time: entry.system_columns.timestamp_columns.system_time,
+            event_time: entry.system_columns.timestamp_columns.event_time,
             ipnft_symbol: entry.payload.ipnft_symbol,
             ipnft_uid: entry.payload.ipnft_uid,
             ipnft_address: entry.payload.ipnft_address,

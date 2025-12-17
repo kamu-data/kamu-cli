@@ -70,8 +70,8 @@ impl MoleculeDataRoomActivity {
 
         Ok(Self {
             offset: r.system_columns.offset,
-            system_time: r.system_columns.system_time,
-            event_time: r.system_columns.event_time,
+            system_time: r.system_columns.timestamp_columns.system_time,
+            event_time: r.system_columns.timestamp_columns.event_time,
             activity_type: r.payload.activity_type,
             ipnft_uid: r.payload.ipnft_uid,
             path: r.payload.path,

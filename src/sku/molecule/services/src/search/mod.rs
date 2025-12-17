@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod molecule_search_filters;
 mod molecule_search_schema_provider;
 
 mod indexers;
 mod updaters;
 
+pub(crate) use molecule_search_filters::*;
 pub use molecule_search_schema_provider::*;
-pub use updaters::*;
+pub(crate) use updaters::*;

@@ -14,6 +14,7 @@ use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     MoleculeAnnouncementPayloadRecord,
     MoleculeGlobalAnnouncement,
+    MoleculeViewGlobalAnnouncementsMode,
     MoleculeViewGlobalAnnouncementsUseCase,
     molecule_announcement_full_text_search_schema as announcement_schema,
 };
@@ -28,11 +29,13 @@ const BULK_SIZE: usize = 500;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn index_announcement_from_global_entity(
+    molecule_account_id: &odf::AccountID,
     global_announcement: &MoleculeGlobalAnnouncement,
 ) -> serde_json::Value {
     serde_json::json!({
-        announcement_schema::FIELD_CREATED_AT: global_announcement.announcement.system_time,
-        announcement_schema::FIELD_UPDATED_AT: global_announcement.announcement.system_time,
+        announcement_schema::FIELD_EVENT_TIME: global_announcement.announcement.event_time,
+        announcement_schema::FIELD_SYSTEM_TIME: global_announcement.announcement.system_time,
+        announcement_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
         announcement_schema::FIELD_IPNFT_UID: global_announcement.ipnft_uid,
         announcement_schema::FIELD_HEADLINE: global_announcement.announcement.headline,
         announcement_schema::FIELD_BODY: global_announcement.announcement.body,
@@ -47,13 +50,16 @@ pub(crate) fn index_announcement_from_global_entity(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn index_announcement_from_publication_record(
+    event_time: DateTime<Utc>,
+    system_time: DateTime<Utc>,
+    molecule_account_id: &odf::AccountID,
     ipnft_uid: &str,
     announcement_record: &MoleculeAnnouncementPayloadRecord,
-    system_time: DateTime<Utc>,
 ) -> serde_json::Value {
     serde_json::json!({
-        announcement_schema::FIELD_CREATED_AT: system_time,
-        announcement_schema::FIELD_UPDATED_AT: system_time,
+        announcement_schema::FIELD_EVENT_TIME: event_time,
+        announcement_schema::FIELD_SYSTEM_TIME: system_time,
+        announcement_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
         announcement_schema::FIELD_IPNFT_UID: ipnft_uid,
         announcement_schema::FIELD_HEADLINE: announcement_record.headline,
         announcement_schema::FIELD_BODY: announcement_record.body,
@@ -93,6 +99,7 @@ pub(crate) async fn index_announcements(
         let announcements_listing = molecule_view_global_announcements_uc
             .execute(
                 organization_account,
+                MoleculeViewGlobalAnnouncementsMode::LatestSource,
                 None, /* no filters */
                 Some(PaginationOpts {
                     limit: BULK_SIZE,
@@ -110,7 +117,10 @@ pub(crate) async fn index_announcements(
         // Index each announcement
         for announcement in announcements_listing.list {
             // Serialize announcement into search document
-            let document = index_announcement_from_global_entity(&announcement);
+            let document = index_announcement_from_global_entity(
+                &organization_account.account_id,
+                &announcement,
+            );
 
             operations.push(FullTextUpdateOperation::Index {
                 id: announcement.announcement.announcement_id.to_string(),

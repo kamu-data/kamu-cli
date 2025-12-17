@@ -199,7 +199,7 @@ async fn load_project_indexing_data(
         .molecule_view_data_room_entries_uc
         .execute(
             &project,
-            MoleculeViewDataRoomEntriesMode::LatestFromCollection,
+            MoleculeViewDataRoomEntriesMode::LatestSource,
             None, /* all prefixes */
             None, /* any depth */
             None, /* no filters */

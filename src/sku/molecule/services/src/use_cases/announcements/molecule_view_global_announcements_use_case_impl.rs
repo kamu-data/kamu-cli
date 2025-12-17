@@ -10,30 +10,29 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
-use kamu_molecule_domain::*;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_molecule_domain::{
+    molecule_announcement_full_text_search_schema as announcement_schema,
+    *,
+};
+use kamu_search::*;
 
-use crate::MoleculeAnnouncementsService;
+use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_search};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewGlobalAnnouncementsUseCase)]
 pub struct MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    catalog: dill::Catalog,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsUseCaseImpl {
-    #[tracing::instrument(
-        name = MoleculeViewGlobalAnnouncementsUseCaseImpl_execute,
-        level = "debug",
-        skip_all
-    )]
-    async fn execute(
+impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    async fn global_announcements_from_source(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         filters: Option<MoleculeAnnouncementsFilters>,
@@ -91,7 +90,7 @@ impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsU
 
         let announcements = records
             .into_iter()
-            .map(MoleculeGlobalAnnouncement::from_json)
+            .map(MoleculeGlobalAnnouncement::from_changelog_entry_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
@@ -99,6 +98,91 @@ impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsU
             total_count,
             list: announcements,
         })
+    }
+
+    async fn global_announcements_from_search(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
+        let ctx = FullTextSearchContext {
+            catalog: &self.catalog,
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // molecule_account_id equality
+            and_clauses.push(field_eq_str(
+                announcement_schema::FIELD_MOLECULE_ACCOUNT_ID,
+                molecule_subject.account_id.to_string().as_str(),
+            ));
+
+            // filters by categories, tags, access levels
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_announcements_filters_to_search(filters));
+            }
+
+            FullTextSearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .full_text_search_service
+            .search(
+                ctx,
+                FullTextSearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas: vec![announcement_schema::SCHEMA_NAME],
+                    source: FullTextSearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    page: pagination.into(),
+                    options: FullTextSearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeGlobalAnnouncementListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| {
+                    MoleculeGlobalAnnouncement::from_global_announcement_json(hit.id, hit.source)
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    #[tracing::instrument(
+        name = MoleculeViewGlobalAnnouncementsUseCaseImpl_execute,
+        level = "debug",
+        skip_all
+    )]
+    async fn execute(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeViewGlobalAnnouncementsMode,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
+        match mode {
+            MoleculeViewGlobalAnnouncementsMode::LatestSource => {
+                self.global_announcements_from_source(molecule_subject, filters, pagination)
+                    .await
+            }
+            MoleculeViewGlobalAnnouncementsMode::LatestProjection => {
+                self.global_announcements_from_search(molecule_subject, filters, pagination)
+                    .await
+            }
+        }
     }
 }
 

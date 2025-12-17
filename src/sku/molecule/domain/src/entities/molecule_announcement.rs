@@ -40,12 +40,12 @@ pub struct MoleculeAnnouncement {
 }
 
 impl MoleculeAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeAnnouncementChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
-            system_time: entry.system_columns.system_time,
-            event_time: entry.system_columns.event_time,
+            system_time: entry.system_columns.timestamp_columns.system_time,
+            event_time: entry.system_columns.timestamp_columns.event_time,
             announcement_id: entry.payload.announcement_id,
             headline: entry.payload.headline,
             body: entry.payload.body,
@@ -54,6 +54,44 @@ impl MoleculeAnnouncement {
             change_by: entry.payload.change_by,
             categories: entry.payload.categories,
             tags: entry.payload.tags,
+        })
+    }
+
+    pub fn from_search_index_json(
+        announcement_id: String,
+        mut record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct AnnouncementRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            #[serde(flatten)]
+            pub payload: MoleculeAnnouncementPayloadRecord,
+        }
+
+        // Parse the announcement_id and insert it into the record
+        let announcement_uuid = uuid::Uuid::parse_str(&announcement_id).int_err()?;
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert(
+                "announcement_id".to_string(),
+                serde_json::Value::String(announcement_id),
+            );
+        }
+
+        let record = serde_json::from_value::<AnnouncementRecord>(record).int_err()?;
+
+        Ok(MoleculeAnnouncement {
+            system_time: record.timestamp_columns.system_time,
+            event_time: record.timestamp_columns.event_time,
+            announcement_id: announcement_uuid,
+            headline: record.payload.headline,
+            body: record.payload.body,
+            attachments: record.payload.attachments,
+            access_level: record.payload.access_level,
+            change_by: record.payload.change_by,
+            categories: record.payload.categories,
+            tags: record.payload.tags,
         })
     }
 }
@@ -67,15 +105,15 @@ pub struct MoleculeGlobalAnnouncement {
 }
 
 impl MoleculeGlobalAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeGlobalAnnouncementChangelogEntry =
             serde_json::from_value(record).int_err()?;
 
         Ok(Self {
             ipnft_uid: entry.payload.ipnft_uid,
             announcement: MoleculeAnnouncement {
-                system_time: entry.system_columns.system_time,
-                event_time: entry.system_columns.event_time,
+                system_time: entry.system_columns.timestamp_columns.system_time,
+                event_time: entry.system_columns.timestamp_columns.event_time,
                 announcement_id: entry.payload.announcement.announcement_id,
                 headline: entry.payload.announcement.headline,
                 body: entry.payload.announcement.body,
@@ -84,6 +122,49 @@ impl MoleculeGlobalAnnouncement {
                 change_by: entry.payload.announcement.change_by,
                 categories: entry.payload.announcement.categories,
                 tags: entry.payload.announcement.tags,
+            },
+        })
+    }
+
+    pub fn from_global_announcement_json(
+        announcement_id: String,
+        mut record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct GlobalAnnouncementRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            pub ipnft_uid: String,
+
+            #[serde(flatten)]
+            pub payload: MoleculeAnnouncementPayloadRecord,
+        }
+
+        // Parse the announcement_id and insert it into the record
+        let announcement_uuid = uuid::Uuid::parse_str(&announcement_id).int_err()?;
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert(
+                "announcement_id".to_string(),
+                serde_json::Value::String(announcement_id),
+            );
+        }
+
+        let record = serde_json::from_value::<GlobalAnnouncementRecord>(record).int_err()?;
+
+        Ok(MoleculeGlobalAnnouncement {
+            ipnft_uid: record.ipnft_uid,
+            announcement: MoleculeAnnouncement {
+                system_time: record.timestamp_columns.system_time,
+                event_time: record.timestamp_columns.event_time,
+                announcement_id: announcement_uuid,
+                headline: record.payload.headline,
+                body: record.payload.body,
+                attachments: record.payload.attachments,
+                access_level: record.payload.access_level,
+                change_by: record.payload.change_by,
+                categories: record.payload.categories,
+                tags: record.payload.tags,
             },
         })
     }

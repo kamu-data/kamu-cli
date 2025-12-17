@@ -48,9 +48,11 @@ impl MoleculeAnnouncementSearchUpdater {
         published_message: &MoleculeAnnouncementMessagePublished,
     ) -> Result<(), InternalError> {
         let announcement_document = index_announcement_from_publication_record(
+            published_message.event_time,
+            published_message.system_time,
+            &published_message.molecule_account_id,
             &published_message.ipnft_uid,
             &published_message.announcement_record,
-            published_message.event_time, // consider propagating ingest time instead
         );
 
         self.full_text_search_service

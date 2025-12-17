@@ -29,12 +29,14 @@ pub enum MoleculeAnnouncementMessage {
 impl MoleculeAnnouncementMessage {
     pub fn published(
         event_time: DateTime<Utc>,
+        system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         ipnft_uid: String,
         announcement_record: MoleculeAnnouncementPayloadRecord,
     ) -> Self {
         Self::Published(MoleculeAnnouncementMessagePublished {
             event_time,
+            system_time,
             molecule_account_id,
             ipnft_uid,
             announcement_record,
@@ -55,6 +57,7 @@ impl Message for MoleculeAnnouncementMessage {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeAnnouncementMessagePublished {
     pub event_time: DateTime<Utc>,
+    pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub ipnft_uid: String,
     pub announcement_record: MoleculeAnnouncementPayloadRecord,

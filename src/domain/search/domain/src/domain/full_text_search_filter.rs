@@ -128,10 +128,21 @@ pub fn field_lte_num(field: FullTextSearchFieldPath, value: i64) -> FullTextSear
 }
 
 #[inline]
-pub fn field_in_str(field: FullTextSearchFieldPath, values: &[&str]) -> FullTextSearchFilterExpr {
+pub fn field_in_str<S>(
+    field: FullTextSearchFieldPath,
+    values: impl IntoIterator<Item = S>,
+) -> FullTextSearchFilterExpr
+where
+    S: Into<String>,
+{
     FullTextSearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::In(values.iter().map(|v| serde_json::json!(v)).collect()),
+        op: FullTextSearchFilterOp::In(
+            values
+                .into_iter()
+                .map(|v| serde_json::Value::String(v.into()))
+                .collect(),
+        ),
     }
 }
 

@@ -18,7 +18,11 @@ use kamu_molecule_domain::{
 };
 use kamu_search::*;
 
-use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionService};
+use crate::{
+    MoleculeDataRoomCollectionReadError,
+    MoleculeDataRoomCollectionService,
+    map_molecule_data_room_entries_filters_to_search,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,7 +93,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
             &molecule_project.ipnft_uid,
             path_prefix.as_ref(),
             max_depth,
-            filters.as_ref(),
+            filters,
         );
 
         let search_results = self
@@ -113,7 +117,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
             list: search_results
                 .hits
                 .into_iter()
-                .map(|hit| MoleculeDataRoomEntry::from_payload_record_json(hit.source))
+                .map(|hit| MoleculeDataRoomEntry::from_data_room_entry_json(hit.source))
                 .collect::<Result<Vec<_>, InternalError>>()?,
         })
     }
@@ -122,7 +126,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         ipnft_uid: &str,
         path_prefix: Option<&CollectionPath>,
         max_depth: Option<usize>,
-        filters: Option<&MoleculeDataRoomEntriesFilters>,
+        filters: Option<MoleculeDataRoomEntriesFilters>,
     ) -> FullTextSearchFilterExpr {
         let mut and_clauses = vec![];
 
@@ -150,35 +154,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
 
         // filters by categories, tags, access levels
         if let Some(filters) = filters {
-            if let Some(by_access_levels) = filters.by_access_levels.as_ref()
-                && !by_access_levels.is_empty()
-            {
-                and_clauses.push(field_in_str(
-                    data_room_entry_schema::FIELD_ACCESS_LEVEL,
-                    &by_access_levels
-                        .iter()
-                        .map(String::as_str)
-                        .collect::<Vec<_>>(),
-                ));
-            }
-
-            if let Some(by_categories) = filters.by_categories.as_ref()
-                && !by_categories.is_empty()
-            {
-                and_clauses.push(field_in_str(
-                    data_room_entry_schema::FIELD_CATEGORIES,
-                    &by_categories.iter().map(String::as_str).collect::<Vec<_>>(),
-                ));
-            }
-
-            if let Some(by_tags) = filters.by_tags.as_ref()
-                && !by_tags.is_empty()
-            {
-                and_clauses.push(field_in_str(
-                    data_room_entry_schema::FIELD_TAGS,
-                    &by_tags.iter().map(String::as_str).collect::<Vec<_>>(),
-                ));
-            }
+            and_clauses.extend(map_molecule_data_room_entries_filters_to_search(filters));
         }
 
         FullTextSearchFilterExpr::and_clauses(and_clauses)
@@ -213,7 +189,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
         match mode {
             // When historical view is requested, use slower collection-based method
-            MoleculeViewDataRoomEntriesMode::AsOf(as_of) => {
+            MoleculeViewDataRoomEntriesMode::Historical(as_of) => {
                 self.list_entries_via_collection(
                     molecule_project,
                     Some(as_of),
@@ -225,8 +201,8 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
                 .await
             }
 
-            // Latest snapshot, but it is requested to be read via collections explicitly
-            MoleculeViewDataRoomEntriesMode::LatestFromCollection => {
+            // Latest state, but it is requested to be read from source collection explicitly
+            MoleculeViewDataRoomEntriesMode::LatestSource => {
                 self.list_entries_via_collection(
                     molecule_project,
                     None,
@@ -238,8 +214,8 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
                 .await
             }
 
-            // As for the latest snapshot, use faster search-based method
-            MoleculeViewDataRoomEntriesMode::Latest => {
+            // As for the latest projection, use faster search-based method
+            MoleculeViewDataRoomEntriesMode::LatestProjection => {
                 self.list_latest_entries_via_search(
                     molecule_project,
                     path_prefix,

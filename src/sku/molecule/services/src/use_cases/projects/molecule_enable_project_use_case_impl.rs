@@ -98,8 +98,14 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             // Project is already enabled
             return Ok(MoleculeProject::from_payload(
                 last_changelog_entry.payload,
-                last_changelog_entry.system_columns.system_time,
-                last_changelog_entry.system_columns.event_time,
+                last_changelog_entry
+                    .system_columns
+                    .timestamp_columns
+                    .system_time,
+                last_changelog_entry
+                    .system_columns
+                    .timestamp_columns
+                    .event_time,
             )?);
         }
 

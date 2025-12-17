@@ -67,7 +67,7 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         let announcement_record = records
             .into_iter()
             .next()
-            .map(MoleculeAnnouncement::from_json)
+            .map(MoleculeAnnouncement::from_changelog_entry_json)
             .transpose()?;
 
         Ok(announcement_record)

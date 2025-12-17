@@ -21,14 +21,15 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+pub const FIELD_EVENT_TIME: &str = "event_time";
+pub const FIELD_SYSTEM_TIME: &str = "system_time";
+pub const FIELD_MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
 pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
 pub const FIELD_HEADLINE: &str = "headline";
 pub const FIELD_BODY: &str = "body";
 pub const FIELD_ATTACHMENTS: &str = "attachments";
-pub const FIELD_ACCESS_LEVEL: &str = "access_level";
-pub const FIELD_CHANGE_BY: &str = "change_by";
+pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
+pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
 pub const FIELD_CATEGORIES: &str = "categories";
 pub const FIELD_TAGS: &str = "tags";
 
@@ -36,12 +37,16 @@ pub const FIELD_TAGS: &str = "tags";
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
     FullTextSchemaField {
-        path: FIELD_CREATED_AT,
+        path: FIELD_EVENT_TIME,
         role: FullTextSchemaFieldRole::DateTime,
     },
     FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: FIELD_SYSTEM_TIME,
         role: FullTextSchemaFieldRole::DateTime,
+    },
+    FullTextSchemaField {
+        path: FIELD_MOLECULE_ACCOUNT_ID,
+        role: FullTextSchemaFieldRole::Keyword,
     },
     FullTextSchemaField {
         path: FIELD_IPNFT_UID,
