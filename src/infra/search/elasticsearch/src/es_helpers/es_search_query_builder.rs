@@ -215,7 +215,7 @@ impl ElasticSearchQueryBuilder {
                                 FullTextSortDirection::Ascending => "asc",
                                 FullTextSortDirection::Descending => "desc",
                             },
-                            "missing": if *nulls_first { "first" } else { "last" },
+                            "missing": if *nulls_first { "_first" } else { "_last" },
                             "unmapped_type": "keyword",
                         }
                     })
