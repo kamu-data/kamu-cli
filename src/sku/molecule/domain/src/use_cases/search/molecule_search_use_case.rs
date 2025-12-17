@@ -35,7 +35,8 @@ pub struct MoleculeSearchFilters {
     pub by_ipnft_uids: Option<Vec<String>>,
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
-    pub by_access_levels: Option<Vec<String>>,
+    // NOTE: Access level is required to prevent accidental permission escalations
+    pub by_access_levels: Vec<String>,
     pub by_kinds: Option<Vec<MoleculeSearchEntityKind>>,
 }
 

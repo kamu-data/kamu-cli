@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: use enum instead of string?
@@ -17,6 +19,9 @@
 //     Admin2,
 //     Holder,
 // }
+
+pub const MOLECULE_DEFAULT_ACCESS_LEVELS: LazyLock<Vec<MoleculeAccessLevel>> =
+    LazyLock::new(|| vec!["public".to_string()]);
 
 pub type MoleculeAccessLevel = String;
 

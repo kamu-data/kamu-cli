@@ -167,6 +167,7 @@ impl MoleculeDataRoomProjection<'_> {
 pub struct MoleculeDataRoomEntriesFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
+    /// Defaults to public-only if not specified
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
 }
 
@@ -175,7 +176,9 @@ impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeData
         Self {
             by_tags: value.by_tags,
             by_categories: value.by_categories,
-            by_access_levels: value.by_access_levels,
+            by_access_levels: value
+                .by_access_levels
+                .unwrap_or_else(|| super::MOLECULE_DEFAULT_ACCESS_LEVELS.clone()),
         }
     }
 }
