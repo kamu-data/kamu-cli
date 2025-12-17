@@ -10,10 +10,12 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use datafusion::logical_expr::{col, lit};
+use datafusion::error::DataFusionError;
+use datafusion::prelude::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
+use odf::utils::data::DataFrameExt;
 
 use crate::{MoleculeAnnouncementsService, MoleculeGlobalDataRoomActivitiesService};
 
@@ -27,6 +29,39 @@ pub struct MoleculeSearchUseCaseImpl {
 }
 
 impl MoleculeSearchUseCaseImpl {
+    async fn project_global_data_room_activities(
+        ledger: DataFrameExt,
+    ) -> Result<DataFrameExt, DataFusionError> {
+        // TODO: PERF: Re-assess implementation as it may be sub-optimal
+        const RANK_COLUMN: &str = "__rank";
+
+        let vocab = odf::metadata::DatasetVocabulary::default();
+        // NOTE: Unlike other places, we set PK not by `path`, but by `ref`.
+        let primary_key = ["ipnft_uid", "ref"]
+            .into_iter()
+            .map(|name| col(Column::from_name(name)))
+            .collect::<Vec<_>>();
+
+        let projection = ledger
+            .window(vec![
+                datafusion::functions_window::row_number::row_number()
+                    .partition_by(primary_key)
+                    .order_by(vec![
+                        col(Column::from_name(&vocab.offset_column)).sort(false, false),
+                    ])
+                    .build()?
+                    .alias(RANK_COLUMN),
+            ])?
+            .filter(
+                col(Column::from_name(RANK_COLUMN))
+                    .eq(lit(1))
+                    .and(col(Column::from_name("activity_type")).not_eq(lit("removed"))),
+            )?
+            .without_columns(&[RANK_COLUMN])?;
+
+        Ok(projection)
+    }
+
     async fn get_global_data_room_activities_listing(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
@@ -58,10 +93,9 @@ impl MoleculeSearchUseCaseImpl {
             Err(e) => Err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>(e)),
         }?;
 
-        // NOTE: We present the dataset as a projection so that
-        //       we only have actual data for all data rooms.
+        // Load raw ledger DF
         let maybe_df = data_room_activities_reader
-            .changelog_projection_data_frame_by("path")
+            .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeSearchError>)?;
 
@@ -86,9 +120,12 @@ impl MoleculeSearchUseCaseImpl {
             df
         };
 
-        use datafusion::logical_expr::{col, lit};
+        let df = Self::project_global_data_room_activities(df)
+            .await
+            .int_err()?;
 
-        let df = df.filter(col("description").ilike(lit(prompt))).int_err()?;
+        let pattern = lit(format!("%{prompt}%"));
+        let df = df.filter(col("description").ilike(pattern)).int_err()?;
 
         // Sorting will be done after merge
         let records = df.collect_json_aos().await.int_err()?;
@@ -162,12 +199,12 @@ impl MoleculeSearchUseCaseImpl {
             df
         };
 
+        let pattern = lit(format!("%{prompt}%"));
         let df = df
             .filter(
                 col("headline")
-                    .ilike(lit(prompt))
-                    .or(col("body"))
-                    .ilike(lit(prompt)),
+                    .ilike(pattern.clone())
+                    .or(col("body").ilike(pattern)),
             )
             .int_err()?;
 

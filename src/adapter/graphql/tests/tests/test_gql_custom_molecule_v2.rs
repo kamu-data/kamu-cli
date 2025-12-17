@@ -293,6 +293,64 @@ const REMOVE_ENTRY_QUERY: &str = indoc!(
     }
     "#
 );
+const SEARCH_QUERY: &str = indoc!(
+    r#"
+    query ($prompt: String!, $filters: MoleculeSemanticSearchFilters) {
+      molecule {
+        v2 {
+          search(prompt: $prompt, filters: $filters) {
+            totalCount
+            nodes {
+              ... on MoleculeSemanticSearchFoundFile {
+                __typename
+                entry {
+                  matching {
+                    version
+                    contentType
+                    accessLevel
+                    changeBy
+                    description
+                    categories
+                    tags
+                    contentText
+                    encryptionMetadata {
+                      dataToEncryptHash
+                      accessControlConditions
+                      encryptedBy
+                      encryptedAt
+                      chain
+                      litSdkVersion
+                      litNetwork
+                      templateName
+                      contractVersion
+                    }
+                    content
+                  }
+                }
+              }
+              ... on MoleculeSemanticSearchFoundAnnouncement {
+                __typename
+                entry {
+                  project {
+                    ipnftUid
+                  }
+                  id
+                  headline
+                  body
+                  attachments
+                  accessLevel
+                  changeBy
+                  categories
+                  tags
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -7883,6 +7941,553 @@ async fn test_molecule_v2_activity() {
                     }
                 }
             }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_search() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
+    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
+    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
+
+    assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitafast",
+                    "ipnftUid": PROJECT_1_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
+
+    // Create a few versioned files
+    let project_1_file_1_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": "public",
+                "description": "Plain text file (foo)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+    let project_1_file_2_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
+                "contentType": "text/plain",
+                "changeBy": USER_2,
+                "accessLevel": "holders",
+                "description": "Plain text file (bar)",
+                "categories": ["test-category-2"],
+                "tags": [],
+                "contentText": "hello bar",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+
+    // Upload new file versions
+    const UPLOAD_NEW_VERSION: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    ref: $ref
+                    content: $content
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                  ) {
+                    isSuccess
+                    message
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPLOAD_NEW_VERSION,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "ref": project_1_file_1_dataset_id,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
+                "changeBy": USER_1,
+                "accessLevel": "public",
+                "description": "Plain text file (foo) -- updated",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPLOAD_NEW_VERSION,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "ref": project_1_file_2_dataset_id,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
+                "changeBy": USER_2,
+                "accessLevel": "holders",
+                "description": "Plain text file (bar) -- updated",
+                "categories": ["test-category-2"],
+                "tags": [],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Move a file
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "fromPath": "/foo.txt",
+                "toPath": "/foo_renamed.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Create an announcement for the first project
+    let project_1_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+                "moleculeAccessLevel": "public",
+                "moleculeChangeBy": USER_1,
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    // Remove a file
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            REMOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "removeEntry": {
+                                "isSuccess": true,
+                                "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    ///////////////////////////////////////////////////////////////////////////////
+
+    // Create another project
+    assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitaslow",
+                    "ipnftUid": PROJECT_2_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
+                    "ipnftTokenId": "10",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
+
+    // Create an announcement for the second project
+    let project_2_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_2_UID,
+                "headline": "Test announcement 2",
+                "body": "Blah blah 2",
+                "attachments": [],
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": USER_2,
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag2"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    // Create a file for the second project
+    let project_2_file_1_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_2_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": "public",
+                "description": "Plain text file (baz)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+
+    ////////////
+    // Search //
+    ////////////
+
+    // Empty prompt
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                {
+                    "__typename": "MoleculeSemanticSearchFoundFile",
+                    "entry": {
+                        "matching": {
+                            "accessLevel": "public",
+                            "categories": ["test-category"],
+                            "changeBy": USER_1,
+                            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
+                            "contentText": "hello foo",
+                            "contentType": "text/plain",
+                            "description": "Plain text file (baz)",
+                            "encryptionMetadata": null,
+                            "tags": ["test-tag1", "test-tag2"],
+                            "version": 1
+                        }
+                    }
+                },
+                {
+                    "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+                    "entry": {
+                        "accessLevel": "holders",
+                        "attachments": [],
+                        "body": "Blah blah 2",
+                        "categories": ["test-category-1", "test-category-2"],
+                        "changeBy": USER_2,
+                        "headline": "Test announcement 2",
+                        "id": project_2_announcement_1_id,
+                        "project": {
+                            "ipnftUid": PROJECT_2_UID,
+                        },
+                        "tags": ["test-tag2"]
+                    }
+                },
+                {
+                    "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+                    "entry": {
+                        "accessLevel": "public",
+                        "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+                        "body": "Blah blah 1",
+                        "categories": ["test-category-1"],
+                        "changeBy": USER_1,
+                        "headline": "Test announcement 1",
+                        "id": project_1_announcement_1_id,
+                        "project": {
+                            "ipnftUid": PROJECT_1_UID,
+                        },
+                        "tags": ["test-tag1", "test-tag2"]
+                    }
+                },
+                {
+                    "__typename": "MoleculeSemanticSearchFoundFile",
+                    "entry": {
+                        "matching": {
+                            "accessLevel": "public",
+                            "categories": ["test-category"],
+                            "changeBy": USER_1,
+                            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
+                            "contentText": null,
+                            "contentType": "application/octet-stream",
+                            "description": "Plain text file (foo) -- updated",
+                            "encryptionMetadata": null,
+                            "tags": ["test-tag1", "test-tag2"],
+                            "version": 2
+                        }
+                    }
+                }
+            ],
+            "totalCount": 4
         })
     );
 }
