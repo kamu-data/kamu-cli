@@ -8532,7 +8532,7 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Prompt: "tEXt" (files + announcement (body))
+    // Prompt: "tEXt" (files + announcements (body))
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
@@ -8556,7 +8556,7 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Prompt: "tESt" (files + announcement (headline))
+    // Prompt: "tESt" (files + announcements (headline))
     assert_eq!(
         GraphQLQueryRequest::new(
             SEARCH_QUERY,
@@ -8577,6 +8577,30 @@ async fn test_molecule_v2_search() {
                 // project_1_file_1_dataset_id_search_hit_node,
             ],
             "totalCount": 3
+        })
+    );
+
+    // Prompt: "bLaH" (only announcements (body))
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "bLaH",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_id_search_hit_node,
+                project_2_announcement_1_id_search_hit_node,
+                project_1_announcement_1_id_search_hit_node,
+                // project_1_file_1_dataset_id_search_hit_node,
+            ],
+            "totalCount": 2
         })
     );
 }
