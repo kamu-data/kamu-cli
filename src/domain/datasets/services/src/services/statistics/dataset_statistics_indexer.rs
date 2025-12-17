@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::{transactional_method1, transactional_method3};
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -23,6 +24,24 @@ use crate::compute_dataset_statistics_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct DatasetStatisticsIndexerConfig {
+    pub max_concurrency: usize,
+}
+
+impl Default for DatasetStatisticsIndexerConfig {
+    fn default() -> Self {
+        Self { max_concurrency: 8 }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DatasetStatisticsIndexer {
+    catalog: Catalog,
+    config: DatasetStatisticsIndexerConfig,
+}
+
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
@@ -30,20 +49,25 @@ use crate::compute_dataset_statistics_increment;
     depends_on: &[
         JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     ],
-    requires_transaction: true,
+    requires_transaction: false,
 })]
-pub struct DatasetStatisticsIndexer {
-    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    dataset_entry_repo: Arc<dyn kamu_datasets::DatasetEntryRepository>,
-    dataset_statistics_repo: dill::Lazy<Arc<dyn DatasetStatisticsRepository>>,
-}
-
 impl DatasetStatisticsIndexer {
+    pub fn new(catalog: Catalog, config: DatasetStatisticsIndexerConfig) -> Self {
+        Self { catalog, config }
+    }
+
+    #[transactional_method1(dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>)]
     async fn has_any_stats(&self) -> Result<bool, InternalError> {
-        self.dataset_statistics_repo
-            .get()
-            .unwrap()
-            .has_any_stats()
+        dataset_statistics_repo.has_any_stats().await
+    }
+
+    #[transactional_method1(dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>)]
+    async fn get_dataset_ids(&self) -> Result<Vec<odf::DatasetID>, InternalError> {
+        use futures::TryStreamExt;
+
+        dataset_storage_unit
+            .stored_dataset_ids()
+            .try_collect()
             .await
     }
 
@@ -53,55 +77,63 @@ impl DatasetStatisticsIndexer {
         name = "DatasetStatisticsIndexer::index_dataset_statistics"
     )]
     async fn index_dataset_statistics(&self) -> Result<(), InternalError> {
-        use futures::TryStreamExt;
+        use futures::stream::{self, StreamExt, TryStreamExt};
 
-        let dataset_ids: Vec<_> = self
-            .dataset_storage_unit
-            .stored_dataset_ids()
-            .try_collect()
+        let dataset_ids = self.get_dataset_ids().await?;
+
+        // Process datasets in parallel with per-dataset transactions
+        let concurrency = std::cmp::max(self.config.max_concurrency, 1);
+        stream::iter(dataset_ids)
+            .map(|dataset_id| async move { self.process_dataset(dataset_id).await })
+            .buffer_unordered(concurrency)
+            .try_collect::<()>()
             .await?;
 
-        for dataset_id in dataset_ids {
-            let dataset = self
-                .dataset_storage_unit
-                .get_stored_dataset_by_id(&dataset_id)
-                .await
-                .int_err()?;
+        Ok(())
+    }
 
-            match self.dataset_entry_repo.get_dataset_entry(&dataset_id).await {
-                Ok(_) => {}
-                Err(GetDatasetEntryError::NotFound(_)) => {
-                    tracing::warn!(
-                        "Dataset entry for dataset {} not found, skipping statistics indexing",
-                        dataset_id
-                    );
-                    continue;
-                }
-                Err(e) => return Err(e.int_err()),
+    #[transactional_method3(
+        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
+        dataset_entry_repo: Arc<dyn kamu_datasets::DatasetEntryRepository>,
+        dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>
+    )]
+    async fn process_dataset(&self, dataset_id: odf::DatasetID) -> Result<(), InternalError> {
+        let dataset = dataset_storage_unit
+            .get_stored_dataset_by_id(&dataset_id)
+            .await
+            .int_err()?;
+
+        match dataset_entry_repo.get_dataset_entry(&dataset_id).await {
+            Ok(_) => {}
+            Err(GetDatasetEntryError::NotFound(_)) => {
+                tracing::warn!(
+                    "Dataset entry for dataset {} not found, skipping statistics indexing",
+                    dataset_id
+                );
+                return Ok(());
             }
-
-            let head = dataset
-                .as_metadata_chain()
-                .as_uncached_ref_repo()
-                .get(odf::BlockRef::Head.as_str())
-                .await
-                .int_err()?;
-
-            let increment = compute_dataset_statistics_increment(
-                dataset.as_metadata_chain().as_uncached_chain(),
-                &head,
-                None,
-            )
-            .await?;
-
-            assert!(increment.seen_seed);
-            self.dataset_statistics_repo
-                .get()
-                .unwrap()
-                .set_dataset_statistics(&dataset_id, &odf::BlockRef::Head, increment.statistics)
-                .await
-                .int_err()?;
+            Err(e) => return Err(e.int_err()),
         }
+
+        let head = dataset
+            .as_metadata_chain()
+            .as_uncached_ref_repo()
+            .get(odf::BlockRef::Head.as_str())
+            .await
+            .int_err()?;
+
+        let increment = compute_dataset_statistics_increment(
+            dataset.as_metadata_chain().as_uncached_chain(),
+            &head,
+            None,
+        )
+        .await?;
+
+        assert!(increment.seen_seed);
+        dataset_statistics_repo
+            .set_dataset_statistics(&dataset_id, &odf::BlockRef::Head, increment.statistics)
+            .await
+            .int_err()?;
 
         Ok(())
     }
