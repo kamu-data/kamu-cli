@@ -8378,7 +8378,7 @@ async fn test_molecule_v2_search() {
                 "changeBy": USER_2,
                 "accessLevel": "public",
                 "description": "Plain te-x-t test file (baz)",
-                "categories": ["test-category"],
+                "categories": ["test-category-1"],
                 "tags": ["test-tag2"],
                 "contentText": "hello foo",
                 "encryptionMetadata": null,
@@ -8417,7 +8417,7 @@ async fn test_molecule_v2_search() {
     // Search //
     ////////////
 
-    let project_1_file_1_dataset_id_search_hit_node = json!({
+    let project_1_file_1_dataset_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
         "entry": {
             "accessLevel": "public",
@@ -8446,7 +8446,7 @@ async fn test_molecule_v2_search() {
             "ref": project_1_file_1_dataset_id,
         }
     });
-    let project_1_announcement_1_id_search_hit_node = json!({
+    let project_1_announcement_1_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundAnnouncement",
         "entry": {
             "accessLevel": "public",
@@ -8462,23 +8462,23 @@ async fn test_molecule_v2_search() {
             "tags": ["test-tag1", "test-tag2"]
         }
     });
-    let project_2_announcement_1_id_search_hit_node = json!({
-            "__typename": "MoleculeSemanticSearchFoundAnnouncement",
-            "entry": {
-                "accessLevel": "holders",
-                "attachments": [],
-                "body": "Blah blah 2 text",
-                "categories": ["test-category-1", "test-category-2"],
-                "changeBy": USER_2,
-                "headline": "Test announcement 2",
-                "id": project_2_announcement_1_id,
-                "project": {
-                    "ipnftUid": PROJECT_2_UID,
-                },
-                "tags": ["test-tag2"]
-            }
+    let project_2_announcement_1_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+        "entry": {
+            "accessLevel": "holders",
+            "attachments": [],
+            "body": "Blah blah 2 text",
+            "categories": ["test-category-1", "test-category-2"],
+            "changeBy": USER_2,
+            "headline": "Test announcement 2",
+            "id": project_2_announcement_1_id,
+            "project": {
+                "ipnftUid": PROJECT_2_UID,
+            },
+            "tags": ["test-tag2"]
+        }
     });
-    let project_2_file_1_dataset_id_search_hit_node = json!({
+    let project_2_file_1_dataset_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
         "entry": {
             "accessLevel": "public",
@@ -8488,7 +8488,7 @@ async fn test_molecule_v2_search() {
             "asVersionedFile": {
                 "matching": {
                     "accessLevel": "public",
-                    "categories": ["test-category"],
+                    "categories": ["test-category-1"],
                     "changeBy": USER_2,
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                     "contentText": "hello foo",
@@ -8523,10 +8523,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 4
         })
@@ -8547,10 +8547,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 3
         })
@@ -8571,10 +8571,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                // project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 3
         })
@@ -8595,10 +8595,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                // project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8619,10 +8619,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                // project_2_announcement_1_id_search_hit_node,
-                // project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8646,10 +8646,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                // project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8673,10 +8673,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                // project_1_announcement_1_id_search_hit_node,
-                // project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8700,10 +8700,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 4
         })
@@ -8727,10 +8727,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                // project_2_announcement_1_id_search_hit_node,
-                // project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8754,10 +8754,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                // project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8781,10 +8781,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 4
         })
@@ -8808,10 +8808,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                // project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })
@@ -8835,10 +8835,10 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                project_2_file_1_dataset_id_search_hit_node,
-                project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 4
         })
@@ -8862,12 +8862,93 @@ async fn test_molecule_v2_search() {
         .unwrap()["molecule"]["v2"]["search"],
         json!({
             "nodes": [
-                // project_2_file_1_dataset_id_search_hit_node,
-                // project_2_announcement_1_id_search_hit_node,
-                project_1_announcement_1_id_search_hit_node,
-                project_1_file_1_dataset_id_search_hit_node,
+                // project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
+        })
+    );
+
+    // Filters: byCategories: [test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byCategories": ["test-category-1"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 3
+        })
+    );
+
+    // Filters: byCategories: [test-category-2]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byCategories": ["test-category-2"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 1
+        })
+    );
+
+    // Filters: byCategories: [test-category-2, test-category-1]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byCategories": ["test-category-2", "test-category-1"],
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
+                // project_1_announcement_1_search_hit_node,
+                // project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 1
         })
     );
 }
