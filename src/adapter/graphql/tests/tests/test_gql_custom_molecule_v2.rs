@@ -348,7 +348,7 @@ const SEARCH_QUERY: &str = indoc!(
               }
               ... on MoleculeSemanticSearchFoundAnnouncement {
                 __typename
-                entry {
+                announcement {
                   project {
                     ipnftUid
                   }
@@ -8646,7 +8646,7 @@ async fn test_molecule_v2_search() {
     });
     let project_1_announcement_1_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundAnnouncement",
-        "entry": {
+        "announcement": {
             "accessLevel": "public",
             "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
             "body": "Blah blah 1 text",
@@ -8662,7 +8662,7 @@ async fn test_molecule_v2_search() {
     });
     let project_2_announcement_1_search_hit_node = json!({
         "__typename": "MoleculeSemanticSearchFoundAnnouncement",
-        "entry": {
+        "announcement": {
             "accessLevel": "holders",
             "attachments": [],
             "body": "Blah blah 2 text",
