@@ -23,7 +23,7 @@ pub fn molecule_fields_filter(
         NonEmpty::from_vec(values).map(|values| Filter {
             field_name: "ipnft_uid".to_string(),
             values,
-            is_array: true,
+            is_array: false,
         })
     });
     let maybe_tags_filter = by_tags.and_then(|values| {
