@@ -147,7 +147,7 @@ impl MoleculeProjectV2 {
         let listing = view_project_activities_uc
             .execute(
                 &self.entity,
-                MoleculeViewProjectActivitiesMode::LatestProjection,
+                MoleculeViewProjectActivitiesMode::LatestProjection, /* LatestSource */
                 filters.map(Into::into),
                 Some(PaginationOpts {
                     limit: per_page,

@@ -186,7 +186,7 @@ impl MoleculeV2 {
         let listing = view_global_activities_uc
             .execute(
                 &molecule_subject,
-                MoleculeViewGlobalActivitiesMode::LatestProjection,
+                MoleculeViewGlobalActivitiesMode::LatestProjection, /* LatestSource */
                 filters.map(Into::into),
                 Some(PaginationOpts::from_page(page, per_page)),
             )

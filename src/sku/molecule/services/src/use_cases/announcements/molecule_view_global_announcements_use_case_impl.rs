@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
     molecule_announcement_full_text_search_schema as announcement_schema,
     *,
@@ -39,11 +40,24 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
         // Gain read access to global announcements dataset
-        let global_announcements_reader = self
+        let global_announcements_reader = match self
             .announcements_service
             .global_reader(&molecule_subject.account_name)
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalAnnouncementsError>)?;
+        {
+            Ok(reader) => reader,
+
+            // No announcements dataset yet is fine, just return empty listing
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
+                return Ok(MoleculeGlobalAnnouncementListing::default());
+            }
+
+            Err(e) => {
+                return Err(MoleculeDatasetErrorExt::adapt::<
+                    MoleculeViewGlobalAnnouncementsError,
+                >(e));
+            }
+        };
 
         // Obtain raw ledger DF
         let maybe_df = global_announcements_reader
