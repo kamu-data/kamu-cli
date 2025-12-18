@@ -187,11 +187,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(
-                    &molecule_subject,
-                    Some(event_time),
-                    data_room_activity_record,
-                )
+                .execute(&molecule_subject, event_time, data_room_activity_record)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -315,11 +311,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(
-                    &molecule_subject,
-                    Some(event_time),
-                    data_room_activity_record,
-                )
+                .execute(&molecule_subject, event_time, data_room_activity_record)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
@@ -417,11 +409,7 @@ impl MoleculeDataRoomMutV2 {
 
         // TODO: asynchronous write of activity log
         append_global_data_room_activity_uc
-            .execute(
-                &molecule_subject,
-                Some(event_time),
-                data_room_activity_record,
-            )
+            .execute(&molecule_subject, event_time, data_room_activity_record)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeAppendDataRoomActivityError as E;
@@ -867,11 +855,7 @@ impl MoleculeDataRoomMutV2 {
             };
 
             append_global_data_room_activity_uc
-                .execute(
-                    &molecule_subject,
-                    Some(event_time),
-                    data_room_activity_record,
-                )
+                .execute(&molecule_subject, event_time, data_room_activity_record)
                 .await
                 .map_err(|e| -> GqlError {
                     use MoleculeAppendDataRoomActivityError as E;
