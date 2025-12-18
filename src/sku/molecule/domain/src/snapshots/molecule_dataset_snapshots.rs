@@ -422,7 +422,7 @@ impl MoleculeDatasetSnapshots {
                     read: odf::metadata::ReadStepNdJson {
                         schema: Some(
                             [
-                                "event_time TIMESTAMP",
+                                "event_time TIMESTAMP NOT NULL",
                                 "activity_type STRING NOT NULL",
                                 "ipnft_uid STRING NOT NULL",
                                 "path STRING NOT NULL",
