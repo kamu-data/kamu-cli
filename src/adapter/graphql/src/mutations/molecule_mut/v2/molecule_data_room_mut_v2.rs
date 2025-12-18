@@ -173,7 +173,7 @@ impl MoleculeDataRoomMutV2 {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
                 ipnft_uid: self.project.entity.ipnft_uid.clone(),
-                path: path.into_v1(),
+                path,
                 r#ref: versioned_file_dataset_id,
                 version: versioned_file_entry.version,
                 change_by: versioned_file_entry.basic_info.change_by,
@@ -282,7 +282,7 @@ impl MoleculeDataRoomMutV2 {
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                existing_data_room_entry.path.clone(),
+                existing_data_room_entry.path.clone().into_v1(),
                 existing_data_room_entry.reference.clone(),
                 versioned_file_entry.to_denormalized(),
             )
@@ -398,7 +398,8 @@ impl MoleculeDataRoomMutV2 {
         let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
             activity_type,
             ipnft_uid: self.project.entity.ipnft_uid.clone(),
-            path: collection_entry_record.path,
+            // SAFETY: All paths should be normalized after v2 migration
+            path: CollectionPathV2::from_v1_unchecked(collection_entry_record.path).into(),
             r#ref: collection_entry_record.reference,
             version: denormalized_latest_file_info.version,
             change_by: denormalized_latest_file_info.change_by,
@@ -662,7 +663,10 @@ impl MoleculeDataRoomMutV2 {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path: path.into() }.into())
+                Ok(MoleculeDataRoomUpdateEntryNotFound {
+                    path: CollectionPathV2::from_v1_unchecked(path),
+                }
+                .into())
             }
             Err(MoleculeMoveDataRoomEntryError::Access(e)) => Err(e.into()),
             Err(MoleculeMoveDataRoomEntryError::RefCASFailed(_)) => {
@@ -689,14 +693,13 @@ impl MoleculeDataRoomMutV2 {
         );
 
         let event_time = time_sourcem.now();
-        let path = path.into_v1_scalar();
 
         match remove_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                path.clone().into(),
+                path.clone().into_v1_scalar().into(),
                 expected_head.map(Into::into),
             )
             .await
@@ -831,7 +834,7 @@ impl MoleculeDataRoomMutV2 {
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
-                existing_data_room_entry.path.clone(),
+                existing_data_room_entry.path.clone().into_v1(),
                 reference.into(),
                 new_denormalized_file_info.clone(),
             )
@@ -954,7 +957,7 @@ impl MoleculeDataRoomUpdateSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct MoleculeDataRoomUpdateEntryNotFound {
-    pub path: CollectionPath<'static>,
+    pub path: CollectionPathV2<'static>,
 }
 #[ComplexObject]
 impl MoleculeDataRoomUpdateEntryNotFound {

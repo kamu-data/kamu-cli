@@ -21,6 +21,10 @@ impl<'a> CollectionPathV2<'a> {
         let inner: kamu_datasets::CollectionPathV2 = self.into();
         CollectionPath::from(inner.into_v1())
     }
+
+    pub fn from_v1_unchecked(path: kamu_datasets::CollectionPath) -> Self {
+        kamu_datasets::CollectionPathV2::from_v1_unchecked(path).into()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

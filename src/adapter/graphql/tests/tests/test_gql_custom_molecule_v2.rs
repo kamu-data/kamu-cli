@@ -201,7 +201,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
 );
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
@@ -235,7 +235,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 );
 const MOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $fromPath: CollectionPath!, $toPath: CollectionPath!) {
+    mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
@@ -283,7 +283,7 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
 );
 const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPath!) {
+    mutation ($ipnftUid: String!, $path: CollectionPathV2!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
@@ -916,7 +916,7 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
                     v2 {
                       project(ipnftUid: $ipnftUid) {
@@ -1111,7 +1111,7 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
                     v2 {
                       project(ipnftUid: $ipnftUid) {
@@ -1309,7 +1309,7 @@ async fn test_molecule_v2_data_room_operations() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
                     v2 {
                       project(ipnftUid: $ipnftUid) {

@@ -11,62 +11,66 @@ use crate::CollectionPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DELIM: &str = "%2F";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Collection path that was verified at creation time.
-#[derive(Clone, Debug, derive_more::Deref, derive_more::Display, Eq, PartialEq)]
+#[derive(
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Deref,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
 pub struct CollectionPathV2(String); // Stored trimmed decoded value
 
 impl CollectionPathV2 {
     pub fn try_new(path: impl Into<String>) -> Result<Self, CollectionPathValidationError> {
         let path = path.into();
-        let trimmed_path = path.trim();
-
-        if trimmed_path.is_empty() {
-            return Err(CollectionPathValidationError::IsEmpty);
-        }
-
-        // "/" is allowed in the path
-        let trimmed_path = trimmed_path.replace('/', DELIM);
-
-        let Ok(decoded) = urlencoding::decode(&trimmed_path) else {
-            return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
-        };
-
-        if urlencoding::encode(&decoded) != trimmed_path {
-            return Err(CollectionPathValidationError::InvalidUrlEncoding { path });
-        }
-
-        let trimmed_decoded = decoded.trim();
-
-        if trimmed_decoded.is_empty() {
-            return Err(CollectionPathValidationError::IsEmpty);
-        }
-
-        let result = if !trimmed_decoded.starts_with('/') {
-            // Add leading / if it was missing
-            format!("/{trimmed_decoded}")
+        let path = if path.starts_with('/') {
+            path
         } else {
-            trimmed_decoded.to_owned()
+            format!("/{path}")
         };
 
-        Ok(Self(result))
+        for (i, segment) in path.split('/').enumerate() {
+            if segment.is_empty() {
+                if i == 0 {
+                    continue;
+                }
+                return Err(CollectionPathValidationError { path });
+            }
+
+            let Ok(decoded) = urlencoding::decode(segment) else {
+                return Err(CollectionPathValidationError { path });
+            };
+
+            if urlencoding::encode(&decoded) != segment {
+                return Err(CollectionPathValidationError { path });
+            }
+        }
+
+        Ok(Self(path))
     }
 
     pub fn into_v1(self) -> CollectionPath {
         CollectionPath::new(self.0)
     }
+
+    pub fn from_v1_unchecked(path: CollectionPath) -> Self {
+        Self(path.into_inner())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CollectionPathValidationError {
-    #[error("Path is empty")]
-    IsEmpty,
-
-    #[error("Invalid URL encoding for path: `{path}`")]
-    InvalidUrlEncoding { path: String },
+#[error(
+    "Invalid path `{path}` - path must be in the form \
+     `/<url-encoded-segment>/<url-encoded-segment>/...`"
+)]
+pub struct CollectionPathValidationError {
+    path: String,
 }
 
 #[cfg(test)]
@@ -77,48 +81,36 @@ mod tests {
 
     #[test]
     fn test_collection_path_v2() {
-        const SPACE: &str = "%20";
+        // Err: empty
+        assert_matches!(CollectionPathV2::try_new(""), Err(_));
 
-        // --- Invalid paths ---
-        assert_matches!(
-            CollectionPathV2::try_new(""),
-            Err(CollectionPathValidationError::IsEmpty)
-        );
-        assert_matches!(
-            CollectionPathV2::try_new("     "),
-            Err(CollectionPathValidationError::IsEmpty)
-        );
-        assert_matches!(
-            CollectionPathV2::try_new(format!("{DELIM}path{DELIM}to{DELIM}file with spaces")),
-            Err(CollectionPathValidationError::InvalidUrlEncoding { .. })
+        // Err: unencoded spaces
+        assert_matches!(CollectionPathV2::try_new("     "), Err(_));
+
+        // Err: empty segments
+        assert_matches!(CollectionPathV2::try_new("/"), Err(_));
+        assert_matches!(CollectionPathV2::try_new("/a/"), Err(_));
+        assert_matches!(CollectionPathV2::try_new("/a//b"), Err(_));
+
+        // Ok: prepends leading slash
+        assert_eq!(
+            CollectionPathV2::try_new("path/to/file").unwrap().as_str(),
+            "/path/to/file",
         );
 
-        // --- Valid paths ---
-        assert_eq!(
-            "/path/to/file",
-            *CollectionPathV2::try_new("/path/to/file").unwrap()
-        );
-        assert_eq!("/file.exe", *CollectionPathV2::try_new("file.exe").unwrap());
-        // Leading / is optional
-        assert_eq!(
-            "/path/to/file",
-            *CollectionPathV2::try_new(format!("path{DELIM}to{DELIM}file")).unwrap()
-        );
-        assert_eq!(
-            "/path/to/file with spaces",
-            *CollectionPathV2::try_new(format!(
-                "{DELIM}path{DELIM}to{DELIM}file{SPACE}with{SPACE}spaces"
-            ))
-            .unwrap()
-        );
-        // Trim decoded spaces
-        assert_eq!(
-            "/path to file",
-            *CollectionPathV2::try_new(format!(
-                "{SPACE}{SPACE}path{SPACE}to{SPACE}file{SPACE}{SPACE}"
-            ))
-            .unwrap()
-        );
+        // Ok
+        CollectionPathV2::try_new("a").unwrap();
+        CollectionPathV2::try_new("/a").unwrap();
+        CollectionPathV2::try_new("/a.txt").unwrap();
+
+        // Ok: can have encoded slashes
+        CollectionPathV2::try_new("/a%2Fb%2Fc").unwrap();
+
+        // Ok: 'slava 🇺🇦'
+        CollectionPathV2::try_new("/slava%20%F0%9F%87%BA%F0%9F%87%A6").unwrap();
+
+        // Ok: yes even ' ' path is ok - we don't care
+        CollectionPathV2::try_new("/%20").unwrap();
     }
 }
 

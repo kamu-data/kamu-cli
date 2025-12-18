@@ -37,7 +37,7 @@ pub struct MoleculeDataRoomActivity {
     // TODO: typing
     pub ipnft_uid: String,
 
-    pub path: kamu_datasets::CollectionPath,
+    pub path: kamu_datasets::CollectionPathV2,
 
     pub r#ref: odf::DatasetID,
 
@@ -118,7 +118,7 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
 
     pub ipnft_uid: String,
 
-    pub path: kamu_datasets::CollectionPath,
+    pub path: kamu_datasets::CollectionPathV2,
 
     pub r#ref: odf::DatasetID,
 

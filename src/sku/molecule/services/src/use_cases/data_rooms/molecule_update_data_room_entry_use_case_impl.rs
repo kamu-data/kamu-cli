@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
-use kamu_datasets::CollectionPath;
+use kamu_datasets::{CollectionPath, CollectionPathV2};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -77,7 +77,8 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
             MoleculeUpdateDataRoomEntryResult::Success(success) => MoleculeDataRoomEntry {
                 system_time: success.system_time,
                 event_time: source_event_time.unwrap_or(success.system_time),
-                path,
+                // SAFETY: All paths should be normalized after v2 migration
+                path: CollectionPathV2::from_v1_unchecked(path),
                 reference,
                 denormalized_latest_file_info,
             },
@@ -88,7 +89,8 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
                 MoleculeDataRoomEntry {
                     system_time: now,
                     event_time: now,
-                    path,
+                    // SAFETY: All paths should be normalized after v2 migration
+                    path: CollectionPathV2::from_v1_unchecked(path),
                     reference,
                     denormalized_latest_file_info,
                 }

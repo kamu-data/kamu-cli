@@ -3286,7 +3286,7 @@ type MoleculeDataRoomEntry {
 	asDataset: Dataset
 	systemTime: DateTime!
 	eventTime: DateTime!
-	path: CollectionPath!
+	path: CollectionPathV2!
 	ref: DatasetID!
 	changeBy: String!
 	accessLevel: String!
@@ -3378,8 +3378,8 @@ type MoleculeDataRoomMutV2 {
 }
 
 type MoleculeDataRoomProjection {
-	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
-	entry(path: CollectionPath!): MoleculeDataRoomEntry
+	entries(pathPrefix: CollectionPathV2, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
+	entry(path: CollectionPathV2!): MoleculeDataRoomEntry
 }
 
 interface MoleculeDataRoomRemoveEntryResult {
@@ -3388,7 +3388,7 @@ interface MoleculeDataRoomRemoveEntryResult {
 }
 
 type MoleculeDataRoomUpdateEntryNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
-	path: CollectionPath!
+	path: CollectionPathV2!
 	isSuccess: Boolean!
 	message: String!
 }

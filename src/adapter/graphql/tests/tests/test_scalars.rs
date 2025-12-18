@@ -388,7 +388,7 @@ async fn test_collection_path_v_2() {
             .await;
         assert_eq!(
             value!({
-                "collectionPathV2": "/path/to/file"
+                "collectionPathV2": "/%2Fpath%2Fto%2Ffile"
             }),
             res.data,
             "{res:?}"
@@ -402,8 +402,8 @@ async fn test_collection_path_v_2() {
             .await;
         assert_eq!(
             [
-                "Failed to parse \"CollectionPathV2\": Invalid URL encoding for path: \
-                 `/path/to/file with spaces`"
+                "Failed to parse \"CollectionPathV2\": Invalid path `/path/to/file with spaces` - \
+                 path must be in the form `/<url-encoded-segment>/<url-encoded-segment>/...`"
             ],
             *res.error_messages(),
             "{res:?}"
