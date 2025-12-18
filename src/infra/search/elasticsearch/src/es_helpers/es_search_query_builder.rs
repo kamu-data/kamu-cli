@@ -196,7 +196,7 @@ impl ElasticSearchQueryBuilder {
 
     fn sort_argument(req: &FullTextSearchRequest) -> serde_json::Value {
         fn relevance_sort() -> serde_json::Value {
-            serde_json::json!([{"_score": {"order": "desc"}}])
+            serde_json::json!({"_score": {"order": "desc"}})
         }
 
         let parts = req

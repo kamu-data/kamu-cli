@@ -16,8 +16,8 @@ use datafusion::prelude::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
-    molecule_activity_search_schema as activity_schema,
     molecule_announcement_search_schema as announcement_schema,
+    molecule_data_room_entry_search_schema as dataroom_entry_schema,
     molecule_search_schema_common as molecule_schema,
     *,
 };
@@ -294,7 +294,7 @@ impl MoleculeSearchUseCaseImpl {
             let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
 
             if search_entity_kinds.contains(&MoleculeSearchEntityKind::DataRoomActivity) {
-                entity_schemas.push(activity_schema::SCHEMA_NAME);
+                entity_schemas.push(dataroom_entry_schema::SCHEMA_NAME);
             }
 
             if search_entity_kinds.contains(&MoleculeSearchEntityKind::Announcement) {
@@ -351,9 +351,35 @@ impl MoleculeSearchUseCaseImpl {
                 .hits
                 .into_iter()
                 .map(|hit| match hit.schema_name {
-                    activity_schema::SCHEMA_NAME => {
-                        MoleculeDataRoomActivity::from_search_index_json(hit.source)
-                            .map(MoleculeSearchHit::DataRoomActivity)
+                    dataroom_entry_schema::SCHEMA_NAME => {
+                        // Extract "ipnft_uid" field from source
+                        let ipnft_uid = if let Some(obj) = hit.source.as_object() {
+                            obj.get(molecule_schema::fields::IPNFT_UID)
+                                .and_then(|v| v.as_str())
+                                .map(ToString::to_string)
+                                .ok_or_else(|| {
+                                    InternalError::new(
+                                        "Missing or invalid ipnft_uid field in search hit",
+                                    )
+                                })?
+                        } else {
+                            unreachable!()
+                        };
+
+                        // Recover data room entry
+                        let data_room_entry =
+                            MoleculeDataRoomEntry::from_search_index_json(hit.source)?;
+
+                        // Convert it do dummy activity
+                        let activity = MoleculeDataRoomActivity::from_data_room_operation(
+                            0, /* unknown */
+                            MoleculeDataRoomFileActivityType::Added,
+                            data_room_entry,
+                            ipnft_uid,
+                        );
+
+                        // Finally wrap as search hit
+                        Ok(MoleculeSearchHit::DataRoomActivity(activity))
                     }
                     announcement_schema::SCHEMA_NAME => {
                         MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)

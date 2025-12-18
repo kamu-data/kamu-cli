@@ -118,7 +118,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
             list: search_results
                 .hits
                 .into_iter()
-                .map(|hit| MoleculeDataRoomEntry::from_data_room_entry_json(hit.source))
+                .map(|hit| MoleculeDataRoomEntry::from_search_index_json(hit.source))
                 .collect::<Result<Vec<_>, InternalError>>()?,
         })
     }
