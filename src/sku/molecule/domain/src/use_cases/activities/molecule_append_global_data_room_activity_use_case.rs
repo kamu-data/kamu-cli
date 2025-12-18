@@ -19,7 +19,7 @@ pub trait MoleculeAppendGlobalDataRoomActivityUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        source_event_time: Option<DateTime<Utc>>,
+        source_event_time: DateTime<Utc>,
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError>;
 }

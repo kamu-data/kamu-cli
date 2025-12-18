@@ -82,7 +82,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
-        source_event_time: Option<DateTime<Utc>>,
+        source_event_time: DateTime<Utc>,
         announcement: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError> {
         let new_announcement_id = announcement.announcement_id;
@@ -95,6 +95,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         let global_announcement_record = MoleculeGlobalAnnouncementChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
+            event_time: Some(source_event_time),
             payload: MoleculeGlobalAnnouncementPayloadRecord {
                 ipnft_uid: molecule_project.ipnft_uid.clone(),
                 announcement,
@@ -108,7 +109,10 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         let push_res = global_announcements_writer
-            .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
+            .push_ndjson_data(
+                global_announcement_record.to_bytes(),
+                Some(source_event_time),
+            )
             .await?;
 
         assert!(matches!(push_res, PushIngestResult::Updated { .. }));
@@ -124,7 +128,10 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         let push_res = project_announcements_writer
-            .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
+            .push_ndjson_data(
+                project_announcement_record.to_bytes(),
+                Some(source_event_time),
+            )
             .await?;
 
         match push_res {

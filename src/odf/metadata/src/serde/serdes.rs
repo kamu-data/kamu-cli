@@ -271,6 +271,8 @@ where
 pub struct DatasetDefaultVocabularyChangelogInsertionRecord<T> {
     pub op: OperationType,
 
+    pub event_time: Option<DateTime<Utc>>,
+
     #[serde(flatten)]
     pub payload: T,
 }
