@@ -54,6 +54,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         // Append new activity record
         let new_changelog_record = MoleculeDataRoomActivityChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
+            event_time: source_event_time,
             payload: activity_record,
         };
 

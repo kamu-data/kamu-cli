@@ -95,6 +95,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         let global_announcement_record = MoleculeGlobalAnnouncementChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
+            event_time: source_event_time,
             payload: MoleculeGlobalAnnouncementPayloadRecord {
                 ipnft_uid: molecule_project.ipnft_uid.clone(),
                 announcement,

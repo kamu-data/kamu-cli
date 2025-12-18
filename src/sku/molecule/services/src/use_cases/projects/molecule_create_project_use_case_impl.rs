@@ -201,6 +201,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
+            event_time: source_event_time,
             payload: project_payload,
         };
 
