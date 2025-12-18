@@ -47,14 +47,21 @@ pub struct EntityPageListing<Entity> {
     pub total_count: usize,
 }
 
-// Entity may be a type that doesn't implement Default, so we implement it
-// manually
-impl<Entity> Default for EntityPageListing<Entity> {
-    fn default() -> Self {
+impl<Entity> EntityPageListing<Entity> {
+    #[inline]
+    pub fn empty() -> Self {
         Self {
             list: Vec::new(),
             total_count: 0,
         }
+    }
+}
+
+// Entity may be a type that doesn't implement Default, so we implement it
+// manually
+impl<Entity> Default for EntityPageListing<Entity> {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 

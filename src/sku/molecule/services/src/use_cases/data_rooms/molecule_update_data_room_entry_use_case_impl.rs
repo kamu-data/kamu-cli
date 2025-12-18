@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
-use kamu_datasets::CollectionPath;
+use kamu_datasets::{CollectionPath, CollectionPathV2};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -48,14 +48,15 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
         content_text: Option<&str>,
     ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError> {
-        let entry = self
+        let result = self
             .data_room_collection_service
-            .upsert_data_room_collection_entry(
+            .move_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
                 source_event_time,
-                path,
-                reference,
-                denormalized_latest_file_info.to_collection_extra_data_fields(),
+                path.clone(),
+                path.clone(),
+                Some(denormalized_latest_file_info.to_collection_extra_data_fields()),
+                None,
             )
             .await
             .map_err(|e| match e {
@@ -73,12 +74,35 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
                 }
             })?;
 
-        let data_room_entry = MoleculeDataRoomEntry {
-            system_time: entry.system_time,
-            event_time: entry.event_time,
-            path: entry.path,
-            reference: entry.reference,
-            denormalized_latest_file_info,
+        let data_room_entry = match result {
+            MoleculeUpdateDataRoomEntryResult::Success(success) => MoleculeDataRoomEntry {
+                system_time: success.system_time,
+                event_time: source_event_time.unwrap_or(success.system_time),
+                // SAFETY: All paths should be normalized after v2 migration
+                path: CollectionPathV2::from_v1_unchecked(path),
+                reference,
+                denormalized_latest_file_info,
+            },
+            MoleculeUpdateDataRoomEntryResult::UpToDate => {
+                // TODO: Return existing entry in `UpToDate` result
+                let now = Utc::now();
+
+                MoleculeDataRoomEntry {
+                    system_time: now,
+                    event_time: now,
+                    // SAFETY: All paths should be normalized after v2 migration
+                    path: CollectionPathV2::from_v1_unchecked(path),
+                    reference,
+                    denormalized_latest_file_info,
+                }
+            }
+            MoleculeUpdateDataRoomEntryResult::EntryNotFound(_) => {
+                // TODO: Entry presence is currently validated in GQL layer, but likely should
+                // be moved into this use case
+                return Err(format!("Entry not found with path: {path}")
+                    .int_err()
+                    .into());
+            }
         };
 
         self.outbox

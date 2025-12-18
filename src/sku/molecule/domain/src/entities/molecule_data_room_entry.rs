@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
+use kamu_datasets::{CollectionEntry, CollectionPathV2, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +25,7 @@ pub struct MoleculeDataRoomEntry {
     /// File system-like path
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
-    pub path: CollectionPath,
+    pub path: CollectionPathV2,
 
     /// DID of the linked dataset
     pub reference: odf::DatasetID,
@@ -44,7 +44,8 @@ impl MoleculeDataRoomEntry {
         Self {
             system_time: entry.system_time,
             event_time: entry.event_time,
-            path: entry.path,
+            // SAFETY: All paths should be normalized after v2 migration
+            path: CollectionPathV2::from_v1_unchecked(entry.path),
             reference: entry.reference,
             denormalized_latest_file_info,
         }

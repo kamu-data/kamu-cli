@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -85,7 +86,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath<'static>>,
+        path_prefix: Option<CollectionPathV2<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -105,7 +106,7 @@ impl MoleculeDataRoomProjection<'_> {
                     Some(ref hash) => MoleculeViewDataRoomEntriesMode::Historical(hash.clone()),
                     None => MoleculeViewDataRoomEntriesMode::LatestProjection, /* LatestSource */
                 },
-                path_prefix.map(Into::into),
+                path_prefix.map(|p| p.into_v1_scalar().into()),
                 max_depth,
                 filters.map(Into::into),
                 Some(PaginationOpts {
@@ -145,12 +146,16 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath<'static>,
+        path: CollectionPathV2<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
         let find_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeFindDataRoomEntryUseCase);
 
         let maybe_entry = find_data_room_entry_uc
-            .execute_find_by_path(&self.project.entity, self.as_of.clone(), path.into())
+            .execute_find_by_path(
+                &self.project.entity,
+                self.as_of.clone(),
+                path.into_v1_scalar().into(),
+            )
             .await
             .map_err(|e| match e {
                 MoleculeFindDataRoomEntryError::Access(e) => GqlError::Access(e),
@@ -261,8 +266,8 @@ impl MoleculeDataRoomEntry {
         self.entity.event_time
     }
 
-    async fn path(&self) -> CollectionPath<'_> {
-        CollectionPath::from(&self.entity.path)
+    async fn path(&self) -> CollectionPathV2<'_> {
+        CollectionPathV2::from(&self.entity.path)
     }
 
     #[graphql(name = "ref")]
@@ -270,14 +275,20 @@ impl MoleculeDataRoomEntry {
         DatasetID::from(&self.entity.reference)
     }
 
+    // TODO: Do we need these fields here? -->
     async fn change_by(&self) -> &MoleculeChangeBy {
         &self.entity.denormalized_latest_file_info.change_by
     }
 
+    async fn access_level(&self) -> &MoleculeAccessLevel {
+        &self.entity.denormalized_latest_file_info.access_level
+    }
+    // <--
+
     #[expect(clippy::unused_async)]
     async fn as_versioned_file(&self) -> Result<MoleculeVersionedFile<'_>> {
         Ok(MoleculeVersionedFile::new(
-            &self.entity,
+            Cow::Borrowed(&self.entity),
             self.is_latest_data_room_entry,
         ))
     }

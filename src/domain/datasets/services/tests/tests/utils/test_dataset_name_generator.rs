@@ -15,7 +15,10 @@ use pretty_assertions::assert_eq;
 
 #[rstest::rstest]
 #[case("/path/to/file", "00000000-1111-2222-3333-444444444444-path-to-file")]
-#[case("/path/to//file", "00000000-1111-2222-3333-444444444444-path-to-file")]
+#[case(
+    "/path/to/%20/file",
+    "00000000-1111-2222-3333-444444444444-path-to-file"
+)]
 #[case(
     "/path/to/file.txt",
     "00000000-1111-2222-3333-444444444444-path-to-file-txt"

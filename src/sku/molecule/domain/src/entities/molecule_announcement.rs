@@ -12,7 +12,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MoleculeAnnouncement {
     /// System time when this announcement was created/updated
     pub system_time: DateTime<Utc>,
@@ -52,8 +52,8 @@ impl MoleculeAnnouncement {
             attachments: entry.payload.attachments,
             access_level: entry.payload.access_level,
             change_by: entry.payload.change_by,
-            categories: entry.payload.categories,
-            tags: entry.payload.tags,
+            categories: entry.payload.categories.unwrap_or_default(),
+            tags: entry.payload.tags.unwrap_or_default(),
         })
     }
 
@@ -90,15 +90,15 @@ impl MoleculeAnnouncement {
             attachments: record.payload.attachments,
             access_level: record.payload.access_level,
             change_by: record.payload.change_by,
-            categories: record.payload.categories,
-            tags: record.payload.tags,
+            categories: record.payload.categories.unwrap_or_default(),
+            tags: record.payload.tags.unwrap_or_default(),
         })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MoleculeGlobalAnnouncement {
     pub ipnft_uid: String,
     pub announcement: MoleculeAnnouncement,
@@ -120,8 +120,8 @@ impl MoleculeGlobalAnnouncement {
                 attachments: entry.payload.announcement.attachments,
                 access_level: entry.payload.announcement.access_level,
                 change_by: entry.payload.announcement.change_by,
-                categories: entry.payload.announcement.categories,
-                tags: entry.payload.announcement.tags,
+                categories: entry.payload.announcement.categories.unwrap_or_default(),
+                tags: entry.payload.announcement.tags.unwrap_or_default(),
             },
         })
     }
@@ -163,8 +163,8 @@ impl MoleculeGlobalAnnouncement {
                 attachments: record.payload.attachments,
                 access_level: record.payload.access_level,
                 change_by: record.payload.change_by,
-                categories: record.payload.categories,
-                tags: record.payload.tags,
+                categories: record.payload.categories.unwrap_or_default(),
+                tags: record.payload.tags.unwrap_or_default(),
             },
         })
     }
@@ -233,11 +233,13 @@ pub struct MoleculeAnnouncementPayloadRecord {
     #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
+    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
     #[serde(default)]
-    pub categories: Vec<String>,
+    pub categories: Option<Vec<String>>,
 
+    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

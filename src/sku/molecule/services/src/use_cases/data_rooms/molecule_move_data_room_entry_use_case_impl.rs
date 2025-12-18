@@ -54,6 +54,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 source_event_time,
                 path_from.clone(),
                 path_to.clone(),
+                None,
                 expected_head,
             )
             .await

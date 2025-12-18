@@ -153,7 +153,8 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 path_prefix,
                 max_depth,
                 filters.and_then(|f| {
-                    molecule_extra_data_fields_filter(
+                    utils::molecule_fields_filter(
+                        None,
                         f.by_tags,
                         f.by_categories,
                         f.by_access_levels,
@@ -288,12 +289,15 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
+        extra_data: Option<kamu_datasets::ExtraDataFields>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
         self.execute_collection_update(
             data_room_dataset_id,
             source_event_time,
-            vec![CollectionUpdateOperation::r#move(path_from, path_to, None)],
+            vec![CollectionUpdateOperation::r#move(
+                path_from, path_to, extra_data,
+            )],
             expected_head,
         )
         .await

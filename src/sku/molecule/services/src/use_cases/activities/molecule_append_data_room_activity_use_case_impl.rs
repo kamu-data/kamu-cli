@@ -15,14 +15,14 @@ use kamu_core::PushIngestResult;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::MoleculeGlobalActivitiesService;
+use crate::MoleculeGlobalDataRoomActivitiesService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
-    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -76,8 +76,8 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
         // Gain write access to global activities dataset
-        let global_activities_writer = self
-            .global_activities_service
+        let global_data_room_activities_writer = self
+            .global_data_room_activities_service
             .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
@@ -88,7 +88,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
             payload: activity_record,
         };
 
-        let push_res = global_activities_writer
+        let push_res = global_data_room_activities_writer
             .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
@@ -106,7 +106,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
                 // We need to know offset for message
                 let offset = self
                     .get_offset_after_append(
-                        global_activities_writer
+                        global_data_room_activities_writer
                             .get_write_checked_dataset()
                             .as_ref(),
                         &new_head,

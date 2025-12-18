@@ -20,7 +20,7 @@ use kamu_molecule_domain::{
 };
 use kamu_search::*;
 
-use crate::{MoleculeGlobalActivitiesService, map_molecule_activities_filters_to_search};
+use crate::{MoleculeGlobalDataRoomActivitiesService, map_molecule_activities_filters_to_search};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +28,7 @@ use crate::{MoleculeGlobalActivitiesService, map_molecule_activities_filters_to_
 #[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
 pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
     catalog: dill::Catalog,
-    global_activities_service: Arc<dyn MoleculeGlobalActivitiesService>,
+    global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     view_global_announcements_uc: Arc<dyn MoleculeViewGlobalAnnouncementsUseCase>,
     full_text_search_service: Arc<dyn kamu_search::FullTextSearchService>,
 }
@@ -76,14 +76,14 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         // Get read access to global activities dataset
-        let activities_reader = match self
-            .global_activities_service
+        let data_room_activities_reader = match self
+            .global_data_room_activities_service
             .reader(&molecule_subject.account_name)
             .await
         {
             Ok(reader) => Ok(reader),
 
-            // No activities dataset yet is fine, just return empty listing
+            // No activities dataset yet is fine, just return an empty listing
             Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
                 return Ok(MoleculeGlobalActivityListing::default());
             }
@@ -94,7 +94,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         }?;
 
         // Load raw ledger DF
-        let maybe_df = activities_reader
+        let maybe_df = data_room_activities_reader
             .raw_ledger_data_frame()
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
@@ -104,17 +104,13 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             return Ok(MoleculeGlobalActivityListing::default());
         };
 
-        // Apply filters, if presnet
-        let maybe_extra_data_fields_filter = filters.and_then(|f| {
-            molecule_extra_data_fields_filter(f.by_tags, f.by_categories, f.by_access_levels)
+        // Apply filters, if present
+        let maybe_filter = filters.and_then(|f| {
+            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
         });
-
-        let df = if let Some(extra_data_fields_filter) = maybe_extra_data_fields_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(
-                df,
-                extra_data_fields_filter,
-            )
-            .int_err()?
+        let df = if let Some(filter) = maybe_filter {
+            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
+                .int_err()?
         } else {
             df
         };

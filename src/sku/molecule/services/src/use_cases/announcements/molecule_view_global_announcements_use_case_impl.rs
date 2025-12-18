@@ -71,11 +71,7 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
         };
 
         let maybe_filter = filters.and_then(|f| {
-            kamu_molecule_domain::molecule_extra_data_fields_filter(
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
+            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
         });
 
         let df = if let Some(filters) = maybe_filter {

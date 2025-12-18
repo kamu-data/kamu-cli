@@ -99,6 +99,7 @@ content:
     read:
       kind: NdJson
       schema:
+      - event_time TIMESTAMP
       - version INT
       - content_hash STRING
       - content_length BIGINT
