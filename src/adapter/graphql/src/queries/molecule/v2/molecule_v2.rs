@@ -19,6 +19,7 @@ use kamu_molecule_domain::{
     MoleculeProjectListing,
     MoleculeSearchError,
     MoleculeSearchHit,
+    MoleculeSearchMode,
     MoleculeSearchUseCase,
     MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesMode,
@@ -278,6 +279,7 @@ impl MoleculeV2 {
         let listing = search_uc
             .execute(
                 &molecule_subject,
+                MoleculeSearchMode::ViaSearchIndex, /* ViaChangelog */
                 prompt.as_str(),
                 filters.map(Into::into),
                 Some(PaginationOpts::from_page(page, per_page)),

@@ -13,7 +13,8 @@ use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::{
-    molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
+    molecule_data_room_entry_search_schema as data_room_entry_schema,
+    molecule_search_schema_common as molecule_schema,
     *,
 };
 use kamu_search::*;
@@ -105,7 +106,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
                     entity_schemas: vec![data_room_entry_schema::SCHEMA_NAME],
                     source: FullTextSearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    sort: sort!(data_room_entry_schema::FIELD_PATH),
+                    sort: sort!(molecule_schema::fields::PATH),
                     page: pagination.into(),
                     options: FullTextSearchOptions::default(),
                 },
@@ -131,15 +132,12 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         let mut and_clauses = vec![];
 
         // ipnft_uid equality
-        and_clauses.push(field_eq_str(
-            data_room_entry_schema::FIELD_IPNFT_UID,
-            ipnft_uid,
-        ));
+        and_clauses.push(field_eq_str(molecule_schema::fields::IPNFT_UID, ipnft_uid));
 
         // path prefix
         if let Some(path_prefix) = path_prefix {
             and_clauses.push(field_prefix(
-                data_room_entry_schema::FIELD_PATH,
+                molecule_schema::fields::PATH,
                 path_prefix.as_str(),
             ));
         }
@@ -147,7 +145,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         // max depth
         if let Some(max_depth) = max_depth {
             and_clauses.push(field_lte_num(
-                data_room_entry_schema::FIELD_DEPTH,
+                data_room_entry_schema::fields::DEPTH,
                 i64::try_from(max_depth).unwrap(),
             ));
         }

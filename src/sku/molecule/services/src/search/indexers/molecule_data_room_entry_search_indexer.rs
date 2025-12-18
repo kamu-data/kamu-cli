@@ -21,7 +21,8 @@ use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewProjectsUseCase,
-    molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
+    molecule_data_room_entry_search_schema as data_room_entry_schema,
+    molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
 
@@ -35,27 +36,29 @@ const PARALLEL_PROJECTS: usize = 10;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn index_data_room_entry_from_entity(
+    molecule_account_id: &odf::AccountID,
     ipnft_uid: &str,
     entry: &MoleculeDataRoomEntry,
     content_text: Option<&String>,
 ) -> serde_json::Value {
     serde_json::json!({
-        data_room_entry_schema::FIELD_EVENT_TIME: entry.event_time,
-        data_room_entry_schema::FIELD_SYSTEM_TIME: entry.system_time,
-        data_room_entry_schema::FIELD_IPNFT_UID: ipnft_uid,
-        data_room_entry_schema::FIELD_REF: entry.reference,
-        data_room_entry_schema::FIELD_PATH: entry.path,
-        data_room_entry_schema::FIELD_DEPTH: entry.path.depth(),
-        data_room_entry_schema::FIELD_VERSION: entry.denormalized_latest_file_info.version,
-        data_room_entry_schema::FIELD_CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
-        data_room_entry_schema::FIELD_CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
-        data_room_entry_schema::FIELD_CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
-        data_room_entry_schema::FIELD_CONTENT_TEXT: content_text,
-        data_room_entry_schema::FIELD_ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
-        data_room_entry_schema::FIELD_CHANGE_BY: entry.denormalized_latest_file_info.change_by,
-        data_room_entry_schema::FIELD_DESCRIPTION: entry.denormalized_latest_file_info.description,
-        data_room_entry_schema::FIELD_CATEGORIES: entry.denormalized_latest_file_info.categories,
-        data_room_entry_schema::FIELD_TAGS: entry.denormalized_latest_file_info.tags,
+        molecule_schema::fields::EVENT_TIME: entry.event_time,
+        molecule_schema::fields::SYSTEM_TIME: entry.system_time,
+        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+        molecule_schema::fields::IPNFT_UID: ipnft_uid,
+        molecule_schema::fields::REF: entry.reference,
+        molecule_schema::fields::PATH: entry.path,
+        data_room_entry_schema::fields::DEPTH: entry.path.depth(),
+        molecule_schema::fields::VERSION: entry.denormalized_latest_file_info.version,
+        molecule_schema::fields::CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
+        molecule_schema::fields::CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
+        molecule_schema::fields::CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
+        data_room_entry_schema::fields::CONTENT_TEXT: content_text,
+        molecule_schema::fields::ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
+        molecule_schema::fields::CHANGE_BY: entry.denormalized_latest_file_info.change_by,
+        molecule_schema::fields::DESCRIPTION: entry.denormalized_latest_file_info.description,
+        molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
+        molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
     })
 }
 
@@ -83,8 +86,13 @@ pub(crate) async fn index_data_room_entries(
         .await
         .int_err()?;
 
-    let total_documents_count =
-        process_projects_in_batches(&projects_listing.list, &dependencies, repo).await?;
+    let total_documents_count = process_projects_in_batches(
+        &organization_account.account_id,
+        &projects_listing.list,
+        &dependencies,
+        repo,
+    )
+    .await?;
 
     tracing::info!(
         organization_account_name = organization_account.account_name.as_str(),
@@ -124,6 +132,7 @@ impl IndexingDependencies {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ProjectIndexingData {
+    molecule_account_id: odf::AccountID,
     project: MoleculeProject,
     entries_result: Result<MoleculeDataRoomEntriesListing, InternalError>,
     versioned_files_map: HashMap<odf::DatasetID, MoleculeVersionedFileEntry>,
@@ -132,6 +141,7 @@ struct ProjectIndexingData {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn process_projects_in_batches(
+    molecule_account_id: &odf::AccountID,
     projects: &[MoleculeProject],
     dependencies: &IndexingDependencies,
     repo: &dyn FullTextSearchRepository,
@@ -147,6 +157,7 @@ async fn process_projects_in_batches(
         let mut futures = FuturesUnordered::new();
         for project in project_chunk {
             futures.push(load_project_indexing_data(
+                molecule_account_id.clone(),
                 project.clone(),
                 dependencies.clone(),
             ));
@@ -191,6 +202,7 @@ async fn process_projects_in_batches(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn load_project_indexing_data(
+    molecule_account_id: odf::AccountID,
     project: MoleculeProject,
     dependencies: IndexingDependencies,
 ) -> ProjectIndexingData {
@@ -223,6 +235,7 @@ async fn load_project_indexing_data(
     };
 
     ProjectIndexingData {
+        molecule_account_id,
         project,
         entries_result: result,
         versioned_files_map,
@@ -308,6 +321,7 @@ fn index_project_data(
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
         let document = index_data_room_entry_from_entity(
+            &project_data.molecule_account_id,
             &project_data.project.ipnft_uid,
             &entry,
             content_text,

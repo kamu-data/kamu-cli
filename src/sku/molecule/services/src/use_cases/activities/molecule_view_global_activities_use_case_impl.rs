@@ -14,8 +14,9 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
-    molecule_activity_full_text_search_schema as activity_schema,
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_activity_search_schema as activity_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
     *,
 };
 use kamu_search::*;
@@ -191,7 +192,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
             // molecule_account_id equality
             and_clauses.push(field_eq_str(
-                announcement_schema::FIELD_MOLECULE_ACCOUNT_ID,
+                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
                 molecule_subject.account_id.to_string().as_str(),
             ));
 
@@ -217,8 +218,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                     ],
                     source: FullTextSearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    // this sorting field is available in both schemas
-                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
                     options: FullTextSearchOptions::default(),
                 },
@@ -240,7 +240,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                             .map(MoleculeGlobalActivity::Announcement)
                     }
                     _ => Err(InternalError::new(format!(
-                        "Unknown schema name: {schema_name}",
+                        "Unexpected schema name: {schema_name}",
                         schema_name = hit.schema_name
                     ))),
                 })

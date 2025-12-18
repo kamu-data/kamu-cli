@@ -18,7 +18,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomMessageEntryMoved,
     MoleculeDataRoomMessageEntryRemoved,
     MoleculeDataRoomMessageEntryUpdated,
-    molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
+    molecule_data_room_entry_search_schema as data_room_entry_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
 use messaging_outbox::*;
@@ -51,6 +51,7 @@ impl MoleculeDataRoomSearchUpdater {
         created_message: &MoleculeDataRoomMessageEntryCreated,
     ) -> Result<(), InternalError> {
         let data_room_entry_document = index_data_room_entry_from_entity(
+            &created_message.molecule_account_id,
             &created_message.ipnft_uid,
             &created_message.data_room_entry,
             created_message.content_text.as_ref(),
@@ -79,6 +80,7 @@ impl MoleculeDataRoomSearchUpdater {
         updated_message: &MoleculeDataRoomMessageEntryUpdated,
     ) -> Result<(), InternalError> {
         let data_room_entry_document = index_data_room_entry_from_entity(
+            &updated_message.molecule_account_id,
             &updated_message.ipnft_uid,
             &updated_message.data_room_entry,
             updated_message.content_text.as_ref(),

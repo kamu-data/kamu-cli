@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod molecule_activity_full_text_search_schema;
-pub mod molecule_announcement_full_text_search_schema;
-pub mod molecule_data_room_entry_full_text_search_schema;
-pub mod molecule_project_full_text_search_schema;
+pub mod molecule_activity_search_schema;
+pub mod molecule_announcement_search_schema;
+pub mod molecule_data_room_entry_search_schema;
+pub mod molecule_project_search_schema;
+pub mod molecule_search_schema_common;

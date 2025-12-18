@@ -14,10 +14,10 @@ use internal_error::InternalError;
 use kamu_accounts::{AccountService, CurrentAccountSubject, LoggedAccount};
 use kamu_core::KamuBackgroundCatalog;
 use kamu_molecule_domain::{
-    molecule_activity_full_text_search_schema as activity_schema,
-    molecule_announcement_full_text_search_schema as announcement_schema,
-    molecule_data_room_entry_full_text_search_schema as data_room_entry_schema,
-    molecule_project_full_text_search_schema as project_schema,
+    molecule_activity_search_schema as activity_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_data_room_entry_search_schema as data_room_entry_schema,
+    molecule_project_search_schema as project_schema,
 };
 use kamu_search::*;
 

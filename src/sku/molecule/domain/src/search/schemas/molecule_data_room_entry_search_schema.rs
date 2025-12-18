@@ -14,51 +14,56 @@ use kamu_search::{
     FullTextSearchEntitySchemaUpgradeMode,
 };
 
+use crate::search::schemas::molecule_search_schema_common as molecule_schema;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA_NAME: &str = "molecule-projects";
+pub const SCHEMA_NAME: &str = "molecule-data-room-entries";
 const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_EVENT_TIME: &str = "event_time";
-pub const FIELD_SYSTEM_TIME: &str = "system_time";
-pub const FIELD_MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
-pub const FIELD_IPNFT_SYMBOL: &str = "ipnft_symbol";
-pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
-pub const FIELD_PROJECT_ACCOUNT_ID: &str = "project_account_id";
+pub mod fields {
+    pub const DEPTH: &str = "depth";
+    pub const CONTENT_TEXT: &str = "content_text";
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
+    molecule_schema::field_definitions::EVENT_TIME,
+    molecule_schema::field_definitions::SYSTEM_TIME,
+    molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
+    molecule_schema::field_definitions::IPNFT_UID,
+    molecule_schema::field_definitions::REF,
     FullTextSchemaField {
-        path: FIELD_EVENT_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_SYSTEM_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_MOLECULE_ACCOUNT_ID,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_IPNFT_SYMBOL,
+        path: molecule_schema::fields::PATH,
         role: FullTextSchemaFieldRole::Identifier {
-            hierarchical: false,
+            // Path is an identifier in this index, not a filter
+            hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
     FullTextSchemaField {
-        path: FIELD_IPNFT_UID,
-        role: FullTextSchemaFieldRole::Keyword,
+        path: fields::DEPTH,
+        role: FullTextSchemaFieldRole::Integer,
     },
+    molecule_schema::field_definitions::VERSION,
+    molecule_schema::field_definitions::CONTENT_TYPE,
+    molecule_schema::field_definitions::CONTENT_HASH,
+    molecule_schema::field_definitions::CONTENT_LENGTH,
     FullTextSchemaField {
-        path: FIELD_PROJECT_ACCOUNT_ID,
-        role: FullTextSchemaFieldRole::Keyword,
+        path: fields::CONTENT_TEXT,
+        role: FullTextSchemaFieldRole::Prose {
+            enable_positions: true,
+        },
     },
+    molecule_schema::field_definitions::ACCESS_LEVEL,
+    molecule_schema::field_definitions::CHANGE_BY,
+    molecule_schema::field_definitions::DESCRIPTION,
+    molecule_schema::field_definitions::CATEGORIES,
+    molecule_schema::field_definitions::TAGS,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,8 +73,14 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
-    title_field: FIELD_IPNFT_SYMBOL,
-    enable_banning: true,
+    title_field: molecule_schema::fields::PATH,
+    enable_banning: false,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn unique_id_for_data_room_entry(ipnft_uid: &str, entry_path: &str) -> String {
+    format!("{ipnft_uid}:{entry_path}")
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

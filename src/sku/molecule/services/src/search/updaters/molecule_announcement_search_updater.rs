@@ -15,7 +15,7 @@ use kamu_molecule_domain::{
     MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
     MoleculeAnnouncementMessage,
     MoleculeAnnouncementMessagePublished,
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_announcement_search_schema as announcement_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
 use messaging_outbox::*;

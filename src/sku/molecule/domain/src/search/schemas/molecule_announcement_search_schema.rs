@@ -14,6 +14,8 @@ use kamu_search::{
     FullTextSearchEntitySchemaUpgradeMode,
 };
 
+use crate::search::schemas::molecule_search_schema_common as molecule_schema;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "molecule-announcements";
@@ -21,69 +23,39 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_EVENT_TIME: &str = "event_time";
-pub const FIELD_SYSTEM_TIME: &str = "system_time";
-pub const FIELD_MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
-pub const FIELD_IPNFT_UID: &str = "ipnft_uid";
-pub const FIELD_HEADLINE: &str = "headline";
-pub const FIELD_BODY: &str = "body";
-pub const FIELD_ATTACHMENTS: &str = "attachments";
-pub const FIELD_ACCESS_LEVEL: &str = "molecule_access_level";
-pub const FIELD_CHANGE_BY: &str = "molecule_change_by";
-pub const FIELD_CATEGORIES: &str = "categories";
-pub const FIELD_TAGS: &str = "tags";
+pub mod fields {
+    pub const HEADLINE: &str = "headline";
+    pub const BODY: &str = "body";
+    pub const ATTACHMENTS: &str = "attachments";
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
+    molecule_schema::field_definitions::EVENT_TIME,
+    molecule_schema::field_definitions::SYSTEM_TIME,
+    molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
+    molecule_schema::field_definitions::IPNFT_UID,
     FullTextSchemaField {
-        path: FIELD_EVENT_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_SYSTEM_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
-    },
-    FullTextSchemaField {
-        path: FIELD_MOLECULE_ACCOUNT_ID,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_IPNFT_UID,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_HEADLINE,
+        path: fields::HEADLINE,
         role: FullTextSchemaFieldRole::Prose {
             enable_positions: false,
         },
     },
     FullTextSchemaField {
-        path: FIELD_BODY,
+        path: fields::BODY,
         role: FullTextSchemaFieldRole::Prose {
             enable_positions: true,
         },
     },
     FullTextSchemaField {
-        path: FIELD_ATTACHMENTS,
+        path: fields::ATTACHMENTS,
         role: FullTextSchemaFieldRole::Keyword,
     },
-    FullTextSchemaField {
-        path: FIELD_ACCESS_LEVEL,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_CHANGE_BY,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_CATEGORIES,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
-    FullTextSchemaField {
-        path: FIELD_TAGS,
-        role: FullTextSchemaFieldRole::Keyword,
-    },
+    molecule_schema::field_definitions::ACCESS_LEVEL,
+    molecule_schema::field_definitions::CHANGE_BY,
+    molecule_schema::field_definitions::CATEGORIES,
+    molecule_schema::field_definitions::TAGS,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +65,7 @@ pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
-    title_field: FIELD_HEADLINE,
+    title_field: fields::HEADLINE,
     enable_banning: false,
 };
 

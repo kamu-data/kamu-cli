@@ -15,7 +15,7 @@ use kamu_molecule_domain::{
     MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
     MoleculeActivityMessage,
     MoleculeActivityMessagePublished,
-    molecule_activity_full_text_search_schema as activity_schema,
+    molecule_activity_search_schema as activity_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
 use messaging_outbox::*;

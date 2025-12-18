@@ -17,7 +17,7 @@ use kamu_molecule_domain::{
     MoleculeProjectMessageCreated,
     MoleculeProjectMessageDisabled,
     MoleculeProjectMessageReenabled,
-    molecule_project_full_text_search_schema as project_schema,
+    molecule_project_search_schema as project_schema,
 };
 use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
 use messaging_outbox::*;

@@ -12,8 +12,9 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_molecule_domain::{
-    molecule_activity_full_text_search_schema as activity_schema,
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_activity_search_schema as activity_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
     *,
 };
 use kamu_search::*;
@@ -238,7 +239,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
             // ipnft_uid equality
             and_clauses.push(field_eq_str(
-                activity_schema::FIELD_IPNFT_UID,
+                molecule_schema::fields::IPNFT_UID,
                 &molecule_project.ipnft_uid,
             ));
 
@@ -264,8 +265,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                     ],
                     source: FullTextSearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    // this sorting field is available in both schemas
-                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
                     options: FullTextSearchOptions::default(),
                 },
@@ -287,7 +287,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                             .map(MoleculeProjectActivity::Announcement)
                     }
                     _ => Err(InternalError::new(format!(
-                        "Unknown schema name: {schema_name}",
+                        "Unexpected schema name: {schema_name}",
                         schema_name = hit.schema_name
                     ))),
                 })

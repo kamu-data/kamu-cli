@@ -13,7 +13,8 @@ use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     MoleculeProject,
     MoleculeViewProjectsUseCase,
-    molecule_project_full_text_search_schema as project_schema,
+    molecule_project_search_schema as project_schema,
+    molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
 
@@ -30,12 +31,12 @@ pub(crate) fn index_project_from_entity(
     project: &MoleculeProject,
 ) -> serde_json::Value {
     serde_json::json!({
-        project_schema::FIELD_EVENT_TIME: project.event_time,
-        project_schema::FIELD_SYSTEM_TIME: project.system_time,
-        project_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        project_schema::FIELD_IPNFT_SYMBOL: project.ipnft_symbol,
-        project_schema::FIELD_IPNFT_UID: project.ipnft_uid,
-        project_schema::FIELD_PROJECT_ACCOUNT_ID: project.account_id,
+        molecule_schema::fields::EVENT_TIME: project.event_time,
+        molecule_schema::fields::SYSTEM_TIME: project.system_time,
+        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+        project_schema::fields::IPNFT_SYMBOL: project.ipnft_symbol,
+        molecule_schema::fields::IPNFT_UID: project.ipnft_uid,
+        project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
         kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: false,
     })
 }
@@ -51,12 +52,12 @@ pub(crate) fn index_project_from_parts(
     system_time: DateTime<Utc>,
 ) -> serde_json::Value {
     serde_json::json!({
-        project_schema::FIELD_EVENT_TIME: event_time,
-        project_schema::FIELD_SYSTEM_TIME: system_time,
-        project_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        project_schema::FIELD_IPNFT_SYMBOL: ipnft_symbol,
-        project_schema::FIELD_IPNFT_UID: ipnft_uid,
-        project_schema::FIELD_PROJECT_ACCOUNT_ID: account_id,
+        molecule_schema::fields::EVENT_TIME: event_time,
+        molecule_schema::fields::SYSTEM_TIME: system_time,
+        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+        project_schema::fields::IPNFT_SYMBOL: ipnft_symbol,
+        molecule_schema::fields::IPNFT_UID: ipnft_uid,
+        project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
         kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: false,
     })
 }
@@ -69,9 +70,9 @@ pub(crate) fn partial_update_project_when_ban_status_changed(
     system_time: DateTime<Utc>,
 ) -> serde_json::Value {
     serde_json::json!({
-        project_schema::FIELD_EVENT_TIME: event_time,
-        project_schema::FIELD_SYSTEM_TIME: system_time,
-        "is_banned": is_banned,
+        molecule_schema::fields::EVENT_TIME: event_time,
+        molecule_schema::fields::SYSTEM_TIME: system_time,
+        kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: is_banned,
     })
 }
 

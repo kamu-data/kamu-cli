@@ -16,7 +16,8 @@ use kamu_molecule_domain::{
     MoleculeGlobalAnnouncement,
     MoleculeViewGlobalAnnouncementsMode,
     MoleculeViewGlobalAnnouncementsUseCase,
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
 
@@ -33,17 +34,17 @@ pub(crate) fn index_announcement_from_global_entity(
     global_announcement: &MoleculeGlobalAnnouncement,
 ) -> serde_json::Value {
     serde_json::json!({
-        announcement_schema::FIELD_EVENT_TIME: global_announcement.announcement.event_time,
-        announcement_schema::FIELD_SYSTEM_TIME: global_announcement.announcement.system_time,
-        announcement_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        announcement_schema::FIELD_IPNFT_UID: global_announcement.ipnft_uid,
-        announcement_schema::FIELD_HEADLINE: global_announcement.announcement.headline,
-        announcement_schema::FIELD_BODY: global_announcement.announcement.body,
-        announcement_schema::FIELD_ATTACHMENTS: global_announcement.announcement.attachments,
-        announcement_schema::FIELD_ACCESS_LEVEL: global_announcement.announcement.access_level,
-        announcement_schema::FIELD_CHANGE_BY: global_announcement.announcement.change_by,
-        announcement_schema::FIELD_CATEGORIES: global_announcement.announcement.categories,
-        announcement_schema::FIELD_TAGS: global_announcement.announcement.tags,
+        molecule_schema::fields::EVENT_TIME: global_announcement.announcement.event_time,
+        molecule_schema::fields::SYSTEM_TIME: global_announcement.announcement.system_time,
+        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+        molecule_schema::fields::IPNFT_UID: global_announcement.ipnft_uid,
+        announcement_schema::fields::HEADLINE: global_announcement.announcement.headline,
+        announcement_schema::fields::BODY: global_announcement.announcement.body,
+        announcement_schema::fields::ATTACHMENTS: global_announcement.announcement.attachments,
+        molecule_schema::fields::ACCESS_LEVEL: global_announcement.announcement.access_level,
+        molecule_schema::fields::CHANGE_BY: global_announcement.announcement.change_by,
+        molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
+        molecule_schema::fields::TAGS: global_announcement.announcement.tags,
     })
 }
 
@@ -57,17 +58,17 @@ pub(crate) fn index_announcement_from_publication_record(
     announcement_record: &MoleculeAnnouncementPayloadRecord,
 ) -> serde_json::Value {
     serde_json::json!({
-        announcement_schema::FIELD_EVENT_TIME: event_time,
-        announcement_schema::FIELD_SYSTEM_TIME: system_time,
-        announcement_schema::FIELD_MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        announcement_schema::FIELD_IPNFT_UID: ipnft_uid,
-        announcement_schema::FIELD_HEADLINE: announcement_record.headline,
-        announcement_schema::FIELD_BODY: announcement_record.body,
-        announcement_schema::FIELD_ATTACHMENTS: announcement_record.attachments,
-        announcement_schema::FIELD_ACCESS_LEVEL: announcement_record.access_level,
-        announcement_schema::FIELD_CHANGE_BY: announcement_record.change_by,
-        announcement_schema::FIELD_CATEGORIES: announcement_record.categories,
-        announcement_schema::FIELD_TAGS: announcement_record.tags,
+        molecule_schema::fields::EVENT_TIME: event_time,
+        molecule_schema::fields::SYSTEM_TIME: system_time,
+        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+        molecule_schema::fields::IPNFT_UID: ipnft_uid,
+        announcement_schema::fields::HEADLINE: announcement_record.headline,
+        announcement_schema::fields::BODY: announcement_record.body,
+        announcement_schema::fields::ATTACHMENTS: announcement_record.attachments,
+        molecule_schema::fields::ACCESS_LEVEL: announcement_record.access_level,
+        molecule_schema::fields::CHANGE_BY: announcement_record.change_by,
+        molecule_schema::fields::CATEGORIES: announcement_record.categories,
+        molecule_schema::fields::TAGS: announcement_record.tags,
     })
 }
 

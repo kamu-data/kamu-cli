@@ -12,7 +12,8 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_molecule_domain::{
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
     *,
 };
 use kamu_search::*;
@@ -110,7 +111,7 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
 
             // ipnft_uid equality
             and_clauses.push(field_eq_str(
-                announcement_schema::FIELD_IPNFT_UID,
+                molecule_schema::fields::IPNFT_UID,
                 &molecule_project.ipnft_uid,
             ));
 
@@ -131,7 +132,7 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
                     entity_schemas: vec![announcement_schema::SCHEMA_NAME],
                     source: FullTextSearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
                     options: FullTextSearchOptions::default(),
                 },

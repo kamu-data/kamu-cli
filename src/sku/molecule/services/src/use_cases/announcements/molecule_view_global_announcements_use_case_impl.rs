@@ -13,7 +13,8 @@ use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
-    molecule_announcement_full_text_search_schema as announcement_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
     *,
 };
 use kamu_search::*;
@@ -125,7 +126,7 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
 
             // molecule_account_id equality
             and_clauses.push(field_eq_str(
-                announcement_schema::FIELD_MOLECULE_ACCOUNT_ID,
+                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
                 molecule_subject.account_id.to_string().as_str(),
             ));
 
@@ -146,7 +147,7 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
                     entity_schemas: vec![announcement_schema::SCHEMA_NAME],
                     source: FullTextSearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    sort: sort!(announcement_schema::FIELD_SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
                     options: FullTextSearchOptions::default(),
                 },
