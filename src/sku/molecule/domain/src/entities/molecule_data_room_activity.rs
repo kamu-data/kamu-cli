@@ -28,6 +28,8 @@ pub enum MoleculeDataRoomFileActivityType {
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug)]
 pub struct MoleculeDataRoomActivity {
+    pub offset: u64, // We need this offset for identification
+
     pub system_time: DateTime<Utc>,
 
     pub event_time: DateTime<Utc>,
@@ -63,12 +65,13 @@ pub struct MoleculeDataRoomActivity {
 }
 
 impl MoleculeDataRoomActivity {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let r: MoleculeDataRoomActivityChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
-            system_time: r.system_columns.system_time,
-            event_time: r.system_columns.event_time,
+            offset: r.system_columns.offset,
+            system_time: r.system_columns.timestamp_columns.system_time,
+            event_time: r.system_columns.timestamp_columns.event_time,
             activity_type: r.payload.activity_type,
             ipnft_uid: r.payload.ipnft_uid,
             path: r.payload.path,
@@ -85,12 +88,48 @@ impl MoleculeDataRoomActivity {
         })
     }
 
+    pub fn from_search_index_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct DataRoomActivityRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            pub offset: u64,
+
+            #[serde(flatten)]
+            pub payload: MoleculeDataRoomActivityPayloadRecord,
+        }
+
+        let record = serde_json::from_value::<DataRoomActivityRecord>(record).int_err()?;
+
+        Ok(Self {
+            offset: record.offset,
+            system_time: record.timestamp_columns.system_time,
+            event_time: record.timestamp_columns.event_time,
+            ipnft_uid: record.payload.ipnft_uid,
+            activity_type: record.payload.activity_type,
+            path: record.payload.path,
+            r#ref: record.payload.r#ref,
+            description: record.payload.description,
+            version: record.payload.version,
+            content_type: record.payload.content_type,
+            content_length: record.payload.content_length,
+            content_hash: record.payload.content_hash,
+            access_level: record.payload.access_level,
+            change_by: record.payload.change_by,
+            categories: record.payload.categories,
+            tags: record.payload.tags,
+        })
+    }
+
     pub fn from_data_room_operation(
+        offset: u64,
         activity_type: MoleculeDataRoomFileActivityType,
         entry: MoleculeDataRoomEntry,
         ipnft_uid: String,
     ) -> Self {
         Self {
+            offset,
             system_time: entry.system_time,
             event_time: entry.event_time,
             activity_type,

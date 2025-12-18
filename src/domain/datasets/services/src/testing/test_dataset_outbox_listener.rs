@@ -149,7 +149,11 @@ impl std::fmt::Display for TestDatasetOutboxListener {
                     DatasetLifecycleMessage::Renamed(renamed_msg) => {
                         writeln!(f, "  Renamed {{",)?;
                         writeln!(f, "    Dataset ID: {}", renamed_msg.dataset_id)?;
-                        writeln!(f, "    New Name: {}", renamed_msg.new_dataset_name)?;
+                        writeln!(
+                            f,
+                            "    New Name: {}",
+                            renamed_msg.new_dataset_alias.dataset_name
+                        )?;
                         writeln!(f, "  }}")?;
                     }
                     DatasetLifecycleMessage::Deleted(deleted_msg) => {

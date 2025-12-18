@@ -37,6 +37,7 @@ impl MoleculeDataRoomMessage {
         project_account_id: odf::AccountID,
         ipnft_uid: String,
         data_room_entry: MoleculeDataRoomEntry,
+        content_text: Option<String>,
     ) -> Self {
         Self::EntryCreated(MoleculeDataRoomMessageEntryCreated {
             event_time,
@@ -44,6 +45,7 @@ impl MoleculeDataRoomMessage {
             project_account_id,
             ipnft_uid,
             data_room_entry,
+            content_text,
         })
     }
 
@@ -53,6 +55,7 @@ impl MoleculeDataRoomMessage {
         project_account_id: odf::AccountID,
         ipnft_uid: String,
         data_room_entry: MoleculeDataRoomEntry,
+        content_text: Option<String>,
     ) -> Self {
         Self::EntryUpdated(MoleculeDataRoomMessageEntryUpdated {
             event_time,
@@ -60,6 +63,7 @@ impl MoleculeDataRoomMessage {
             project_account_id,
             ipnft_uid,
             data_room_entry,
+            content_text,
         })
     }
 
@@ -153,6 +157,7 @@ pub struct MoleculeDataRoomMessageEntryCreated {
     pub project_account_id: odf::AccountID,
     pub ipnft_uid: String,
     pub data_room_entry: MoleculeDataRoomEntry,
+    pub content_text: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,6 +169,7 @@ pub struct MoleculeDataRoomMessageEntryUpdated {
     pub project_account_id: odf::AccountID,
     pub ipnft_uid: String,
     pub data_room_entry: MoleculeDataRoomEntry,
+    pub content_text: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

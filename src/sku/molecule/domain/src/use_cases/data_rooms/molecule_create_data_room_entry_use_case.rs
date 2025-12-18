@@ -26,6 +26,7 @@ pub trait MoleculeCreateDataRoomEntryUseCase: Send + Sync {
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
+        content_text: Option<&str>,
     ) -> Result<MoleculeDataRoomEntry, MoleculeCreateDataRoomEntryError>;
 }
 

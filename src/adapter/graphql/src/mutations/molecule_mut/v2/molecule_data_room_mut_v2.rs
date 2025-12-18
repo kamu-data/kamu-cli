@@ -157,6 +157,7 @@ impl MoleculeDataRoomMutV2 {
                 path.clone().into_v1(),
                 versioned_file_dataset_id.clone(),
                 versioned_file_entry.to_denormalized(),
+                versioned_file_entry.detailed_info.content_text.as_deref(),
             )
             .await
             .map_err(|e| match e {
@@ -281,6 +282,7 @@ impl MoleculeDataRoomMutV2 {
                 existing_data_room_entry.path.clone().into_v1(),
                 existing_data_room_entry.reference.clone(),
                 versioned_file_entry.to_denormalized(),
+                versioned_file_entry.detailed_info.content_text.as_deref(),
             )
             .await
             .map_err(|e| match e {
@@ -825,6 +827,10 @@ impl MoleculeDataRoomMutV2 {
                 existing_data_room_entry.path.clone().into_v1(),
                 reference.into(),
                 new_denormalized_file_info.clone(),
+                updated_versioned_file_entry
+                    .detailed_info
+                    .content_text
+                    .as_deref(),
             )
             .await
             .map_err(|e| match e {

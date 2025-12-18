@@ -34,6 +34,7 @@ pub enum MoleculeProjectMessage {
 impl MoleculeProjectMessage {
     pub fn created(
         event_time: DateTime<Utc>,
+        system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
         ipnft_uid: String,
@@ -41,6 +42,7 @@ impl MoleculeProjectMessage {
     ) -> Self {
         Self::Created(MoleculeProjectMessageCreated {
             event_time,
+            system_time,
             molecule_account_id,
             project_account_id,
             ipnft_uid,
@@ -50,6 +52,7 @@ impl MoleculeProjectMessage {
 
     pub fn disabled(
         event_time: DateTime<Utc>,
+        system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
         ipnft_uid: String,
@@ -57,6 +60,7 @@ impl MoleculeProjectMessage {
     ) -> Self {
         Self::Disabled(MoleculeProjectMessageDisabled {
             event_time,
+            system_time,
             molecule_account_id,
             project_account_id,
             ipnft_uid,
@@ -66,6 +70,7 @@ impl MoleculeProjectMessage {
 
     pub fn reenabled(
         event_time: DateTime<Utc>,
+        system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
         ipnft_uid: String,
@@ -73,6 +78,7 @@ impl MoleculeProjectMessage {
     ) -> Self {
         Self::Reenabled(MoleculeProjectMessageReenabled {
             event_time,
+            system_time,
             molecule_account_id,
             project_account_id,
             ipnft_uid,
@@ -125,6 +131,7 @@ impl Message for MoleculeProjectMessage {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageCreated {
     pub event_time: DateTime<Utc>,
+    pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
     pub ipnft_uid: String,
@@ -137,6 +144,7 @@ pub struct MoleculeProjectMessageCreated {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageDisabled {
     pub event_time: DateTime<Utc>,
+    pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
     pub ipnft_uid: String,
@@ -149,6 +157,7 @@ pub struct MoleculeProjectMessageDisabled {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectMessageReenabled {
     pub event_time: DateTime<Utc>,
+    pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
     pub ipnft_uid: String,

@@ -10,30 +10,30 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
-use kamu_molecule_domain::*;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_molecule_domain::{
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
+    *,
+};
+use kamu_search::*;
 
-use crate::MoleculeAnnouncementsService;
+use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_search};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectAnnouncementsUseCase)]
 pub struct MoleculeViewProjectAnnouncementsUseCaseImpl {
+    catalog: dill::Catalog,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    full_text_search_service: Arc<dyn FullTextSearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncementsUseCaseImpl {
-    #[tracing::instrument(
-        name = MoleculeViewProjectAnnouncementsUseCaseImpl_execute,
-        level = "debug",
-        skip_all
-    )]
-    async fn execute(
+impl MoleculeViewProjectAnnouncementsUseCaseImpl {
+    async fn project_announcements_from_source(
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeAnnouncementsFilters>,
@@ -86,7 +86,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
 
         let announcements = records
             .into_iter()
-            .map(MoleculeAnnouncement::from_json)
+            .map(MoleculeAnnouncement::from_changelog_entry_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
@@ -94,6 +94,90 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
             total_count,
             list: announcements,
         })
+    }
+
+    async fn project_announcements_from_search(
+        &self,
+        molecule_project: &MoleculeProject,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
+        let ctx = FullTextSearchContext {
+            catalog: &self.catalog,
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // ipnft_uid equality
+            and_clauses.push(field_eq_str(
+                molecule_schema::fields::IPNFT_UID,
+                &molecule_project.ipnft_uid,
+            ));
+
+            // filters by categories, tags, access levels
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_announcements_filters_to_search(filters));
+            }
+
+            FullTextSearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .full_text_search_service
+            .search(
+                ctx,
+                FullTextSearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas: vec![announcement_schema::SCHEMA_NAME],
+                    source: FullTextSearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
+                    page: pagination.into(),
+                    options: FullTextSearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeProjectAnnouncementListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| MoleculeAnnouncement::from_search_index_json(hit.id, hit.source))
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncementsUseCaseImpl {
+    #[tracing::instrument(
+        name = MoleculeViewProjectAnnouncementsUseCaseImpl_execute,
+        level = "debug",
+        skip_all
+    )]
+    async fn execute(
+        &self,
+        molecule_project: &MoleculeProject,
+        mode: MoleculeViewProjectAnnouncementsMode,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
+        match mode {
+            MoleculeViewProjectAnnouncementsMode::LatestSource => {
+                self.project_announcements_from_source(molecule_project, filters, pagination)
+                    .await
+            }
+
+            MoleculeViewProjectAnnouncementsMode::LatestProjection => {
+                self.project_announcements_from_search(molecule_project, filters, pagination)
+                    .await
+            }
+        }
     }
 }
 

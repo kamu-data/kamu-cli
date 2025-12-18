@@ -15,6 +15,12 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
+    b.add::<MoleculeSearchSchemaProvider>();
+    b.add::<MoleculeProjectSearchUpdater>();
+    b.add::<MoleculeDataRoomSearchUpdater>();
+    b.add::<MoleculeAnnouncementSearchUpdater>();
+    b.add::<MoleculeActivitySearchUpdater>();
+
     b.add::<MoleculeDatasetAccessorFactory>();
 
     b.add::<MoleculeDataRoomCollectionServiceImpl>();
@@ -44,6 +50,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalActivitiesUseCaseImpl>();
     b.add::<MoleculeViewProjectActivitiesUseCaseImpl>();
+    b.add::<MoleculeViewGlobalAnnouncementsUseCaseImpl>();
 
     b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
     b.add::<MoleculeFindProjectAnnouncementUseCaseImpl>();

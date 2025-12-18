@@ -22,10 +22,18 @@ pub trait MoleculeSearchUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeSearchMode,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum MoleculeSearchMode {
+    ViaSearchIndex,
+    ViaChangelog,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

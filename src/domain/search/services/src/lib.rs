@@ -9,12 +9,20 @@
 
 #![feature(error_generic_member_access)]
 
+mod dummy_full_text_search_service;
 mod embeddings_chunker_simple;
-mod search_service_local_impl;
-mod search_service_local_indexer;
-mod search_service_local_lazy_init;
+mod full_text_search_indexer;
+mod full_text_search_lazy_init_impl;
+mod full_text_search_service_impl;
+mod natural_language_search_indexer;
+mod natural_language_search_lazy_init;
+mod natural_language_search_service_impl;
 
+pub use dummy_full_text_search_service::*;
 pub use embeddings_chunker_simple::*;
-pub use search_service_local_impl::*;
-pub use search_service_local_indexer::*;
-pub use search_service_local_lazy_init::*;
+pub use full_text_search_indexer::*;
+pub use full_text_search_lazy_init_impl::*;
+pub use full_text_search_service_impl::*;
+pub use natural_language_search_indexer::*;
+pub use natural_language_search_lazy_init::*;
+pub use natural_language_search_service_impl::*;

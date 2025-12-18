@@ -10,9 +10,11 @@
 #![feature(iterator_try_collect)]
 
 mod dependencies;
+mod search;
 mod services;
 mod use_cases;
 
 pub use dependencies::*;
+pub use search::*;
 pub use services::*;
 pub use use_cases::*;

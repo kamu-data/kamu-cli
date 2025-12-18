@@ -55,6 +55,10 @@ impl CollectionPathV2 {
         Ok(Self(path))
     }
 
+    pub fn depth(&self) -> usize {
+        self.0.chars().filter(|&c| c == '/').count()
+    }
+
     pub fn into_v1(self) -> CollectionPath {
         CollectionPath::new(self.0)
     }
