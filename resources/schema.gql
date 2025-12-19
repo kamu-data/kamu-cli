@@ -897,6 +897,11 @@ type CreateAnnouncementErrorInvalidAttachment implements CreateAnnouncementResul
 	isSuccess: Boolean!
 }
 
+type CreateAnnouncementErrorQuotaExceeded implements CreateAnnouncementResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
 interface CreateAnnouncementResult {
 	isSuccess: Boolean!
 	message: String!

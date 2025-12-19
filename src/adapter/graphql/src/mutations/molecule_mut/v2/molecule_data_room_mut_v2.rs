@@ -194,21 +194,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: versioned_file_entry.basic_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
@@ -330,21 +334,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: versioned_file_entry.basic_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
@@ -431,21 +439,26 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // TODO: asynchronous write of activity log
-        append_global_data_room_activity_uc
+        match append_global_data_room_activity_uc
             .execute(
                 &molecule_subject,
                 Some(event_time),
                 data_room_activity_record,
             )
             .await
-            .map_err(|e| -> GqlError {
-                use MoleculeAppendDataRoomActivityError as E;
-
-                match e {
-                    E::Access(e) => e.into(),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        {
+            Ok(_) => {}
+            Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+            Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                let d = quota_result(e)?;
+                return Err(GqlError::gql(quota_exceeded_message(
+                    d.used, d.incoming, d.limit,
+                )));
+            }
+            Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        }
 
         Ok(())
     }
@@ -897,21 +910,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: new_denormalized_file_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {

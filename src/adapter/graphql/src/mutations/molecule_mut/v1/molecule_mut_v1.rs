@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::ErrorIntoInternal;
 use kamu::domain;
+use kamu_core::{PushIngestDataError, PushIngestError};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_molecule_domain::{
     MoleculeCreateProjectError,
@@ -188,7 +190,7 @@ impl MoleculeProjectMut {
             "tags": [],
         });
 
-        push_ingest_uc
+        match push_ingest_uc
             .execute(
                 target_dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(
@@ -204,13 +206,19 @@ impl MoleculeProjectMut {
                 None,
             )
             .await
-            .int_err()?;
-
-        Ok(CreateAnnouncementResult::Success(
-            CreateAnnouncementSuccess {
-                announcement_id: announcement_id.to_string(),
-            },
-        ))
+        {
+            Ok(_) => Ok(CreateAnnouncementResult::Success(
+                CreateAnnouncementSuccess {
+                    announcement_id: announcement_id.to_string(),
+                },
+            )),
+            Err(PushIngestDataError::Execution(PushIngestError::QuotaExceeded(err))) => Ok(
+                CreateAnnouncementResult::QuotaExceeded(CreateAnnouncementErrorQuotaExceeded {
+                    message: err.to_string(),
+                }),
+            ),
+            Err(other) => Err(other.int_err().into()),
+        }
     }
 }
 
@@ -269,6 +277,7 @@ impl CreateProjectErrorConflict {
 pub enum CreateAnnouncementResult {
     Success(CreateAnnouncementSuccess),
     InvalidAttachment(CreateAnnouncementErrorInvalidAttachment),
+    QuotaExceeded(CreateAnnouncementErrorQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -294,6 +303,18 @@ pub struct CreateAnnouncementErrorInvalidAttachment {
 }
 #[ComplexObject]
 impl CreateAnnouncementErrorInvalidAttachment {
+    async fn is_success(&self) -> bool {
+        false
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateAnnouncementErrorQuotaExceeded {
+    pub(crate) message: String,
+}
+#[ComplexObject]
+impl CreateAnnouncementErrorQuotaExceeded {
     async fn is_success(&self) -> bool {
         false
     }
