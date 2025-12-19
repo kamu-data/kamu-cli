@@ -14,7 +14,6 @@ Recommendation: for ease of reading, use the following order:
 ## Unreleased
 ### Added
 - Support for re-defining the `AddPushSource`
-- CLI: `datasetIndexer` config exposes `statisticsIndexer.maxConcurrency` to control dataset statistics indexing parallelism
 ### Changed
 - GQL: `byIds` and `byRefs` endpoints will return results in the same order as inputs (including duplicates) to allow `zip`'ing them on the client side
 - Schema nullability coercion now works for `List` field elements

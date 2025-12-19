@@ -97,7 +97,6 @@ impl CLIConfig {
         Self {
             database: None,
             dataset_env_vars: None,
-            dataset_indexer: None,
             engine: None,
             flow_system: None,
             webhooks: None,
@@ -122,7 +121,6 @@ impl CLIConfig {
         Self {
             database: Some(DatabaseConfig::sample()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
-            dataset_indexer: Some(DatasetIndexerConfig::sample()),
             engine: Some(EngineConfig::sample()),
             flow_system: Some(FlowSystemConfig::sample()),
             webhooks: Some(WebhooksConfig::sample()),
@@ -145,7 +143,6 @@ impl Default for CLIConfig {
         Self {
             database: None,
             dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
-            dataset_indexer: Some(DatasetIndexerConfig::default()),
             engine: Some(EngineConfig::default()),
             flow_system: Some(FlowSystemConfig::default()),
             webhooks: Some(WebhooksConfig::default()),

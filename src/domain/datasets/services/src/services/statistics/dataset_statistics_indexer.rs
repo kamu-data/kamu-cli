@@ -70,7 +70,7 @@ impl DatasetStatisticsIndexer {
         // Process datasets in parallel with per-dataset transactions using all
         // available cores
         let parallelism = std::thread::available_parallelism()
-            .map(|n| n.get())
+            .map(std::num::NonZero::get)
             .unwrap_or(1);
         stream::iter(dataset_ids.into_iter().map(Ok::<_, InternalError>))
             .try_for_each_concurrent(parallelism, |dataset_id| async move {
