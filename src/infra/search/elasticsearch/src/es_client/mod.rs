@@ -9,8 +9,10 @@
 
 mod es_client;
 mod es_count_response;
+mod es_get_document_by_id_response;
 mod es_search_response;
 
 pub(crate) use es_client::*;
 pub(crate) use es_count_response::*;
+pub(crate) use es_get_document_by_id_response::*;
 pub(crate) use es_search_response::*;

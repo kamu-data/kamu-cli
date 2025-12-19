@@ -34,6 +34,12 @@ pub trait FullTextSearchRepository: Send + Sync {
         req: FullTextSearchRequest,
     ) -> Result<FullTextSearchResponse, InternalError>;
 
+    async fn find_document_by_id(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError>;
+
     async fn bulk_update(
         &self,
         schema_name: FullTextEntitySchemaName,

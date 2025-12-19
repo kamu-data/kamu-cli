@@ -27,6 +27,28 @@ pub enum FullTextSearchFilterExpr {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl FullTextSearchFilterExpr {
+    pub fn and_clauses(clauses: Vec<FullTextSearchFilterExpr>) -> Self {
+        assert!(!clauses.is_empty());
+        if clauses.len() == 1 {
+            clauses.into_iter().next().unwrap()
+        } else {
+            FullTextSearchFilterExpr::And(clauses)
+        }
+    }
+
+    pub fn or_clauses(clauses: Vec<FullTextSearchFilterExpr>) -> Self {
+        assert!(!clauses.is_empty());
+        if clauses.len() == 1 {
+            clauses.into_iter().next().unwrap()
+        } else {
+            FullTextSearchFilterExpr::Or(clauses)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // AND: variable number of arguments
 #[macro_export]
 macro_rules! filter_and {
@@ -79,33 +101,56 @@ macro_rules! filter_not {
 #[derive(Debug)]
 pub enum FullTextSearchFilterOp {
     Eq(serde_json::Value),
+    Ne(serde_json::Value),
+    Lt(serde_json::Value),
+    Lte(serde_json::Value),
+    Gt(serde_json::Value),
+    Gte(serde_json::Value),
     In(Vec<serde_json::Value>),
+    Prefix(String),
     // TODO: Add more operators as needed
 }
 
-impl FullTextSearchFilterOp {
-    pub fn eq_str(value: &str) -> Self {
-        FullTextSearchFilterOp::Eq(serde_json::json!(value))
-    }
-
-    pub fn in_str(values: &[&str]) -> Self {
-        FullTextSearchFilterOp::In(values.iter().map(|v| serde_json::json!(v)).collect())
+#[inline]
+pub fn field_eq_str(field: FullTextSearchFieldPath, value: &str) -> FullTextSearchFilterExpr {
+    FullTextSearchFilterExpr::Field {
+        field,
+        op: FullTextSearchFilterOp::Eq(serde_json::json!(value)),
     }
 }
 
 #[inline]
-pub fn field_eq(field: FullTextSearchFieldPath, value: &str) -> FullTextSearchFilterExpr {
+pub fn field_lte_num(field: FullTextSearchFieldPath, value: i64) -> FullTextSearchFilterExpr {
     FullTextSearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::eq_str(value),
+        op: FullTextSearchFilterOp::Lte(serde_json::json!(value)),
     }
 }
 
 #[inline]
-pub fn field_in(field: FullTextSearchFieldPath, values: &[&str]) -> FullTextSearchFilterExpr {
+pub fn field_in_str<S>(
+    field: FullTextSearchFieldPath,
+    values: impl IntoIterator<Item = S>,
+) -> FullTextSearchFilterExpr
+where
+    S: Into<String>,
+{
     FullTextSearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::in_str(values),
+        op: FullTextSearchFilterOp::In(
+            values
+                .into_iter()
+                .map(|v| serde_json::Value::String(v.into()))
+                .collect(),
+        ),
+    }
+}
+
+#[inline]
+pub fn field_prefix(field: FullTextSearchFieldPath, prefix: &str) -> FullTextSearchFilterExpr {
+    FullTextSearchFilterExpr::Field {
+        field,
+        op: FullTextSearchFilterOp::Prefix(prefix.to_string()),
     }
 }
 

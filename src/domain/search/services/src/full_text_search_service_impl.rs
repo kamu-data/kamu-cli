@@ -39,6 +39,17 @@ impl FullTextSearchService for FullTextSearchServiceImpl {
         self.full_text_repo.search(req).await
     }
 
+    async fn find_document_by_id(
+        &self,
+        _: FullTextSearchContext<'_>,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        self.full_text_repo
+            .find_document_by_id(schema_name, id)
+            .await
+    }
+
     async fn bulk_update(
         &self,
         _: FullTextSearchContext<'_>,

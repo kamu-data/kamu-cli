@@ -267,14 +267,19 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
+
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+
+        let wrapped_work_catalog = dill::CatalogBuilder::new_chained(work_catalog)
+            .add_value(KamuBackgroundCatalog::new(work_catalog.clone()))
+            .build();
 
         maybe_transactional(
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
                 let command_builder = cli_commands::get_command(
-                    work_catalog,
+                    &wrapped_work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
                     current_account,

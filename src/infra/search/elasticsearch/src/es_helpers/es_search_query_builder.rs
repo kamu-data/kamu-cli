@@ -75,10 +75,71 @@ impl ElasticSearchQueryBuilder {
                         }
                     })
                 }
+
+                FullTextSearchFilterOp::Ne(value) => {
+                    serde_json::json!({
+                        "bool": {
+                            "must_not": {
+                                "term": {
+                                    *field: value
+                                }
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Lt(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "lt": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Lte(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "lte": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Gt(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "gt": value
+                            }
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Gte(value) => {
+                    serde_json::json!({
+                        "range": {
+                            *field: {
+                                "gte": value
+                            }
+                        }
+                    })
+                }
+
                 FullTextSearchFilterOp::In(values) => {
                     serde_json::json!({
                         "terms": {
                             *field: values
+                        }
+                    })
+                }
+
+                FullTextSearchFilterOp::Prefix(prefix) => {
+                    serde_json::json!({
+                        "prefix": {
+                            *field: prefix
                         }
                     })
                 }
@@ -135,7 +196,7 @@ impl ElasticSearchQueryBuilder {
 
     fn sort_argument(req: &FullTextSearchRequest) -> serde_json::Value {
         fn relevance_sort() -> serde_json::Value {
-            serde_json::json!([{"_score": {"order": "desc"}}])
+            serde_json::json!({"_score": {"order": "desc"}})
         }
 
         let parts = req
@@ -154,7 +215,7 @@ impl ElasticSearchQueryBuilder {
                                 FullTextSortDirection::Ascending => "asc",
                                 FullTextSortDirection::Descending => "desc",
                             },
-                            "missing": if *nulls_first { "first" } else { "last" },
+                            "missing": if *nulls_first { "_first" } else { "_last" },
                             "unmapped_type": "keyword",
                         }
                     })

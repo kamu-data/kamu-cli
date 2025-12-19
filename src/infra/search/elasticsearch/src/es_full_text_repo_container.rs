@@ -132,6 +132,17 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
         self.inner().await?.documents_of_kind(schema_name).await
     }
 
+    async fn find_document_by_id(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        self.inner()
+            .await?
+            .find_document_by_id(schema_name, id)
+            .await
+    }
+
     async fn bulk_update(
         &self,
         schema_name: FullTextEntitySchemaName,

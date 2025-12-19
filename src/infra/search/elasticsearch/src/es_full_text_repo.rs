@@ -123,16 +123,29 @@ impl ElasticSearchFullTextRepo {
         &self,
         client: &es_client::ElasticSearchClient,
         entity_schemas: &[Arc<FullTextSearchEntitySchema>],
+    ) -> Result<Vec<String>, InternalError> {
+        assert!(!entity_schemas.is_empty());
+
+        entity_schemas
+            .iter()
+            .map(|schema| self.resolve_read_index_alias(client, schema.schema_name))
+            .collect()
+    }
+
+    fn map_write_index_names(
+        &self,
+        client: &es_client::ElasticSearchClient,
+        entity_schemas: &[Arc<FullTextSearchEntitySchema>],
     ) -> Result<HashMap<String, FullTextEntitySchemaName>, InternalError> {
         assert!(!entity_schemas.is_empty());
 
         entity_schemas
             .iter()
             .map(|schema| {
-                let index_name = self.resolve_read_index_alias(client, schema.schema_name)?;
+                let index_name = self.resolve_writable_index_name(client, schema.schema_name)?;
                 Ok((index_name, schema.schema_name))
             })
-            .collect::<Result<HashMap<_, _>, InternalError>>()
+            .collect()
     }
 }
 
@@ -257,22 +270,22 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Resolve affected index names
-        let schema_names_by_index_names =
-            self.resolve_read_index_aliases(client, &entity_schemas)?;
+        // Resolve read aliases
+        let read_index_aliases = self.resolve_read_index_aliases(client, &entity_schemas)?;
+        let read_index_alias_refs = read_index_aliases
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
 
-        // Involved indexes
-        let involved_index_names: Vec<&str> = schema_names_by_index_names
-            .keys()
-            .map(std::string::String::as_str)
-            .collect();
+        // Resolve write index names to schemas
+        let schema_names_by_write_index = self.map_write_index_names(client, &entity_schemas)?;
 
         // Build ElasticSearch request body
         let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
 
         // Execute request
         let es_response: es_client::SearchResponse = client
-            .search(req_body, &involved_index_names)
+            .search(req_body, &read_index_alias_refs)
             .await
             .int_err()?;
 
@@ -287,7 +300,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 .into_iter()
                 .map(|hit| FullTextSearchHit {
                     id: hit.id.unwrap_or_default(),
-                    schema_name: schema_names_by_index_names
+                    schema_name: schema_names_by_write_index
                         .get(&hit.index)
                         .copied()
                         .unwrap_or("<unknown>"),
@@ -302,6 +315,21 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 })
                 .collect(),
         })
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_find_document_by_id, skip_all, fields(schema_name, id))]
+    async fn find_document_by_id(
+        &self,
+        schema_name: FullTextEntitySchemaName,
+        id: &FullTextEntityId,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        let client = self.es_client().await?;
+        let index_name = self.resolve_read_index_alias(client, schema_name)?;
+        let doc = client
+            .find_document_by_id(&index_name, id)
+            .await
+            .int_err()?;
+        Ok(doc)
     }
 
     #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
