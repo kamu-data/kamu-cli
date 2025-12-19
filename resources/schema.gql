@@ -3399,19 +3399,13 @@ type MoleculeDataRoomUpdateEntryByPathNotFound implements MoleculeDataRoomMoveEn
 	message: String!
 }
 
-type MoleculeDataRoomUpdateEntryByRefNotFound implements MoleculeDataRoomFinishUploadFileResult {
+type MoleculeDataRoomUpdateEntryByRefNotFound implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomUpdateFileMetadataResult {
 	ref: DatasetID!
 	isSuccess: Boolean!
 	message: String!
 }
 
 interface MoleculeDataRoomUpdateFileMetadataResult {
-	isSuccess: Boolean!
-	message: String!
-}
-
-type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
-	ref: DatasetID!
 	isSuccess: Boolean!
 	message: String!
 }
