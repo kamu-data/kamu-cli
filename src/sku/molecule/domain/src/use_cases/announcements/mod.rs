@@ -9,8 +9,10 @@
 
 mod molecule_create_announcement_use_case;
 mod molecule_find_project_announcement_use_case;
+mod molecule_view_global_announcements_use_case;
 mod molecule_view_project_announcements_use_case;
 
 pub use molecule_create_announcement_use_case::*;
 pub use molecule_find_project_announcement_use_case::*;
+pub use molecule_view_global_announcements_use_case::*;
 pub use molecule_view_project_announcements_use_case::*;

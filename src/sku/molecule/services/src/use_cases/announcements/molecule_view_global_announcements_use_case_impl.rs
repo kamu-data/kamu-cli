@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
 use crate::MoleculeAnnouncementsService;
@@ -18,43 +19,49 @@ use crate::MoleculeAnnouncementsService;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn MoleculeViewProjectAnnouncementsUseCase)]
-pub struct MoleculeViewProjectAnnouncementsUseCaseImpl {
+#[dill::interface(dyn MoleculeViewGlobalAnnouncementsUseCase)]
+pub struct MoleculeViewGlobalAnnouncementsUseCaseImpl {
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncementsUseCaseImpl {
-    #[tracing::instrument(
-        name = MoleculeViewProjectAnnouncementsUseCaseImpl_execute,
-        level = "debug",
-        skip_all
-    )]
-    async fn execute(
+impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    async fn global_announcements_from_source(
         &self,
-        molecule_project: &MoleculeProject,
+        molecule_subject: &kamu_accounts::LoggedAccount,
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
-    ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
-        // Gain read access to project's announcements dataset
-        let projects_announcements_reader = self
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
+        // Gain read access to global announcements dataset
+        let global_announcements_reader = match self
             .announcements_service
-            .project_reader(molecule_project)
+            .global_reader(&molecule_subject.account_name)
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?;
+        {
+            Ok(reader) => reader,
+
+            // No announcements dataset yet is fine, just return empty listing
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
+                return Ok(MoleculeGlobalAnnouncementListing::default());
+            }
+
+            Err(e) => {
+                return Err(MoleculeDatasetErrorExt::adapt::<
+                    MoleculeViewGlobalAnnouncementsError,
+                >(e));
+            }
+        };
 
         // Obtain raw ledger DF
-        let maybe_df = projects_announcements_reader
+        let maybe_df = global_announcements_reader
             .raw_ledger_data_frame()
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectAnnouncementsError>)?;
+            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalAnnouncementsError>)?;
 
         // Empty? Return empty listing
         let Some(df) = maybe_df else {
-            return Ok(MoleculeProjectAnnouncementListing::default());
+            return Ok(MoleculeGlobalAnnouncementListing::default());
         };
 
         use datafusion::logical_expr::col;
@@ -74,6 +81,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
         let maybe_filter = filters.and_then(|f| {
             utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
         });
+
         let df = if let Some(filters) = maybe_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters)
                 .int_err()?
@@ -86,14 +94,35 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
 
         let announcements = records
             .into_iter()
-            .map(MoleculeAnnouncement::from_changelog_entry_json)
+            .map(MoleculeGlobalAnnouncement::from_changelog_entry_json)
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
-        Ok(MoleculeProjectAnnouncementListing {
+        Ok(MoleculeGlobalAnnouncementListing {
             total_count,
             list: announcements,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    #[tracing::instrument(
+        name = MoleculeViewGlobalAnnouncementsUseCaseImpl_execute,
+        level = "debug",
+        skip_all
+    )]
+    async fn execute(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
+        self.global_announcements_from_source(molecule_subject, filters, pagination)
+            .await
     }
 }
 

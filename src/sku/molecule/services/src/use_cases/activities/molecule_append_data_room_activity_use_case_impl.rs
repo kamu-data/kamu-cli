@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::PushIngestResult;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -24,6 +24,37 @@ use crate::MoleculeGlobalDataRoomActivitiesService;
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     outbox: Arc<dyn Outbox>,
+}
+
+impl MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
+    async fn get_offset_after_append(
+        &self,
+        global_activities_dataset: &dyn odf::Dataset,
+        new_head: &odf::Multihash,
+    ) -> Result<u64, InternalError> {
+        // Extract the event from the new head
+        let new_odf_event = global_activities_dataset
+            .as_metadata_chain()
+            .get_block(new_head)
+            .await
+            .int_err()?
+            .event;
+
+        // We expect it to be AddData
+        let odf::metadata::MetadataEvent::AddData(add_data) = new_odf_event else {
+            unreachable!("We just appended data, the latest event must be AddData")
+        };
+
+        // We expect just 1 record to be appended
+        let offset = if let Some(new_data) = add_data.new_data {
+            assert_eq!(new_data.num_records(), 1);
+            new_data.offset_interval.end
+        } else {
+            unreachable!("We just appended data, new_data must be Some")
+        };
+
+        Ok(offset)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,8 +100,19 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
             }
             PushIngestResult::Updated {
                 system_time: insertion_system_time,
+                new_head,
                 ..
             } => {
+                // We need to know offset for message
+                let offset = self
+                    .get_offset_after_append(
+                        global_data_room_activities_writer
+                            .get_write_checked_dataset()
+                            .as_ref(),
+                        &new_head,
+                    )
+                    .await?;
+
                 // Notify external listeners
                 self.outbox
                     .post_message(
@@ -78,6 +120,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
                         MoleculeActivityMessage::published(
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
+                            offset,
                             new_changelog_record.payload,
                         ),
                     )

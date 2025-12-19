@@ -40,12 +40,12 @@ pub struct MoleculeAnnouncement {
 }
 
 impl MoleculeAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeAnnouncementChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
-            system_time: entry.system_columns.system_time,
-            event_time: entry.system_columns.event_time,
+            system_time: entry.system_columns.timestamp_columns.system_time,
+            event_time: entry.system_columns.timestamp_columns.event_time,
             announcement_id: entry.payload.announcement_id,
             headline: entry.payload.headline,
             body: entry.payload.body,
@@ -67,15 +67,15 @@ pub struct MoleculeGlobalAnnouncement {
 }
 
 impl MoleculeGlobalAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeGlobalAnnouncementChangelogEntry =
             serde_json::from_value(record).int_err()?;
 
         Ok(Self {
             ipnft_uid: entry.payload.ipnft_uid,
             announcement: MoleculeAnnouncement {
-                system_time: entry.system_columns.system_time,
-                event_time: entry.system_columns.event_time,
+                system_time: entry.system_columns.timestamp_columns.system_time,
+                event_time: entry.system_columns.timestamp_columns.event_time,
                 announcement_id: entry.payload.announcement.announcement_id,
                 headline: entry.payload.announcement.headline,
                 body: entry.payload.announcement.body,

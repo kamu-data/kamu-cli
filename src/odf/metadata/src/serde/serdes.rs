@@ -235,16 +235,22 @@ impl<'de> serde::Deserialize<'de> for OperationType {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct DatasetDefaultVocabularySystemColumns {
-    pub offset: u64,
-
-    pub op: OperationType,
-
+pub struct DatasetDefaultVocabularyTimestampColumns {
     #[serde(with = "crate::serde::yaml::datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
 
     #[serde(with = "crate::serde::yaml::datetime_rfc3339")]
     pub event_time: DateTime<Utc>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct DatasetDefaultVocabularySystemColumns {
+    pub offset: u64,
+
+    pub op: OperationType,
+
+    #[serde(flatten)]
+    pub timestamp_columns: DatasetDefaultVocabularyTimestampColumns,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

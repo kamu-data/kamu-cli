@@ -219,6 +219,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                     .post_message(
                         MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
                         MoleculeProjectMessage::created(
+                            source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
                             project_account.id,
