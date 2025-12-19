@@ -341,6 +341,7 @@ pub struct MoleculeSemanticSearchFilters {
     by_ipnft_uids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
+    /// Defaults to public-only if not specified
     by_access_levels: Option<Vec<String>>,
     by_kinds: Option<Vec<MoleculeSearchEntityKindInput>>,
 }
@@ -351,7 +352,9 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
             by_ipnft_uids: value.by_ipnft_uids,
             by_tags: value.by_tags,
             by_categories: value.by_categories,
-            by_access_levels: value.by_access_levels,
+            by_access_levels: value
+                .by_access_levels
+                .unwrap_or_else(|| super::MOLECULE_DEFAULT_ACCESS_LEVELS.clone()),
             by_kinds: value
                 .by_kinds
                 .map(|kinds| kinds.into_iter().map(Into::into).collect()),

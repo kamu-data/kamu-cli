@@ -2213,7 +2213,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2283,7 +2283,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": ["test-tag1", "test-tag1"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2353,7 +2353,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2423,7 +2423,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2493,7 +2493,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2563,7 +2563,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-3", "test-category-1"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -2605,6 +2605,76 @@ async fn test_molecule_v2_data_room_operations() {
                 //         }
                 //     }
                 // },
+                // {
+                //     "path": "/baz.txt",
+                //     "ref": file_3_did,
+                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                //     "asVersionedFile": {
+                //         "latest": {
+                //             "accessLevel": "holders",
+                //             "contentType": "text/plain",
+                //             "version": 1,
+                //             "description": null,
+                //             "categories": [],
+                //             "tags": [],
+                //         }
+                //     }
+                // },
+            ],
+        })
+    );
+
+    // Filters by access levels: null - defaults to ["public"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": null,
+                    "byCategories": null,
+                    "byAccessLevels":null,
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        json!({
+            "totalCount": 2,
+            "nodes": [
+                {
+                    "path": "/2025/foo.txt",
+                    "ref": file_1_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 2,
+                            "description": "Plain text file that was updated",
+                            "categories": ["test-category-1", "test-category-3"],
+                            "tags": ["test-tag1", "test-tag4"],
+                        }
+                    }
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": file_2_did,
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "asVersionedFile": {
+                        "latest": {
+                            "accessLevel": "public",
+                            "contentType": "text/plain",
+                            "version": 1,
+                            "description": "Plain text file",
+                            "categories": ["test-category-2"],
+                            "tags": ["test-tag1", "test-tag2"],
+                        }
+                    }
+                },
                 // {
                 //     "path": "/baz.txt",
                 //     "ref": file_3_did,
@@ -3943,7 +4013,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -3975,7 +4045,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -4043,7 +4113,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": ["test-tag3"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -4111,7 +4181,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -4179,7 +4249,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -4247,7 +4317,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -4315,7 +4385,7 @@ async fn test_molecule_v2_announcements_operations() {
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2", "test-category-1"],
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -5940,7 +6010,7 @@ async fn test_molecule_v2_activity() {
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -7015,7 +7085,7 @@ async fn test_molecule_v2_activity() {
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
-                    "byAccessLevels": null,
+                    "byAccessLevels": [],
                 },
             })),
         )
@@ -8861,6 +8931,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byIpnftUids": [PROJECT_2_UID],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -8888,6 +8959,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -8915,6 +8987,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byKinds": ["FILE"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -8942,6 +9015,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byKinds": ["ANNOUNCEMENT"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -8969,6 +9043,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -8996,6 +9071,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byTags": ["test-tag1"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9023,6 +9099,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byTags": ["test-tag2"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9050,6 +9127,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9077,6 +9155,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byCategories": ["test-category-1"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9104,6 +9183,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byCategories": ["test-category-2"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9131,6 +9211,7 @@ async fn test_molecule_v2_search() {
                 "prompt": "",
                 "filters": {
                     "byCategories": ["test-category-2", "test-category-1"],
+                    "byAccessLevels": [],
                 }
             })),
         )
@@ -9147,6 +9228,33 @@ async fn test_molecule_v2_search() {
                 // project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 1
+        })
+    );
+
+    // Filters: byAccessLevels: null - defaults to ["public"]
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": "",
+                "filters": {
+                    "byAccessLevels": null,
+                }
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap()["molecule"]["v2"]["search"],
+        json!({
+            "nodes": [
+                // project_2_file_1_dataset_search_hit_node,
+                // project_2_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 2
         })
     );
 

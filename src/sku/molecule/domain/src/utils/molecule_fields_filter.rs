@@ -15,7 +15,7 @@ pub fn molecule_fields_filter(
     by_ipnft_uids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
-    by_access_levels: Option<Vec<String>>,
+    by_access_levels: Vec<String>,
 ) -> Option<kamu_datasets::ExtraDataFieldsFilter> {
     use kamu_datasets::ExtraDataFieldFilter as Filter;
 
@@ -40,12 +40,10 @@ pub fn molecule_fields_filter(
             is_array: true,
         })
     });
-    let maybe_access_levels_filter = by_access_levels.and_then(|values| {
-        NonEmpty::from_vec(values).map(|values| Filter {
-            field_name: "molecule_access_level".to_string(),
-            values,
-            is_array: false,
-        })
+    let maybe_access_levels_filter = NonEmpty::from_vec(by_access_levels).map(|values| Filter {
+        field_name: "molecule_access_level".to_string(),
+        values,
+        is_array: false,
     });
 
     let filters = maybe_ipnft_uids_filter
