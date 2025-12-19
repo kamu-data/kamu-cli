@@ -25,6 +25,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - GQL: `byIds` and `byRefs` endpoints will return results in the same order as inputs (including duplicates) to allow `zip`'ing them on the client side
 - Schema nullability coercion now works for `List` field elements
+- Dataset statistics indexer now runs datasets in parallel using per-dataset transactions
 
 ## [0.254.1] - 2025-12-08
 ### Fixed
