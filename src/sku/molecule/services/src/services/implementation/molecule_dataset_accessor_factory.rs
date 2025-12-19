@@ -106,7 +106,6 @@ pub struct MoleculeDatasetWriter {
 }
 
 impl MoleculeDatasetWriter {
-    #[expect(dead_code)]
     pub(crate) fn get_write_checked_dataset(&self) -> &WriteCheckedDataset<'_> {
         &self.dataset
     }

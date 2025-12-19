@@ -44,6 +44,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
     b.add::<MoleculeAppendGlobalDataRoomActivityUseCaseImpl>();
     b.add::<MoleculeViewGlobalActivitiesUseCaseImpl>();
     b.add::<MoleculeViewProjectActivitiesUseCaseImpl>();
+    b.add::<MoleculeViewGlobalAnnouncementsUseCaseImpl>();
 
     b.add::<MoleculeCreateAnnouncementUseCaseImpl>();
     b.add::<MoleculeFindProjectAnnouncementUseCaseImpl>();

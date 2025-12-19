@@ -40,20 +40,20 @@ pub struct MoleculeAnnouncement {
 }
 
 impl MoleculeAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeAnnouncementChangelogEntry = serde_json::from_value(record).int_err()?;
 
         Ok(Self {
-            system_time: entry.system_columns.system_time,
-            event_time: entry.system_columns.event_time,
+            system_time: entry.system_columns.timestamp_columns.system_time,
+            event_time: entry.system_columns.timestamp_columns.event_time,
             announcement_id: entry.payload.announcement_id,
             headline: entry.payload.headline,
             body: entry.payload.body,
             attachments: entry.payload.attachments,
             access_level: entry.payload.access_level,
             change_by: entry.payload.change_by,
-            categories: entry.payload.categories,
-            tags: entry.payload.tags,
+            categories: entry.payload.categories.unwrap_or_default(),
+            tags: entry.payload.tags.unwrap_or_default(),
         })
     }
 }
@@ -67,23 +67,23 @@ pub struct MoleculeGlobalAnnouncement {
 }
 
 impl MoleculeGlobalAnnouncement {
-    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+    pub fn from_changelog_entry_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeGlobalAnnouncementChangelogEntry =
             serde_json::from_value(record).int_err()?;
 
         Ok(Self {
             ipnft_uid: entry.payload.ipnft_uid,
             announcement: MoleculeAnnouncement {
-                system_time: entry.system_columns.system_time,
-                event_time: entry.system_columns.event_time,
+                system_time: entry.system_columns.timestamp_columns.system_time,
+                event_time: entry.system_columns.timestamp_columns.event_time,
                 announcement_id: entry.payload.announcement.announcement_id,
                 headline: entry.payload.announcement.headline,
                 body: entry.payload.announcement.body,
                 attachments: entry.payload.announcement.attachments,
                 access_level: entry.payload.announcement.access_level,
                 change_by: entry.payload.announcement.change_by,
-                categories: entry.payload.announcement.categories,
-                tags: entry.payload.announcement.tags,
+                categories: entry.payload.announcement.categories.unwrap_or_default(),
+                tags: entry.payload.announcement.tags.unwrap_or_default(),
             },
         })
     }
@@ -152,11 +152,13 @@ pub struct MoleculeAnnouncementPayloadRecord {
     #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
+    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
     #[serde(default)]
-    pub categories: Vec<String>,
+    pub categories: Option<Vec<String>>,
 
+    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

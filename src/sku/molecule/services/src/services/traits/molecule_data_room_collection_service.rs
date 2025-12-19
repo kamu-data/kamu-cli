@@ -57,6 +57,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
+        extra_data: Option<kamu_datasets::ExtraDataFields>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 

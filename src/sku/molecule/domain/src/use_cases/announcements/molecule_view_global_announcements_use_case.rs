@@ -7,41 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
+use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
-use kamu_accounts::LoggedAccount;
-use kamu_datasets::CollectionPath;
 
-use crate::{MoleculeDataRoomEntry, MoleculeDenormalizeFileToDataRoom, MoleculeProject};
+use crate::{MoleculeAnnouncementsFilters, MoleculeGlobalAnnouncement};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait MoleculeUpdateDataRoomEntryUseCase: Send + Sync {
+pub trait MoleculeViewGlobalAnnouncementsUseCase: Send + Sync {
     async fn execute(
         &self,
-        molecule_subject: &LoggedAccount,
-        molecule_project: &MoleculeProject,
-        source_event_time: Option<DateTime<Utc>>,
-        path: CollectionPath,
-        reference: odf::DatasetID,
-        denormalized_file_info: MoleculeDenormalizeFileToDataRoom,
-        content_text: Option<&str>,
-    ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError>;
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
-pub enum MoleculeUpdateDataRoomEntryError {
-    #[error(transparent)]
-    RefCASFailed(#[from] odf::dataset::RefCASError),
+pub type MoleculeGlobalAnnouncementListing = EntityPageListing<MoleculeGlobalAnnouncement>;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum MoleculeViewGlobalAnnouncementsError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
-
-    #[error(transparent)]
-    QuotaExceeded(#[from] kamu_accounts::QuotaError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

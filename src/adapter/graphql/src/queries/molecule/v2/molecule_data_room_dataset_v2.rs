@@ -85,7 +85,7 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<CollectionPath<'static>>,
+        path_prefix: Option<CollectionPathV2<'static>>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -101,7 +101,7 @@ impl MoleculeDataRoomProjection<'_> {
             .execute(
                 &self.project.entity,
                 self.as_of.clone(),
-                path_prefix.map(Into::into),
+                path_prefix.map(|p| p.into_v1_scalar().into()),
                 max_depth,
                 filters.map(Into::into),
                 Some(PaginationOpts {
@@ -141,12 +141,16 @@ impl MoleculeDataRoomProjection<'_> {
     async fn entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath<'static>,
+        path: CollectionPathV2<'static>,
     ) -> Result<Option<MoleculeDataRoomEntry>> {
         let find_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeFindDataRoomEntryUseCase);
 
         let maybe_entry = find_data_room_entry_uc
-            .execute_find_by_path(&self.project.entity, self.as_of.clone(), path.into())
+            .execute_find_by_path(
+                &self.project.entity,
+                self.as_of.clone(),
+                path.into_v1_scalar().into(),
+            )
             .await
             .map_err(|e| match e {
                 MoleculeFindDataRoomEntryError::Access(e) => GqlError::Access(e),
@@ -257,8 +261,8 @@ impl MoleculeDataRoomEntry {
         self.entity.event_time
     }
 
-    async fn path(&self) -> CollectionPath<'_> {
-        CollectionPath::from(&self.entity.path)
+    async fn path(&self) -> CollectionPathV2<'_> {
+        CollectionPathV2::from(&self.entity.path)
     }
 
     #[graphql(name = "ref")]

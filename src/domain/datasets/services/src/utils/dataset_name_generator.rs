@@ -26,33 +26,26 @@ impl DatasetNameGenerator {
     ) -> odf::DatasetName {
         // Dataset name PEG grammar: [a-zA-Z0-9]+ ("-" [a-zA-Z0-9]+)*
         // Based on: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
-        let sanitized_path = {
-            let mut s = String::with_capacity(path.as_str().len());
-            let mut prev_was_dash = true; // ignore the first dash in the path
+        let mut s = String::with_capacity(path.as_str().len());
 
-            for c in path.as_str().chars() {
-                match c {
-                    // valid chars
-                    c if c.is_ascii_alphanumeric() => {
-                        s.push(c);
-                        prev_was_dash = false;
-                    }
-                    _ if prev_was_dash => {
-                        // merge "--" into "-"
-                    }
-                    _ => {
-                        s.push('-');
-                        prev_was_dash = true;
-                    }
+        for segment in path.as_str().split('/') {
+            // SAFETY: Path is already validated
+            let segment_decoded = urlencoding::decode(segment).unwrap();
+
+            for c in segment_decoded.chars() {
+                if c.is_ascii_alphanumeric() {
+                    s.push(c);
+                } else if !s.ends_with('-') {
+                    s.push('-');
                 }
             }
 
-            if s.ends_with('-') {
-                s.pop();
+            if !s.ends_with('-') {
+                s.push('-');
             }
+        }
 
-            s
-        };
+        let sanitized_path = s.trim_matches('-');
 
         let raw = format!("{uuid}-{sanitized_path}");
         odf::DatasetName::try_from(raw).unwrap()

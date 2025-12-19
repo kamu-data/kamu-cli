@@ -140,6 +140,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
                     .post_message(
                         MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
                         MoleculeAnnouncementMessage::published(
+                            source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
                             molecule_project.ipnft_uid.clone(),

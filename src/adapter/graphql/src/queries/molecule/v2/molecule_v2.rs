@@ -384,8 +384,8 @@ pub enum MoleculeSemanticSearchHit {
 }
 
 impl MoleculeSemanticSearchHit {
-    pub fn announcement(entry: MoleculeAnnouncementEntry) -> Self {
-        Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { entry })
+    pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
+        Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { announcement })
     }
 
     pub fn data_room_entry(entry: MoleculeDataRoomEntry) -> Self {
@@ -400,7 +400,7 @@ pub struct MoleculeSemanticSearchFoundDataRoomEntry {
 
 #[derive(SimpleObject)]
 pub struct MoleculeSemanticSearchFoundAnnouncement {
-    pub entry: MoleculeAnnouncementEntry,
+    pub announcement: MoleculeAnnouncementEntry,
 }
 
 page_based_connection!(

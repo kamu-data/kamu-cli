@@ -24,6 +24,10 @@ impl CollectionPath {
     pub fn into_inner(self) -> String {
         self.0
     }
+
+    pub fn depth(&self) -> usize {
+        self.0.chars().filter(|&c| c == '/').count()
+    }
 }
 
 impl TryFrom<&str> for CollectionPath {

@@ -15,7 +15,7 @@ use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
-use crate::{MoleculeAnnouncementsService, MoleculeGlobalDataRoomActivitiesService};
+use crate::MoleculeGlobalDataRoomActivitiesService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ use crate::{MoleculeAnnouncementsService, MoleculeGlobalDataRoomActivitiesServic
 #[dill::interface(dyn MoleculeViewGlobalActivitiesUseCase)]
 pub struct MoleculeViewGlobalActivitiesUseCaseImpl {
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
-    announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    view_global_announcements_uc: Arc<dyn MoleculeViewGlobalAnnouncementsUseCase>,
 }
 
 impl MoleculeViewGlobalActivitiesUseCaseImpl {
@@ -80,7 +80,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeDataRoomActivity::from_json(record)?;
+                let entity = MoleculeDataRoomActivity::from_changelog_entry_json(record)?;
                 Ok(MoleculeGlobalActivity::DataRoomActivity(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
@@ -93,58 +93,43 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
-        // Get read access to global announcements dataset
-        let announcements_reader = match self
-            .announcements_service
-            .global_reader(&molecule_subject.account_name)
+        let announcements_listing = self
+            .view_global_announcements_uc
+            .execute(
+                molecule_subject,
+                if let Some(filters) = filters {
+                    Some(MoleculeAnnouncementsFilters {
+                        by_tags: filters.by_tags,
+                        by_categories: filters.by_categories,
+                        by_access_levels: filters.by_access_levels,
+                    })
+                } else {
+                    None
+                },
+                None,
+            )
             .await
-        {
-            Ok(reader) => Ok(reader),
+            .map_err(|e| match e {
+                MoleculeViewGlobalAnnouncementsError::Access(e) => {
+                    MoleculeViewGlobalActivitiesError::Access(e)
+                }
+                MoleculeViewGlobalAnnouncementsError::Internal(e) => {
+                    MoleculeViewGlobalActivitiesError::Internal(e)
+                }
+            })?;
 
-            // No announcements dataset yet is fine, just return empty listing
-            Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
-                return Ok(MoleculeGlobalActivityListing::default());
-            }
-
-            Err(e) => Err(MoleculeDatasetErrorExt::adapt::<
-                MoleculeViewGlobalActivitiesError,
-            >(e)),
-        }?;
-
-        // Load raw ledger DF
-        let maybe_df = announcements_reader
-            .raw_ledger_data_frame()
-            .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewGlobalActivitiesError>)?;
-
-        // Empty? Return empty listing
-        let Some(df) = maybe_df else {
-            return Ok(MoleculeGlobalActivityListing::default());
-        };
-
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
-        });
-        let df = if let Some(filter) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
-                .int_err()?
-        } else {
-            df
-        };
-
-        // Sorting will be done after merge
-        let records = df.collect_json_aos().await.int_err()?;
-        let total_count = records.len();
-
-        let list = records
+        let list = announcements_listing
+            .list
             .into_iter()
-            .map(|record| {
-                let entity = MoleculeGlobalAnnouncement::from_json(record)?;
-                Ok(MoleculeGlobalActivity::Announcement(entity))
+            .map(|global_announcement| {
+                Ok(MoleculeGlobalActivity::Announcement(global_announcement))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(MoleculeGlobalActivityListing { list, total_count })
+        Ok(MoleculeGlobalActivityListing {
+            list,
+            total_count: announcements_listing.total_count,
+        })
     }
 }
 

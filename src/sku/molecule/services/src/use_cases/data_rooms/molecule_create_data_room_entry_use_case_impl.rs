@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
-use kamu_datasets::CollectionPath;
+use kamu_datasets::{CollectionPath, CollectionPathV2};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -46,6 +46,7 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
         path: CollectionPath,
         reference: odf::DatasetID,
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
+        content_text: Option<&str>,
     ) -> Result<MoleculeDataRoomEntry, MoleculeCreateDataRoomEntryError> {
         let entry = self
             .data_room_collection_service
@@ -78,7 +79,8 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
         let data_room_entry = MoleculeDataRoomEntry {
             system_time: entry.system_time,
             event_time: entry.event_time,
-            path: entry.path,
+            // SAFETY: All paths should be normalized after v2 migration
+            path: CollectionPathV2::from_v1_unchecked(entry.path),
             reference: entry.reference,
             denormalized_latest_file_info,
         };
@@ -92,6 +94,7 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
                     molecule_project.account_id.clone(),
                     molecule_project.ipnft_uid.clone(),
                     data_room_entry.clone(),
+                    content_text.map(ToOwned::to_owned),
                 ),
             )
             .await

@@ -30,11 +30,13 @@ impl MoleculeActivityMessage {
     pub fn published(
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
+        offset: u64,
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Self {
         Self::Published(MoleculeActivityMessagePublished {
             event_time,
             molecule_account_id,
+            offset,
             activity_record,
         })
     }
@@ -54,6 +56,7 @@ impl Message for MoleculeActivityMessage {
 pub struct MoleculeActivityMessagePublished {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
+    pub offset: u64,
     pub activity_record: MoleculeDataRoomActivityPayloadRecord,
 }
 

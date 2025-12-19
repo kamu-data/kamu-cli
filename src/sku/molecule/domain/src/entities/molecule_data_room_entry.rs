@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::{CollectionEntry, CollectionPath, FileVersion};
+use kamu_datasets::{CollectionEntry, CollectionPathV2, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +25,7 @@ pub struct MoleculeDataRoomEntry {
     /// File system-like path
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
-    pub path: CollectionPath,
+    pub path: CollectionPathV2,
 
     /// DID of the linked dataset
     pub reference: odf::DatasetID,
@@ -44,20 +44,24 @@ impl MoleculeDataRoomEntry {
         Self {
             system_time: entry.system_time,
             event_time: entry.event_time,
-            path: entry.path,
+            // SAFETY: All paths should be normalized after v2 migration
+            path: CollectionPathV2::from_v1_unchecked(entry.path),
             reference: entry.reference,
             denormalized_latest_file_info,
         }
     }
 
-    pub fn from_json(
+    pub fn from_changelog_entry_json(
         mut value: serde_json::Value,
         vocab: &odf::metadata::DatasetVocabulary,
-    ) -> Result<(odf::metadata::OperationType, Self), InternalError> {
+    ) -> Result<(u64, odf::metadata::OperationType, Self), InternalError> {
         let Some(obj) = value.as_object_mut() else {
             unreachable!()
         };
         let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
+            unreachable!()
+        };
+        let Some(offset) = obj[&vocab.offset_column].as_u64() else {
             unreachable!()
         };
 
@@ -67,7 +71,7 @@ impl MoleculeDataRoomEntry {
         let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
         let data_room_entry = Self::from_collection_entry(collection_entity);
 
-        Ok((op, data_room_entry))
+        Ok((offset, op, data_room_entry))
     }
 }
 

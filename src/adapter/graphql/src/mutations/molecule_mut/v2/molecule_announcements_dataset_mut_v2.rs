@@ -66,8 +66,8 @@ impl MoleculeAnnouncementsDatasetMutV2 {
                 .collect(),
             change_by: molecule_change_by,
             access_level: molecule_access_level,
-            categories,
-            tags,
+            categories: Some(categories),
+            tags: Some(tags),
         };
 
         use kamu_molecule_domain::MoleculeCreateAnnouncementError as E;

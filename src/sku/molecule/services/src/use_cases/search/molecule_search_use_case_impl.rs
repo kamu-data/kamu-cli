@@ -130,7 +130,7 @@ impl MoleculeSearchUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeDataRoomActivity::from_json(record)?;
+                let entity = MoleculeDataRoomActivity::from_changelog_entry_json(record)?;
                 Ok(MoleculeSearchHit::DataRoomActivity(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
@@ -208,7 +208,7 @@ impl MoleculeSearchUseCaseImpl {
         let list = records
             .into_iter()
             .map(|record| {
-                let entity = MoleculeGlobalAnnouncement::from_json(record)?;
+                let entity = MoleculeGlobalAnnouncement::from_changelog_entry_json(record)?;
                 Ok(MoleculeSearchHit::Announcement(entity))
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
