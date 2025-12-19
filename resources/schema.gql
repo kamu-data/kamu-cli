@@ -3377,6 +3377,12 @@ type MoleculeDataRoomMutV2 {
 	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
+type MoleculeDataRoomPathOccupied implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult {
+	byEntry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
 type MoleculeDataRoomProjection {
 	entries(pathPrefix: CollectionPathV2, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
 	entry(path: CollectionPathV2!): MoleculeDataRoomEntry
@@ -3387,19 +3393,19 @@ interface MoleculeDataRoomRemoveEntryResult {
 	message: String!
 }
 
-type MoleculeDataRoomUpdateEntryNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+type MoleculeDataRoomUpdateEntryByPathNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
 	path: CollectionPathV2!
 	isSuccess: Boolean!
 	message: String!
 }
 
-interface MoleculeDataRoomUpdateFileMetadataResult {
+type MoleculeDataRoomUpdateEntryByRefNotFound implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
 	isSuccess: Boolean!
 	message: String!
 }
 
-type MoleculeDataRoomUpdateFileMetadataResultEntryNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
-	ref: DatasetID!
+interface MoleculeDataRoomUpdateFileMetadataResult {
 	isSuccess: Boolean!
 	message: String!
 }

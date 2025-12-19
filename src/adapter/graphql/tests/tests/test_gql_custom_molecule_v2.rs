@@ -912,98 +912,136 @@ async fn test_molecule_v2_data_room_operations() {
     //
     // In this request we are fetching back only "basic info" that is denormalized
     // to the data room entry.
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
-                  molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
-                        dataRoom {
-                          uploadFile(
-                            path: $path
-                            content: $content
-                            contentType: $contentType
-                            changeBy: $changeBy
-                            accessLevel: $accessLevel
-                            description: $description
-                            categories: $categories
-                            tags: $tags
-                            contentText: $contentText
-                            encryptionMetadata: $encryptionMetadata
-                          ) {
-                            isSuccess
-                            message
-                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                              entry {
-                                project {
-                                  account {
-                                    accountName
-                                  }
-                                }
-                                path
-                                ref
-                                asVersionedFile {
-                                  latest {
-                                    version
-                                    contentHash
-                                    contentType
-                                    changeBy
-                                    accessLevel
-                                    description
-                                    categories
-                                    tags
-                                    encryptionMetadata {
-                                      dataToEncryptHash
-                                      accessControlConditions
-                                      encryptedBy
-                                      encryptedAt
-                                      chain
-                                      litSdkVersion
-                                      litNetwork
-                                      templateName
-                                      contractVersion
-                                    }
-                                  }
-                                }
-                              }
+    const UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    path: $path
+                    content: $content
+                    contentType: $contentType
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                    encryptionMetadata: $encryptionMetadata
+                  ) {
+                    __typename
+                    isSuccess
+                    message
+                    ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                      entry {
+                        project {
+                          account {
+                            accountName
+                          }
+                        }
+                        path
+                        ref
+                        asVersionedFile {
+                          latest {
+                            version
+                            contentHash
+                            contentType
+                            changeBy
+                            accessLevel
+                            description
+                            categories
+                            tags
+                            encryptionMetadata {
+                              dataToEncryptHash
+                              accessControlConditions
+                              encryptedBy
+                              encryptedAt
+                              chain
+                              litSdkVersion
+                              litNetwork
+                              templateName
+                              contractVersion
                             }
+                          }
+                        }
+                      }
+                    }
+                    ... on MoleculeDataRoomPathOccupied {
+                      byEntry {
+                        project {
+                          ipnftUid
+                        }
+                        ref
+                        changeBy
+                        accessLevel
+                        asVersionedFile {
+                          matching {
+                            version
+                            contentHash
+                            contentLength
+                            contentType
+                            accessLevel
+                            changeBy
+                            description
+                            categories
+                            tags
+                            contentText
+                            encryptionMetadata {
+                              dataToEncryptHash
+                              accessControlConditions
+                              encryptedBy
+                              encryptedAt
+                              chain
+                              litSdkVersion
+                              litNetwork
+                              templateName
+                              contractVersion
+                            }
+                            content
                           }
                         }
                       }
                     }
                   }
                 }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-                "path": "/foo.txt",
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
-                "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                "accessLevel": "public",
-                "description": "Plain text file",
-                "categories": ["test-category-1"],
-                "tags": ["test-tag1"],
-                "contentText": "hello",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1",
-                    "accessControlConditions": "EM2",
-                    "encryptedBy": "EM3",
-                    "encryptedAt": "EM4",
-                    "chain": "EM5",
-                    "litSdkVersion": "EM6",
-                    "litNetwork": "EM7",
-                    "templateName": "EM8",
-                    "contractVersion": "EM9",
-                },
-            }))),
-        )
-        .await;
+              }
+            }
+          }
+        }
+        "#
+    );
 
-    assert!(res.is_ok(), "{res:#?}");
+    let res = GraphQLQueryRequest::new(
+        UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": ipnft_uid,
+            "path": "/foo.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            "contentType": "text/plain",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "accessLevel": "public",
+            "description": "Plain text file",
+            "categories": ["test-category-1"],
+            "tags": ["test-tag1"],
+            "contentText": "hello",
+            "encryptionMetadata": {
+                "dataToEncryptHash": "EM1",
+                "accessControlConditions": "EM2",
+                "encryptedBy": "EM3",
+                "encryptedAt": "EM4",
+                "chain": "EM5",
+                "litSdkVersion": "EM6",
+                "litNetwork": "EM7",
+                "templateName": "EM8",
+                "contractVersion": "EM9",
+            },
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+
     let res_data = res.data.into_json().unwrap();
     assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
@@ -1017,6 +1055,7 @@ async fn test_molecule_v2_data_room_operations() {
     assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
         json!({
+            "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
             "isSuccess": true,
             "message": "",
             "entry": {
@@ -1048,6 +1087,88 @@ async fn test_molecule_v2_data_room_operations() {
                         },
                         "categories": ["test-category-1"],
                         "tags": ["test-tag1"],
+                    }
+                }
+            }
+        })
+    );
+
+    // Attempt to upload a new file to the same path
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello 2"),
+                "contentType": "application/octet-stream",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "accessLevel": "holders",
+                "description": "Plain text file -- the second attempt",
+                "categories": ["test-category-4"],
+                "tags": ["test-tag5"],
+                "contentText": "hello -- the second attempt",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1 -- the second attempt",
+                    "accessControlConditions": "EM2 -- the second attempt",
+                    "encryptedBy": "EM3 -- the second attempt",
+                    "encryptedAt": "EM4 -- the second attempt",
+                    "chain": "EM5 -- the second attempt",
+                    "litSdkVersion": "EM6 -- the second attempt",
+                    "litNetwork": "EM7 -- the second attempt",
+                    "templateName": "EM8 -- the second attempt",
+                    "contractVersion": "EM9 -- the second attempt",
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "__typename": "MoleculeDataRoomPathOccupied",
+                                "isSuccess": false,
+                                "message": "Path is occupied",
+                                "byEntry": {
+                                    "project": {
+                                        "ipnftUid": ipnft_uid,
+                                    },
+                                    "ref": file_1_did,
+                                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                    "accessLevel": "public",
+                                    "asVersionedFile": {
+                                        "matching": {
+                                            "version": 1,
+                                            "contentHash": "f16203338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392",
+                                            "contentLength": 5,
+                                            "contentType": "text/plain",
+                                            "accessLevel": "public",
+                                            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                                            "description": "Plain text file",
+                                            "categories": ["test-category-1"],
+                                            "tags": ["test-tag1"],
+                                            "contentText": "hello",
+                                            "encryptionMetadata": {
+                                                "dataToEncryptHash": "EM1",
+                                                "accessControlConditions": "EM2",
+                                                "encryptedBy": "EM3",
+                                                "encryptedAt": "EM4",
+                                                "chain": "EM5",
+                                                "litSdkVersion": "EM6",
+                                                "litNetwork": "EM7",
+                                                "templateName": "EM8",
+                                                "contractVersion": "EM9",
+                                            },
+                                            "content": "aGVsbG8",
+                                        }
+                                    },
+                                },
+                            }
+                        }
                     }
                 }
             }
@@ -1585,92 +1706,135 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
-    // Upload new version of an existing file
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
-                  molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
-                        dataRoom {
-                          uploadFile(
-                            ref: $ref
-                            content: $content
-                            contentType: $contentType
-                            changeBy: $changeBy
-                            accessLevel: $accessLevel
-                            description: $description
-                            categories: $categories
-                            tags: $tags
-                            contentText: $contentText
-                            encryptionMetadata: $encryptionMetadata
-                          ) {
-                            isSuccess
-                            message
-                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                              entry {
-                                path
-                                ref
-                                asVersionedFile {
-                                  latest {
-                                    version
-                                    contentHash
-                                    contentType
-                                    changeBy
-                                    accessLevel
-                                    description
-                                    categories
-                                    tags
-                                    contentText
-                                    encryptionMetadata {
-                                      dataToEncryptHash
-                                      accessControlConditions
-                                      encryptedBy
-                                      encryptedAt
-                                      chain
-                                      litSdkVersion
-                                      litNetwork
-                                      templateName
-                                      contractVersion
-                                    }
-                                    content
-                                  }
-                                }
-                              }
+    // First, we try to update using a non-existent ref
+
+    const UPDATE_FILE_BY_REF_QUERY: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    ref: $ref
+                    content: $content
+                    contentType: $contentType
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                    encryptionMetadata: $encryptionMetadata
+                  ) {
+                    isSuccess
+                    message
+                    ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                      entry {
+                        path
+                        ref
+                        asVersionedFile {
+                          latest {
+                            version
+                            contentHash
+                            contentType
+                            changeBy
+                            accessLevel
+                            description
+                            categories
+                            tags
+                            contentText
+                            encryptionMetadata {
+                              dataToEncryptHash
+                              accessControlConditions
+                              encryptedBy
+                              encryptedAt
+                              chain
+                              litSdkVersion
+                              litNetwork
+                              templateName
+                              contractVersion
                             }
+                            content
                           }
                         }
                       }
                     }
                   }
                 }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    let random_ref = odf::DatasetID::new_generated_ed25519().1;
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_FILE_BY_REF_QUERY,
+            async_graphql::Variables::from_value(value!({
                 "ipnftUid": ipnft_uid,
-                "ref": file_1_did,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
-                "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "ref": random_ref,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye -- random ref"),
+                "contentType": "application/octet-stream",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC -- random ref",
                 "accessLevel": "public",
                 "description": "Plain text file that was updated",
-                "categories": ["test-category-1", "test-category-3"],
-                "tags": ["test-tag1", "test-tag4"],
-                "contentText": "bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1",
-                    "accessControlConditions": "EM2",
-                    "encryptedBy": "EM3",
-                    "encryptedAt": "EM4",
-                    "chain": "EM5",
-                    "litSdkVersion": "EM6",
-                    "litNetwork": "EM7",
-                    "templateName": "EM8",
-                    "contractVersion": "EM9",
-                },
-            }))),
+                "categories": ["test-category-5"],
+                "tags": ["test-tag6"],
+                "contentText": "bye -- random ref",
+                "encryptionMetadata": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": false,
+                                "message": "Data room entry not found by ref",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Actually upload a new version of an existing file
+
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(UPDATE_FILE_BY_REF_QUERY).variables(
+                async_graphql::Variables::from_json(json!({
+                    "ipnftUid": ipnft_uid,
+                    "ref": file_1_did,
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
+                    "contentType": "text/plain",
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "accessLevel": "public",
+                    "description": "Plain text file that was updated",
+                    "categories": ["test-category-1", "test-category-3"],
+                    "tags": ["test-tag1", "test-tag4"],
+                    "contentText": "bye",
+                    "encryptionMetadata": {
+                        "dataToEncryptHash": "EM1",
+                        "accessControlConditions": "EM2",
+                        "encryptedBy": "EM3",
+                        "encryptedAt": "EM4",
+                        "chain": "EM5",
+                        "litSdkVersion": "EM6",
+                        "litNetwork": "EM7",
+                        "templateName": "EM8",
+                        "contractVersion": "EM9",
+                    },
+                })),
+            ),
         )
         .await;
 
@@ -1989,7 +2153,36 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "moveEntry": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by path",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Attempt to move to an already occupied path
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "fromPath": "/foo.txt",
+                "toPath": "/baz.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": false,
+                                "message": "Path is occupied",
                             }
                         }
                     }
@@ -2882,7 +3075,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "removeEntry": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by path",
                             }
                         }
                     }
@@ -3133,7 +3326,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "updateFileMetadata": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by ref",
                             }
                         }
                     }
@@ -3383,7 +3576,6 @@ async fn test_molecule_v2_data_room_operations() {
     // similar to what Molecule does on their side currently.
     //
     // Introduce tests for:
-    // - Attempt to create new file with path that already exists - expect error
     // - Get entries with prefix and maxDepth
 }
 

@@ -23,6 +23,8 @@ use kamu_molecule_domain::{
     MoleculeCreateVersionedFileDatasetUseCase,
     MoleculeDataRoomActivityPayloadRecord,
     MoleculeDataRoomFileActivityType,
+    MoleculeFindDataRoomEntryError,
+    MoleculeFindDataRoomEntryUseCase,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
     MoleculeReadVersionedFileEntryError,
@@ -94,14 +96,39 @@ impl MoleculeDataRoomMutV2 {
             upload_versioned_file_version_uc,
             create_data_room_entry_uc,
             append_global_data_room_activity_uc,
+            find_data_room_entry_uc,
         ) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
             dyn MoleculeCreateVersionedFileDatasetUseCase,
             dyn MoleculeUploadVersionedFileVersionUseCase,
             dyn MoleculeCreateDataRoomEntryUseCase,
-            dyn MoleculeAppendGlobalDataRoomActivityUseCase
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        // 0. `path` must not be occupied.
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(&self.project.entity, None, path.clone().into_v1())
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -250,7 +277,7 @@ impl MoleculeDataRoomMutV2 {
             .get_latest_data_room_entry(ctx, reference.as_ref())
             .await?
         else {
-            todo!();
+            return Ok(MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference }.into());
         };
 
         // 2. Upload the next version to the specified dataset.
@@ -447,7 +474,7 @@ impl MoleculeDataRoomMutV2 {
     /// data room via a single transaction. Uploads a new version of content
     /// in-band, so should be used only for very small files.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_upload_file, skip_all)]
     async fn upload_file(
         &self,
         ctx: &Context<'_>,
@@ -626,11 +653,38 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (time_source, move_data_room_entry_uc) = from_catalog_n!(
+        let (time_source, move_data_room_entry_uc, find_data_room_entry_uc) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
-            dyn MoleculeMoveDataRoomEntryUseCase
+            dyn MoleculeMoveDataRoomEntryUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(
+                &self.project.entity,
+                None,
+                to_path.clone().into_v1_scalar().into(),
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -665,7 +719,7 @@ impl MoleculeDataRoomMutV2 {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound {
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound {
                     path: CollectionPathV2::from_v1_unchecked(path),
                 }
                 .into())
@@ -723,7 +777,7 @@ impl MoleculeDataRoomMutV2 {
                 .into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound { path }.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(_)) => {
                 unreachable!(
@@ -779,7 +833,7 @@ impl MoleculeDataRoomMutV2 {
             .await?
         else {
             return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
-                MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
+                MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference },
             ));
         };
 
@@ -910,6 +964,8 @@ impl MoleculeDataRoomMutV2 {
 )]
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
+    PathOccupied(MoleculeDataRoomPathOccupied),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
 }
 
 #[derive(SimpleObject)]
@@ -929,6 +985,40 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
     }
 }
 
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomPathOccupied {
+    pub by_entry: MoleculeDataRoomEntry,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomPathOccupied {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "Path is occupied".to_string()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub r#ref: DatasetID<'static>,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "Data room entry not found by ref".into()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
@@ -938,8 +1028,9 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
 )]
 pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
+    PathOccupied(MoleculeDataRoomPathOccupied),
 }
 
 #[derive(SimpleObject)]
@@ -962,17 +1053,18 @@ impl MoleculeDataRoomUpdateSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomUpdateEntryNotFound {
+pub struct MoleculeDataRoomUpdateEntryByPathNotFound {
     pub path: CollectionPathV2<'static>,
 }
+
 #[ComplexObject]
-impl MoleculeDataRoomUpdateEntryNotFound {
+impl MoleculeDataRoomUpdateEntryByPathNotFound {
     pub async fn is_success(&self) -> bool {
         false
     }
 
     pub async fn message(&self) -> String {
-        "Data room entry not found".into()
+        "Data room entry not found by path".into()
     }
 }
 
@@ -997,7 +1089,7 @@ impl MoleculeDataRoomUpdateUpToDate {
 )]
 pub enum MoleculeDataRoomRemoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1010,7 +1102,7 @@ pub enum MoleculeDataRoomRemoveEntryResult {
 )]
 pub enum MoleculeDataRoomUpdateFileMetadataResult {
     Success(MoleculeDataRoomUpdateFileMetadataResultSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateFileMetadataResultEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
     FileNotFound(MoleculeDataRoomUpdateFileMetadataResultFileNotFound),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
@@ -1030,22 +1122,6 @@ impl MoleculeDataRoomUpdateFileMetadataResultSuccess {
 
     pub async fn message(&self) -> String {
         String::new()
-    }
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub r#ref: DatasetID<'static>,
-}
-#[ComplexObject]
-impl MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub async fn is_success(&self) -> bool {
-        false
-    }
-
-    pub async fn message(&self) -> String {
-        "Data room entry not found".to_string()
     }
 }
 
