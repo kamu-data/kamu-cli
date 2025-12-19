@@ -3393,8 +3393,14 @@ interface MoleculeDataRoomRemoveEntryResult {
 	message: String!
 }
 
-type MoleculeDataRoomUpdateEntryNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+type MoleculeDataRoomUpdateEntryByPathNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
 	path: CollectionPathV2!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateEntryByRefNotFound implements MoleculeDataRoomFinishUploadFileResult {
+	ref: DatasetID!
 	isSuccess: Boolean!
 	message: String!
 }

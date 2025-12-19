@@ -1706,92 +1706,135 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
-    // Upload new version of an existing file
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
-                  molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
-                        dataRoom {
-                          uploadFile(
-                            ref: $ref
-                            content: $content
-                            contentType: $contentType
-                            changeBy: $changeBy
-                            accessLevel: $accessLevel
-                            description: $description
-                            categories: $categories
-                            tags: $tags
-                            contentText: $contentText
-                            encryptionMetadata: $encryptionMetadata
-                          ) {
-                            isSuccess
-                            message
-                            ... on MoleculeDataRoomFinishUploadFileResultSuccess {
-                              entry {
-                                path
-                                ref
-                                asVersionedFile {
-                                  latest {
-                                    version
-                                    contentHash
-                                    contentType
-                                    changeBy
-                                    accessLevel
-                                    description
-                                    categories
-                                    tags
-                                    contentText
-                                    encryptionMetadata {
-                                      dataToEncryptHash
-                                      accessControlConditions
-                                      encryptedBy
-                                      encryptedAt
-                                      chain
-                                      litSdkVersion
-                                      litNetwork
-                                      templateName
-                                      contractVersion
-                                    }
-                                    content
-                                  }
-                                }
-                              }
+    // First, we try to update using a non-existent ref
+
+    const UPDATE_FILE_BY_REF_QUERY: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    ref: $ref
+                    content: $content
+                    contentType: $contentType
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                    encryptionMetadata: $encryptionMetadata
+                  ) {
+                    isSuccess
+                    message
+                    ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                      entry {
+                        path
+                        ref
+                        asVersionedFile {
+                          latest {
+                            version
+                            contentHash
+                            contentType
+                            changeBy
+                            accessLevel
+                            description
+                            categories
+                            tags
+                            contentText
+                            encryptionMetadata {
+                              dataToEncryptHash
+                              accessControlConditions
+                              encryptedBy
+                              encryptedAt
+                              chain
+                              litSdkVersion
+                              litNetwork
+                              templateName
+                              contractVersion
                             }
+                            content
                           }
                         }
                       }
                     }
                   }
                 }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    let random_ref = odf::DatasetID::new_generated_ed25519().1;
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_FILE_BY_REF_QUERY,
+            async_graphql::Variables::from_value(value!({
                 "ipnftUid": ipnft_uid,
-                "ref": file_1_did,
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
-                "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "ref": random_ref,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye -- random ref"),
+                "contentType": "application/octet-stream",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC -- random ref",
                 "accessLevel": "public",
                 "description": "Plain text file that was updated",
-                "categories": ["test-category-1", "test-category-3"],
-                "tags": ["test-tag1", "test-tag4"],
-                "contentText": "bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1",
-                    "accessControlConditions": "EM2",
-                    "encryptedBy": "EM3",
-                    "encryptedAt": "EM4",
-                    "chain": "EM5",
-                    "litSdkVersion": "EM6",
-                    "litNetwork": "EM7",
-                    "templateName": "EM8",
-                    "contractVersion": "EM9",
-                },
-            }))),
+                "categories": ["test-category-5"],
+                "tags": ["test-tag6"],
+                "contentText": "bye -- random ref",
+                "encryptionMetadata": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "uploadFile": {
+                                "isSuccess": false,
+                                "message": "Data room entry not found by ref",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Actually upload a new version of an existing file
+
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(UPDATE_FILE_BY_REF_QUERY).variables(
+                async_graphql::Variables::from_json(json!({
+                    "ipnftUid": ipnft_uid,
+                    "ref": file_1_did,
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
+                    "contentType": "text/plain",
+                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "accessLevel": "public",
+                    "description": "Plain text file that was updated",
+                    "categories": ["test-category-1", "test-category-3"],
+                    "tags": ["test-tag1", "test-tag4"],
+                    "contentText": "bye",
+                    "encryptionMetadata": {
+                        "dataToEncryptHash": "EM1",
+                        "accessControlConditions": "EM2",
+                        "encryptedBy": "EM3",
+                        "encryptedAt": "EM4",
+                        "chain": "EM5",
+                        "litSdkVersion": "EM6",
+                        "litNetwork": "EM7",
+                        "templateName": "EM8",
+                        "contractVersion": "EM9",
+                    },
+                })),
+            ),
         )
         .await;
 
@@ -2110,7 +2153,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "moveEntry": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by path",
                             }
                         }
                     }
@@ -3032,7 +3075,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "removeEntry": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by path",
                             }
                         }
                     }
@@ -3283,7 +3326,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "dataRoom": {
                             "updateFileMetadata": {
                                 "isSuccess": false,
-                                "message": "Data room entry not found",
+                                "message": "Data room entry not found by ref",
                             }
                         }
                     }

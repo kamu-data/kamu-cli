@@ -277,7 +277,7 @@ impl MoleculeDataRoomMutV2 {
             .get_latest_data_room_entry(ctx, reference.as_ref())
             .await?
         else {
-            todo!();
+            return Ok(MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference }.into());
         };
 
         // 2. Upload the next version to the specified dataset.
@@ -719,7 +719,7 @@ impl MoleculeDataRoomMutV2 {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound {
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound {
                     path: CollectionPathV2::from_v1_unchecked(path),
                 }
                 .into())
@@ -777,7 +777,7 @@ impl MoleculeDataRoomMutV2 {
                 .into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound { path }.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(_)) => {
                 unreachable!(
@@ -833,7 +833,7 @@ impl MoleculeDataRoomMutV2 {
             .await?
         else {
             return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
-                MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
+                MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference },
             ));
         };
 
@@ -965,6 +965,7 @@ impl MoleculeDataRoomMutV2 {
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
     PathOccupied(MoleculeDataRoomPathOccupied),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
 }
 
 #[derive(SimpleObject)]
@@ -1001,6 +1002,23 @@ impl MoleculeDataRoomPathOccupied {
     }
 }
 
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub r#ref: DatasetID<'static>,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "Data room entry not found by ref".into()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
@@ -1010,7 +1028,7 @@ impl MoleculeDataRoomPathOccupied {
 )]
 pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
     PathOccupied(MoleculeDataRoomPathOccupied),
 }
@@ -1035,17 +1053,18 @@ impl MoleculeDataRoomUpdateSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomUpdateEntryNotFound {
+pub struct MoleculeDataRoomUpdateEntryByPathNotFound {
     pub path: CollectionPathV2<'static>,
 }
+
 #[ComplexObject]
-impl MoleculeDataRoomUpdateEntryNotFound {
+impl MoleculeDataRoomUpdateEntryByPathNotFound {
     pub async fn is_success(&self) -> bool {
         false
     }
 
     pub async fn message(&self) -> String {
-        "Data room entry not found".into()
+        "Data room entry not found by path".into()
     }
 }
 
@@ -1070,7 +1089,7 @@ impl MoleculeDataRoomUpdateUpToDate {
 )]
 pub enum MoleculeDataRoomRemoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1083,7 +1102,7 @@ pub enum MoleculeDataRoomRemoveEntryResult {
 )]
 pub enum MoleculeDataRoomUpdateFileMetadataResult {
     Success(MoleculeDataRoomUpdateFileMetadataResultSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateFileMetadataResultEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
     FileNotFound(MoleculeDataRoomUpdateFileMetadataResultFileNotFound),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
@@ -1103,22 +1122,6 @@ impl MoleculeDataRoomUpdateFileMetadataResultSuccess {
 
     pub async fn message(&self) -> String {
         String::new()
-    }
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub r#ref: DatasetID<'static>,
-}
-#[ComplexObject]
-impl MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub async fn is_success(&self) -> bool {
-        false
-    }
-
-    pub async fn message(&self) -> String {
-        "Data room entry not found".to_string()
     }
 }
 
