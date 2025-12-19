@@ -320,7 +320,7 @@ impl MoleculeDatasetSnapshots {
                         schema: Some(
                             [
                                 "op INT NOT NULL",
-                                "event_time TIMESTAMP NOT NULL",
+                                "event_time TIMESTAMP",
                                 "ipnft_uid STRING NOT NULL",
                                 "announcement_id STRING NOT NULL",
                                 "headline STRING NOT NULL",
@@ -422,7 +422,7 @@ impl MoleculeDatasetSnapshots {
                     read: odf::metadata::ReadStepNdJson {
                         schema: Some(
                             [
-                                "event_time TIMESTAMP NOT NULL",
+                                "event_time TIMESTAMP",
                                 "activity_type STRING NOT NULL",
                                 "ipnft_uid STRING NOT NULL",
                                 "path STRING NOT NULL",

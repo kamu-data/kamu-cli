@@ -20,7 +20,7 @@ pub trait MoleculeCreateAnnouncementUseCase: Send + Sync {
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_project: &MoleculeProject,
-        source_event_time: DateTime<Utc>,
+        source_event_time: Option<DateTime<Utc>>,
         announcement_record: MoleculeAnnouncementPayloadRecord,
     ) -> Result<MoleculeCreateAnnouncementResult, MoleculeCreateAnnouncementError>;
 }

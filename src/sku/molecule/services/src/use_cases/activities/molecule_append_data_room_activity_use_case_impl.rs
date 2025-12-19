@@ -41,7 +41,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
-        source_event_time: DateTime<Utc>,
+        source_event_time: Option<DateTime<Utc>>,
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), MoleculeAppendDataRoomActivityError> {
         // Gain write access to global activities dataset
@@ -54,12 +54,11 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         // Append new activity record
         let new_changelog_record = MoleculeDataRoomActivityChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
-            event_time: Some(source_event_time),
             payload: activity_record,
         };
 
         let push_res = global_data_room_activities_writer
-            .push_ndjson_data(new_changelog_record.to_bytes(), Some(source_event_time))
+            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
             .await
             .int_err()?;
 

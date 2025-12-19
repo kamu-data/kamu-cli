@@ -73,7 +73,6 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         // Add retraction record to disable the project
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
             op: odf::metadata::OperationType::Retract,
-            event_time: source_event_time,
             payload: last_changelog_entry.payload,
         };
 
