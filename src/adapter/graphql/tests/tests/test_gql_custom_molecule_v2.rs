@@ -962,21 +962,13 @@ async fn test_molecule_v2_data_room_quota_exceeded() {
         )
         .await;
 
-    if upload_res.is_ok() {
-        let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
-            ["uploadFile"]
-            .clone();
-        assert_eq!(payload["isSuccess"], json!(false));
-        let msg = payload["message"].as_str().unwrap();
-        assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
-        assert_eq!(payload["__typename"], json!("MoleculeQuotaExceeded"));
-    } else {
-        let msg = &upload_res.errors[0].message;
-        assert!(
-            msg.contains("Quota exceeded") || msg.contains("Internal error"),
-            "unexpected error: {msg}"
-        );
-    }
+    let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
+        ["uploadFile"]
+        .clone();
+    assert_eq!(payload["isSuccess"], json!(false));
+    let msg = payload["message"].as_str().unwrap();
+    assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
+    assert_eq!(payload["__typename"], json!("MoleculeQuotaExceeded"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3526,20 +3518,12 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
         ))
         .await;
 
-    if announcement_res.is_ok() {
-        let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
-            ["announcements"]["create"]
-            .clone();
-        assert_eq!(payload["isSuccess"], json!(false));
-        let msg = payload["message"].as_str().unwrap();
-        assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
-    } else {
-        let msg = &announcement_res.errors[0].message;
-        assert!(
-            msg.contains("Quota exceeded") || msg.contains("Internal error"),
-            "unexpected announcement error: {msg}"
-        );
-    }
+    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
+        ["announcements"]["create"]
+        .clone();
+    assert_eq!(payload["isSuccess"], json!(false));
+    let msg = payload["message"].as_str().unwrap();
+    assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

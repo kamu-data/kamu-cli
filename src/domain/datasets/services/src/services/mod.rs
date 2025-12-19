@@ -16,7 +16,7 @@ mod entry;
 mod env;
 mod graph;
 mod odf;
-pub mod quota_defaults_config;
+mod quota_defaults_config;
 mod refs;
 mod statistics;
 

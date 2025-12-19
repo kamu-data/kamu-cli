@@ -47,13 +47,13 @@ impl PushIngestExecutorImpl {
     ) -> Result<(), kamu_accounts::QuotaError> {
         // In single-tenant mode aliases does not carry account names; skip quota check
         // in that case
-        let Some(account_name) = target.get_alias().account_name.clone() else {
+        let Some(account_name) = target.get_alias().account_name.as_ref() else {
             return Ok(());
         };
 
         let account = self
             .account_service
-            .get_account_by_name(&account_name)
+            .get_account_by_name(account_name)
             .await
             .int_err()?;
 

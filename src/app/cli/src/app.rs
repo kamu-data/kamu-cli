@@ -517,6 +517,8 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
+    b.add::<DidSecretService>();
+
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);

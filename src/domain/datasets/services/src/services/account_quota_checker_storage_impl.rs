@@ -19,7 +19,7 @@ use kamu_accounts::{
 };
 use kamu_datasets::DatasetStatisticsService;
 
-use crate::quota_defaults_config::QuotaDefaultsConfig;
+use crate::QuotaDefaultsConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
