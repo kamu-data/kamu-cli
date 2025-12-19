@@ -968,7 +968,7 @@ async fn test_molecule_v2_data_room_operations() {
                         }
                       }
                     }
-                    ... on MoleculeDataRoomFinishUploadFileResultPathOccupied {
+                    ... on MoleculeDataRoomPathOccupied {
                       byEntry {
                         project {
                           ipnftUid
@@ -1130,9 +1130,9 @@ async fn test_molecule_v2_data_room_operations() {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
-                                "__typename": "MoleculeDataRoomFinishUploadFileResultPathOccupied",
+                                "__typename": "MoleculeDataRoomPathOccupied",
                                 "isSuccess": false,
-                                "message": "",
+                                "message": "Path is occupied",
                                 "byEntry": {
                                     "project": {
                                         "ipnftUid": ipnft_uid,
@@ -2111,6 +2111,35 @@ async fn test_molecule_v2_data_room_operations() {
                             "moveEntry": {
                                 "isSuccess": false,
                                 "message": "Data room entry not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Attempt to move to an already occupied path
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            MOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "fromPath": "/foo.txt",
+                "toPath": "/baz.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "moveEntry": {
+                                "isSuccess": false,
+                                "message": "Path is occupied",
                             }
                         }
                     }

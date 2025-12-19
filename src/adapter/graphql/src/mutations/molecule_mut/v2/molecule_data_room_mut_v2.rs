@@ -120,7 +120,7 @@ impl MoleculeDataRoomMutV2 {
             })?;
 
         if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
-            return Ok(MoleculeDataRoomFinishUploadFileResultPathOccupied {
+            return Ok(MoleculeDataRoomPathOccupied {
                 by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
                     &self.project,
                     existing_data_room_entry,
@@ -653,11 +653,38 @@ impl MoleculeDataRoomMutV2 {
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (time_source, move_data_room_entry_uc) = from_catalog_n!(
+        let (time_source, move_data_room_entry_uc, find_data_room_entry_uc) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
-            dyn MoleculeMoveDataRoomEntryUseCase
+            dyn MoleculeMoveDataRoomEntryUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(
+                &self.project.entity,
+                None,
+                to_path.clone().into_v1_scalar().into(),
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -937,7 +964,7 @@ impl MoleculeDataRoomMutV2 {
 )]
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
-    PathOccupied(MoleculeDataRoomFinishUploadFileResultPathOccupied),
+    PathOccupied(MoleculeDataRoomPathOccupied),
 }
 
 #[derive(SimpleObject)]
@@ -959,18 +986,18 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomFinishUploadFileResultPathOccupied {
+pub struct MoleculeDataRoomPathOccupied {
     pub by_entry: MoleculeDataRoomEntry,
 }
 
 #[ComplexObject]
-impl MoleculeDataRoomFinishUploadFileResultPathOccupied {
+impl MoleculeDataRoomPathOccupied {
     pub async fn is_success(&self) -> bool {
         false
     }
 
     pub async fn message(&self) -> String {
-        String::new()
+        "Path is occupied".to_string()
     }
 }
 
@@ -985,6 +1012,7 @@ pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
     EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
+    PathOccupied(MoleculeDataRoomPathOccupied),
 }
 
 #[derive(SimpleObject)]
