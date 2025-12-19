@@ -24,22 +24,8 @@ use crate::compute_dataset_statistics_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct DatasetStatisticsIndexerConfig {
-    pub max_concurrency: usize,
-}
-
-impl Default for DatasetStatisticsIndexerConfig {
-    fn default() -> Self {
-        Self { max_concurrency: 8 }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct DatasetStatisticsIndexer {
     catalog: Catalog,
-    config: DatasetStatisticsIndexerConfig,
 }
 
 #[component(pub)]
@@ -52,8 +38,8 @@ pub struct DatasetStatisticsIndexer {
     requires_transaction: false,
 })]
 impl DatasetStatisticsIndexer {
-    pub fn new(catalog: Catalog, config: DatasetStatisticsIndexerConfig) -> Self {
-        Self { catalog, config }
+    pub fn new(catalog: Catalog) -> Self {
+        Self { catalog }
     }
 
     #[transactional_method1(dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>)]
@@ -77,16 +63,19 @@ impl DatasetStatisticsIndexer {
         name = "DatasetStatisticsIndexer::index_dataset_statistics"
     )]
     async fn index_dataset_statistics(&self) -> Result<(), InternalError> {
-        use futures::stream::{self, StreamExt, TryStreamExt};
+        use futures::stream::{self, TryStreamExt};
 
         let dataset_ids = self.get_dataset_ids().await?;
 
-        // Process datasets in parallel with per-dataset transactions
-        let concurrency = std::cmp::max(self.config.max_concurrency, 1);
-        stream::iter(dataset_ids)
-            .map(|dataset_id| async move { self.process_dataset(dataset_id).await })
-            .buffer_unordered(concurrency)
-            .try_collect::<()>()
+        // Process datasets in parallel with per-dataset transactions using all
+        // available cores
+        let parallelism = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        stream::iter(dataset_ids.into_iter().map(Ok::<_, InternalError>))
+            .try_for_each_concurrent(parallelism, |dataset_id| async move {
+                self.process_dataset(dataset_id).await
+            })
             .await?;
 
         Ok(())

@@ -918,21 +918,6 @@ pub fn register_config_in_catalog(
     }
     //
 
-    // Dataset statistics indexing configuration
-    let statistics_indexer_cfg = config
-        .dataset_indexer
-        .as_ref()
-        .and_then(|dataset_indexer_cfg| dataset_indexer_cfg.statistics_indexer.as_ref())
-        .cloned()
-        .unwrap_or_default();
-
-    catalog_builder.add_value(kamu_datasets_services::DatasetStatisticsIndexerConfig {
-        max_concurrency: statistics_indexer_cfg.max_concurrency.unwrap_or_else(|| {
-            kamu_datasets_services::DatasetStatisticsIndexerConfig::default().max_concurrency
-        }),
-    });
-    //
-
     // Did secret key encryption configuration
     catalog_builder.add_value(config.did_encryption.clone().unwrap());
 

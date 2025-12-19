@@ -39,10 +39,6 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub dataset_env_vars: Option<DatasetEnvVarsConfig>,
 
-    /// Dataset indexing configuration
-    #[merge(strategy = merge_recursive)]
-    pub dataset_indexer: Option<DatasetIndexerConfig>,
-
     /// Engine configuration
     #[merge(strategy = merge_recursive)]
     pub engine: Option<EngineConfig>,
@@ -181,59 +177,6 @@ pub struct ExtraConfig {
 impl ExtraConfig {
     fn sample() -> Self {
         Self::default()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Dataset indexer
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
-pub struct DatasetIndexerConfig {
-    #[merge(strategy = merge::option::overwrite_none)]
-    pub statistics_indexer: Option<DatasetStatisticsIndexerConfig>,
-}
-
-impl DatasetIndexerConfig {
-    fn sample() -> Self {
-        Self {
-            statistics_indexer: Some(DatasetStatisticsIndexerConfig::sample()),
-        }
-    }
-}
-
-impl Default for DatasetIndexerConfig {
-    fn default() -> Self {
-        Self {
-            statistics_indexer: Some(DatasetStatisticsIndexerConfig::default()),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
-pub struct DatasetStatisticsIndexerConfig {
-    /// Maximum number of datasets to index concurrently when rebuilding
-    /// statistics
-    pub max_concurrency: Option<usize>,
-}
-
-impl DatasetStatisticsIndexerConfig {
-    fn sample() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for DatasetStatisticsIndexerConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrency: Some(8),
-        }
     }
 }
 
