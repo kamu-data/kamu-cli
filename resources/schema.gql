@@ -3377,6 +3377,12 @@ type MoleculeDataRoomMutV2 {
 	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
+type MoleculeDataRoomPathOccupied implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult {
+	byEntry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
 type MoleculeDataRoomProjection {
 	entries(pathPrefix: CollectionPathV2, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
 	entry(path: CollectionPathV2!): MoleculeDataRoomEntry
