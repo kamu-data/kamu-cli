@@ -76,7 +76,7 @@ impl MoleculeAnnouncementsDatasetMutV2 {
             .execute(
                 &molecule_subject,
                 &self.project.entity,
-                event_time,
+                Some(event_time),
                 announcement_record,
             )
             .await

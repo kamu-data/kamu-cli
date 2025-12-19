@@ -127,7 +127,6 @@ impl MoleculeGlobalAnnouncementChangelogInsertionRecordExt
     fn into_announcement_record(self) -> MoleculeAnnouncementChangelogInsertionRecord {
         MoleculeAnnouncementChangelogInsertionRecord {
             op: self.op,
-            event_time: self.event_time,
             payload: self.payload.announcement,
         }
     }

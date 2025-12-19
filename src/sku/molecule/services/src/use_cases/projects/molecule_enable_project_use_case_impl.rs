@@ -106,7 +106,6 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         // Add Append record to re-enable the project
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
-            event_time: source_event_time,
             payload: last_changelog_entry.payload,
         };
 
