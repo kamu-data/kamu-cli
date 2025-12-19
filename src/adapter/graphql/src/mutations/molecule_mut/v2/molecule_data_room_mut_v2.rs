@@ -23,6 +23,8 @@ use kamu_molecule_domain::{
     MoleculeCreateVersionedFileDatasetUseCase,
     MoleculeDataRoomActivityPayloadRecord,
     MoleculeDataRoomFileActivityType,
+    MoleculeFindDataRoomEntryError,
+    MoleculeFindDataRoomEntryUseCase,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
     MoleculeReadVersionedFileEntryError,
@@ -94,14 +96,39 @@ impl MoleculeDataRoomMutV2 {
             upload_versioned_file_version_uc,
             create_data_room_entry_uc,
             append_global_data_room_activity_uc,
+            find_data_room_entry_uc,
         ) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
             dyn MoleculeCreateVersionedFileDatasetUseCase,
             dyn MoleculeUploadVersionedFileVersionUseCase,
             dyn MoleculeCreateDataRoomEntryUseCase,
-            dyn MoleculeAppendGlobalDataRoomActivityUseCase
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        // 0. `path` must not be occupied.
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(&self.project.entity, None, path.clone().into_v1())
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomFinishUploadFileResultPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -447,7 +474,7 @@ impl MoleculeDataRoomMutV2 {
     /// data room via a single transaction. Uploads a new version of content
     /// in-band, so should be used only for very small files.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_upload_file, skip_all)]
     async fn upload_file(
         &self,
         ctx: &Context<'_>,
@@ -910,6 +937,7 @@ impl MoleculeDataRoomMutV2 {
 )]
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
+    PathOccupied(MoleculeDataRoomFinishUploadFileResultPathOccupied),
 }
 
 #[derive(SimpleObject)]
@@ -922,6 +950,23 @@ pub struct MoleculeDataRoomFinishUploadFileResultSuccess {
 impl MoleculeDataRoomFinishUploadFileResultSuccess {
     pub async fn is_success(&self) -> bool {
         true
+    }
+
+    pub async fn message(&self) -> String {
+        String::new()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomFinishUploadFileResultPathOccupied {
+    pub by_entry: MoleculeDataRoomEntry,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomFinishUploadFileResultPathOccupied {
+    pub async fn is_success(&self) -> bool {
+        false
     }
 
     pub async fn message(&self) -> String {
