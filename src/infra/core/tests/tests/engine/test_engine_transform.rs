@@ -895,7 +895,7 @@ async fn test_transform_empty_inputs() {
 
     deriv_helper
         .assert_latest_schema_in_meta_eq(&odf::schema::DataSchema::new(vec![
-            odf::schema::DataField::i64("offset").optional(),
+            odf::schema::DataField::i64("offset"),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time"),
@@ -939,7 +939,7 @@ async fn test_transform_empty_inputs() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));

@@ -635,7 +635,8 @@ fn extract_table_refs_rec_set_expr(
         | SetExpr::Values(_)
         | SetExpr::Insert(_)
         | SetExpr::Update(_)
-        | SetExpr::Delete(_) => Ok(()),
+        | SetExpr::Delete(_)
+        | SetExpr::Merge(_) => Ok(()),
     }
 }
 

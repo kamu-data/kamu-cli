@@ -23,6 +23,7 @@ use std::fmt::Display;
 use datafusion::sql::sqlparser::dialect::{dialect_from_str, Dialect, GenericDialect};
 use datafusion::sql::sqlparser::keywords::Keyword;
 use datafusion::sql::sqlparser::tokenizer::{Token, Tokenizer};
+use datafusion_common::config;
 use rustyline::highlight::{CmdKind, Highlighter};
 
 /// The syntax highlighter.
@@ -32,7 +33,7 @@ pub struct SyntaxHighlighter {
 }
 
 impl SyntaxHighlighter {
-    pub fn new(dialect: &str) -> Self {
+    pub fn new(dialect: &config::Dialect) -> Self {
         let dialect = dialect_from_str(dialect).unwrap_or(Box::new(GenericDialect {}));
         Self { dialect }
     }
@@ -90,12 +91,13 @@ impl Color {
 mod tests {
     use rustyline::highlight::Highlighter;
 
+    use super::config::Dialect;
     use super::SyntaxHighlighter;
 
     #[test]
     fn highlighter_valid() {
         let s = "SElect col_a from tab_1;";
-        let highlighter = SyntaxHighlighter::new("generic");
+        let highlighter = SyntaxHighlighter::new(&Dialect::Generic);
         let out = highlighter.highlight(s, s.len());
         assert_eq!(
             "\u{1b}[91mSElect\u{1b}[0m col_a \u{1b}[91mfrom\u{1b}[0m tab_1;",
@@ -106,7 +108,7 @@ mod tests {
     #[test]
     fn highlighter_valid_with_new_line() {
         let s = "SElect col_a from tab_1\n WHERE col_b = 'なにか';";
-        let highlighter = SyntaxHighlighter::new("generic");
+        let highlighter = SyntaxHighlighter::new(&Dialect::Generic);
         let out = highlighter.highlight(s, s.len());
         assert_eq!(
             "\u{1b}[91mSElect\u{1b}[0m col_a \u{1b}[91mfrom\u{1b}[0m tab_1\n \
@@ -118,7 +120,7 @@ mod tests {
     #[test]
     fn highlighter_invalid() {
         let s = "SElect col_a from tab_1 WHERE col_b = ';";
-        let highlighter = SyntaxHighlighter::new("generic");
+        let highlighter = SyntaxHighlighter::new(&Dialect::Generic);
         let out = highlighter.highlight(s, s.len());
         assert_eq!("SElect col_a from tab_1 WHERE col_b = ';", out);
     }

@@ -22,6 +22,7 @@ deny = [
     ### Crates we shouldn't use ####
     { name = "md5", reason = "Use `md-5` instead, which is part of the RustCrypto ecosystem" },
     { name = "native-tls", reason = "We use rustls throughout the project" },
+
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
     { name = "alloy", deny-multiple-versions = true },

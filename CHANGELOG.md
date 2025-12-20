@@ -15,6 +15,9 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - `SearchIndexerConfig` is respected both by natural and full-text search engine
 - Ability to disable incremental full-text search indexing via config option
+### Changed
+- Upgraded core to `datafusion v52`
+- Upgraded to `kamu-engine-datafusion v0.9.0` based on latest `datafusion`
 
 ## [0.256.0] - 2026-01-08
 ### Added

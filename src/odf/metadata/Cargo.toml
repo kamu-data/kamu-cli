@@ -76,7 +76,7 @@ tonic = { version = "0.14", default-features = false, features = [
 tonic-prost = { version = "0.14", default-features = false }
 
 # Optional
-arrow = { optional = true, version = "56", default-features = false, features = [
+arrow = { optional = true, version = "57", default-features = false, features = [
     "ipc",
 ] }
 rand = { optional = true, version = "0.9", default-features = false }
@@ -84,7 +84,9 @@ sqlx = { optional = true, version = "0.8", default-features = false }
 ssi-caips = { optional = true, version = "0.2", default-features = false, features = [
     "eip",
 ] }
-utoipa = { optional = true, version = "5", default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+    "macros",
+] }
 
 
 [dev-dependencies]

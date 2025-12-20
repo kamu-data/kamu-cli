@@ -971,11 +971,11 @@ async fn test_smart_push_all_smart_pull_all(
         let expected_derivative_schema = indoc::indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset;
+              REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 place (INTEGER(64,false));
+              REQUIRED INT64 place (INTEGER(64,false));
               OPTIONAL INT64 match_id;
               OPTIONAL BYTE_ARRAY player_id (STRING);
               OPTIONAL INT64 score;
@@ -1269,11 +1269,11 @@ async fn test_smart_push_recursive_smart_pull_recursive(
         let expected_derivative_schema = indoc::indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset;
+              REQUIRED INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 place (INTEGER(64,false));
+              REQUIRED INT64 place (INTEGER(64,false));
               OPTIONAL INT64 match_id;
               OPTIONAL BYTE_ARRAY player_id (STRING);
               OPTIONAL INT64 score;

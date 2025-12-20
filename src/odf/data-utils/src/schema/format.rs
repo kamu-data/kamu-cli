@@ -149,7 +149,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 // Also print logical type if it is available
                 // If there is a logical type, do not print converted type
                 let logical_type_str = Self::format_logical_and_converted(
-                    basic_info.logical_type().as_ref(),
+                    basic_info.logical_type_ref(),
                     basic_info.converted_type(),
                     precision,
                     scale,
@@ -240,10 +240,10 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 LogicalType::Enum => "ENUM".to_string(),
                 LogicalType::List => "LIST".to_string(),
                 LogicalType::Map => "MAP".to_string(),
-                LogicalType::Variant => "VARIANT".to_string(),
-                LogicalType::Geography => "GEOGRAPHY".to_string(),
-                LogicalType::Geometry => "GEOMETRY".to_string(),
-                LogicalType::Unknown => "UNKNOWN".to_string(),
+                LogicalType::Variant { .. } => "VARIANT".to_string(),
+                LogicalType::Geography { .. } => "GEOGRAPHY".to_string(),
+                LogicalType::Geometry { .. } => "GEOMETRY".to_string(),
+                LogicalType::Unknown | LogicalType::_Unknown { .. } => "UNKNOWN".to_string(),
             },
             None => {
                 // Also print converted type if it is available
@@ -272,9 +272,9 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
 
     fn print_timeunit(unit: &TimeUnit) -> &str {
         match unit {
-            TimeUnit::MILLIS(_) => "MILLIS",
-            TimeUnit::MICROS(_) => "MICROS",
-            TimeUnit::NANOS(_) => "NANOS",
+            TimeUnit::MILLIS => "MILLIS",
+            TimeUnit::MICROS => "MICROS",
+            TimeUnit::NANOS => "NANOS",
         }
     }
 }

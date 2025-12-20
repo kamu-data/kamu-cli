@@ -126,7 +126,7 @@ impl DataWriterDataFusion {
                          should either rename the data column or configure the dataset vocabulary \
                          to use a different name: {system_column}"
                     ),
-                    SchemaRef::new(df.schema().into()),
+                    df.schema().inner().clone(),
                 ));
             }
         }
@@ -148,7 +148,7 @@ impl DataWriterDataFusion {
                              found: {}",
                             self.meta.vocab.event_time_column, typ
                         ),
-                        SchemaRef::new(df.schema().into()),
+                        df.schema().inner().clone(),
                     ));
                 }
             }
@@ -260,6 +260,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -626,6 +627,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -736,6 +738,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -1023,7 +1026,7 @@ impl DataWriter for DataWriterDataFusion {
             let df = self.coerce_schema(df, dataset_schema_arrow.as_ref())?;
 
             // Validate schema matches the declared one
-            let new_slice_schema_arrow = SchemaRef::new(df.schema().into());
+            let new_slice_schema_arrow = df.schema().inner().clone();
             tracing::info!(?new_slice_schema_arrow, "Final output schema");
 
             if let Some(dataset_schema_arrow) = &dataset_schema_arrow {
