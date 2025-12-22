@@ -17,24 +17,24 @@ use kamu_search::{
     SearchEntitySchemaUpgradeMode,
 };
 
-use super::ElasticSearchIndexMappings;
-use crate::ElasticSearchRepositoryConfig;
-use crate::es_client::ElasticSearchClient;
+use super::ElasticsearchIndexMappings;
+use crate::ElasticsearchRepositoryConfig;
+use crate::es_client::ElasticsearchClient;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchVersionedEntityIndex<'a> {
-    client: &'a ElasticSearchClient,
-    repo_config: &'a ElasticSearchRepositoryConfig,
+pub struct ElasticsearchVersionedEntityIndex<'a> {
+    client: &'a ElasticsearchClient,
+    repo_config: &'a ElasticsearchRepositoryConfig,
     schema_name: SearchEntitySchemaName,
     version: u32,
 }
 
 #[common_macros::method_names_consts]
-impl<'a> ElasticSearchVersionedEntityIndex<'a> {
+impl<'a> ElasticsearchVersionedEntityIndex<'a> {
     pub fn new(
-        client: &'a ElasticSearchClient,
-        repo_config: &'a ElasticSearchRepositoryConfig,
+        client: &'a ElasticsearchClient,
+        repo_config: &'a ElasticsearchRepositoryConfig,
         schema_name: SearchEntitySchemaName,
         version: u32,
     ) -> Self {
@@ -48,13 +48,13 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
     #[tracing::instrument(
         level = "info",
-        name = ElasticSearchVersionedEntityIndex_ensure_version_existence,
+        name = ElasticsearchVersionedEntityIndex_ensure_version_existence,
         skip_all,
         fields(schema_name = self.schema_name, version = self.version)
     )]
     pub async fn ensure_version_existence(
         &self,
-        mappings: ElasticSearchIndexMappings,
+        mappings: ElasticsearchIndexMappings,
         schema: &SearchEntitySchema,
     ) -> Result<EntityIndexEnsureOutcome, InternalError> {
         let alias_name = self.alias_name();
@@ -292,7 +292,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     async fn create_new_index(
         &self,
         index_name: &str,
-        mappings: &ElasticSearchIndexMappings,
+        mappings: &ElasticsearchIndexMappings,
         version_metadata: IndexVersionMetadata<'_>,
     ) -> Result<(), InternalError> {
         let mut mappings_json = mappings.mappings_json.clone();
@@ -305,7 +305,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
         let body = serde_json::json!({
             "settings": {
-                "analysis": ElasticSearchIndexMappings::build_analysis_settings_json(),
+                "analysis": ElasticsearchIndexMappings::build_analysis_settings_json(),
                 "index": {
                     "max_ngram_diff": 3
                 }

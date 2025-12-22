@@ -11,9 +11,9 @@ use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchQueryBuilder {}
+pub struct ElasticsearchQueryBuilder {}
 
-impl ElasticSearchQueryBuilder {
+impl ElasticsearchQueryBuilder {
     pub fn build_search_query(request: &SearchRequest) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),

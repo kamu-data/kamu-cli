@@ -10,7 +10,7 @@
 use kamu_search::SearchIndexUpdateOperation;
 
 use super::*;
-use crate::ElasticSearchClientConfig;
+use crate::ElasticsearchClientConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,15 +19,15 @@ const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchClient {
+pub struct ElasticsearchClient {
     client: elasticsearch::Elasticsearch,
 }
 
 #[common_macros::method_names_consts]
-impl ElasticSearchClient {
-    #[tracing::instrument(level = "info", name = ElasticSearchClient_init, skip_all)]
-    pub fn init(config: &ElasticSearchClientConfig) -> Result<Self, ElasticSearchClientBuildError> {
-        tracing::info!(config = ?config, "Initializing ElasticSearch client");
+impl ElasticsearchClient {
+    #[tracing::instrument(level = "info", name = ElasticsearchClient_init, skip_all)]
+    pub fn init(config: &ElasticsearchClientConfig) -> Result<Self, ElasticsearchClientBuildError> {
+        tracing::info!(config = ?config, "Initializing Elasticsearch client");
         use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 
         let pool = SingleNodeConnectionPool::new(config.url.clone());
@@ -50,8 +50,8 @@ impl ElasticSearchClient {
         Ok(Self { client })
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_cluster_health, skip_all)]
-    pub async fn cluster_health(&self) -> Result<serde_json::Value, ElasticSearchClientError> {
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_cluster_health, skip_all)]
+    pub async fn cluster_health(&self) -> Result<serde_json::Value, ElasticsearchClientError> {
         let response = self
             .client
             .cluster()
@@ -64,8 +64,8 @@ impl ElasticSearchClient {
         Ok(body)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_total_documents, skip_all)]
-    pub async fn total_documents(&self) -> Result<u64, ElasticSearchClientError> {
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_total_documents, skip_all)]
+    pub async fn total_documents(&self) -> Result<u64, ElasticsearchClientError> {
         let response = self
             .client
             .count(elasticsearch::CountParts::None)
@@ -80,14 +80,14 @@ impl ElasticSearchClient {
 
     #[tracing::instrument(
         level = "debug",
-        name = ElasticSearchClient_documents_in_index,
+        name = ElasticsearchClient_documents_in_index,
         skip_all,
         fields(index_name)
     )]
     pub async fn documents_in_index(
         &self,
         index_name: &str,
-    ) -> Result<u64, ElasticSearchClientError> {
+    ) -> Result<u64, ElasticsearchClientError> {
         let response = self
             .client
             .count(elasticsearch::CountParts::Index(&[index_name]))
@@ -101,19 +101,19 @@ impl ElasticSearchClient {
         Ok(count)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_search, skip_all)]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_search, skip_all)]
     pub async fn search(
         &self,
         req_body: serde_json::Value,
         index_names: &[&str],
-    ) -> Result<es_client::SearchResponse, ElasticSearchClientError> {
-        tracing::debug!(index_names = ?index_names, req_body = ?req_body, "Executing ElasticSearch search");
+    ) -> Result<es_client::SearchResponse, ElasticsearchClientError> {
+        tracing::debug!(index_names = ?index_names, req_body = ?req_body, "Executing Elasticsearch search");
         /*println!(
             "\nES Search request: {}, indexes: {index_names:?}\n",
             serde_json::to_string_pretty(&req_body).unwrap()
         );*/
 
-        // Send request to ElasticSearch
+        // Send request to Elasticsearch
         let response = self
             .client
             .search(elasticsearch::SearchParts::Index(index_names))
@@ -124,7 +124,7 @@ impl ElasticSearchClient {
         // Obtain and log a raw response
         let response = ensure_client_response(response).await?;
         let body: serde_json::Value = response.json().await?;
-        tracing::debug!(body = ?body, "Raw ElasticSearch response");
+        tracing::debug!(body = ?body, "Raw Elasticsearch response");
         /*println!(
             "\nRaw ES Search response: {}\n",
             serde_json::to_string_pretty(&body).unwrap()
@@ -137,12 +137,12 @@ impl ElasticSearchClient {
         Ok(search_response)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_find_document_by_id, skip_all, fields(index_name, id))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_find_document_by_id, skip_all, fields(index_name, id))]
     pub async fn find_document_by_id(
         &self,
         index_name: &str,
         id: &str,
-    ) -> Result<Option<serde_json::Value>, ElasticSearchClientError> {
+    ) -> Result<Option<serde_json::Value>, ElasticsearchClientError> {
         use elasticsearch::GetParts;
         let response = self
             .client
@@ -162,7 +162,7 @@ impl ElasticSearchClient {
     pub async fn list_indices_by_prefix(
         &self,
         prefix: &str,
-    ) -> Result<Vec<String>, ElasticSearchClientError> {
+    ) -> Result<Vec<String>, ElasticsearchClientError> {
         use elasticsearch::indices::IndicesGetParts;
 
         let pattern = format!("{prefix}*",);
@@ -186,11 +186,11 @@ impl ElasticSearchClient {
         Ok(indices)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_refresh_indices, skip_all, fields(index_names = ?index_names))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_refresh_indices, skip_all, fields(index_names = ?index_names))]
     pub async fn refresh_indices(
         &self,
         index_names: &[&str],
-    ) -> Result<(), ElasticSearchClientError> {
+    ) -> Result<(), ElasticsearchClientError> {
         use elasticsearch::indices::IndicesRefreshParts;
 
         let response = self
@@ -204,13 +204,13 @@ impl ElasticSearchClient {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", name = ElasticSearchClient_create_index, skip_all, fields(index_name))]
+    #[tracing::instrument(level = "info", name = ElasticsearchClient_create_index, skip_all, fields(index_name))]
     pub async fn create_index(
         &self,
         index_name: &str,
         body: serde_json::Value,
-    ) -> Result<(), ElasticSearchClientError> {
-        tracing::debug!(index_name, body = ?body, "Creating ElasticSearch index");
+    ) -> Result<(), ElasticsearchClientError> {
+        tracing::debug!(index_name, body = ?body, "Creating Elasticsearch index");
 
         let response = self
             .client
@@ -226,11 +226,11 @@ impl ElasticSearchClient {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", name = ElasticSearchClient_delete_indices_bulk, skip_all, fields(index_names = ?index_names))]
+    #[tracing::instrument(level = "info", name = ElasticsearchClient_delete_indices_bulk, skip_all, fields(index_names = ?index_names))]
     pub async fn delete_indices_bulk(
         &self,
         index_names: &[&str],
-    ) -> Result<(), ElasticSearchClientError> {
+    ) -> Result<(), ElasticsearchClientError> {
         use elasticsearch::indices::IndicesDeleteParts;
 
         let response = self
@@ -244,11 +244,11 @@ impl ElasticSearchClient {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_read_index_meta, skip_all, fields(index_name))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_read_index_meta, skip_all, fields(index_name))]
     pub async fn read_index_meta(
         &self,
         index_name: &str,
-    ) -> Result<serde_json::Value, ElasticSearchClientError> {
+    ) -> Result<serde_json::Value, ElasticsearchClientError> {
         let response = self
             .client
             .indices()
@@ -277,13 +277,13 @@ impl ElasticSearchClient {
         Ok(index_settings.clone())
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_assign_alias, skip_all, fields(alias_name, to_index))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_assign_alias, skip_all, fields(alias_name, to_index))]
     pub async fn assign_alias(
         &self,
         alias_name: &str,
         to_index: &str,
         maybe_filter_json: Option<serde_json::Value>,
-    ) -> Result<(), ElasticSearchClientError> {
+    ) -> Result<(), ElasticsearchClientError> {
         let mut add_command_json = serde_json::json!({
             "index": to_index,
             "alias": alias_name,
@@ -304,7 +304,7 @@ impl ElasticSearchClient {
             alias_name,
             to_index,
             body = ?body,
-            "Moving ElasticSearch alias to new index"
+            "Moving Elasticsearch alias to new index"
         );
 
         let response = self
@@ -320,11 +320,11 @@ impl ElasticSearchClient {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_resolve_alias_indices, skip_all, fields(alias_name))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_resolve_alias_indices, skip_all, fields(alias_name))]
     pub async fn resolve_alias_indices(
         &self,
         alias_name: &str,
-    ) -> Result<Vec<String>, ElasticSearchClientError> {
+    ) -> Result<Vec<String>, ElasticsearchClientError> {
         use elasticsearch::indices::IndicesGetAliasParts;
 
         let response = self
@@ -359,12 +359,12 @@ impl ElasticSearchClient {
         Ok(indices)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticSearchClient_reindex_data, skip_all, fields(from_index, to_index))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_reindex_data, skip_all, fields(from_index, to_index))]
     pub async fn reindex_data(
         &self,
         from_index: &str,
         to_index: &str,
-    ) -> Result<(), ElasticSearchReindexError> {
+    ) -> Result<(), ElasticsearchReindexError> {
         // Copy everything from source to dest
         let body = serde_json::json!({
             "source": {
@@ -379,7 +379,7 @@ impl ElasticSearchClient {
             from_index,
             to_index,
             body = ?body,
-            "Reindexing data from one ElasticSearch index to another"
+            "Reindexing data from one Elasticsearch index to another"
         );
 
         let response = self
@@ -390,16 +390,15 @@ impl ElasticSearchClient {
             .refresh(true) // refresh dest so new alias sees all docs
             .send()
             .await
-            .map_err(|e| ElasticSearchReindexError::Client(e.into()))?;
+            .map_err(|e| ElasticsearchReindexError::Client(e.into()))?;
 
         let response = ensure_client_response(response)
             .await
-            .map_err(ElasticSearchReindexError::Client)?;
-
+            .map_err(ElasticsearchReindexError::Client)?;
         let value: serde_json::Value = response
             .json()
             .await
-            .map_err(|e| ElasticSearchReindexError::Client(e.into()))?;
+            .map_err(|e| ElasticsearchReindexError::Client(e.into()))?;
 
         tracing::info!(
             "Reindex from '{}' to '{}' completed with response: {}",
@@ -419,12 +418,12 @@ impl ElasticSearchClient {
 
         // Check for failures
         if !summary.failures.is_empty() {
-            return Err(ElasticSearchReindexError::ReindexFailures(summary.failures));
+            return Err(ElasticsearchReindexError::ReindexFailures(summary.failures));
         }
 
         // We only expect new documents to be created, no updates or deletions
         if summary.deleted > 0 || summary.updated > 0 {
-            return Err(ElasticSearchReindexError::UnexpectedDocumentChanges {
+            return Err(ElasticsearchReindexError::UnexpectedDocumentChanges {
                 updated: summary.updated,
                 deleted: summary.deleted,
             });
@@ -436,7 +435,7 @@ impl ElasticSearchClient {
 
     #[tracing::instrument(
         level = "debug",
-        name = ElasticSearchClient_bulk_update,
+        name = ElasticsearchClient_bulk_update,
         skip_all,
         fields(index_name, num_operations = operations.len())
     )]
@@ -444,7 +443,7 @@ impl ElasticSearchClient {
         &self,
         index_name: &str,
         operations: Vec<SearchIndexUpdateOperation>,
-    ) -> Result<(), ElasticSearchClientError> {
+    ) -> Result<(), ElasticsearchClientError> {
         use elasticsearch::BulkParts;
 
         if operations.is_empty() {
@@ -497,9 +496,9 @@ impl ElasticSearchClient {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum ElasticSearchReindexError {
-    #[error("ElasticSearch client error: {0}")]
-    Client(#[from] ElasticSearchClientError),
+pub enum ElasticsearchReindexError {
+    #[error("Elasticsearch client error: {0}")]
+    Client(#[from] ElasticsearchClientError),
 
     #[error("Detected unexpected document updates or deletions during reindexing")]
     UnexpectedDocumentChanges { updated: u64, deleted: u64 },
@@ -511,19 +510,19 @@ pub enum ElasticSearchReindexError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum ElasticSearchClientBuildError {
-    #[error("transport error building ElasticSearch client: {0}")]
+pub enum ElasticsearchClientBuildError {
+    #[error("transport error building Elasticsearch client: {0}")]
     Build(#[from] elasticsearch::http::transport::BuildError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum ElasticSearchClientError {
-    #[error("transport error communicating to ElasticSearch: {0}")]
+pub enum ElasticsearchClientError {
+    #[error("transport error communicating to Elasticsearch: {0}")]
     Transport(#[from] elasticsearch::Error),
 
-    #[error("ElasticSearch error {status} ({error_type}): {reason}")]
+    #[error("Elasticsearch error {status} ({error_type}): {reason}")]
     BadResponse {
         status: elasticsearch::http::StatusCode,
         error_type: String,
@@ -531,7 +530,7 @@ pub enum ElasticSearchClientError {
         body: serde_json::Value,
     },
 
-    #[error("ElasticSearch index not found: {index}")]
+    #[error("Elasticsearch index not found: {index}")]
     IndexNotFound { index: String },
 }
 
@@ -547,7 +546,7 @@ async fn handle_bulk_response(
     response: elasticsearch::http::response::Response,
     index_name: &str,
     operation_name: &str,
-) -> Result<(), ElasticSearchClientError> {
+) -> Result<(), ElasticsearchClientError> {
     let response = ensure_client_response(response).await?;
     let bulk_result: BulkResponse = response.json().await?;
 
@@ -557,7 +556,7 @@ async fn handle_bulk_response(
             items = ?bulk_result.items,
             "Bulk {operation_name} completed with errors"
         );
-        return Err(ElasticSearchClientError::BadResponse {
+        return Err(ElasticsearchClientError::BadResponse {
             status: elasticsearch::http::StatusCode::from_u16(500).unwrap(),
             error_type: format!("bulk_{operation_name}_errors"),
             reason: format!("Some documents failed to {operation_name}"),
@@ -576,14 +575,14 @@ async fn handle_bulk_response(
 
 async fn ensure_client_response(
     resp: elasticsearch::http::response::Response,
-) -> Result<elasticsearch::http::response::Response, ElasticSearchClientError> {
+) -> Result<elasticsearch::http::response::Response, ElasticsearchClientError> {
     let status = resp.status_code();
     if status.is_success() {
         return Ok(resp);
     }
 
     let body_text = resp.text().await.unwrap_or_default();
-    // println!("ElasticSearch error response body: {body_text}" );
+    // println!("Elasticsearch error response body: {body_text}" );
 
     #[derive(serde::Deserialize)]
     struct EsErrorRoot {
@@ -612,10 +611,10 @@ async fn ensure_client_response(
                 .unwrap_or_default()
                 .to_string();
 
-            return Err(ElasticSearchClientError::IndexNotFound { index });
+            return Err(ElasticsearchClientError::IndexNotFound { index });
         }
 
-        return Err(ElasticSearchClientError::BadResponse {
+        return Err(ElasticsearchClientError::BadResponse {
             status,
             error_type,
             reason,
@@ -624,7 +623,7 @@ async fn ensure_client_response(
     }
 
     // If it wasn’t JSON, still return a structured error
-    Err(ElasticSearchClientError::BadResponse {
+    Err(ElasticsearchClientError::BadResponse {
         status,
         error_type: "non_json_error".to_string(),
         reason: body_text.clone(),

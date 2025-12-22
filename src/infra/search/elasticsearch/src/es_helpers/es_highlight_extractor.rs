@@ -13,9 +13,9 @@ use super::{FIELD_SUFFIX_KEYWORD, FIELD_SUFFIX_NGRAM, FIELD_SUFFIX_SUBSTR, FIELD
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchHighlightExtractor {}
+pub struct ElasticsearchHighlightExtractor {}
 
-impl ElasticSearchHighlightExtractor {
+impl ElasticsearchHighlightExtractor {
     pub fn extract_highlights(highlight_json: &serde_json::Value) -> Option<Vec<SearchHighlight>> {
         if let Some(highlight_obj) = highlight_json.as_object() {
             let mut highlights = Vec::new();

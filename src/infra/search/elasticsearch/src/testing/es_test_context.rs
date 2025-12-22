@@ -14,12 +14,12 @@ use random_strings::get_random_name;
 use tokio::sync::OnceCell;
 use url::Url;
 
-use crate::es_client::ElasticSearchClient;
-use crate::{ElasticSearchClientConfig, ElasticSearchRepository, ElasticSearchRepositoryConfig};
+use crate::es_client::ElasticsearchClient;
+use crate::{ElasticsearchClientConfig, ElasticsearchRepository, ElasticsearchRepositoryConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static ELASTICSEARCH_CLIENT: OnceCell<Arc<ElasticSearchClient>> = OnceCell::const_new();
+static ELASTICSEARCH_CLIENT: OnceCell<Arc<ElasticsearchClient>> = OnceCell::const_new();
 
 const ENV_ES_URL: &str = "ES_URL";
 const ENV_ES_PASSWORD: &str = "ES_PASSWORD";
@@ -33,8 +33,8 @@ const INDEX_PREFIX_TEMPLATE: &str = "kamu-test-";
 
 pub struct EsTestContext {
     catalog: dill::Catalog,
-    client: Arc<ElasticSearchClient>,
-    search_repo: Arc<ElasticSearchRepository>,
+    client: Arc<ElasticsearchClient>,
+    search_repo: Arc<ElasticsearchRepository>,
     index_prefix: String,
 }
 
@@ -49,7 +49,7 @@ impl EsTestContext {
             .or_else(|| DEFAULT_ES_PASSWORD.map(ToString::to_string));
 
         // Client config
-        let client_config = ElasticSearchClientConfig {
+        let client_config = ElasticsearchClientConfig {
             url: Url::parse(&es_url).unwrap(),
             password: es_password.clone(),
             timeout_secs: 30,
@@ -60,7 +60,7 @@ impl EsTestContext {
         let client = ELASTICSEARCH_CLIENT
             .get_or_init(|| async {
                 // Initialize client
-                let client = ElasticSearchClient::init(&client_config).unwrap();
+                let client = ElasticsearchClient::init(&client_config).unwrap();
 
                 // Clean up any leftover test indices from previous runs
                 let all_test_index_names = client
@@ -79,21 +79,21 @@ impl EsTestContext {
 
         // Prepare repository config: this one is test-specific and not shared
         let index_prefix = get_random_name(Some(INDEX_PREFIX_TEMPLATE), 10).to_ascii_lowercase();
-        let repo_config = ElasticSearchRepositoryConfig {
+        let repo_config = ElasticsearchRepositoryConfig {
             index_prefix: index_prefix.clone(),
         };
 
         // Manually build repository with predefined client and config
         let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add_value(ElasticSearchRepository::with_predefined_client(
+        catalog_builder.add_value(ElasticsearchRepository::with_predefined_client(
             Arc::new(client_config),
             Arc::new(repo_config),
             client.clone(),
         ));
-        catalog_builder.bind::<dyn SearchRepository, ElasticSearchRepository>();
+        catalog_builder.bind::<dyn SearchRepository, ElasticsearchRepository>();
 
         let catalog = catalog_builder.build();
-        let search_repo = catalog.get_one::<ElasticSearchRepository>().unwrap();
+        let search_repo = catalog.get_one::<ElasticsearchRepository>().unwrap();
 
         Self {
             catalog,

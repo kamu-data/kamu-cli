@@ -17,27 +17,27 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Lazily spawns a local `ElasticSearch` container
+/// Lazily spawns a local `Elasticsearch` container
 /// that will be cleaned up on exit
-pub struct ElasticSearchContainerRepository {
+pub struct ElasticsearchContainerRepository {
     runtime: Arc<container_runtime::ContainerRuntime>,
-    config: Arc<ElasticSearchContainerConfig>,
+    config: Arc<ElasticsearchContainerConfig>,
     state: tokio::sync::OnceCell<State>,
 }
 
 #[allow(dead_code)]
 struct State {
     container: container_runtime::ContainerProcess,
-    inner: ElasticSearchRepository,
+    inner: ElasticsearchRepository,
 }
 
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn SearchRepository)]
-impl ElasticSearchContainerRepository {
+impl ElasticsearchContainerRepository {
     pub fn new(
         runtime: Arc<container_runtime::ContainerRuntime>,
-        config: Arc<ElasticSearchContainerConfig>,
+        config: Arc<ElasticsearchContainerConfig>,
     ) -> Self {
         Self {
             runtime,
@@ -46,7 +46,7 @@ impl ElasticSearchContainerRepository {
         }
     }
 
-    async fn inner(&self) -> Result<&ElasticSearchRepository, InternalError> {
+    async fn inner(&self) -> Result<&ElasticsearchRepository, InternalError> {
         let state = self
             .state
             .get_or_try_init(async || self.init_state().await)
@@ -85,16 +85,16 @@ impl ElasticSearchContainerRepository {
             .int_err()?;
 
         let url = Url::parse(&format!("http://{runtime_host}:{rest_api_port}")).int_err()?;
-        tracing::info!("ElasticSearch container is starting at {url}");
+        tracing::info!("Elasticsearch container is starting at {url}");
 
-        let inner = ElasticSearchRepository::new(
-            Arc::new(ElasticSearchClientConfig {
+        let inner = ElasticsearchRepository::new(
+            Arc::new(ElasticsearchClientConfig {
                 url,
                 password: Some(DUMMY_PASSWORD.to_string()),
                 timeout_secs: 5,
                 enable_compression: false,
             }),
-            Arc::new(ElasticSearchRepositoryConfig {
+            Arc::new(ElasticsearchRepositoryConfig {
                 index_prefix: String::new(),
             }),
         );
@@ -106,7 +106,7 @@ impl ElasticSearchContainerRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl SearchRepository for ElasticSearchContainerRepository {
+impl SearchRepository for ElasticsearchContainerRepository {
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         self.inner().await?.health().await
     }

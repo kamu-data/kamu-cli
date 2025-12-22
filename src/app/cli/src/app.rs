@@ -1156,25 +1156,25 @@ pub fn register_config_in_catalog(
             catalog_builder.add::<kamu_search_services::DummySearchService>();
         }
 
-        config::SearchRepositoryConfig::ElasticSearch(mut cfg) => {
-            cfg.merge(config::SearchRepositoryConfigElasticSearch::default());
+        config::SearchRepositoryConfig::Elasticsearch(mut cfg) => {
+            cfg.merge(config::SearchRepositoryConfigElasticsearch::default());
 
             catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
-            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchRepository>();
-            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchClientConfig {
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchClientConfig {
                 url: url::Url::parse(&cfg.url).int_err()?,
                 password: cfg.password,
                 timeout_secs: cfg.timeout_secs.unwrap(),
                 enable_compression: cfg.enable_compression.unwrap(),
             });
-            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchRepositoryConfig {
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
                 index_prefix: cfg.index_prefix.unwrap(),
             });
         }
-        config::SearchRepositoryConfig::ElasticSearchContainer(cfg) => {
+        config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
             catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
-            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchContainerRepository>();
-            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchContainerConfig {
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchContainerRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
                 image: cfg.image.unwrap(),
                 start_timeout: cfg.start_timeout.unwrap().into(),
             });

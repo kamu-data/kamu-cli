@@ -13,15 +13,15 @@ use std::sync::Arc;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::*;
 
-use crate::es_helpers::ElasticSearchHighlightExtractor;
-use crate::{ElasticSearchClientConfig, ElasticSearchRepositoryConfig, es_client, es_helpers};
+use crate::es_helpers::ElasticsearchHighlightExtractor;
+use crate::{ElasticsearchClientConfig, ElasticsearchRepositoryConfig, es_client, es_helpers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchRepository {
-    client_config: Arc<ElasticSearchClientConfig>,
-    repo_config: Arc<ElasticSearchRepositoryConfig>,
-    client: tokio::sync::OnceCell<Arc<es_client::ElasticSearchClient>>,
+pub struct ElasticsearchRepository {
+    client_config: Arc<ElasticsearchClientConfig>,
+    repo_config: Arc<ElasticsearchRepositoryConfig>,
+    client: tokio::sync::OnceCell<Arc<es_client::ElasticsearchClient>>,
     state: std::sync::RwLock<State>,
 }
 
@@ -35,10 +35,10 @@ struct State {
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn SearchRepository)]
-impl ElasticSearchRepository {
+impl ElasticsearchRepository {
     pub fn new(
-        client_config: Arc<ElasticSearchClientConfig>,
-        repo_config: Arc<ElasticSearchRepositoryConfig>,
+        client_config: Arc<ElasticsearchClientConfig>,
+        repo_config: Arc<ElasticsearchRepositoryConfig>,
     ) -> Self {
         Self {
             client_config,
@@ -49,9 +49,9 @@ impl ElasticSearchRepository {
     }
 
     pub fn with_predefined_client(
-        client_config: Arc<ElasticSearchClientConfig>,
-        repo_config: Arc<ElasticSearchRepositoryConfig>,
-        client: Arc<es_client::ElasticSearchClient>,
+        client_config: Arc<ElasticsearchClientConfig>,
+        repo_config: Arc<ElasticsearchRepositoryConfig>,
+        client: Arc<es_client::ElasticsearchClient>,
     ) -> Self {
         Self {
             client_config,
@@ -61,12 +61,12 @@ impl ElasticSearchRepository {
         }
     }
 
-    async fn es_client(&self) -> Result<&es_client::ElasticSearchClient, InternalError> {
+    async fn es_client(&self) -> Result<&es_client::ElasticsearchClient, InternalError> {
         let client = self
             .client
             .get_or_try_init(async || {
                 let client =
-                    es_client::ElasticSearchClient::init(self.client_config.as_ref()).int_err()?;
+                    es_client::ElasticsearchClient::init(self.client_config.as_ref()).int_err()?;
                 Ok::<_, InternalError>(Arc::new(client))
             })
             .await
@@ -76,7 +76,7 @@ impl ElasticSearchRepository {
 
     fn resolve_read_index_alias(
         &self,
-        client: &es_client::ElasticSearchClient,
+        client: &es_client::ElasticsearchClient,
         schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
@@ -86,7 +86,7 @@ impl ElasticSearchRepository {
             )));
         };
 
-        let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
+        let entity_index = es_helpers::ElasticsearchVersionedEntityIndex::new(
             client,
             &self.repo_config,
             schema.schema_name,
@@ -97,7 +97,7 @@ impl ElasticSearchRepository {
 
     fn resolve_writable_index_name(
         &self,
-        client: &es_client::ElasticSearchClient,
+        client: &es_client::ElasticsearchClient,
         schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
@@ -107,7 +107,7 @@ impl ElasticSearchRepository {
             )));
         };
 
-        let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
+        let entity_index = es_helpers::ElasticsearchVersionedEntityIndex::new(
             client,
             &self.repo_config,
             schema.schema_name,
@@ -142,7 +142,7 @@ impl ElasticSearchRepository {
 
     fn resolve_read_index_aliases(
         &self,
-        client: &es_client::ElasticSearchClient,
+        client: &es_client::ElasticsearchClient,
         entity_schemas: &[Arc<SearchEntitySchema>],
     ) -> Result<Vec<String>, InternalError> {
         assert!(!entity_schemas.is_empty());
@@ -155,7 +155,7 @@ impl ElasticSearchRepository {
 
     fn map_write_index_names(
         &self,
-        client: &es_client::ElasticSearchClient,
+        client: &es_client::ElasticsearchClient,
         entity_schemas: &[Arc<SearchEntitySchema>],
     ) -> Result<HashMap<String, SearchEntitySchemaName>, InternalError> {
         assert!(!entity_schemas.is_empty());
@@ -174,8 +174,8 @@ impl ElasticSearchRepository {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl SearchRepository for ElasticSearchRepository {
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_health skip_all)]
+impl SearchRepository for ElasticsearchRepository {
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_health skip_all)]
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         let client = self.es_client().await?;
         client.cluster_health().await.int_err()
@@ -183,7 +183,7 @@ impl SearchRepository for ElasticSearchRepository {
 
     #[tracing::instrument(
         level = "debug",
-        name=ElasticSearchRepository_ensure_entity_index,
+        name=ElasticsearchRepository_ensure_entity_index,
         skip_all, fields(
             entity_kind = %schema.schema_name,
             version = schema.version
@@ -206,14 +206,14 @@ impl SearchRepository for ElasticSearchRepository {
             }
         }
 
-        let index = es_helpers::ElasticSearchVersionedEntityIndex::new(
+        let index = es_helpers::ElasticsearchVersionedEntityIndex::new(
             self.es_client().await?,
             &self.repo_config,
             schema.schema_name,
             schema.version,
         );
 
-        let mappings = es_helpers::ElasticSearchIndexMappings::from_entity_schema(schema);
+        let mappings = es_helpers::ElasticsearchIndexMappings::from_entity_schema(schema);
 
         let outcome = index.ensure_version_existence(mappings, schema).await?;
 
@@ -265,13 +265,13 @@ impl SearchRepository for ElasticSearchRepository {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_total_documents, skip_all)]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_total_documents, skip_all)]
     async fn total_documents(&self) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
         client.total_documents().await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_documents_of_kind, skip_all, fields(schema_name))]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_documents_of_kind, skip_all, fields(schema_name))]
     async fn documents_of_kind(
         &self,
         schema_name: SearchEntitySchemaName,
@@ -281,7 +281,7 @@ impl SearchRepository for ElasticSearchRepository {
         client.documents_in_index(&index_name).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_search, skip_all)]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
     async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
         let client = self.es_client().await?;
 
@@ -298,8 +298,8 @@ impl SearchRepository for ElasticSearchRepository {
         // Resolve write index names to schemas
         let schema_names_by_write_index = self.map_write_index_names(client, &entity_schemas)?;
 
-        // Build ElasticSearch request body
-        let req_body = es_helpers::ElasticSearchQueryBuilder::build_search_query(&req);
+        // Build Elasticsearch request body
+        let req_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(&req);
 
         // Execute request
         let es_response: es_client::SearchResponse = client
@@ -307,7 +307,7 @@ impl SearchRepository for ElasticSearchRepository {
             .await
             .int_err()?;
 
-        // Translate parsed ElasticSearch response to domain model
+        // Translate parsed Elasticsearch response to domain model
         Ok(SearchResponse {
             took_ms: es_response.took,
             timeout: es_response.timed_out,
@@ -325,7 +325,7 @@ impl SearchRepository for ElasticSearchRepository {
                     score: hit.score,
                     source: hit.source.unwrap_or_default(),
                     highlights: if let Some(highlight_json) = hit.highlight {
-                        ElasticSearchHighlightExtractor::extract_highlights(&highlight_json)
+                        ElasticsearchHighlightExtractor::extract_highlights(&highlight_json)
                     } else {
                         None
                     },
@@ -335,7 +335,7 @@ impl SearchRepository for ElasticSearchRepository {
         })
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]
     async fn find_document_by_id(
         &self,
         schema_name: SearchEntitySchemaName,
@@ -350,7 +350,7 @@ impl SearchRepository for ElasticSearchRepository {
         Ok(doc)
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
     async fn bulk_update(
         &self,
         schema_name: SearchEntitySchemaName,

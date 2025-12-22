@@ -1103,8 +1103,8 @@ impl SearchConfig {
             })),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
-            repo: Some(SearchRepositoryConfig::ElasticSearch(
-                SearchRepositoryConfigElasticSearch {
+            repo: Some(SearchRepositoryConfig::Elasticsearch(
+                SearchRepositoryConfigElasticsearch {
                     url: "http://localhost:9200".to_string(),
                     password: Some("root".to_string()),
                     index_prefix: Some(String::new()),
@@ -1308,8 +1308,8 @@ impl Default for VectorRepoConfigQdrantContainer {
 pub enum SearchRepositoryConfig {
     #[default]
     Dummy,
-    ElasticSearch(SearchRepositoryConfigElasticSearch),
-    ElasticSearchContainer(SearchRepositoryConfigElasticSearchContainer),
+    Elasticsearch(SearchRepositoryConfigElasticsearch),
+    ElasticsearchContainer(SearchRepositoryConfigElasticsearchContainer),
 }
 
 #[skip_serializing_none]
@@ -1317,7 +1317,7 @@ pub enum SearchRepositoryConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
-pub struct SearchRepositoryConfigElasticSearch {
+pub struct SearchRepositoryConfigElasticsearch {
     #[merge(skip)]
     pub url: String,
     pub password: Option<String>,
@@ -1326,7 +1326,7 @@ pub struct SearchRepositoryConfigElasticSearch {
     pub enable_compression: Option<bool>,
 }
 
-impl Default for SearchRepositoryConfigElasticSearch {
+impl Default for SearchRepositoryConfigElasticsearch {
     fn default() -> Self {
         Self {
             url: "http://localhost:9200".to_string(),
@@ -1343,12 +1343,12 @@ impl Default for SearchRepositoryConfigElasticSearch {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
-pub struct SearchRepositoryConfigElasticSearchContainer {
+pub struct SearchRepositoryConfigElasticsearchContainer {
     pub image: Option<String>,
     pub start_timeout: Option<DurationString>,
 }
 
-impl Default for SearchRepositoryConfigElasticSearchContainer {
+impl Default for SearchRepositoryConfigElasticsearchContainer {
     fn default() -> Self {
         Self {
             image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),

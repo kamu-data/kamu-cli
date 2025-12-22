@@ -23,14 +23,14 @@ pub const FIELD_SUFFIX_TOKENS: &str = "tokens";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchIndexMappings {
+pub struct ElasticsearchIndexMappings {
     pub mappings_json: serde_json::Value,
     pub mappings_hash: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ElasticSearchIndexMappings {
+impl ElasticsearchIndexMappings {
     pub fn build_analysis_settings_json() -> serde_json::Value {
         serde_json::json!({
             "filter": {

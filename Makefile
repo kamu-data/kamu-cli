@@ -224,14 +224,14 @@ elasticsearch-setup:
 		docker.io/library/kibana:9.2.1	
 	sleep 10  # Letting the containers to start
 
-# Stops and removes the ElasticSearch and Kibana containers + network
+# Stops and removes the Elasticsearch and Kibana containers + network
 .PHONY: elasticsearch-stop
 elasticsearch-stop:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-elasticsearch || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-elasticsearch || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-kibana || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-kibana || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) network rm kamu-elastic-net || true
 
-# Stop actions + removes the ElasticSearch data volume
+# Stop actions + removes the Elasticsearch data volume
 .PHONY: elasticsearch-clean
 elasticsearch-clean:
 	$(MAKE) elasticsearch-stop
