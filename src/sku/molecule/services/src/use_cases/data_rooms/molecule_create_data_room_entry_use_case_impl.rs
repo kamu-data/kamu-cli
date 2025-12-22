@@ -68,6 +68,9 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
                     MoleculeCreateDataRoomEntryError::Access(e)
                 }
+                MoleculeDataRoomCollectionWriteError::QuotaExceeded(e) => {
+                    MoleculeCreateDataRoomEntryError::QuotaExceeded(e)
+                }
                 e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
                     MoleculeCreateDataRoomEntryError::Internal(e.int_err())
                 }

@@ -91,6 +91,11 @@ impl MoleculeAnnouncementsDatasetMutV2 {
                     message: e.to_string(),
                 },
             )),
+            Err(E::QuotaExceeded(e)) => Ok(v1::CreateAnnouncementResult::QuotaExceeded(
+                v1::CreateAnnouncementErrorQuotaExceeded {
+                    message: e.to_string(),
+                },
+            )),
             Err(E::Access(e)) => Err(e.into()),
             Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }

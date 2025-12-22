@@ -34,6 +34,8 @@ container-runtime = { workspace = true }
 file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-accounts = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["datafusion"] }
 
 async-stream = { version = "0.3", default-features = false }

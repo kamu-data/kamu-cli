@@ -61,9 +61,18 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         &self,
         _account_id: &odf::AccountID,
     ) -> Result<TotalStatistic, InternalError> {
-        // Used only for testing, but to implement this logic requires to handle issues
-        // with transaction leaks
-        unimplemented!()
+        // TODO: this is a dummy implementation that does not filter by account_id
+        // To implement real logic requires to handle issues with transaction leaks
+        let guard = self.state.lock().unwrap();
+
+        let mut total = TotalStatistic::default();
+        for per_dataset in guard.statistics.values() {
+            for stat in per_dataset.values() {
+                total.add_dataset_statistic(stat);
+            }
+        }
+
+        Ok(total)
     }
 
     async fn get_dataset_statistics(

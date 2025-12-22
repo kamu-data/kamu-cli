@@ -1454,6 +1454,11 @@ impl GraphQLMoleculeV1Harness {
     pub async fn new(
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        #[builder(default = PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })]
+        predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
@@ -1502,10 +1507,7 @@ impl GraphQLMoleculeV1Harness {
                 account_id: molecule_account_id.clone(),
                 account_name: "molecule".parse().unwrap(),
             })),
-            PredefinedAccountOpts {
-                is_admin: false,
-                can_provision_accounts: true,
-            },
+            predefined_account_opts,
         )
         .await;
 

@@ -10,11 +10,13 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
     GetDataOptions,
+    PushIngestDataError,
     PushIngestDataUseCase,
+    PushIngestError,
     PushIngestResult,
     QueryError,
     QueryService,
@@ -119,7 +121,7 @@ impl MoleculeDatasetWriter {
         &self,
         buffer: bytes::Bytes,
         source_event_time: Option<DateTime<Utc>>,
-    ) -> Result<PushIngestResult, InternalError> {
+    ) -> Result<PushIngestResult, PushIngestError> {
         let res = self
             .push_ingest_uc
             .execute(
@@ -135,7 +137,10 @@ impl MoleculeDatasetWriter {
                 None,
             )
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                PushIngestDataError::Execution(e) => e,
+                e => PushIngestError::Internal(e.int_err()),
+            })?;
 
         Ok(res)
     }

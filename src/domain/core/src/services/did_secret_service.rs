@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use kamu_datasets::{
     DatasetLifecycleMessage,
@@ -86,8 +86,6 @@ impl DidSecretService {
 
 impl MessageConsumer for DidSecretService {}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
 impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
     #[tracing::instrument(
@@ -100,24 +98,19 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
         _: &dill::Catalog,
         message: &AccountLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received account lifecycle message");
-
         match message {
-            AccountLifecycleMessage::Deleted(message) => {
-                self.handle_account_lifecycle_deleted_message(message).await
-            }
-
-            AccountLifecycleMessage::Created(_)
-            | AccountLifecycleMessage::Renamed(_)
-            | AccountLifecycleMessage::PasswordChanged(_) => {
-                // No action required
-                Ok(())
-            }
+            AccountLifecycleMessage::Deleted(message) => self
+                .handle_account_lifecycle_deleted_message(message)
+                .await
+                .map_err(ErrorIntoInternal::int_err)?,
+            AccountLifecycleMessage::Renamed(_)
+            | AccountLifecycleMessage::Created(_)
+            | AccountLifecycleMessage::PasswordChanged(_) => {}
         }
+
+        Ok(())
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
@@ -131,18 +124,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
         _: &dill::Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
-
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                self.handle_dataset_lifecycle_deleted_message(message).await
+                self.handle_dataset_lifecycle_deleted_message(message)
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?;
             }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
-                Ok(())
-            }
+            DatasetLifecycleMessage::Renamed(_) | DatasetLifecycleMessage::Created(_) => {}
         }
+
+        Ok(())
     }
 }
 

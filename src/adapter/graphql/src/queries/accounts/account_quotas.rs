@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::Account;
+use kamu_accounts::{Account, AccountQuotaService, GetAccountQuotaError, QuotaType};
 
 use crate::prelude::*;
 
@@ -20,60 +20,67 @@ pub struct AccountQuotas<'a> {
 #[Object]
 impl<'a> AccountQuotas<'a> {
     #[graphql(skip)]
-    #[expect(unused)]
     pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 
     /// User-level quotas
-    pub async fn user(&self) -> AccountQuotasUser<'_> {
-        AccountQuotasUser::new(self.account)
+    pub async fn user(&self) -> AccountQuotasUsage<'_> {
+        AccountQuotasUsage::new(self.account)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountQuotasUser<'a> {
+pub struct AccountQuotasUsage<'a> {
     account: &'a Account,
 }
 
 #[Object]
-impl<'a> AccountQuotasUser<'a> {
+impl<'a> AccountQuotasUsage<'a> {
     #[graphql(skip)]
     pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 
     /// User-level quotas
-    pub async fn storage(&self) -> AccountQuotasUserStorage<'_> {
-        AccountQuotasUserStorage::new(self.account)
+    pub async fn storage(&self) -> AccountQuotasUsageStorage<'_> {
+        AccountQuotasUsageStorage::new(self.account)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountQuotasUserStorage<'a> {
-    #[expect(unused)]
+pub struct AccountQuotasUsageStorage<'a> {
     account: &'a Account,
 }
 
 #[Object]
-impl<'a> AccountQuotasUserStorage<'a> {
+impl<'a> AccountQuotasUsageStorage<'a> {
     #[graphql(skip)]
     pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 
-    #[expect(clippy::unused_async)]
-    /// Total bytes used by this account.
-    pub async fn utilized_total_bytes(&self) -> Result<u64> {
-        todo!()
-    }
-
-    #[expect(clippy::unused_async)]
     /// Total bytes limit for this account.
-    pub async fn limit_total_bytes(&self) -> Result<u64> {
-        todo!()
+    pub async fn limit_total_bytes(&self, ctx: &Context<'_>) -> Result<u64> {
+        let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
+
+        let quota = quota_service
+            .get_account_quota(&self.account.id, QuotaType::storage_space())
+            .await
+            .map_err(map_get_quota_error)?;
+
+        Ok(quota.quota_payload.value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_get_quota_error(e: GetAccountQuotaError) -> GqlError {
+    match e {
+        GetAccountQuotaError::NotFound(_) => GqlError::gql("Account quota not configured"),
+        GetAccountQuotaError::Internal(inner) => inner.into(),
     }
 }
 

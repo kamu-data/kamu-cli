@@ -36,8 +36,8 @@ internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
-kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
+event-sourcing = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
 time-source = { workspace = true }

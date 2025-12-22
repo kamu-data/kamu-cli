@@ -1243,8 +1243,8 @@ impl GraphQLAccountsHarness {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
-        let catalog = b.build();
-        let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
+        let base_catalog = b.build();
+        let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
             .add_value(kamu_core::TenancyConfig::MultiTenant)
             .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
             .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
@@ -1270,7 +1270,7 @@ impl GraphQLAccountsHarness {
             .build();
 
         let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&final_catalog, predefined_account_opts).await;
+            authentication_catalogs(&catalog, predefined_account_opts).await;
 
         Self {
             schema: kamu_adapter_graphql::schema_quiet(),

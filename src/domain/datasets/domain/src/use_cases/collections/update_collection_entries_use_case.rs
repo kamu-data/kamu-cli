@@ -121,6 +121,13 @@ pub enum UpdateCollectionEntriesUseCaseError {
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
 
+    #[error("Quota exceeded")]
+    QuotaExceeded(
+        #[from]
+        #[backtrace]
+        kamu_accounts::QuotaError,
+    ),
+
     #[error(transparent)]
     Internal(
         #[from]

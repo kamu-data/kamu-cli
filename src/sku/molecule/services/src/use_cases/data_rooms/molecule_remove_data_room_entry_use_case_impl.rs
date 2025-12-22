@@ -60,6 +60,9 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
                     MoleculeRemoveDataRoomEntryError::RefCASFailed(e)
                 }
+                MoleculeDataRoomCollectionWriteError::QuotaExceeded(e) => {
+                    MoleculeRemoveDataRoomEntryError::QuotaExceeded(e)
+                }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
                     MoleculeRemoveDataRoomEntryError::Access(e)
                 }

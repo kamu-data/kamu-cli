@@ -69,6 +69,9 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
                     MoleculeUpdateDataRoomEntryError::Access(e)
                 }
+                MoleculeDataRoomCollectionWriteError::QuotaExceeded(e) => {
+                    MoleculeUpdateDataRoomEntryError::QuotaExceeded(e)
+                }
                 e @ MoleculeDataRoomCollectionWriteError::Internal(_) => {
                     MoleculeUpdateDataRoomEntryError::Internal(e.int_err())
                 }

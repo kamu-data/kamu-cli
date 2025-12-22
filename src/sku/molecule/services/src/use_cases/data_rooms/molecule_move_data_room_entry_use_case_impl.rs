@@ -63,6 +63,9 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 MoleculeDataRoomCollectionWriteError::RefCASFailed(e) => {
                     MoleculeMoveDataRoomEntryError::RefCASFailed(e)
                 }
+                MoleculeDataRoomCollectionWriteError::QuotaExceeded(e) => {
+                    MoleculeMoveDataRoomEntryError::QuotaExceeded(e)
+                }
                 MoleculeDataRoomCollectionWriteError::Access(e) => {
                     MoleculeMoveDataRoomEntryError::Access(e)
                 }

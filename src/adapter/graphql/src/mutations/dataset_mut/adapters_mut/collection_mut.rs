@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::QuotaError;
 use kamu_datasets::{
     CollectionEntryAdd,
     CollectionEntryMove,
@@ -94,6 +95,23 @@ impl<'a> CollectionMut<'a> {
                 }),
             ),
             Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(err)) => match err {
+                QuotaError::Exceeded(e) => Ok(CollectionUpdateResult::QuotaExceeded(
+                    CollectionUpdateErrorQuotaExceeded {
+                        used: Some(e.used),
+                        incoming: Some(e.incoming),
+                        limit: Some(e.limit),
+                    },
+                )),
+                QuotaError::NotConfigured => Ok(CollectionUpdateResult::QuotaExceeded(
+                    CollectionUpdateErrorQuotaExceeded {
+                        used: None,
+                        incoming: None,
+                        limit: None,
+                    },
+                )),
+                QuotaError::Internal(e) => Err(e.into()),
+            },
             Err(UpdateCollectionEntriesUseCaseError::Internal(err)) => Err(err.into()),
         }
     }
@@ -254,6 +272,7 @@ pub enum CollectionUpdateResult {
     UpToDate(CollectionUpdateUpToDate),
     CasFailed(CollectionUpdateErrorCasFailed),
     NotFound(CollectionUpdateErrorNotFound),
+    QuotaExceeded(CollectionUpdateErrorQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -312,6 +331,30 @@ impl CollectionUpdateErrorNotFound {
     }
     async fn message(&self) -> String {
         format!("Path {} does not exist", self.path)
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CollectionUpdateErrorQuotaExceeded {
+    pub used: Option<u64>,
+    pub incoming: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[ComplexObject]
+impl CollectionUpdateErrorQuotaExceeded {
+    async fn is_success(&self) -> bool {
+        false
+    }
+
+    async fn message(&self) -> String {
+        match (self.used, self.incoming, self.limit) {
+            (Some(used), Some(incoming), Some(limit)) => {
+                format!("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")
+            }
+            _ => "Quota exceeded".to_string(),
+        }
     }
 }
 

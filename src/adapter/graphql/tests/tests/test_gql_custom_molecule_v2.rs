@@ -21,7 +21,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
-use crate::utils::GraphQLQueryRequest;
+use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -874,6 +874,107 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
             "__typename": "CreateProjectErrorConflict",
         }),
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_data_room_quota_exceeded() {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
+        .build()
+        .await;
+
+    // Create project
+    let create_project_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "quota-room",
+                "ipnftUid": ipnft_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "901",
+            })),
+        ))
+        .await;
+    assert!(create_project_res.is_ok(), "{create_project_res:#?}");
+
+    // Cap storage to force quota failure
+    let set_quota_res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+            mutation ($limit: Int!) {
+              accounts {
+                me {
+                  quotas {
+                    setAccountQuotas(quotas: { storage: { limitTotalBytes: $limit } }) {
+                      success
+                    }
+                  }
+                }
+              }
+            }
+            "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({ "limit": 1 }))),
+        )
+        .await;
+    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+
+    // Try uploading a file - should fail with quota exceeded
+    let upload_res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
+                  molecule {
+                    v2 {
+                      project(ipnftUid: $ipnftUid) {
+                        dataRoom {
+                          uploadFile(
+                            path: $path
+                            content: $content
+                            contentType: "text/plain"
+                            changeBy: "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                            accessLevel: "public"
+                          ) {
+                            isSuccess
+                            message
+                            __typename
+                            ... on MoleculeQuotaExceeded {
+                              used
+                              incoming
+                              limit
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "path": "/quota.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            }))),
+        )
+        .await;
+
+    let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
+        ["uploadFile"]
+        .clone();
+    assert_eq!(payload["isSuccess"], json!(false));
+    let msg = payload["message"].as_str().unwrap();
+    assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
+    assert_eq!(payload["__typename"], json!("MoleculeQuotaExceeded"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3577,6 +3678,78 @@ async fn test_molecule_v2_data_room_operations() {
     //
     // Introduce tests for:
     // - Get entries with prefix and maxDepth
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_announcements_quota_exceeded() {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
+
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
+        .build()
+        .await;
+
+    // Create project
+    let create_project_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "quota-announce",
+                "ipnftUid": ipnft_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "902",
+            })),
+        ))
+        .await;
+    assert!(create_project_res.is_ok(), "{create_project_res:#?}");
+
+    // Set very small quota
+    let set_quota_res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc!(
+            r#"
+            mutation {
+              accounts {
+                me {
+                  quotas {
+                    setAccountQuotas(quotas: { storage: { limitTotalBytes: 1 } }) {
+                      success
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+
+    // Attempt to create announcement - expect quota error surfaced
+    let announcement_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "headline": "Quota limited",
+                "body": "This should fail",
+                "attachments": [],
+                "moleculeAccessLevel": "public",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": [],
+                "tags": [],
+            })),
+        ))
+        .await;
+
+    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
+        ["announcements"]["create"]
+        .clone();
+    assert_eq!(payload["isSuccess"], json!(false));
+    let msg = payload["message"].as_str().unwrap();
+    assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_core::PushIngestError;
 
 use crate::MoleculeDataRoomActivityPayloadRecord;
 
@@ -36,7 +37,25 @@ pub enum MoleculeAppendDataRoomActivityError {
     ),
 
     #[error(transparent)]
+    QuotaExceeded(
+        #[from]
+        #[backtrace]
+        kamu_accounts::QuotaError,
+    ),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<PushIngestError> for MoleculeAppendDataRoomActivityError {
+    fn from(err: PushIngestError) -> Self {
+        match err {
+            PushIngestError::Access(e) => Self::Access(e),
+            PushIngestError::QuotaExceeded(e) => Self::QuotaExceeded(e),
+            PushIngestError::Internal(e) => Self::Internal(e),
+            other => Self::Internal(other.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
