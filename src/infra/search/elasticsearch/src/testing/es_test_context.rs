@@ -21,13 +21,15 @@ use crate::{ElasticsearchClientConfig, ElasticsearchRepository, ElasticsearchRep
 
 static ELASTICSEARCH_CLIENT: OnceCell<Arc<ElasticsearchClient>> = OnceCell::const_new();
 
-const ENV_ES_URL: &str = "ES_URL";
-const ENV_ES_PASSWORD: &str = "ES_PASSWORD";
+const ENV_ELASTICSEARCH_URL: &str = "ELASTICSEARCH_URL";
+const ENV_ELASTICSEARCH_PASSWORD: &str = "ELASTICSEARCH_PASSWORD";
 
-const DEFAULT_ES_URL: &str = "http://localhost:9200";
-const DEFAULT_ES_PASSWORD: Option<&str> = None;
+const DEFAULT_ELASTICSEARCH_URL: &str = "http://localhost:9200";
+const DEFAULT_ELASTICSEARCH_PASSWORD: Option<&str> = None;
 
 const INDEX_PREFIX_TEMPLATE: &str = "kamu-test-";
+
+const ELASTICSEARCH_TIMEOUT_SECS: u64 = 180;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,16 +45,17 @@ pub struct EsTestContext {
 impl EsTestContext {
     pub async fn new(_test_name: &str) -> Self {
         // Read configuration from environment variables
-        let es_url = std::env::var(ENV_ES_URL).unwrap_or_else(|_| DEFAULT_ES_URL.to_string());
-        let es_password = std::env::var(ENV_ES_PASSWORD)
+        let es_url = std::env::var(ENV_ELASTICSEARCH_URL)
+            .unwrap_or_else(|_| DEFAULT_ELASTICSEARCH_URL.to_string());
+        let es_password = std::env::var(ENV_ELASTICSEARCH_PASSWORD)
             .ok()
-            .or_else(|| DEFAULT_ES_PASSWORD.map(ToString::to_string));
+            .or_else(|| DEFAULT_ELASTICSEARCH_PASSWORD.map(ToString::to_string));
 
         // Client config
         let client_config = ElasticsearchClientConfig {
             url: Url::parse(&es_url).unwrap(),
             password: es_password.clone(),
-            timeout_secs: 30,
+            timeout_secs: ELASTICSEARCH_TIMEOUT_SECS,
             enable_compression: false,
         };
 

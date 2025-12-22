@@ -308,7 +308,9 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
                 "analysis": ElasticsearchIndexMappings::build_analysis_settings_json(),
                 "index": {
                     "max_ngram_diff": 3
-                }
+                },
+                "number_of_shards": 1,
+                "number_of_replicas": 0,
             },
             "mappings": mappings_json,
         });

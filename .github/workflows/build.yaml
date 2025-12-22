@@ -95,11 +95,13 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ingest-ftp,web-ui
             nextest-flags: --cargo-profile ci --features ingest-ftp,web-ui
-            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::spark::) | test(::flink::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::elasticsearch::) | test(::spark::) | test(::flink::))'
             nextest-exclusions-database-set-part: ''
+            nextest-exclusions-elasticsearch-set-part: ''
             container-runtime: podman
             ipfs: true
             database: true
+            elasticsearch: true
             maximize-space: true
           # TODO: M1 cannot run docker due to lack of nested virtualization
           # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
@@ -107,11 +109,13 @@ jobs:
             runs-on: macos-15
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
-            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::) | test(::elasticsearch::))'
             nextest-exclusions-database-set-part: '& !(test(::containerized::))'
+            nextest-exclusions-elasticsearch-set-part: '& !(test(::containerized::))'
             container-runtime: ''
             ipfs: false
             database: false
+            elasticsearch: false
             maximize-space: false
           # TODO: DataFusion tests are temporarily disabled
           # See: https://github.com/kamu-data/kamu-cli/issues/226
@@ -120,11 +124,13 @@ jobs:
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
             # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-            nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::))'
+            nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::) | test(::elasticsearch::))'
             nextest-exclusions-database-set-part: '& !(test(::datafusion::))'
+            nextest-exclusions-elasticsearch-set-part: '& !(test(::datafusion::))'
             container-runtime: ''
             ipfs: false
             database: false
+            elasticsearch: false
             maximize-space: false
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
@@ -144,6 +150,21 @@ jobs:
           MARIADB_DATABASE: kamu-test
         ports:
           - 3306:3306
+      elasticsearch:
+        image: ${{ matrix.elasticsearch && 'elasticsearch:9.2.1' || '' }}
+        env:
+          discovery.type: single-node
+          ES_JAVA_OPTS: -Xms1g -Xmx1g
+          xpack.security.enabled: "false"
+          xpack.security.http.ssl.enabled: "false"
+          xpack.security.transport.ssl.enabled: "false"
+          xpack.ml.enabled: "false"
+          ingest.geoip.downloader.enabled: "false"
+          node.store.allow_mmap: "false"
+          cluster.routing.allocation.disk.threshold_enabled: "false"
+        ports:
+          - 9200:9200
+          - 9300:9300
     steps:
       - name: Setup IPFS
         uses: ibnesayeed/setup-ipfs@master
@@ -194,18 +215,54 @@ jobs:
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions-main-set-tests }} -v
 
+      - name: Wait for Elasticsearch (stable)
+        if: matrix.elasticsearch
+        run: |
+          set -euo pipefail
+
+          # Require 5 consecutive successful responses.
+          ok=0
+          for i in {1..180}; do
+            if curl -fsS --max-time 2 "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=1s" >/dev/null; then
+              ok=$((ok+1))
+              echo "ES health ok ($ok/5) at attempt $i"
+              if [ "$ok" -ge 5 ]; then
+                echo "ES is stable and healthy"
+                exit 0
+              fi
+            else
+              ok=0
+            fi
+            sleep 1
+          done
+
+          echo "ES did not become stable"
+          docker logs --tail 300 "${{ job.services.elasticsearch.id }}" || true
+          exit 1
+
+      - name: Elasticsearch tests
+        if: matrix.elasticsearch
+        env:
+          ELASTICSEARCH_URL: http://127.0.0.1:9200
+        run: |
+          # Show actual disk headroom ES sees
+          curl -fsS 'http://127.0.0.1:9200/_cat/nodes?v&h=name,ip,disk.used_percent,disk.avail,disk.total'
+
+          # Run ES related tests
+          cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::elasticsearch::)' ${{ matrix.nextest-exclusions-elasticsearch-set-part }}
+
       - name: Postgres database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
-          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
+          DATABASE_URL: postgres://root:root@127.0.0.1:5432/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       - name: MariaDB database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
-          DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
+          DATABASE_URL: mariadb://root:root@127.0.0.1:3306/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       # Not running on windows due to line ending differences

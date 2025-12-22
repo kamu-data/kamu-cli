@@ -15,7 +15,6 @@ use crate::ElasticsearchClientConfig;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DEFAULT_ELASTICSEARCH_USER: &str = "elastic";
-const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,18 +31,17 @@ impl ElasticsearchClient {
 
         let pool = SingleNodeConnectionPool::new(config.url.clone());
 
-        let builder = TransportBuilder::new(pool)
+        let mut builder = TransportBuilder::new(pool)
             .disable_proxy() // often desirable in k8s
             .timeout(std::time::Duration::from_secs(config.timeout_secs))
-            .request_body_compression(config.enable_compression)
-            .auth(elasticsearch::auth::Credentials::Basic(
+            .request_body_compression(config.enable_compression);
+
+        if let Some(password) = &config.password {
+            builder = builder.auth(elasticsearch::auth::Credentials::Basic(
                 DEFAULT_ELASTICSEARCH_USER.into(),
-                config
-                    .password
-                    .as_ref()
-                    .map(|p| p.as_str().to_string())
-                    .unwrap_or_else(|| DEFAULT_ELASTICSEARCH_PASSWORD.into()),
+                password.clone(),
             ));
+        }
 
         let transport = builder.build()?;
         let client = elasticsearch::Elasticsearch::new(transport);
@@ -212,6 +210,9 @@ impl ElasticsearchClient {
     ) -> Result<(), ElasticsearchClientError> {
         tracing::debug!(index_name, body = ?body, "Creating Elasticsearch index");
 
+        let started = std::time::Instant::now();
+        tracing::info!(len = body.to_string().len(), "Creating index...");
+
         let response = self
             .client
             .indices()
@@ -221,6 +222,8 @@ impl ElasticsearchClient {
             .body(body)
             .send()
             .await?;
+
+        tracing::info!(elapsed = ?started.elapsed(), "Create index returned");
 
         let _ = ensure_client_response(response).await?;
         Ok(())
