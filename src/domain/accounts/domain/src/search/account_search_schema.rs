@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,38 +28,38 @@ pub const FIELD_UPDATED_AT: &str = "updated_at";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
-    FullTextSchemaField {
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
+    SearchSchemaField {
         path: FIELD_ACCOUNT_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_DISPLAY_NAME,
-        role: FullTextSchemaFieldRole::Name,
+        role: SearchSchemaFieldRole::Name,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_CREATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_UPDATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: FIELD_ACCOUNT_NAME,
     enable_banning: true,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

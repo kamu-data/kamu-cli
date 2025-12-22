@@ -11,20 +11,20 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 
-use crate::{FullTextSearchEntitySchema, FullTextSearchRepository};
+use crate::{SearchEntitySchema, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FullTextSearchEntitySchemaProvider: Send + Sync {
+pub trait SearchEntitySchemaProvider: Send + Sync {
     fn provider_name(&self) -> &'static str;
 
-    fn provide_schemas(&self) -> &[FullTextSearchEntitySchema];
+    fn provide_schemas(&self) -> &[SearchEntitySchema];
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
-        schema: &FullTextSearchEntitySchema,
+        repo: Arc<dyn SearchRepository>,
+        schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError>;
 }
 

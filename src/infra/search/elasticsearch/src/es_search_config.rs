@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchConfig {
+pub struct ElasticSearchConfig {
     pub url: url::Url,
     pub password: Option<String>,
     pub index_prefix: String,
@@ -21,7 +21,7 @@ pub struct ElasticSearchFullTextSearchConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchContainerConfig {
+pub struct ElasticSearchContainerConfig {
     pub image: String,
     pub start_timeout: std::time::Duration,
 }

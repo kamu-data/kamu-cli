@@ -14,7 +14,7 @@ use kamu_search::*;
 pub struct ElasticSearchQueryBuilder {}
 
 impl ElasticSearchQueryBuilder {
-    pub fn build_search_query(request: &FullTextSearchRequest) -> serde_json::Value {
+    pub fn build_search_query(request: &SearchRequest) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),
             "sort": Self::sort_argument(request),
@@ -34,7 +34,7 @@ impl ElasticSearchQueryBuilder {
         query_json
     }
 
-    fn query_argument(request: &FullTextSearchRequest) -> serde_json::Value {
+    fn query_argument(request: &SearchRequest) -> serde_json::Value {
         let textual_query = Self::textual_query(request);
         if let Some(filter_expr) = &request.filter {
             let filter = Self::filter(filter_expr);
@@ -49,7 +49,7 @@ impl ElasticSearchQueryBuilder {
         }
     }
 
-    fn textual_query(request: &FullTextSearchRequest) -> serde_json::Value {
+    fn textual_query(request: &SearchRequest) -> serde_json::Value {
         let query = request.query.as_ref().map(|q| q.trim());
         if let Some(query) = query {
             serde_json::json!({
@@ -65,10 +65,10 @@ impl ElasticSearchQueryBuilder {
         }
     }
 
-    fn filter(filter_expr: &FullTextSearchFilterExpr) -> serde_json::Value {
+    fn filter(filter_expr: &SearchFilterExpr) -> serde_json::Value {
         match filter_expr {
-            FullTextSearchFilterExpr::Field { field, op } => match op {
-                FullTextSearchFilterOp::Eq(value) => {
+            SearchFilterExpr::Field { field, op } => match op {
+                SearchFilterOp::Eq(value) => {
                     serde_json::json!({
                         "term": {
                             *field: value
@@ -76,7 +76,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Ne(value) => {
+                SearchFilterOp::Ne(value) => {
                     serde_json::json!({
                         "bool": {
                             "must_not": {
@@ -88,7 +88,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Lt(value) => {
+                SearchFilterOp::Lt(value) => {
                     serde_json::json!({
                         "range": {
                             *field: {
@@ -98,7 +98,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Lte(value) => {
+                SearchFilterOp::Lte(value) => {
                     serde_json::json!({
                         "range": {
                             *field: {
@@ -108,7 +108,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Gt(value) => {
+                SearchFilterOp::Gt(value) => {
                     serde_json::json!({
                         "range": {
                             *field: {
@@ -118,7 +118,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Gte(value) => {
+                SearchFilterOp::Gte(value) => {
                     serde_json::json!({
                         "range": {
                             *field: {
@@ -128,7 +128,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::In(values) => {
+                SearchFilterOp::In(values) => {
                     serde_json::json!({
                         "terms": {
                             *field: values
@@ -136,7 +136,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
 
-                FullTextSearchFilterOp::Prefix(prefix) => {
+                SearchFilterOp::Prefix(prefix) => {
                     serde_json::json!({
                         "prefix": {
                             *field: prefix
@@ -144,7 +144,7 @@ impl ElasticSearchQueryBuilder {
                     })
                 }
             },
-            FullTextSearchFilterExpr::And(operands) => {
+            SearchFilterExpr::And(operands) => {
                 let parts = operands.iter().map(Self::filter).collect::<Vec<_>>();
                 serde_json::json!({
                     "bool": {
@@ -152,7 +152,7 @@ impl ElasticSearchQueryBuilder {
                     },
                 })
             }
-            FullTextSearchFilterExpr::Or(operands) => {
+            SearchFilterExpr::Or(operands) => {
                 let parts = operands.iter().map(Self::filter).collect::<Vec<_>>();
                 serde_json::json!({
                     "bool": {
@@ -161,7 +161,7 @@ impl ElasticSearchQueryBuilder {
                     },
                 })
             }
-            FullTextSearchFilterExpr::Not(operand) => {
+            SearchFilterExpr::Not(operand) => {
                 let part = Self::filter(operand);
                 serde_json::json!({
                     "bool": {
@@ -172,17 +172,17 @@ impl ElasticSearchQueryBuilder {
         }
     }
 
-    fn source_argument(request: &kamu_search::FullTextSearchRequest) -> serde_json::Value {
+    fn source_argument(request: &kamu_search::SearchRequest) -> serde_json::Value {
         match &request.source {
-            FullTextSearchRequestSourceSpec::None => serde_json::json!(false),
+            SearchRequestSourceSpec::None => serde_json::json!(false),
 
-            FullTextSearchRequestSourceSpec::All => serde_json::json!(true),
+            SearchRequestSourceSpec::All => serde_json::json!(true),
 
-            FullTextSearchRequestSourceSpec::Particular(fields) => {
+            SearchRequestSourceSpec::Particular(fields) => {
                 serde_json::json!(fields)
             }
 
-            FullTextSearchRequestSourceSpec::Complex {
+            SearchRequestSourceSpec::Complex {
                 include_patterns,
                 exclude_patterns,
             } => {
@@ -194,7 +194,7 @@ impl ElasticSearchQueryBuilder {
         }
     }
 
-    fn sort_argument(req: &FullTextSearchRequest) -> serde_json::Value {
+    fn sort_argument(req: &SearchRequest) -> serde_json::Value {
         fn relevance_sort() -> serde_json::Value {
             serde_json::json!({"_score": {"order": "desc"}})
         }
@@ -203,8 +203,8 @@ impl ElasticSearchQueryBuilder {
             .sort
             .iter()
             .map(|sort_part| match sort_part {
-                kamu_search::FullTextSortSpec::Relevance => relevance_sort(),
-                kamu_search::FullTextSortSpec::ByField {
+                kamu_search::SearchSortSpec::Relevance => relevance_sort(),
+                kamu_search::SearchSortSpec::ByField {
                     field,
                     direction,
                     nulls_first,
@@ -212,8 +212,8 @@ impl ElasticSearchQueryBuilder {
                     serde_json::json!({
                         *field: {
                             "order": match direction {
-                                FullTextSortDirection::Ascending => "asc",
-                                FullTextSortDirection::Descending => "desc",
+                                SearchSortDirection::Ascending => "asc",
+                                SearchSortDirection::Descending => "desc",
                             },
                             "missing": if *nulls_first { "_first" } else { "_last" },
                             "unmapped_type": "keyword",
@@ -230,7 +230,7 @@ impl ElasticSearchQueryBuilder {
         }
     }
 
-    fn highlight_argument(request: &FullTextSearchRequest) -> Option<serde_json::Value> {
+    fn highlight_argument(request: &SearchRequest) -> Option<serde_json::Value> {
         if request.options.enable_highlighting {
             Some(serde_json::json!({
                 "pre_tags": ["<em>"],

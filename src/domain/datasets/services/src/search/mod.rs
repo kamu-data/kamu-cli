@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_full_text_search_schema_helpers;
-mod dataset_full_text_search_schema_provider;
-mod dataset_full_text_search_updater;
+mod dataset_search_schema_helpers;
+mod dataset_search_schema_provider;
+mod dataset_search_updater;
 
-pub use dataset_full_text_search_schema_provider::*;
-pub use dataset_full_text_search_updater::*;
+pub use dataset_search_schema_provider::*;
+pub use dataset_search_updater::*;

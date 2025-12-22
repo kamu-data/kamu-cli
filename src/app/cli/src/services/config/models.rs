@@ -1073,8 +1073,8 @@ pub struct SearchConfig {
     /// may be inaccessible to user.
     pub overfetch_amount: Option<usize>,
 
-    /// Full-text search configuration
-    pub full_text: Option<FullTextSearchConfig>,
+    /// Search repository configuration
+    pub repo: Option<SearchRepositoryConfig>,
 }
 
 impl SearchConfig {
@@ -1103,8 +1103,8 @@ impl SearchConfig {
             })),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
-            full_text: Some(FullTextSearchConfig::ElasticSearch(
-                FullTextSearchConfigElasticSearch {
+            repo: Some(SearchRepositoryConfig::ElasticSearch(
+                SearchRepositoryConfigElasticSearch {
                     url: "http://localhost:9200".to_string(),
                     password: Some("root".to_string()),
                     index_prefix: Some(String::new()),
@@ -1131,7 +1131,7 @@ impl Default for SearchConfig {
             )),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
-            full_text: Some(FullTextSearchConfig::default()),
+            repo: Some(SearchRepositoryConfig::default()),
         }
     }
 }
@@ -1305,11 +1305,11 @@ impl Default for VectorRepoConfigQdrantContainer {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
-pub enum FullTextSearchConfig {
+pub enum SearchRepositoryConfig {
     #[default]
     Dummy,
-    ElasticSearch(FullTextSearchConfigElasticSearch),
-    ElasticSearchContainer(FullTextSearchConfigElasticSearchContainer),
+    ElasticSearch(SearchRepositoryConfigElasticSearch),
+    ElasticSearchContainer(SearchRepositoryConfigElasticSearchContainer),
 }
 
 #[skip_serializing_none]
@@ -1317,7 +1317,7 @@ pub enum FullTextSearchConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
-pub struct FullTextSearchConfigElasticSearch {
+pub struct SearchRepositoryConfigElasticSearch {
     #[merge(skip)]
     pub url: String,
     pub password: Option<String>,
@@ -1326,7 +1326,7 @@ pub struct FullTextSearchConfigElasticSearch {
     pub enable_compression: Option<bool>,
 }
 
-impl Default for FullTextSearchConfigElasticSearch {
+impl Default for SearchRepositoryConfigElasticSearch {
     fn default() -> Self {
         Self {
             url: "http://localhost:9200".to_string(),
@@ -1343,12 +1343,12 @@ impl Default for FullTextSearchConfigElasticSearch {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[merge(strategy = overwrite_none)]
-pub struct FullTextSearchConfigElasticSearchContainer {
+pub struct SearchRepositoryConfigElasticSearchContainer {
     pub image: Option<String>,
     pub start_timeout: Option<DurationString>,
 }
 
-impl Default for FullTextSearchConfigElasticSearchContainer {
+impl Default for SearchRepositoryConfigElasticSearchContainer {
     fn default() -> Self {
         Self {
             image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),

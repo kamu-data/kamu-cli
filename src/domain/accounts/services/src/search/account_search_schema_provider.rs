@@ -10,37 +10,37 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_accounts::account_full_text_search_schema as account_schema;
+use kamu_accounts::account_search_schema;
 use kamu_search::*;
 
-use super::account_full_text_search_schema_helpers::*;
+use super::account_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
-pub struct AccountFullTextSearchSchemaProvider {
+#[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
+pub struct AccountSearchSchemaProvider {
     expensive_account_repo: Arc<dyn kamu_accounts::ExpensiveAccountRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSchemaProvider {
+impl kamu_search::SearchEntitySchemaProvider for AccountSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
-        "dev.kamu.domain.accounts.AccountFullTextSearchSchemaProvider"
+        "dev.kamu.domain.accounts.AccountSearchSchemaProvider"
     }
 
-    fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
-        &[account_schema::SCHEMA]
+    fn provide_schemas(&self) -> &[kamu_search::SearchEntitySchema] {
+        &[account_search_schema::SCHEMA]
     }
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
-        schema: &FullTextSearchEntitySchema,
+        repo: Arc<dyn SearchRepository>,
+        schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.schema_name == account_schema::SCHEMA_NAME);
+        assert!(schema.schema_name == account_search_schema::SCHEMA_NAME);
 
         // Index accounts in chunks
 
@@ -56,14 +56,14 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
         while let Some(account) = accounts_stream.try_next().await? {
             // Prepare document
             let account_document = index_from_account(&account);
-            operations.push(FullTextUpdateOperation::Index {
+            operations.push(SearchIndexUpdateOperation::Index {
                 id: account.id.to_string(),
                 doc: account_document,
             });
 
             // Index in chunks to avoid memory overwhelming
             if operations.len() >= CHUNK_SIZE {
-                repo.bulk_update(account_schema::SCHEMA_NAME, operations)
+                repo.bulk_update(account_search_schema::SCHEMA_NAME, operations)
                     .await?;
                 total_indexed += CHUNK_SIZE;
                 operations = Vec::new();
@@ -73,7 +73,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for AccountFullTextSearchSc
         // Index remaining documents
         if !operations.is_empty() {
             let remaining_count = operations.len();
-            repo.bulk_update(account_schema::SCHEMA_NAME, operations)
+            repo.bulk_update(account_search_schema::SCHEMA_NAME, operations)
                 .await?;
             total_indexed += remaining_count;
         }

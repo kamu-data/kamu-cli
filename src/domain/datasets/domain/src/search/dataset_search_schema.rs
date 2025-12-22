@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,80 +38,80 @@ pub const FIELD_VALUE_KIND_DERIVATIVE: &str = "derivative";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
-    FullTextSchemaField {
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
+    SearchSchemaField {
         path: FIELD_DATASET_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_ALIAS,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: false,
             enable_edge_ngrams: false,
             enable_inner_ngrams: false,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_OWNER_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_OWNER_ID,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_KIND,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_CREATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_REF_CHANGED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_SCHEMA_FIELDS,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: false,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_DESCRIPTION,
-        role: FullTextSchemaFieldRole::Prose {
+        role: SearchSchemaFieldRole::Prose {
             enable_positions: false, // short prose
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_KEYWORDS,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: FIELD_ATTACHMENTS,
-        role: FullTextSchemaFieldRole::Prose {
+        role: SearchSchemaFieldRole::Prose {
             enable_positions: true, // long prose
         },
     },
 ];
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: FIELD_ALIAS,
     enable_banning: false, // Potentially might be useful for datasets
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

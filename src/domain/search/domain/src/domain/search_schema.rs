@@ -9,35 +9,35 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type FullTextEntityId = String;
-pub type FullTextEntitySchemaName = &'static str;
-pub type FullTextSearchFieldPath = &'static str;
+pub type SearchEntityId = String;
+pub type SearchEntitySchemaName = &'static str;
+pub type SearchFieldPath = &'static str;
 
-pub const FULL_TEXT_SEARCH_ALIAS_TITLE: &str = "title";
-pub const FULL_TEXT_SEARCH_FIELD_IS_BANNED: &str = "is_banned";
+pub const SEARCH_ALIAS_TITLE: &str = "title";
+pub const SEARCH_FIELD_IS_BANNED: &str = "is_banned";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct FullTextSearchEntitySchema {
-    pub schema_name: FullTextEntitySchemaName,
+pub struct SearchEntitySchema {
+    pub schema_name: SearchEntitySchemaName,
     pub version: u32,
-    pub upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
-    pub fields: &'static [FullTextSchemaField],
-    pub title_field: FullTextSearchFieldPath,
+    pub upgrade_mode: SearchEntitySchemaUpgradeMode,
+    pub fields: &'static [SearchSchemaField],
+    pub title_field: SearchFieldPath,
     pub enable_banning: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct FullTextSchemaField {
-    pub path: FullTextSearchFieldPath,
-    pub role: FullTextSchemaFieldRole,
+pub struct SearchSchemaField {
+    pub path: SearchFieldPath,
+    pub role: SearchSchemaFieldRole,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum FullTextSchemaFieldRole {
+pub enum SearchSchemaFieldRole {
     Identifier {
         hierarchical: bool,
         enable_edge_ngrams: bool,
@@ -58,7 +58,7 @@ pub enum FullTextSchemaFieldRole {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy)]
-pub enum FullTextSearchEntitySchemaUpgradeMode {
+pub enum SearchEntitySchemaUpgradeMode {
     /// Try to preserve existing data via reindexing into new schema
     Reindex,
 

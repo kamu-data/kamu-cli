@@ -7,24 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::FullTextSearchFieldPath;
+use crate::SearchFieldPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub enum FullTextSortSpec {
+pub enum SearchSortSpec {
     #[default]
     Relevance,
 
     ByField {
-        field: FullTextSearchFieldPath,
-        direction: FullTextSortDirection,
+        field: SearchFieldPath,
+        direction: SearchSortDirection,
         nulls_first: bool,
     },
 }
 
 #[derive(Debug)]
-pub enum FullTextSortDirection {
+pub enum SearchSortDirection {
     Ascending,
     Descending,
 }
@@ -35,45 +35,45 @@ pub enum FullTextSortDirection {
 macro_rules! sort_by {
     // field
     ($field:expr) => {
-        $crate::FullTextSortSpec::ByField {
+        $crate::SearchSortSpec::ByField {
             field: $field.into(),
-            direction: $crate::FullTextSortDirection::Ascending,
+            direction: $crate::SearchSortDirection::Ascending,
             nulls_first: false,
         }
     };
 
     // field, asc
     ($field:expr, asc $(,)?) => {
-        $crate::FullTextSortSpec::ByField {
+        $crate::SearchSortSpec::ByField {
             field: $field.into(),
-            direction: $crate::FullTextSortDirection::Ascending,
+            direction: $crate::SearchSortDirection::Ascending,
             nulls_first: false,
         }
     };
 
     // field, desc
     ($field:expr, desc $(,)?) => {
-        $crate::FullTextSortSpec::ByField {
+        $crate::SearchSortSpec::ByField {
             field: $field.into(),
-            direction: $crate::FullTextSortDirection::Descending,
+            direction: $crate::SearchSortDirection::Descending,
             nulls_first: false,
         }
     };
 
     // field, asc, nulls_first
     ($field:expr, asc, nulls_first $(,)?) => {
-        $crate::FullTextSortSpec::ByField {
+        $crate::SearchSortSpec::ByField {
             field: $field.into(),
-            direction: $crate::FullTextSortDirection::Ascending,
+            direction: $crate::SearchSortDirection::Ascending,
             nulls_first: true,
         }
     };
 
     // field, desc, nulls_first
     ($field:expr, desc, nulls_first $(,)?) => {
-        $crate::FullTextSortSpec::ByField {
+        $crate::SearchSortSpec::ByField {
             field: $field.into(),
-            direction: $crate::FullTextSortDirection::Descending,
+            direction: $crate::SearchSortDirection::Descending,
             nulls_first: true,
         }
     };

@@ -19,16 +19,16 @@ use crate::*;
 
 /// This is a temporary solution that initializes the search index upon the
 /// first call.
-pub struct FullTextSearchImplLazyInit {
+pub struct SearchImplLazyInit {
     is_initialized: tokio::sync::OnceCell<()>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn FullTextSearchService)]
+#[dill::interface(dyn SearchService)]
 #[dill::scope(dill::Singleton)]
-impl FullTextSearchImplLazyInit {
+impl SearchImplLazyInit {
     pub fn new() -> Self {
         Self {
             is_initialized: tokio::sync::OnceCell::new(),
@@ -43,7 +43,7 @@ impl FullTextSearchImplLazyInit {
     }
 
     async fn init(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
-        let indexer = FullTextSearchIndexer::builder().get(catalog).int_err()?;
+        let indexer = SearchIndexer::builder().get(catalog).int_err()?;
 
         use init_on_startup::InitOnStartup;
         indexer.run_initialization().await
@@ -52,12 +52,10 @@ impl FullTextSearchImplLazyInit {
     async fn inner(
         &self,
         catalog: &dill::Catalog,
-    ) -> Result<Arc<dyn FullTextSearchService>, InternalError> {
+    ) -> Result<Arc<dyn SearchService>, InternalError> {
         self.maybe_init(catalog).await?;
 
-        let inner = FullTextSearchServiceImpl::builder()
-            .get(catalog)
-            .int_err()?;
+        let inner = SearchServiceImpl::builder().get(catalog).int_err()?;
 
         Ok(inner)
     }
@@ -66,29 +64,26 @@ impl FullTextSearchImplLazyInit {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FullTextSearchService for FullTextSearchImplLazyInit {
-    async fn health(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-    ) -> Result<serde_json::Value, InternalError> {
+impl SearchService for SearchImplLazyInit {
+    async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
         let inner = self.inner(ctx.catalog).await?;
         inner.health(ctx).await
     }
 
     async fn search(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError> {
+        ctx: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
         let inner = self.inner(ctx.catalog).await?;
         inner.search(ctx, req).await
     }
 
     async fn find_document_by_id(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        ctx: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
         let inner = self.inner(ctx.catalog).await?;
         inner.find_document_by_id(ctx, schema_name, id).await
@@ -96,9 +91,9 @@ impl FullTextSearchService for FullTextSearchImplLazyInit {
 
     async fn bulk_update(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        ctx: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
         let inner = self.inner(ctx.catalog).await?;
         inner.bulk_update(ctx, schema_name, operations).await

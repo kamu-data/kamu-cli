@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::FullTextUpdateOperation;
+use kamu_search::SearchIndexUpdateOperation;
 
 use super::*;
-use crate::ElasticSearchFullTextSearchConfig;
+use crate::ElasticSearchConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,15 +21,13 @@ const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
 
 pub struct ElasticSearchClient {
     client: elasticsearch::Elasticsearch,
-    _config: ElasticSearchFullTextSearchConfig,
+    _config: ElasticSearchConfig,
 }
 
 #[common_macros::method_names_consts]
 impl ElasticSearchClient {
     #[tracing::instrument(level = "info", name = ElasticSearchClient_init, skip_all)]
-    pub fn init(
-        config: ElasticSearchFullTextSearchConfig,
-    ) -> Result<Self, ElasticSearchClientBuildError> {
+    pub fn init(config: ElasticSearchConfig) -> Result<Self, ElasticSearchClientBuildError> {
         use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 
         let pool = SingleNodeConnectionPool::new(config.url.clone());
@@ -385,7 +383,7 @@ impl ElasticSearchClient {
     pub async fn bulk_update(
         &self,
         index_name: &str,
-        operations: Vec<FullTextUpdateOperation>,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), ElasticSearchClientError> {
         use elasticsearch::BulkParts;
 
@@ -398,10 +396,10 @@ impl ElasticSearchClient {
 
         for op in operations {
             match op {
-                FullTextUpdateOperation::Index { id, doc } => {
+                SearchIndexUpdateOperation::Index { id, doc } => {
                     body.push(elasticsearch::BulkOperation::index(doc).id(id).into());
                 }
-                FullTextUpdateOperation::Update {
+                SearchIndexUpdateOperation::Update {
                     id,
                     doc: partial_doc,
                 } => {
@@ -413,7 +411,7 @@ impl ElasticSearchClient {
                         .into(),
                     );
                 }
-                FullTextUpdateOperation::Delete { id } => {
+                SearchIndexUpdateOperation::Delete { id } => {
                     body.push(elasticsearch::BulkOperation::delete(id).into());
                 }
             }

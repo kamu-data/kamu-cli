@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_accounts::{account_full_text_search_schema as account_schema, *};
+use kamu_accounts::*;
 use kamu_search::*;
 use messaging_outbox::*;
 
-use super::account_full_text_search_schema_helpers::*;
+use super::account_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,23 +22,23 @@ use super::account_full_text_search_schema_helpers::*;
 #[dill::interface(dyn messaging_outbox::MessageConsumer)]
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<AccountLifecycleMessage>)]
 #[dill::meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_ACCOUNTS_FULL_TEXT_SEARCH_UPDATER,
+    consumer_name: MESSAGE_CONSUMER_KAMU_ACCOUNTS_SEARCH_UPDATER,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct AccountFullTextSearchUpdater {
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+pub struct AccountSearchUpdater {
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl AccountFullTextSearchUpdater {
+impl AccountSearchUpdater {
     async fn handle_new_account(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         new_account_message: &AccountLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
         let doc = index_from_parts(
@@ -47,11 +47,11 @@ impl AccountFullTextSearchUpdater {
             new_account_message.event_time,
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
-                account_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Index {
+                account_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Index {
                     id: new_account_message.account_id.to_string(),
                     doc,
                 }],
@@ -61,7 +61,7 @@ impl AccountFullTextSearchUpdater {
 
     async fn handle_updated_account(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         updated_account_message: &AccountLifecycleMessageUpdated,
     ) -> Result<(), InternalError> {
         // Only update search index if account_name or display_name changed
@@ -82,11 +82,11 @@ impl AccountFullTextSearchUpdater {
             updated_account_message.event_time,
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
-                account_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Update {
+                account_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Update {
                     id: updated_account_message.account_id.to_string(),
                     doc: partial_update,
                 }],
@@ -96,14 +96,14 @@ impl AccountFullTextSearchUpdater {
 
     async fn handle_deleted_account(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         account_id: &odf::AccountID,
     ) -> Result<(), InternalError> {
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
-                account_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Delete {
+                account_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Delete {
                     id: account_id.to_string(),
                 }],
             )
@@ -113,16 +113,16 @@ impl AccountFullTextSearchUpdater {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for AccountFullTextSearchUpdater {}
+impl MessageConsumer for AccountSearchUpdater {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<AccountLifecycleMessage> for AccountFullTextSearchUpdater {
+impl MessageConsumerT<AccountLifecycleMessage> for AccountSearchUpdater {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "AccountFullTextSearchUpdater[AccountLifecycleMessage]"
+        name = "AccountSearchUpdater[AccountLifecycleMessage]"
     )]
     async fn consume_message(
         &self,
@@ -131,7 +131,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for AccountFullTextSearchUpdater 
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: target_catalog,
         };
 
@@ -149,7 +149,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for AccountFullTextSearchUpdater 
             }
 
             AccountLifecycleMessage::PasswordChanged(_) => {
-                // No-op for full-text search
+                // No-op for search
             }
         }
 

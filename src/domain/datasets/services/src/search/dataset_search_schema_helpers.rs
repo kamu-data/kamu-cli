@@ -9,7 +9,7 @@
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_datasets::{ResolvedDataset, dataset_full_text_search_schema as dataset_schema};
+use kamu_datasets::{ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ pub(crate) async fn index_dataset_from_scratch(
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
 ) -> Result<serde_json::Value, InternalError> {
-    // Find key blocks that contribute to full-text search
+    // Find key blocks that contribute to search
     let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
     let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
     let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
@@ -60,23 +60,23 @@ pub(crate) async fn index_dataset_from_scratch(
     // Convert FieldUpdate to Option for JSON serialization
     // For full indexing, Absent means the chain has no such event (use null)
     let schema_fields_value = match schema_fields {
-        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
-        FullTextSearchFieldUpdate::Present(v) => Some(v),
+        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+        SearchFieldUpdate::Present(v) => Some(v),
     };
     let description_value = match description {
-        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
-        FullTextSearchFieldUpdate::Present(v) => Some(v),
+        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+        SearchFieldUpdate::Present(v) => Some(v),
     };
     let keywords_value = match keywords {
-        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
-        FullTextSearchFieldUpdate::Present(v) => Some(v),
+        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+        SearchFieldUpdate::Present(v) => Some(v),
     };
     let attachments_value = match attachments {
-        FullTextSearchFieldUpdate::Absent | FullTextSearchFieldUpdate::Empty => None,
-        FullTextSearchFieldUpdate::Present(v) => Some(v),
+        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+        SearchFieldUpdate::Present(v) => Some(v),
     };
 
-    use dataset_schema::*;
+    use dataset_search_schema::*;
 
     // Prepare full text search document
     let alias = dataset.get_alias();
@@ -110,7 +110,7 @@ pub(crate) async fn partial_update_for_new_interval(
     new_head: &odf::Multihash,
     maybe_prev_head: Option<&odf::Multihash>,
 ) -> Result<serde_json::Value, InternalError> {
-    // Extract key blocks that contribute to full-text search
+    // Extract key blocks that contribute to search
     let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
     let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
     let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
@@ -160,7 +160,7 @@ pub(crate) async fn partial_update_for_new_interval(
         .int_err()?
         .system_time;
 
-    use dataset_schema::*;
+    use dataset_search_schema::*;
 
     // Prepare partial update to full text search document
     // Only include fields that were actually touched in the interval
@@ -169,10 +169,10 @@ pub(crate) async fn partial_update_for_new_interval(
         serde_json::json!(new_head_event_time.to_rfc3339()),
     )]);
 
-    insert_full_text_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
-    insert_full_text_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
-    insert_full_text_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
-    insert_full_text_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
+    insert_search_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
+    insert_search_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
+    insert_search_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
+    insert_search_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
 
     Ok(serde_json::Value::Object(update))
 }
@@ -180,7 +180,7 @@ pub(crate) async fn partial_update_for_new_interval(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_json::Value {
-    use dataset_schema::*;
+    use dataset_search_schema::*;
     serde_json::json!({
         FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
@@ -193,7 +193,7 @@ pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_
 
 fn extract_schema_field_names(
     schema_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetDataSchema>,
-) -> FullTextSearchFieldUpdate<Vec<String>> {
+) -> SearchFieldUpdate<Vec<String>> {
     schema_visitor
         .into_event()
         .map(|e| {
@@ -205,61 +205,55 @@ fn extract_schema_field_names(
                 .map(|f| f.name.clone())
                 .collect();
             if schema_field_names.is_empty() {
-                FullTextSearchFieldUpdate::Empty
+                SearchFieldUpdate::Empty
             } else {
-                FullTextSearchFieldUpdate::Present(schema_field_names)
+                SearchFieldUpdate::Present(schema_field_names)
             }
         })
-        .unwrap_or(FullTextSearchFieldUpdate::Absent)
+        .unwrap_or(SearchFieldUpdate::Absent)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn extract_description_and_keywords(
     info_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetInfo>,
-) -> (
-    FullTextSearchFieldUpdate<String>,
-    FullTextSearchFieldUpdate<Vec<String>>,
-) {
+) -> (SearchFieldUpdate<String>, SearchFieldUpdate<Vec<String>>) {
     info_visitor
         .into_event()
         .map(|e| {
             let description_update = match e.description {
-                None => FullTextSearchFieldUpdate::Empty,
-                Some(s) if s.is_empty() => FullTextSearchFieldUpdate::Empty,
-                Some(s) => FullTextSearchFieldUpdate::Present(s),
+                None => SearchFieldUpdate::Empty,
+                Some(s) if s.is_empty() => SearchFieldUpdate::Empty,
+                Some(s) => SearchFieldUpdate::Present(s),
             };
             let keywords_update = match e.keywords {
-                None => FullTextSearchFieldUpdate::Empty,
-                Some(v) if v.is_empty() => FullTextSearchFieldUpdate::Empty,
-                Some(v) => FullTextSearchFieldUpdate::Present(v),
+                None => SearchFieldUpdate::Empty,
+                Some(v) if v.is_empty() => SearchFieldUpdate::Empty,
+                Some(v) => SearchFieldUpdate::Present(v),
             };
             (description_update, keywords_update)
         })
-        .unwrap_or((
-            FullTextSearchFieldUpdate::Absent,
-            FullTextSearchFieldUpdate::Absent,
-        ))
+        .unwrap_or((SearchFieldUpdate::Absent, SearchFieldUpdate::Absent))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn extract_attachment_contents(
     attachments_visitor: odf::dataset::SearchSingleTypedBlockVisitor<odf::metadata::SetAttachments>,
-) -> FullTextSearchFieldUpdate<Vec<String>> {
+) -> SearchFieldUpdate<Vec<String>> {
     attachments_visitor
         .into_event()
         .map(|e| match e.attachments {
             odf::metadata::Attachments::Embedded(a) => {
                 let items: Vec<String> = a.items.into_iter().map(|a| a.content).collect();
                 if items.is_empty() {
-                    FullTextSearchFieldUpdate::Empty
+                    SearchFieldUpdate::Empty
                 } else {
-                    FullTextSearchFieldUpdate::Present(items)
+                    SearchFieldUpdate::Present(items)
                 }
             }
         })
-        .unwrap_or(FullTextSearchFieldUpdate::Absent)
+        .unwrap_or(SearchFieldUpdate::Absent)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

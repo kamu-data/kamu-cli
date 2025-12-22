@@ -1069,7 +1069,7 @@ pub fn register_config_in_catalog(
         vector_repo,
         overfetch_factor,
         overfetch_amount,
-        full_text,
+        repo,
     } = config.search.clone().unwrap();
 
     // Note: this is specific to CLI:
@@ -1143,43 +1143,39 @@ pub fn register_config_in_catalog(
     //
 
     // Note: this is specific to CLI:
-    // - we are not registering FullTextSearchIndexer startup job here to avoid
-    //   heavyweight load in CLI commands
+    // - we are not registering SearchIndexer startup job here to avoid heavyweight
+    //   load in CLI commands
     // - lazy init wrapper encapsulates the indexing launch on first search API use
     //   (could be quite a long startup time, indexing itself + container start, if
     //   containers are used)
     // - lazy init wrapper is unnecessary in server mode
 
-    match full_text.unwrap_or_default() {
-        config::FullTextSearchConfig::Dummy => {
+    match repo.unwrap_or_default() {
+        config::SearchRepositoryConfig::Dummy => {
             // no lazy init needed for dummy impl
-            catalog_builder.add::<kamu_search_services::DummyFullTextSearchService>();
+            catalog_builder.add::<kamu_search_services::DummySearchService>();
         }
 
-        config::FullTextSearchConfig::ElasticSearch(mut cfg) => {
-            cfg.merge(config::FullTextSearchConfigElasticSearch::default());
+        config::SearchRepositoryConfig::ElasticSearch(mut cfg) => {
+            cfg.merge(config::SearchRepositoryConfigElasticSearch::default());
 
-            catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
-            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepo>();
-            catalog_builder.add_value(
-                kamu_search_elasticsearch::ElasticSearchFullTextSearchConfig {
-                    url: url::Url::parse(&cfg.url).int_err()?,
-                    password: cfg.password,
-                    index_prefix: cfg.index_prefix.unwrap(),
-                    timeout_secs: cfg.timeout_secs.unwrap(),
-                    enable_compression: cfg.enable_compression.unwrap(),
-                },
-            );
+            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchConfig {
+                url: url::Url::parse(&cfg.url).int_err()?,
+                password: cfg.password,
+                index_prefix: cfg.index_prefix.unwrap(),
+                timeout_secs: cfg.timeout_secs.unwrap(),
+                enable_compression: cfg.enable_compression.unwrap(),
+            });
         }
-        config::FullTextSearchConfig::ElasticSearchContainer(cfg) => {
-            catalog_builder.add::<kamu_search_services::FullTextSearchImplLazyInit>();
-            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchFullTextRepoContainer>();
-            catalog_builder.add_value(
-                kamu_search_elasticsearch::ElasticSearchFullTextSearchContainerConfig {
-                    image: cfg.image.unwrap(),
-                    start_timeout: cfg.start_timeout.unwrap().into(),
-                },
-            );
+        config::SearchRepositoryConfig::ElasticSearchContainer(cfg) => {
+            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchContainerRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchContainerConfig {
+                image: cfg.image.unwrap(),
+                start_timeout: cfg.start_timeout.unwrap().into(),
+            });
         }
     }
 

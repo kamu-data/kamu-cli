@@ -14,17 +14,17 @@ use kamu_datasets::{
     DatasetEntryService,
     DatasetRegistry,
     DatasetRegistryExt,
-    dataset_full_text_search_schema as dataset_schema,
+    dataset_search_schema,
 };
 use kamu_search::*;
 
-use super::dataset_full_text_search_schema_helpers::*;
+use super::dataset_search_schema_helpers::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
-pub struct DatasetFullTextSearchSchemaProvider {
+#[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
+pub struct DatasetSearchSchemaProvider {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
 }
@@ -32,21 +32,21 @@ pub struct DatasetFullTextSearchSchemaProvider {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSchemaProvider {
+impl kamu_search::SearchEntitySchemaProvider for DatasetSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
-        "dev.kamu.domain.datasets.DatasetFullTextSearchSchemaProvider"
+        "dev.kamu.domain.datasets.DatasetSearchSchemaProvider"
     }
 
-    fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
-        &[dataset_schema::SCHEMA]
+    fn provide_schemas(&self) -> &[kamu_search::SearchEntitySchema] {
+        &[dataset_search_schema::SCHEMA]
     }
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
-        schema: &FullTextSearchEntitySchema,
+        repo: Arc<dyn SearchRepository>,
+        schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.schema_name == dataset_schema::SCHEMA_NAME);
+        assert!(schema.schema_name == dataset_search_schema::SCHEMA_NAME);
 
         // Process all datasets in chunks
 
@@ -78,14 +78,14 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
             );
 
             // Add dataset document to the chunk
-            operations.push(FullTextUpdateOperation::Index {
+            operations.push(SearchIndexUpdateOperation::Index {
                 id: entry.id.to_string(),
                 doc: dataset_document_json,
             });
 
             // Index in chunks to avoid memory overwhelming
             if operations.len() >= CHUNK_SIZE {
-                repo.bulk_update(dataset_schema::SCHEMA_NAME, operations)
+                repo.bulk_update(dataset_search_schema::SCHEMA_NAME, operations)
                     .await?;
                 total_indexed += CHUNK_SIZE;
                 operations = Vec::new();
@@ -95,7 +95,7 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for DatasetFullTextSearchSc
         // Index remaining documents
         if !operations.is_empty() {
             let remaining_count = operations.len();
-            repo.bulk_update(dataset_schema::SCHEMA_NAME, operations)
+            repo.bulk_update(dataset_search_schema::SCHEMA_NAME, operations)
                 .await?;
             total_indexed += remaining_count;
         }

@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FULL_TEXT_SEARCH_ALIAS_TITLE,
-    FULL_TEXT_SEARCH_FIELD_IS_BANNED,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
+    SEARCH_ALIAS_TITLE,
+    SEARCH_FIELD_IS_BANNED,
+    SearchEntitySchema,
+    SearchSchemaFieldRole,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,11 +126,11 @@ impl ElasticSearchIndexMappings {
         })
     }
 
-    pub fn from_entity_schema(entity_schema: &FullTextSearchEntitySchema) -> Self {
+    pub fn from_entity_schema(entity_schema: &SearchEntitySchema) -> Self {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
             let field_mapping = match field.role {
-                FullTextSchemaFieldRole::Identifier {
+                SearchSchemaFieldRole::Identifier {
                     hierarchical,
                     enable_edge_ngrams,
                     enable_inner_ngrams,
@@ -140,27 +140,27 @@ impl ElasticSearchIndexMappings {
                     enable_inner_ngrams,
                 ),
 
-                FullTextSchemaFieldRole::Name => Self::map_name_field(),
+                SearchSchemaFieldRole::Name => Self::map_name_field(),
 
-                FullTextSchemaFieldRole::Prose { enable_positions } => {
+                SearchSchemaFieldRole::Prose { enable_positions } => {
                     Self::map_prose_field(enable_positions)
                 }
 
-                FullTextSchemaFieldRole::Keyword => Self::map_keyword_field(),
+                SearchSchemaFieldRole::Keyword => Self::map_keyword_field(),
 
-                FullTextSchemaFieldRole::DateTime => serde_json::json!({
+                SearchSchemaFieldRole::DateTime => serde_json::json!({
                     "type": "date"
                 }),
 
-                FullTextSchemaFieldRole::Boolean => serde_json::json!({
+                SearchSchemaFieldRole::Boolean => serde_json::json!({
                     "type": "boolean"
                 }),
 
-                FullTextSchemaFieldRole::Integer => serde_json::json!({
+                SearchSchemaFieldRole::Integer => serde_json::json!({
                     "type": "integer"
                 }),
 
-                FullTextSchemaFieldRole::UnprocessedObject => serde_json::json!({
+                SearchSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
                     "enabled": false
                 }),
@@ -169,7 +169,7 @@ impl ElasticSearchIndexMappings {
         }
 
         mappings.insert(
-            FULL_TEXT_SEARCH_ALIAS_TITLE.to_string(),
+            SEARCH_ALIAS_TITLE.to_string(),
             serde_json::json!({
                 "type": "alias",
                 "path": entity_schema.title_field
@@ -178,7 +178,7 @@ impl ElasticSearchIndexMappings {
 
         if entity_schema.enable_banning {
             mappings.insert(
-                FULL_TEXT_SEARCH_FIELD_IS_BANNED.to_string(),
+                SEARCH_FIELD_IS_BANNED.to_string(),
                 serde_json::json!({
                     "type": "boolean"
                 }),

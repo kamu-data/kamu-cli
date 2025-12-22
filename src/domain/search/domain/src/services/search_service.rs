@@ -10,70 +10,67 @@
 use internal_error::InternalError;
 
 use crate::{
-    FullTextEntityId,
-    FullTextEntitySchemaName,
-    FullTextSearchFieldPath,
-    FullTextSearchRequest,
-    FullTextSearchResponse,
+    SearchEntityId,
+    SearchEntitySchemaName,
+    SearchFieldPath,
+    SearchRequest,
+    SearchResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FullTextSearchService: Send + Sync {
-    async fn health(
-        &self,
-        ctx: FullTextSearchContext<'_>,
-    ) -> Result<serde_json::Value, InternalError>;
+pub trait SearchService: Send + Sync {
+    async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError>;
 
     async fn search(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError>;
+        ctx: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
 
     async fn find_document_by_id(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        ctx: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError>;
 
     async fn bulk_update(
         &self,
-        ctx: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        ctx: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy)]
-pub struct FullTextSearchContext<'a> {
+pub struct SearchContext<'a> {
     pub catalog: &'a dill::Catalog,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum FullTextUpdateOperation {
+pub enum SearchIndexUpdateOperation {
     Index {
-        id: FullTextEntityId,
+        id: SearchEntityId,
         doc: serde_json::Value,
     },
     Update {
-        id: FullTextEntityId,
+        id: SearchEntityId,
         doc: serde_json::Value,
     },
     Delete {
-        id: FullTextEntityId,
+        id: SearchEntityId,
     },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents the state of a field extraction in incremental indexing
-pub enum FullTextSearchFieldUpdate<T> {
+pub enum SearchFieldUpdate<T> {
     /// Field was not present in the interval (no corresponding event)
     Absent,
     /// Field was present but empty (event exists, but data cleared)
@@ -85,17 +82,17 @@ pub enum FullTextSearchFieldUpdate<T> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Helper to conditionally insert field based on update state
-pub fn insert_full_text_incremental_update_field<T: serde::Serialize>(
+pub fn insert_search_incremental_update_field<T: serde::Serialize>(
     incremental_update: &mut serde_json::Map<String, serde_json::Value>,
-    field_path: FullTextSearchFieldPath,
-    field_update: FullTextSearchFieldUpdate<T>,
+    field_path: SearchFieldPath,
+    field_update: SearchFieldUpdate<T>,
 ) {
     match field_update {
-        FullTextSearchFieldUpdate::Absent => {}
-        FullTextSearchFieldUpdate::Empty => {
+        SearchFieldUpdate::Absent => {}
+        SearchFieldUpdate::Empty => {
             incremental_update.insert(field_path.to_string(), serde_json::json!(null));
         }
-        FullTextSearchFieldUpdate::Present(v) => {
+        SearchFieldUpdate::Present(v) => {
             incremental_update.insert(field_path.to_string(), serde_json::json!(v));
         }
     }

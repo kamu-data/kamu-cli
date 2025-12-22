@@ -14,49 +14,46 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FullTextSearchRepository: Send + Sync {
+pub trait SearchRepository: Send + Sync {
     async fn health(&self) -> Result<serde_json::Value, InternalError>;
 
     async fn ensure_entity_index(
         &self,
-        schema: &FullTextSearchEntitySchema,
-    ) -> Result<(), FullTextSearchEnsureEntityIndexError>;
+        schema: &SearchEntitySchema,
+    ) -> Result<(), SearchEnsureEntityIndexError>;
 
     async fn total_documents(&self) -> Result<u64, InternalError>;
 
     async fn documents_of_kind(
         &self,
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
     ) -> Result<u64, InternalError>;
 
-    async fn search(
-        &self,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError>;
+    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError>;
 
     async fn find_document_by_id(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError>;
 
     async fn bulk_update(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum FullTextSearchEnsureEntityIndexError {
+pub enum SearchEnsureEntityIndexError {
     #[error(
         "Entity index schema drift detected for entity '{schema_name}', version {version}: \
          expected mapping hash '{expected_hash}', actual mapping hash '{actual_hash}'"
     )]
     SchemaDriftDetected {
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
         version: u32,
         alias: String,
         index: String,
@@ -69,7 +66,7 @@ pub enum FullTextSearchEnsureEntityIndexError {
          {existing_version} to {attempted_version}"
     )]
     DowngradeAttempted {
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
         existing_version: u32,
         alias: String,
         index: String,

@@ -7,42 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::FullTextSearchFieldPath;
+use crate::SearchFieldPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum FullTextSearchFilterExpr {
+pub enum SearchFilterExpr {
     Field {
-        field: FullTextSearchFieldPath,
-        op: FullTextSearchFilterOp,
+        field: SearchFieldPath,
+        op: SearchFilterOp,
     },
 
-    And(Vec<FullTextSearchFilterExpr>),
+    And(Vec<SearchFilterExpr>),
 
-    Or(Vec<FullTextSearchFilterExpr>),
+    Or(Vec<SearchFilterExpr>),
 
-    Not(Box<FullTextSearchFilterExpr>),
+    Not(Box<SearchFilterExpr>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl FullTextSearchFilterExpr {
-    pub fn and_clauses(clauses: Vec<FullTextSearchFilterExpr>) -> Self {
+impl SearchFilterExpr {
+    pub fn and_clauses(clauses: Vec<SearchFilterExpr>) -> Self {
         assert!(!clauses.is_empty());
         if clauses.len() == 1 {
             clauses.into_iter().next().unwrap()
         } else {
-            FullTextSearchFilterExpr::And(clauses)
+            SearchFilterExpr::And(clauses)
         }
     }
 
-    pub fn or_clauses(clauses: Vec<FullTextSearchFilterExpr>) -> Self {
+    pub fn or_clauses(clauses: Vec<SearchFilterExpr>) -> Self {
         assert!(!clauses.is_empty());
         if clauses.len() == 1 {
             clauses.into_iter().next().unwrap()
         } else {
-            FullTextSearchFilterExpr::Or(clauses)
+            SearchFilterExpr::Or(clauses)
         }
     }
 }
@@ -64,7 +64,7 @@ macro_rules! filter_and {
 
     // 2+ args -> And(vec![...])
     ($first:expr, $($rest:expr),+ $(,)?) => {
-        $crate::FullTextSearchFilterExpr::And(vec![$first, $($rest), +])
+        $crate::SearchFilterExpr::And(vec![$first, $($rest), +])
     };
 }
 
@@ -83,7 +83,7 @@ macro_rules! filter_or {
     };
 
     ($first:expr, $($rest:expr),+ $(,)?) => {
-        $crate::FullTextSearchFilterExpr::Or(vec![$first, $($rest),+])
+        $crate::SearchFilterExpr::Or(vec![$first, $($rest),+])
     };
 }
 
@@ -92,14 +92,14 @@ macro_rules! filter_or {
 #[macro_export]
 macro_rules! filter_not {
     ($expr:expr) => {
-        $crate::FullTextSearchFilterExpr::Not(Box::new($expr))
+        $crate::SearchFilterExpr::Not(Box::new($expr))
     };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum FullTextSearchFilterOp {
+pub enum SearchFilterOp {
     Eq(serde_json::Value),
     Ne(serde_json::Value),
     Lt(serde_json::Value),
@@ -112,32 +112,32 @@ pub enum FullTextSearchFilterOp {
 }
 
 #[inline]
-pub fn field_eq_str(field: FullTextSearchFieldPath, value: &str) -> FullTextSearchFilterExpr {
-    FullTextSearchFilterExpr::Field {
+pub fn field_eq_str(field: SearchFieldPath, value: &str) -> SearchFilterExpr {
+    SearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::Eq(serde_json::json!(value)),
+        op: SearchFilterOp::Eq(serde_json::json!(value)),
     }
 }
 
 #[inline]
-pub fn field_lte_num(field: FullTextSearchFieldPath, value: i64) -> FullTextSearchFilterExpr {
-    FullTextSearchFilterExpr::Field {
+pub fn field_lte_num(field: SearchFieldPath, value: i64) -> SearchFilterExpr {
+    SearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::Lte(serde_json::json!(value)),
+        op: SearchFilterOp::Lte(serde_json::json!(value)),
     }
 }
 
 #[inline]
 pub fn field_in_str<S>(
-    field: FullTextSearchFieldPath,
+    field: SearchFieldPath,
     values: impl IntoIterator<Item = S>,
-) -> FullTextSearchFilterExpr
+) -> SearchFilterExpr
 where
     S: Into<String>,
 {
-    FullTextSearchFilterExpr::Field {
+    SearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::In(
+        op: SearchFilterOp::In(
             values
                 .into_iter()
                 .map(|v| serde_json::Value::String(v.into()))
@@ -147,10 +147,10 @@ where
 }
 
 #[inline]
-pub fn field_prefix(field: FullTextSearchFieldPath, prefix: &str) -> FullTextSearchFilterExpr {
-    FullTextSearchFilterExpr::Field {
+pub fn field_prefix(field: SearchFieldPath, prefix: &str) -> SearchFilterExpr {
+    SearchFilterExpr::Field {
         field,
-        op: FullTextSearchFilterOp::Prefix(prefix.to_string()),
+        op: SearchFilterOp::Prefix(prefix.to_string()),
     }
 }
 

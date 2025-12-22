@@ -1,6 +1,6 @@
 [package]
 name = "kamu-search-elasticsearch"
-description = "Implementation of full-text search using Elasticsearch"
+description = "Implementation of search capability using Elasticsearch"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

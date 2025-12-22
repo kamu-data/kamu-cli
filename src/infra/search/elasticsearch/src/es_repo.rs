@@ -14,28 +14,28 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::*;
 
 use crate::es_helpers::ElasticSearchHighlightExtractor;
-use crate::{ElasticSearchFullTextSearchConfig, es_client, es_helpers};
+use crate::{ElasticSearchConfig, es_client, es_helpers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchFullTextRepo {
-    config: Arc<ElasticSearchFullTextSearchConfig>,
+pub struct ElasticSearchRepository {
+    config: Arc<ElasticSearchConfig>,
     client: tokio::sync::OnceCell<es_client::ElasticSearchClient>,
     state: std::sync::RwLock<State>,
 }
 
 #[derive(Default)]
 struct State {
-    registered_schemas: HashMap<FullTextEntitySchemaName, Arc<FullTextSearchEntitySchema>>,
+    registered_schemas: HashMap<SearchEntitySchemaName, Arc<SearchEntitySchema>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
-#[dill::interface(dyn FullTextSearchRepository)]
-impl ElasticSearchFullTextRepo {
-    pub fn new(config: Arc<ElasticSearchFullTextSearchConfig>) -> Self {
+#[dill::interface(dyn SearchRepository)]
+impl ElasticSearchRepository {
+    pub fn new(config: Arc<ElasticSearchConfig>) -> Self {
         Self {
             config,
             client: tokio::sync::OnceCell::new(),
@@ -55,12 +55,12 @@ impl ElasticSearchFullTextRepo {
     fn resolve_read_index_alias(
         &self,
         client: &es_client::ElasticSearchClient,
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
         let Some(schema) = state.registered_schemas.get(&schema_name) else {
             return Err(InternalError::new(format!(
-                "Entity schema '{schema_name}' is not registered in full-text search repository",
+                "Entity schema '{schema_name}' is not registered in the search repository",
             )));
         };
 
@@ -76,12 +76,12 @@ impl ElasticSearchFullTextRepo {
     fn resolve_writable_index_name(
         &self,
         client: &es_client::ElasticSearchClient,
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
         let Some(schema) = state.registered_schemas.get(&schema_name) else {
             return Err(InternalError::new(format!(
-                "Entity schema '{schema_name}' is not registered in full-text search repository",
+                "Entity schema '{schema_name}' is not registered in the search repository",
             )));
         };
 
@@ -96,8 +96,8 @@ impl ElasticSearchFullTextRepo {
 
     fn resolve_entity_schemas(
         &self,
-        schema_names: &[FullTextEntitySchemaName],
-    ) -> Result<Vec<Arc<FullTextSearchEntitySchema>>, InternalError> {
+        schema_names: &[SearchEntitySchemaName],
+    ) -> Result<Vec<Arc<SearchEntitySchema>>, InternalError> {
         let state = self.state.read().unwrap();
         let mut schemas = Vec::new();
         if schema_names.is_empty() {
@@ -109,8 +109,7 @@ impl ElasticSearchFullTextRepo {
             for schema_name in schema_names {
                 let Some(schema) = state.registered_schemas.get(schema_name) else {
                     return Err(InternalError::new(format!(
-                        "Entity schema '{schema_name}' is not registered in full-text search \
-                         repository",
+                        "Entity schema '{schema_name}' is not registered in the search repository",
                     )));
                 };
                 schemas.push(Arc::clone(schema));
@@ -122,7 +121,7 @@ impl ElasticSearchFullTextRepo {
     fn resolve_read_index_aliases(
         &self,
         client: &es_client::ElasticSearchClient,
-        entity_schemas: &[Arc<FullTextSearchEntitySchema>],
+        entity_schemas: &[Arc<SearchEntitySchema>],
     ) -> Result<Vec<String>, InternalError> {
         assert!(!entity_schemas.is_empty());
 
@@ -135,8 +134,8 @@ impl ElasticSearchFullTextRepo {
     fn map_write_index_names(
         &self,
         client: &es_client::ElasticSearchClient,
-        entity_schemas: &[Arc<FullTextSearchEntitySchema>],
-    ) -> Result<HashMap<String, FullTextEntitySchemaName>, InternalError> {
+        entity_schemas: &[Arc<SearchEntitySchema>],
+    ) -> Result<HashMap<String, SearchEntitySchemaName>, InternalError> {
         assert!(!entity_schemas.is_empty());
 
         entity_schemas
@@ -153,8 +152,8 @@ impl ElasticSearchFullTextRepo {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl FullTextSearchRepository for ElasticSearchFullTextRepo {
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_health skip_all)]
+impl SearchRepository for ElasticSearchRepository {
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_health skip_all)]
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         let client = self.es_client().await?;
         client.cluster_health().await.int_err()
@@ -162,7 +161,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
 
     #[tracing::instrument(
         level = "debug",
-        name=ElasticSearchFullTextRepo_ensure_entity_index,
+        name=ElasticSearchRepository_ensure_entity_index,
         skip_all, fields(
             entity_kind = %schema.schema_name,
             version = schema.version
@@ -170,15 +169,15 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
     )]
     async fn ensure_entity_index(
         &self,
-        schema: &FullTextSearchEntitySchema,
-    ) -> Result<(), FullTextSearchEnsureEntityIndexError> {
+        schema: &SearchEntitySchema,
+    ) -> Result<(), SearchEnsureEntityIndexError> {
         {
             // Check if schema is already registered
             let state = self.state.read().unwrap();
             if let Some(registered_schema) = state.registered_schemas.get(schema.schema_name) {
                 tracing::info!(
                     entity_kind = %schema.schema_name,
-                    "Full-text search entity schema is already registered, skipping",
+                    "Search entity schema is already registered, skipping",
                 );
                 assert!(registered_schema.version == schema.version);
                 return Ok(());
@@ -208,7 +207,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 expected_hash,
                 actual_hash,
             } => {
-                return Err(FullTextSearchEnsureEntityIndexError::SchemaDriftDetected {
+                return Err(SearchEnsureEntityIndexError::SchemaDriftDetected {
                     schema_name: schema.schema_name,
                     version: existing_version,
                     alias,
@@ -223,7 +222,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 existing_version,
                 attempted_version,
             } => {
-                return Err(FullTextSearchEnsureEntityIndexError::DowngradeAttempted {
+                return Err(SearchEnsureEntityIndexError::DowngradeAttempted {
                     schema_name: schema.schema_name,
                     existing_version,
                     attempted_version,
@@ -244,27 +243,24 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_total_documents, skip_all)]
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_total_documents, skip_all)]
     async fn total_documents(&self) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
         client.total_documents().await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_documents_of_kind, skip_all, fields(schema_name))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_documents_of_kind, skip_all, fields(schema_name))]
     async fn documents_of_kind(
         &self,
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
     ) -> Result<u64, InternalError> {
         let client = self.es_client().await?;
         let index_name = self.resolve_writable_index_name(client, schema_name)?; // wriatable index, because we need to count bannned too
         client.documents_in_index(&index_name).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_search, skip_all)]
-    async fn search(
-        &self,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError> {
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_search, skip_all)]
+    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
         let client = self.es_client().await?;
 
         // Resolve entity schemas
@@ -290,7 +286,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
             .int_err()?;
 
         // Translate parsed ElasticSearch response to domain model
-        Ok(FullTextSearchResponse {
+        Ok(SearchResponse {
             took_ms: es_response.took,
             timeout: es_response.timed_out,
             total_hits: es_response.hits.total.value,
@@ -298,7 +294,7 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
                 .hits
                 .hits
                 .into_iter()
-                .map(|hit| FullTextSearchHit {
+                .map(|hit| SearchHit {
                     id: hit.id.unwrap_or_default(),
                     schema_name: schema_names_by_write_index
                         .get(&hit.index)
@@ -317,11 +313,11 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         })
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_find_document_by_id, skip_all, fields(schema_name, id))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]
     async fn find_document_by_id(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
         let client = self.es_client().await?;
         let index_name = self.resolve_read_index_alias(client, schema_name)?;
@@ -332,11 +328,11 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepo {
         Ok(doc)
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticSearchFullTextRepo_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
+    #[tracing::instrument(level = "debug", name=ElasticSearchRepository_bulk_update, skip_all, fields(schema_name, num_operations = operations.len()))]
     async fn bulk_update(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
         let client = self.es_client().await?;
         let index_name = self.resolve_writable_index_name(client, schema_name)?;
