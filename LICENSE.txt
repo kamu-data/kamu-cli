@@ -11,7 +11,7 @@ Business Source License 1.1
 
 Licensor:                  Kamu Data, Inc.
 
-Licensed Work:             Kamu CLI Version 0.254.2
+Licensed Work:             Kamu CLI Version 0.255.0
                            The Licensed Work is © 2025 Kamu Data, Inc.
 
 Additional Use Grant:      You may not use the Licensed Work for a Data Service,
@@ -24,7 +24,7 @@ Additional Use Grant:      You may not use the Licensed Work for a Data Service,
                            Further, you may not distribute the Licensed Work
                            under a different name or a brand.
 
-Change Date:               2029-12-05
+Change Date:               2029-12-22
 
 Change License:            Apache License, Version 2.0
 

@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [0.254.2] - 2025-12-22
+## [0.255.0] - 2025-12-22
 ### Added
 - Support for re-defining the `AddPushSource`
 ### Changed
