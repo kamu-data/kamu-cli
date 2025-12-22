@@ -837,6 +837,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
+        expected_head: Option<String>,
         // TODO: not optional?
         access_level: MoleculeAccessLevel,
         change_by: String,
@@ -877,7 +878,7 @@ impl MoleculeDataRoomMutV2 {
         };
 
         let Some(existing_file_entry) = read_versioned_file_entry_uc
-            .execute(reference.as_ref(), None, None)
+            .execute(reference.as_ref(), expected_head.as_deref(), None)
             .await
             .map_err(|e| {
                 use MoleculeReadVersionedFileEntryError as E;

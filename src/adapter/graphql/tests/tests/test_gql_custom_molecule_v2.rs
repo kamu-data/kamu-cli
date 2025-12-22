@@ -3363,13 +3363,14 @@ async fn test_molecule_v2_data_room_operations() {
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
+                    expectedHead: $expectedHead
                     accessLevel: $accessLevel
                     changeBy: $changeBy
                     description: $description
@@ -3377,7 +3378,7 @@ async fn test_molecule_v2_data_room_operations() {
                     tags: $tags
                     contentText: $contentText
                     encryptionMetadata: $encryptionMetadata
-                  ) {
+                ) {
                     isSuccess
                     message
                   }
@@ -3398,6 +3399,7 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "ref": random_dataset_id.to_string(),
+                "expectedHead": null,
                 "accessLevel": "holder",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "description": "Plain text file that was updated... again",
@@ -3443,6 +3445,7 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "ref": file_1_did,
+                "expectedHead": null,
                 "accessLevel": "holders",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "description": "Plain text file that was updated... again",
@@ -3473,6 +3476,51 @@ async fn test_molecule_v2_data_room_operations() {
                             "updateFileMetadata": {
                                 "isSuccess": true,
                                 "message": "",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+    // CAS failure when expected head mismatches
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_METADATA_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "ref": file_1_did,
+                "expectedHead": "did:odf:any",
+                "accessLevel": "holders",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                "description": "Plain text file that was updated... again",
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                "contentText": "bye bye bye",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1-updated",
+                    "accessControlConditions": "EM2-updated",
+                    "encryptedBy": "EM3-updated",
+                    "encryptedAt": "EM4-updated",
+                    "chain": "EM5-updated",
+                    "litSdkVersion": "EM6-updated",
+                    "litNetwork": "EM7-updated",
+                    "templateName": "EM8-updated",
+                    "contractVersion": "EM9-updated",
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "updateFileMetadata": {
+                                "isSuccess": false,
+                                "message": "Data room linking: CAS failed",
                             }
                         }
                     }
