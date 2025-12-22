@@ -7862,6 +7862,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.254.1"
 dependencies = [
  "async-graphql",
+ "base64 0.21.7",
  "chrono",
  "database-common",
  "datafusion",

@@ -246,6 +246,46 @@ impl AccountApi<'_> {
                 .into()),
         }
     }
+
+    pub async fn set_account_quota_bytes(&self, account_name: impl AsRef<str>, limit_bytes: u64) {
+        let response = self
+            .client
+            .graphql_api_call_ex(
+                async_graphql::Request::new(indoc::indoc!(
+                    r#"
+                    mutation ($accountName: AccountName!, $limitBytes: Int!) {
+                      accounts {
+                        byName(accountName: $accountName) {
+                          quotas {
+                            setAccountQuotas(quotas: { storage: { limitTotalBytes: $limitBytes } }) {
+                              __typename
+                              success
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_value(
+                    async_graphql::value!({
+                        "accountName": account_name.as_ref(),
+                        "limitBytes": limit_bytes,
+                    }),
+                )),
+            )
+            .await;
+
+        assert!(
+            response.errors.is_empty(),
+            "Setting account quota failed: {response:?}"
+        );
+        let data = response.data.into_json().unwrap();
+        let is_success = data["accounts"]["byName"]["quotas"]["setAccountQuotas"]["success"]
+            .as_bool()
+            .unwrap_or(false);
+        assert!(is_success, "Unexpected response: {data:?}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

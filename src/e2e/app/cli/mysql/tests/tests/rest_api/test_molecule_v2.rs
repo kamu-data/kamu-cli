@@ -12,34 +12,23 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture =
-        kamu_cli_e2e_repo_tests::rest_api::test_ingest_dataset_trigger_dependent_datasets_update,
-    options = Options::default().with_kamu_config(indoc::indoc!(
-        r#"
-        kind: CLIConfig
-        version: 1
-        content:
-          flowSystem:
-            flowAgent:
-              awaitingStepSecs: 1
-              mandatoryThrottlingPeriodSecs: 5
-            taskAgent:
-              checkingIntervalSecs: 1
-        "#
-    ))
-    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_data_room_quota_exceeded,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_MOLECULE_QUOTA_CONFIG),
+    extra_test_groups = "containerized, quota, molecule"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::rest_api::test_ingest_respects_account_quota,
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_announcements_quota_exceeded,
     options = Options::default()
         .with_multi_tenant()
-        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_QUOTA_INGEST_TEST_CONFIG),
-    extra_test_groups = "containerized, ingest, quota"
+        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_MOLECULE_QUOTA_CONFIG),
+    extra_test_groups = "containerized, quota, molecule"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

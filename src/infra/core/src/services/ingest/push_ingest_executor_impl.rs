@@ -35,6 +35,7 @@ pub struct PushIngestExecutorImpl {
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
     account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
     account_service: Arc<dyn AccountService>,
+    tenancy_config: TenancyConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,6 +49,11 @@ impl PushIngestExecutorImpl {
         // In single-tenant mode aliases does not carry account names; skip quota check
         // in that case
         let Some(account_name) = target.get_alias().account_name.as_ref() else {
+            assert!(
+                self.tenancy_config != TenancyConfig::MultiTenant,
+                "Dataset alias is missing account name in multi-tenant mode: {}",
+                target.get_alias()
+            );
             return Ok(());
         };
 
