@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -29,6 +28,7 @@ use kamu_datasets::{
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::{assert_eq, assert_matches};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,9 +144,8 @@ async fn test_indexes_datasets_correctly() {
 
     dataset_entries.sort_by(|l, r| l.name.cmp(&r.name));
 
-    pretty_assertions::assert_eq!(
-        dataset_entries,
-        vec![
+    assert_eq!(
+        [
             DatasetEntry {
                 id: dataset_id_1,
                 owner_id: owner_account_id_1.clone(),
@@ -171,7 +170,8 @@ async fn test_indexes_datasets_correctly() {
                 created_at: frozen_time_point(),
                 kind: odf::DatasetKind::Root,
             }
-        ]
+        ],
+        *dataset_entries,
     );
 }
 
