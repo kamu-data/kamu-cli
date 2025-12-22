@@ -14,6 +14,7 @@ use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use kamu_datasets_services::QuotaDefaultsConfig;
 use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl};
 use pretty_assertions::assert_eq;
 use time_source::SystemTimeSourceDefault;
@@ -58,6 +59,7 @@ impl GraphQLAccountQuotasHarness {
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
+            .add_value(QuotaDefaultsConfig::default())
             .add_value(AuthConfig::sample())
             .add_builder(
                 OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
@@ -110,7 +112,7 @@ async fn test_set_and_get_account_quota() {
                 me {
                   quotas {
                     setAccountQuotas(quotas: { storage: { limitTotalBytes: 12345 } }) {
-                      success
+                      isSuccess
                     }
                   }
                 }
@@ -128,7 +130,7 @@ async fn test_set_and_get_account_quota() {
                 "me": {
                     "quotas": {
                         "setAccountQuotas": {
-                            "success": true
+                            "isSuccess": true
                         }
                     }
                 }
@@ -167,6 +169,57 @@ async fn test_set_and_get_account_quota() {
                         "user": {
                             "storage": {
                                 "limitTotalBytes": 12345
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_get_account_quota_default() {
+    let harness = GraphQLAccountQuotasHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
+        .build()
+        .await;
+
+    let get_res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc!(
+            r#"
+            query {
+              accounts {
+                me {
+                  quotas {
+                    user {
+                      storage {
+                        limitTotalBytes
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+
+    assert!(get_res.is_ok(), "{get_res:?}");
+    assert_eq!(
+        get_res.data,
+        value!({
+            "accounts": {
+                "me": {
+                    "quotas": {
+                        "user": {
+                            "storage": {
+                                "limitTotalBytes": 1_000_000_000u64,
                             }
                         }
                     }

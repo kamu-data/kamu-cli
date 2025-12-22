@@ -914,7 +914,7 @@ async fn test_molecule_v2_data_room_quota_exceeded() {
                 me {
                   quotas {
                     setAccountQuotas(quotas: { storage: { limitTotalBytes: $limit } }) {
-                      success
+                      isSuccess
                     }
                   }
                 }
@@ -3717,7 +3717,7 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
                 me {
                   quotas {
                     setAccountQuotas(quotas: { storage: { limitTotalBytes: 1 } }) {
-                      success
+                      isSuccess
                     }
                   }
                 }
