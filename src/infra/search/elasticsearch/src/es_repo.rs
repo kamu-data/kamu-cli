@@ -14,13 +14,14 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::*;
 
 use crate::es_helpers::ElasticSearchHighlightExtractor;
-use crate::{ElasticSearchConfig, es_client, es_helpers};
+use crate::{ElasticSearchClientConfig, ElasticSearchRepositoryConfig, es_client, es_helpers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ElasticSearchRepository {
-    config: Arc<ElasticSearchConfig>,
-    client: tokio::sync::OnceCell<es_client::ElasticSearchClient>,
+    client_config: Arc<ElasticSearchClientConfig>,
+    repo_config: Arc<ElasticSearchRepositoryConfig>,
+    client: tokio::sync::OnceCell<Arc<es_client::ElasticSearchClient>>,
     state: std::sync::RwLock<State>,
 }
 
@@ -35,10 +36,27 @@ struct State {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn SearchRepository)]
 impl ElasticSearchRepository {
-    pub fn new(config: Arc<ElasticSearchConfig>) -> Self {
+    pub fn new(
+        client_config: Arc<ElasticSearchClientConfig>,
+        repo_config: Arc<ElasticSearchRepositoryConfig>,
+    ) -> Self {
         Self {
-            config,
+            client_config,
+            repo_config,
             client: tokio::sync::OnceCell::new(),
+            state: std::sync::RwLock::new(State::default()),
+        }
+    }
+
+    pub fn with_predefined_client(
+        client_config: Arc<ElasticSearchClientConfig>,
+        repo_config: Arc<ElasticSearchRepositoryConfig>,
+        client: Arc<es_client::ElasticSearchClient>,
+    ) -> Self {
+        Self {
+            client_config,
+            repo_config,
+            client: tokio::sync::OnceCell::from(client),
             state: std::sync::RwLock::new(State::default()),
         }
     }
@@ -46,7 +64,11 @@ impl ElasticSearchRepository {
     async fn es_client(&self) -> Result<&es_client::ElasticSearchClient, InternalError> {
         let client = self
             .client
-            .get_or_try_init(async || es_client::ElasticSearchClient::init((*self.config).clone()))
+            .get_or_try_init(async || {
+                let client =
+                    es_client::ElasticSearchClient::init(self.client_config.as_ref()).int_err()?;
+                Ok::<_, InternalError>(Arc::new(client))
+            })
             .await
             .int_err()?;
         Ok(client)
@@ -66,7 +88,7 @@ impl ElasticSearchRepository {
 
         let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
             client,
-            &self.config,
+            &self.repo_config,
             schema.schema_name,
             schema.version,
         );
@@ -87,7 +109,7 @@ impl ElasticSearchRepository {
 
         let entity_index = es_helpers::ElasticSearchVersionedEntityIndex::new(
             client,
-            &self.config,
+            &self.repo_config,
             schema.schema_name,
             schema.version,
         );
@@ -186,7 +208,7 @@ impl SearchRepository for ElasticSearchRepository {
 
         let index = es_helpers::ElasticSearchVersionedEntityIndex::new(
             self.es_client().await?,
-            &self.config,
+            &self.repo_config,
             schema.schema_name,
             schema.version,
         );

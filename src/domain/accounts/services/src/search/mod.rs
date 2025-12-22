@@ -11,5 +11,5 @@ mod account_search_indexer;
 mod account_search_schema_provider;
 mod account_search_updater;
 
-pub(crate) use account_search_schema_provider::*;
-pub(crate) use account_search_updater::*;
+pub use account_search_schema_provider::*;
+pub use account_search_updater::*;

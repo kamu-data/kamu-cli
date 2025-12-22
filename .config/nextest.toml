@@ -8,6 +8,7 @@ setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory
 heavy-engine = { max-threads = 2 }  # Heavy engine tests are very memory-hungry
 database = { max-threads = 8 }  # Don't use too much memory
+elasticsearch = { max-threads = 4 }  # Elasticsearch tests can be parallelized moderately
 
 # NOTE: Periodic missing rows when the system is under load
 #       https://github.com/kamu-data/kamu-engine-risingwave/issues/7
@@ -30,6 +31,10 @@ test-group = "heavy-engine"
 [[profile.default.overrides]]
 filter = "test(::database::)"
 test-group = "database"
+
+[[profile.default.overrides]]
+filter = "test(::elasticsearch::)"
+test-group = "elasticsearch"
 
 [[profile.default.overrides]]
 filter = "test(::flaky::)"

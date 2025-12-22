@@ -1161,12 +1161,14 @@ pub fn register_config_in_catalog(
 
             catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
             catalog_builder.add::<kamu_search_elasticsearch::ElasticSearchRepository>();
-            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchConfig {
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchClientConfig {
                 url: url::Url::parse(&cfg.url).int_err()?,
                 password: cfg.password,
-                index_prefix: cfg.index_prefix.unwrap(),
                 timeout_secs: cfg.timeout_secs.unwrap(),
                 enable_compression: cfg.enable_compression.unwrap(),
+            });
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticSearchRepositoryConfig {
+                index_prefix: cfg.index_prefix.unwrap(),
             });
         }
         config::SearchRepositoryConfig::ElasticSearchContainer(cfg) => {

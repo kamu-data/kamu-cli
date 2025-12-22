@@ -18,14 +18,14 @@ use kamu_search::{
 };
 
 use super::ElasticSearchIndexMappings;
-use crate::ElasticSearchConfig;
+use crate::ElasticSearchRepositoryConfig;
 use crate::es_client::ElasticSearchClient;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ElasticSearchVersionedEntityIndex<'a> {
     client: &'a ElasticSearchClient,
-    config: &'a ElasticSearchConfig,
+    repo_config: &'a ElasticSearchRepositoryConfig,
     schema_name: SearchEntitySchemaName,
     version: u32,
 }
@@ -34,13 +34,13 @@ pub struct ElasticSearchVersionedEntityIndex<'a> {
 impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     pub fn new(
         client: &'a ElasticSearchClient,
-        config: &'a ElasticSearchConfig,
+        repo_config: &'a ElasticSearchRepositoryConfig,
         schema_name: SearchEntitySchemaName,
         version: u32,
     ) -> Self {
         Self {
             client,
-            config,
+            repo_config,
             schema_name,
             version,
         }
@@ -242,19 +242,19 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     }
 
     pub fn alias_name(&self) -> String {
-        if self.config.index_prefix.is_empty() {
+        if self.repo_config.index_prefix.is_empty() {
             self.schema_name.to_string()
         } else {
             format!(
                 "{prefix}-{schema_name}",
-                prefix = self.config.index_prefix,
+                prefix = self.repo_config.index_prefix,
                 schema_name = self.schema_name
             )
         }
     }
 
     pub fn index_name(&self) -> String {
-        if self.config.index_prefix.is_empty() {
+        if self.repo_config.index_prefix.is_empty() {
             format!(
                 "{schema_name}-v{ver}",
                 schema_name = self.schema_name,
@@ -263,7 +263,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
         } else {
             format!(
                 "{prefix}-{schema_name}-{ver}",
-                prefix = self.config.index_prefix,
+                prefix = self.repo_config.index_prefix,
                 schema_name = self.schema_name,
                 ver = self.version
             )

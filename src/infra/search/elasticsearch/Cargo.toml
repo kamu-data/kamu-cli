@@ -20,12 +20,19 @@ workspace = true
 [lib]
 doctest = false
 
+[features]
+default = []
+
+testing = ["dep:random-strings", "dep:kamu-search-elasticsearch-macros"]
+
 
 [dependencies]
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
 internal-error = { workspace = true }
 kamu-search = { workspace = true }
+kamu-search-elasticsearch-macros = { workspace = true, optional = true}
+random-strings = { workspace = true, optional = true}
 
 async-trait = { version = "0.1", default-features = false }
 canonical_json = { version = "0.5", default-features = false }

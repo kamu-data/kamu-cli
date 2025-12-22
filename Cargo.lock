@@ -6984,6 +6984,8 @@ dependencies = [
  "kamu-auth-rebac-services",
  "kamu-datasets",
  "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -6992,6 +6994,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "test-group",
  "test-log",
  "thiserror 2.0.17",
  "time-source",
@@ -8456,6 +8459,8 @@ dependencies = [
  "hex",
  "internal-error",
  "kamu-search",
+ "kamu-search-elasticsearch-macros",
+ "random-strings",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -8463,6 +8468,15 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "kamu-search-elasticsearch-macros"
+version = "0.254.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
 ]
 
 [[package]]

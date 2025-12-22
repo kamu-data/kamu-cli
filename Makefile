@@ -257,10 +257,10 @@ podman-clean:
 test-setup:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::setup::)' --no-capture
 
-# Run all tests excluding databases using nextest and configured concurrency limits
+# Run all tests excluding databases & search using nextest and configured concurrency limits
 .PHONY: test
 test:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::database::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::database::) | test(::elasticsearch::))'
 
 .PHONY: test-full
 test-full:
@@ -269,7 +269,7 @@ test-full:
 # Run all tests excluding the heavy engines and databases
 .PHONY: test-fast
 test-fast:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::database::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::database::) | test(::elasticsearch::))'
 
 .PHONY: test-e2e
 test-e2e:
@@ -278,6 +278,10 @@ test-e2e:
 .PHONY: test-database
 test-database:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::database::)'
+
+.PHONY: test-elasticsearch
+test-elasticsearch:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::elasticsearch::)'
 
 ###############################################################################
 # Benchmarking

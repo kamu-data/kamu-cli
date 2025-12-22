@@ -87,13 +87,17 @@ impl ElasticSearchContainerRepository {
         let url = Url::parse(&format!("http://{runtime_host}:{rest_api_port}")).int_err()?;
         tracing::info!("ElasticSearch container is starting at {url}");
 
-        let inner = ElasticSearchRepository::new(Arc::new(ElasticSearchConfig {
-            url,
-            password: Some(DUMMY_PASSWORD.to_string()),
-            timeout_secs: 5,
-            enable_compression: false,
-            index_prefix: String::new(),
-        }));
+        let inner = ElasticSearchRepository::new(
+            Arc::new(ElasticSearchClientConfig {
+                url,
+                password: Some(DUMMY_PASSWORD.to_string()),
+                timeout_secs: 5,
+                enable_compression: false,
+            }),
+            Arc::new(ElasticSearchRepositoryConfig {
+                index_prefix: String::new(),
+            }),
+        );
 
         Ok(State { container, inner })
     }

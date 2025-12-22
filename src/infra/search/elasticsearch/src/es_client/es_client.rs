@@ -10,7 +10,7 @@
 use kamu_search::SearchIndexUpdateOperation;
 
 use super::*;
-use crate::ElasticSearchConfig;
+use crate::ElasticSearchClientConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,13 +21,13 @@ const DEFAULT_ELASTICSEARCH_PASSWORD: &str = "root";
 
 pub struct ElasticSearchClient {
     client: elasticsearch::Elasticsearch,
-    _config: ElasticSearchConfig,
 }
 
 #[common_macros::method_names_consts]
 impl ElasticSearchClient {
     #[tracing::instrument(level = "info", name = ElasticSearchClient_init, skip_all)]
-    pub fn init(config: ElasticSearchConfig) -> Result<Self, ElasticSearchClientBuildError> {
+    pub fn init(config: &ElasticSearchClientConfig) -> Result<Self, ElasticSearchClientBuildError> {
+        tracing::info!(config = ?config, "Initializing ElasticSearch client");
         use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 
         let pool = SingleNodeConnectionPool::new(config.url.clone());
@@ -47,10 +47,7 @@ impl ElasticSearchClient {
 
         let transport = builder.build()?;
         let client = elasticsearch::Elasticsearch::new(transport);
-        Ok(Self {
-            client,
-            _config: config,
-        })
+        Ok(Self { client })
     }
 
     #[tracing::instrument(level = "debug", name = ElasticSearchClient_cluster_health, skip_all)]
@@ -162,6 +159,51 @@ impl ElasticSearchClient {
         }
     }
 
+    pub async fn list_indices_by_prefix(
+        &self,
+        prefix: &str,
+    ) -> Result<Vec<String>, ElasticSearchClientError> {
+        use elasticsearch::indices::IndicesGetParts;
+
+        let pattern = format!("{prefix}*",);
+        let response = self
+            .client
+            .indices()
+            .get(IndicesGetParts::Index(&[&pattern]))
+            .send()
+            .await?;
+
+        let response = ensure_client_response(response).await?;
+        let body: serde_json::Value = response.json().await?;
+
+        let mut indices = Vec::new();
+        if let Some(obj) = body.as_object() {
+            for (idx_name, _) in obj {
+                indices.push(idx_name.clone());
+            }
+        }
+
+        Ok(indices)
+    }
+
+    #[tracing::instrument(level = "debug", name = ElasticSearchClient_refresh_indices, skip_all, fields(index_names = ?index_names))]
+    pub async fn refresh_indices(
+        &self,
+        index_names: &[&str],
+    ) -> Result<(), ElasticSearchClientError> {
+        use elasticsearch::indices::IndicesRefreshParts;
+
+        let response = self
+            .client
+            .indices()
+            .refresh(IndicesRefreshParts::Index(index_names))
+            .send()
+            .await?;
+
+        let _ = ensure_client_response(response).await?;
+        Ok(())
+    }
+
     #[tracing::instrument(level = "info", name = ElasticSearchClient_create_index, skip_all, fields(index_name))]
     pub async fn create_index(
         &self,
@@ -177,6 +219,24 @@ impl ElasticSearchClient {
                 index_name,
             ))
             .body(body)
+            .send()
+            .await?;
+
+        let _ = ensure_client_response(response).await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "info", name = ElasticSearchClient_delete_indices_bulk, skip_all, fields(index_names = ?index_names))]
+    pub async fn delete_indices_bulk(
+        &self,
+        index_names: &[&str],
+    ) -> Result<(), ElasticSearchClientError> {
+        use elasticsearch::indices::IndicesDeleteParts;
+
+        let response = self
+            .client
+            .indices()
+            .delete(IndicesDeleteParts::Index(index_names))
             .send()
             .await?;
 
