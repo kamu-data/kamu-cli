@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use kamu_accounts::account_search_schema;
 use kamu_search::*;
 
-use super::account_search_schema_helpers::*;
+use crate::search::account_search_indexer::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,48 +37,11 @@ impl kamu_search::SearchEntitySchemaProvider for AccountSearchSchemaProvider {
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn SearchRepository>,
+        search_repo: Arc<dyn SearchRepository>,
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
         assert!(schema.schema_name == account_search_schema::SCHEMA_NAME);
-
-        // Index accounts in chunks
-
-        const CHUNK_SIZE: usize = 500;
-
-        use kamu_accounts::ExpensiveAccountRepositoryExt;
-        let mut accounts_stream = self.expensive_account_repo.all_accounts();
-
-        let mut operations = Vec::new();
-        let mut total_indexed = 0;
-
-        use futures::TryStreamExt;
-        while let Some(account) = accounts_stream.try_next().await? {
-            // Prepare document
-            let account_document = index_from_account(&account);
-            operations.push(SearchIndexUpdateOperation::Index {
-                id: account.id.to_string(),
-                doc: account_document,
-            });
-
-            // Index in chunks to avoid memory overwhelming
-            if operations.len() >= CHUNK_SIZE {
-                repo.bulk_update(account_search_schema::SCHEMA_NAME, operations)
-                    .await?;
-                total_indexed += CHUNK_SIZE;
-                operations = Vec::new();
-            }
-        }
-
-        // Index remaining documents
-        if !operations.is_empty() {
-            let remaining_count = operations.len();
-            repo.bulk_update(account_search_schema::SCHEMA_NAME, operations)
-                .await?;
-            total_indexed += remaining_count;
-        }
-
-        Ok(total_indexed)
+        index_accounts(self.expensive_account_repo.as_ref(), search_repo.as_ref()).await
     }
 }
 

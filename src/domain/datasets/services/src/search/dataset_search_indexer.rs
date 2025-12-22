@@ -9,9 +9,11 @@
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_datasets::{ResolvedDataset, dataset_search_schema};
+use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn index_dataset_from_scratch(
@@ -81,24 +83,24 @@ pub(crate) async fn index_dataset_from_scratch(
     // Prepare full text search document
     let alias = dataset.get_alias();
     Ok(serde_json::json!({
-        FIELD_DATASET_NAME: alias.dataset_name.to_string(),
-        FIELD_ALIAS: alias.to_string(),
-        FIELD_OWNER_NAME: alias
+        fields::DATASET_NAME: alias.dataset_name.to_string(),
+        fields::ALIAS: alias.to_string(),
+        fields::OWNER_NAME: alias
             .account_name
             .as_ref()
             .map(std::string::ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        FIELD_OWNER_ID: owner_id.to_string(),
-        FIELD_KIND: match dataset.get_kind() {
-            odf::DatasetKind::Root => FIELD_VALUE_KIND_ROOT.to_string(),
-            odf::DatasetKind::Derivative => FIELD_VALUE_KIND_DERIVATIVE.to_string(),
+        fields::OWNER_ID: owner_id.to_string(),
+        fields::KIND: match dataset.get_kind() {
+            odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
+            odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
         },
-        FIELD_CREATED_AT: seed_event_time.to_rfc3339(),
-        FIELD_REF_CHANGED_AT: head_event_time.to_rfc3339(),
-        FIELD_SCHEMA_FIELDS: schema_fields_value,
-        FIELD_DESCRIPTION: description_value,
-        FIELD_KEYWORDS: keywords_value,
-        FIELD_ATTACHMENTS: attachments_value,
+        fields::CREATED_AT: seed_event_time.to_rfc3339(),
+        fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
+        fields::SCHEMA_FIELDS: schema_fields_value,
+        fields::DESCRIPTION: description_value,
+        fields::KEYWORDS: keywords_value,
+        fields::ATTACHMENTS: attachments_value,
     }))
 }
 
@@ -165,14 +167,14 @@ pub(crate) async fn partial_update_for_new_interval(
     // Prepare partial update to full text search document
     // Only include fields that were actually touched in the interval
     let mut update = serde_json::Map::from_iter([(
-        FIELD_REF_CHANGED_AT.to_string(),
+        fields::REF_CHANGED_AT.to_string(),
         serde_json::json!(new_head_event_time.to_rfc3339()),
     )]);
 
-    insert_search_incremental_update_field(&mut update, FIELD_SCHEMA_FIELDS, schema_fields);
-    insert_search_incremental_update_field(&mut update, FIELD_DESCRIPTION, description);
-    insert_search_incremental_update_field(&mut update, FIELD_KEYWORDS, keywords);
-    insert_search_incremental_update_field(&mut update, FIELD_ATTACHMENTS, attachments);
+    insert_search_incremental_update_field(&mut update, fields::SCHEMA_FIELDS, schema_fields);
+    insert_search_incremental_update_field(&mut update, fields::DESCRIPTION, description);
+    insert_search_incremental_update_field(&mut update, fields::KEYWORDS, keywords);
+    insert_search_incremental_update_field(&mut update, fields::ATTACHMENTS, attachments);
 
     Ok(serde_json::Value::Object(update))
 }
@@ -182,10 +184,10 @@ pub(crate) async fn partial_update_for_new_interval(
 pub(crate) fn partial_update_for_rename(new_alias: &odf::DatasetAlias) -> serde_json::Value {
     use dataset_search_schema::*;
     serde_json::json!({
-        FIELD_OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
+        fields::OWNER_NAME: new_alias.account_name.as_ref().map(ToString::to_string)
             .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        FIELD_DATASET_NAME: new_alias.dataset_name.to_string(),
-        FIELD_ALIAS: new_alias.to_string(),
+        fields::DATASET_NAME: new_alias.dataset_name.to_string(),
+        fields::ALIAS: new_alias.to_string(),
     })
 }
 
@@ -254,6 +256,70 @@ fn extract_attachment_contents(
             }
         })
         .unwrap_or(SearchFieldUpdate::Absent)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Indexing function
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn index_datasets(
+    dataset_entry_service: &dyn DatasetEntryService,
+    dataset_registry: &dyn DatasetRegistry,
+    search_repo: &dyn SearchRepository,
+) -> Result<usize, InternalError> {
+    const BULK_SIZE: usize = 500;
+
+    let mut entries_stream = dataset_entry_service.all_entries();
+
+    let mut operations = Vec::new();
+    let mut total_indexed = 0;
+
+    use futures::TryStreamExt;
+    use kamu_datasets::DatasetRegistryExt;
+    while let Some(entry) = entries_stream.try_next().await? {
+        // Resolve dataset
+        let dataset = dataset_registry
+            .get_dataset_by_id(&entry.id)
+            .await
+            .int_err()?;
+
+        // Index dataset
+        let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
+        let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
+
+        tracing::debug!(
+            dataset_id = %entry.id,
+            dataset_name = %entry.name,
+            search_document = %dataset_document_json,
+            "Indexed dataset search document",
+        );
+
+        // Add dataset document to the chunk
+        operations.push(SearchIndexUpdateOperation::Index {
+            id: entry.id.to_string(),
+            doc: dataset_document_json,
+        });
+
+        // Index in chunks to avoid memory overwhelming
+        if operations.len() >= BULK_SIZE {
+            search_repo
+                .bulk_update(dataset_search_schema::SCHEMA_NAME, operations)
+                .await?;
+            total_indexed += BULK_SIZE;
+            operations = Vec::new();
+        }
+    }
+
+    // Index remaining documents
+    if !operations.is_empty() {
+        let remaining_count = operations.len();
+        search_repo
+            .bulk_update(dataset_search_schema::SCHEMA_NAME, operations)
+            .await?;
+        total_indexed += remaining_count;
+    }
+
+    Ok(total_indexed)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

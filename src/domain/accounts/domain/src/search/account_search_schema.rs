@@ -21,16 +21,18 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_ACCOUNT_NAME: &str = "account_name";
-pub const FIELD_DISPLAY_NAME: &str = "display_name";
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+pub mod fields {
+    pub const ACCOUNT_NAME: &str = "account_name";
+    pub const DISPLAY_NAME: &str = "display_name";
+    pub const CREATED_AT: &str = "created_at";
+    pub const UPDATED_AT: &str = "updated_at";
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     SearchSchemaField {
-        path: FIELD_ACCOUNT_NAME,
+        path: fields::ACCOUNT_NAME,
         role: SearchSchemaFieldRole::Identifier {
             hierarchical: true,
             enable_edge_ngrams: true,
@@ -38,15 +40,15 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         },
     },
     SearchSchemaField {
-        path: FIELD_DISPLAY_NAME,
+        path: fields::DISPLAY_NAME,
         role: SearchSchemaFieldRole::Name,
     },
     SearchSchemaField {
-        path: FIELD_CREATED_AT,
+        path: fields::CREATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
     SearchSchemaField {
-        path: FIELD_UPDATED_AT,
+        path: fields::UPDATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
 ];
@@ -57,7 +59,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
-    title_field: FIELD_ACCOUNT_NAME,
+    title_field: fields::ACCOUNT_NAME,
     enable_banning: true,
     upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
 };

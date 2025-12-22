@@ -23,7 +23,7 @@ pub trait SearchEntitySchemaProvider: Send + Sync {
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn SearchRepository>,
+        search_repo: Arc<dyn SearchRepository>,
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError>;
 }

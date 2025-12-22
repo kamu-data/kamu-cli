@@ -14,7 +14,7 @@ use kamu_accounts::*;
 use kamu_search::*;
 use messaging_outbox::*;
 
-use super::account_search_schema_helpers::*;
+use crate::search::account_search_indexer::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

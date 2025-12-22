@@ -19,7 +19,7 @@ use kamu_datasets::*;
 use kamu_search::*;
 use messaging_outbox::*;
 
-use super::dataset_search_schema_helpers::*;
+use crate::search::dataset_search_indexer::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
