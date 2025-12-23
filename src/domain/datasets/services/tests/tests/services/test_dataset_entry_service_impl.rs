@@ -35,6 +35,7 @@ use time_source::{FakeSystemTimeSource, SystemTimeSource};
 test_utils::test_for_each_tenancy!(test_indexes_datasets_correctly);
 test_utils::test_for_each_tenancy!(test_try_to_resolve_non_existing_dataset);
 test_utils::test_for_each_tenancy!(test_try_to_resolve_all_datasets_for_non_existing_user);
+test_utils::test_for_each_tenancy!(test_resolve_dataset_handles_by_refs);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -59,7 +60,8 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
         dataset_entry_collector.clone(),
     );
 
-    let harness = DatasetEntryServiceHarness::new(mock_dataset_entry_repository, tenancy_config);
+    let harness =
+        DatasetEntryServiceHarness::new(mock_dataset_entry_repository.into(), tenancy_config);
 
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
@@ -185,7 +187,7 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
 
 async fn test_try_to_resolve_non_existing_dataset(tenancy_config: TenancyConfig) {
     let harness =
-        DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new(), tenancy_config);
+        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
 
     let dataset_ref = odf::DatasetAlias::new(
         Some(odf::AccountName::new_unchecked("foo")),
@@ -210,7 +212,7 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user(tenancy_config: 
     use futures::TryStreamExt;
 
     let harness =
-        DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new(), tenancy_config);
+        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
 
     let resolve_dataset_result = harness
         .dataset_registry
@@ -222,8 +224,119 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user(tenancy_config: 
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
+    let harness =
+        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
+
+    let account_1 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-1");
+    let account_2 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-2");
+
+    for account in [&account_1, &account_2] {
+        harness.account_repo.save_account(account).await.unwrap();
+    }
+
+    let [
+        account_1_dataset_1_handle,
+        account_1_dataset_2_handle,
+        account_2_dataset_3_handle,
+    ] = [
+        (&account_1, "dataset-1"),
+        (&account_1, "dataset-2"),
+        (&account_2, "dataset-3"),
+    ]
+    .map(|(account, dataset_name)| {
+        let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+        let dataset_alias = tenancy_config.make_alias(
+            account.account_name.clone(),
+            odf::DatasetName::new_unchecked(dataset_name),
+        );
+        odf::DatasetHandle::new(dataset_id, dataset_alias, odf::DatasetKind::Root)
+    });
+
+    for (dataset_handle, account) in [
+        (&account_1_dataset_1_handle, &account_1),
+        (&account_1_dataset_2_handle, &account_1),
+        (&account_2_dataset_3_handle, &account_2),
+    ] {
+        harness
+            .dataset_entry_writer
+            .create_entry(
+                &dataset_handle.id,
+                &account.id,
+                &account.account_name,
+                &dataset_handle.alias.dataset_name,
+                dataset_handle.kind,
+            )
+            .await
+            .unwrap();
+    }
+
+    // IDs
+    let not_found_dataset_id_ref = odf::DatasetID::new_generated_ed25519().1.into_local_ref();
+
+    {
+        let refs = [
+            &account_1_dataset_1_handle.id.as_local_ref(),
+            &account_1_dataset_2_handle.id.as_local_ref(),
+            &account_2_dataset_3_handle.id.as_local_ref(),
+            &not_found_dataset_id_ref,
+        ];
+
+        let resolution = harness
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&refs)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            [
+                (
+                    account_1_dataset_1_handle.id.as_local_ref(),
+                    account_1_dataset_1_handle.clone()
+                ),
+                (
+                    account_1_dataset_2_handle.id.as_local_ref(),
+                    account_1_dataset_2_handle.clone()
+                ),
+                (
+                    account_2_dataset_3_handle.id.as_local_ref(),
+                    account_2_dataset_3_handle.clone()
+                ),
+            ],
+            *resolution.resolved_handles
+        );
+        assert_matches!(
+            &resolution.unresolved_refs[..],
+            [(unresolved_ref, odf::DatasetRefUnresolvedError::NotFound(e))]
+                if *unresolved_ref == not_found_dataset_id_ref
+                    && e.dataset_ref == not_found_dataset_id_ref
+        );
+    }
+
+    // Aliases
+    // todo
+
+    // Handles
+    // todo
+
+    // Mixed
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum TestDatasetEntryRepository {
+    Mock(MockDatasetEntryRepository),
+    InMemory,
+}
+
+impl From<MockDatasetEntryRepository> for TestDatasetEntryRepository {
+    fn from(mock: MockDatasetEntryRepository) -> Self {
+        Self::Mock(mock)
+    }
+}
 
 struct DatasetEntryServiceHarness {
     _temp_dir: tempfile::TempDir,
@@ -231,11 +344,12 @@ struct DatasetEntryServiceHarness {
     account_repo: Arc<dyn AccountRepository>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+    dataset_entry_writer: Arc<dyn kamu_datasets_services::DatasetEntryWriter>,
 }
 
 impl DatasetEntryServiceHarness {
     fn new(
-        mock_dataset_entry_repository: MockDatasetEntryRepository,
+        test_dataset_entry_repository: TestDatasetEntryRepository,
         tenancy_config: TenancyConfig,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -254,8 +368,15 @@ impl DatasetEntryServiceHarness {
             b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();
 
-            b.add_value(mock_dataset_entry_repository);
-            b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
+            match test_dataset_entry_repository {
+                TestDatasetEntryRepository::Mock(mock) => {
+                    b.add_value(mock);
+                    b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
+                }
+                TestDatasetEntryRepository::InMemory => {
+                    b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
+                }
+            }
 
             let t = frozen_time_point();
             let fake_system_time_source = FakeSystemTimeSource::new(t);
@@ -292,6 +413,7 @@ impl DatasetEntryServiceHarness {
             account_repo: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
+            dataset_entry_writer: catalog.get_one().unwrap(),
         }
     }
 
