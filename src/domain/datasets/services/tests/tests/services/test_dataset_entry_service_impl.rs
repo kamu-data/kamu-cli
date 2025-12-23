@@ -741,10 +741,7 @@ fn frozen_time_point() -> DateTime<Utc> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn resolution_report(
-    mut resolution: odf::dataset::ResolveDatasetHandlesByRefsResponse,
-    // dataset_handle_map: &HashMap<odf::DatasetID, odf::DatasetAlias>,
-) -> String {
+fn resolution_report(mut resolution: odf::dataset::ResolveDatasetHandlesByRefsResponse) -> String {
     use std::fmt::Write;
 
     resolution

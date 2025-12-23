@@ -12,8 +12,8 @@
 #[macro_export]
 macro_rules! test_for_each_tenancy {
     ($test_name: expr) => {
-        paste::paste! {
-            #[test_log::test(tokio::test)]
+        ::paste::paste! {
+            #[::test_log::test(::tokio::test)]
             async fn [<$test_name "_st">]() {
                 $test_name(::kamu_core::TenancyConfig::SingleTenant).await;
             }
