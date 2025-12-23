@@ -235,7 +235,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     let account_4_not_created =
         Account::test(odf::AccountID::new_generated_ed25519().1, "account-4");
 
-    for account in [&&account_1, &account_2, &account_3_subject] {
+    for account in [&account_1, &account_2, &account_3_subject] {
         harness.account_repo.save_account(account).await.unwrap();
     }
 

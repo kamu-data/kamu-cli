@@ -161,8 +161,8 @@ impl DatasetEntryServiceImpl {
     fn group_aliases_by_resolved_owner_account_name<'a>(
         &'a self,
         dataset_aliases: &'a [&'a odf::DatasetAlias],
-    ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
-        let mut res = HashMap::new();
+    ) -> HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>> {
+        let mut res = HashMap::with_capacity(dataset_aliases.len());
 
         for dataset_alias in dataset_aliases {
             let account_name = dataset_alias
@@ -174,7 +174,7 @@ impl DatasetEntryServiceImpl {
             owner_dataset_aliases.push(*dataset_alias);
         }
 
-        Ok(res)
+        res
     }
 
     async fn resolve_account_ids_by_maybe_names(
@@ -192,14 +192,15 @@ impl DatasetEntryServiceImpl {
         // 1. Read all available data from the cache
         let cached_name_id_pairs = {
             let readable_cache = self.cache.read().unwrap();
-            account_names
-                .iter()
-                .fold(HashMap::new(), |mut acc, account_name| {
+            account_names.iter().fold(
+                HashMap::with_capacity(account_names.len()),
+                |mut acc, account_name| {
                     if let Some(id) = readable_cache.accounts.names2ids.get(account_name) {
                         acc.insert(*account_name, id.clone());
                     }
                     acc
-                })
+                },
+            )
         };
 
         let mut resolved_account_ids = Vec::with_capacity(cached_name_id_pairs.len());
@@ -382,7 +383,7 @@ impl DatasetEntryServiceImpl {
 
         // First, we attempt to resolve accounts
         let owner_name_dataset_aliases_mapping =
-            self.group_aliases_by_resolved_owner_account_name(dataset_aliases)?;
+            self.group_aliases_by_resolved_owner_account_name(dataset_aliases);
         let maybe_owner_names = dataset_aliases
             .iter()
             .map(|alias| alias.account_name.as_ref())
