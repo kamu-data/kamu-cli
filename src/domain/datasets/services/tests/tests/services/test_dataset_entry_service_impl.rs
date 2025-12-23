@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -33,8 +32,15 @@ use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_indexes_datasets_correctly() {
+test_utils::test_for_each_tenancy!(test_indexes_datasets_correctly);
+test_utils::test_for_each_tenancy!(test_try_to_resolve_non_existing_dataset);
+test_utils::test_for_each_tenancy!(test_try_to_resolve_all_datasets_for_non_existing_user);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
     let dataset_name_1 = "dataset1";
     let dataset_name_2 = "dataset2";
     let dataset_name_3 = "dataset3";
@@ -53,7 +59,7 @@ async fn test_indexes_datasets_correctly() {
         dataset_entry_collector.clone(),
     );
 
-    let harness = DatasetEntryServiceHarness::new(mock_dataset_entry_repository);
+    let harness = DatasetEntryServiceHarness::new(mock_dataset_entry_repository, tenancy_config);
 
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
@@ -177,9 +183,9 @@ async fn test_indexes_datasets_correctly() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_try_to_resolve_non_existing_dataset() {
-    let harness = DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new());
+async fn test_try_to_resolve_non_existing_dataset(tenancy_config: TenancyConfig) {
+    let harness =
+        DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new(), tenancy_config);
 
     let dataset_ref = odf::DatasetAlias::new(
         Some(odf::AccountName::new_unchecked("foo")),
@@ -200,11 +206,11 @@ async fn test_try_to_resolve_non_existing_dataset() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
+async fn test_try_to_resolve_all_datasets_for_non_existing_user(tenancy_config: TenancyConfig) {
     use futures::TryStreamExt;
 
-    let harness = DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new());
+    let harness =
+        DatasetEntryServiceHarness::new(MockDatasetEntryRepository::new(), tenancy_config);
 
     let resolve_dataset_result = harness
         .dataset_registry
@@ -216,9 +222,11 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetEntryServiceHarness {
-    _tempdir: tempfile::TempDir,
+    _temp_dir: tempfile::TempDir,
     dataset_entry_indexer: Arc<DatasetEntryIndexer>,
     account_repo: Arc<dyn AccountRepository>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -226,13 +234,18 @@ struct DatasetEntryServiceHarness {
 }
 
 impl DatasetEntryServiceHarness {
-    fn new(mock_dataset_entry_repository: MockDatasetEntryRepository) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
+    fn new(
+        mock_dataset_entry_repository: MockDatasetEntryRepository,
+        tenancy_config: TenancyConfig,
+    ) -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = {
-            let mut b = CatalogBuilder::new();
+            use dill::Component;
+
+            let mut b = dill::CatalogBuilder::new();
 
             use odf::dataset::DatasetStorageUnitLocalFs;
             b.add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir));
@@ -263,7 +276,7 @@ impl DatasetEntryServiceHarness {
 
             b.add_value(CurrentAccountSubject::new_test());
 
-            b.add_value(TenancyConfig::SingleTenant);
+            b.add_value(tenancy_config);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -274,7 +287,7 @@ impl DatasetEntryServiceHarness {
         };
 
         Self {
-            _tempdir: tempdir,
+            _temp_dir: temp_dir,
             dataset_entry_indexer: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
