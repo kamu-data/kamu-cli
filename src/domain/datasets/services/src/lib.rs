@@ -22,6 +22,6 @@ pub mod utils;
 pub mod testing;
 
 pub use dependencies::*;
-pub(crate) use search::*;
+pub use search::*;
 pub use services::*;
 pub use use_cases::*;

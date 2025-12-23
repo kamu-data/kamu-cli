@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
@@ -17,6 +18,7 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn index_dataset_from_scratch(
+    event_time: DateTime<Utc>,
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
 ) -> Result<serde_json::Value, InternalError> {
@@ -36,77 +38,99 @@ pub(crate) async fn index_dataset_from_scratch(
         &mut seed_visitor,
     ];
 
-    // Visit entire metadata chain
-    dataset
-        .as_metadata_chain()
-        .accept(&mut visitors)
-        .await
-        .int_err()?;
-
-    // Extract interested parts from visitors
-    let schema_fields = extract_schema_field_names(schema_visitor);
-    let (description, keywords) = extract_description_and_keywords(info_visitor);
-    let attachments = extract_attachment_contents(attachments_visitor);
-
-    // Seed event: created_at
-    let seed_event_time = seed_visitor.into_block().unwrap().system_time;
-
-    // Head event: ref_changed_at
-    let head_event_time = dataset
-        .as_metadata_chain()
-        .get_block_by_ref(&odf::BlockRef::Head)
-        .await
-        .int_err()?
-        .system_time;
-
-    // Convert FieldUpdate to Option for JSON serialization
-    // For full indexing, Absent means the chain has no such event (use null)
-    let schema_fields_value = match schema_fields {
-        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-        SearchFieldUpdate::Present(v) => Some(v),
-    };
-    let description_value = match description {
-        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-        SearchFieldUpdate::Present(v) => Some(v),
-    };
-    let keywords_value = match keywords {
-        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-        SearchFieldUpdate::Present(v) => Some(v),
-    };
-    let attachments_value = match attachments {
-        SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-        SearchFieldUpdate::Present(v) => Some(v),
-    };
-
     use dataset_search_schema::*;
 
-    // Prepare full text search document
-    let alias = dataset.get_alias();
-    Ok(serde_json::json!({
-        fields::DATASET_NAME: alias.dataset_name.to_string(),
-        fields::ALIAS: alias.to_string(),
-        fields::OWNER_NAME: alias
-            .account_name
-            .as_ref()
-            .map(std::string::ToString::to_string)
-            .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-        fields::OWNER_ID: owner_id.to_string(),
-        fields::KIND: match dataset.get_kind() {
-            odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
-            odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
-        },
-        fields::CREATED_AT: seed_event_time.to_rfc3339(),
-        fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
-        fields::SCHEMA_FIELDS: schema_fields_value,
-        fields::DESCRIPTION: description_value,
-        fields::KEYWORDS: keywords_value,
-        fields::ATTACHMENTS: attachments_value,
-    }))
+    // Visit entire metadata chain
+    match dataset.as_metadata_chain().accept(&mut visitors).await {
+        Ok(_) => {
+            // Extract interested parts from visitors
+            let schema_fields = extract_schema_field_names(schema_visitor);
+            let (description, keywords) = extract_description_and_keywords(info_visitor);
+            let attachments = extract_attachment_contents(attachments_visitor);
+
+            // Seed event: created_at
+            let seed_event_time = seed_visitor.into_block().unwrap().system_time;
+
+            // Head event: ref_changed_at
+            let head_event_time = dataset
+                .as_metadata_chain()
+                .get_block_by_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?
+                .system_time;
+
+            // Convert FieldUpdate to Option for JSON serialization
+            // For full indexing, Absent means the chain has no such event (use null)
+            let schema_fields_value = match schema_fields {
+                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+                SearchFieldUpdate::Present(v) => Some(v),
+            };
+            let description_value = match description {
+                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+                SearchFieldUpdate::Present(v) => Some(v),
+            };
+            let keywords_value = match keywords {
+                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+                SearchFieldUpdate::Present(v) => Some(v),
+            };
+            let attachments_value = match attachments {
+                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
+                SearchFieldUpdate::Present(v) => Some(v),
+            };
+
+            // Prepare full text search document
+            let alias = dataset.get_alias();
+            Ok(serde_json::json!({
+                fields::DATASET_NAME: alias.dataset_name.to_string(),
+                fields::ALIAS: alias.to_string(),
+                fields::OWNER_NAME: alias
+                    .account_name
+                    .as_ref()
+                    .map(std::string::ToString::to_string)
+                    .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
+                fields::OWNER_ID: owner_id.to_string(),
+                fields::KIND: match dataset.get_kind() {
+                    odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
+                    odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
+                },
+                fields::CREATED_AT: seed_event_time.to_rfc3339(),
+                fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
+                fields::SCHEMA_FIELDS: schema_fields_value,
+                fields::DESCRIPTION: description_value,
+                fields::KEYWORDS: keywords_value,
+                fields::ATTACHMENTS: attachments_value,
+            }))
+        }
+
+        Err(AcceptVisitorError::Traversal(IterBlocksError::RefNotFound(_))) => {
+            // No "head" yet, might happen in tests only.
+            // Produce partial index
+            let alias = dataset.get_alias();
+            Ok(serde_json::json!({
+                fields::DATASET_NAME: alias.dataset_name.to_string(),
+                fields::ALIAS: alias.to_string(),
+                fields::OWNER_NAME: alias
+                    .account_name
+                    .as_ref()
+                    .map(std::string::ToString::to_string)
+                    .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
+                fields::OWNER_ID: owner_id.to_string(),
+                fields::KIND: match dataset.get_kind() {
+                    odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
+                    odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
+                },
+                fields::CREATED_AT: event_time.to_rfc3339(),
+            }))
+        }
+
+        Err(e) => Err(e.int_err()),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn partial_update_for_new_interval(
+    event_time: DateTime<Utc>,
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
     new_head: &odf::Multihash,
@@ -142,7 +166,7 @@ pub(crate) async fn partial_update_for_new_interval(
     match result {
         Ok(_) => {}
         Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
-            return index_dataset_from_scratch(dataset, owner_id).await;
+            return index_dataset_from_scratch(event_time, dataset, owner_id).await;
         }
         Err(e) => return Err(e.int_err()),
     }
@@ -284,7 +308,8 @@ pub(crate) async fn index_datasets(
             .int_err()?;
 
         // Index dataset
-        let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
+        let dataset_document =
+            index_dataset_from_scratch(Utc::now(), dataset, &entry.owner_id).await?;
         let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
         tracing::debug!(

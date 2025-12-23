@@ -190,13 +190,25 @@ sqlx-add-migration:
 # ElasticSsearch
 ###############################################################################
 
+ES_URL ?= http://localhost:9200
+ES_TEST_PREFIX ?= kamu-test-
+ES_TIMEOUT_SECS ?= 60
+ES_POLL_INTERVAL_SECS ?= 1
+
 .PHONY: elasticsearch-setup
 elasticsearch-setup:
+	@echo "Creating Elasticsearch network..."
 	$(KAMU_CONTAINER_RUNTIME_TYPE) network create kamu-elastic-net || true
+
+	@echo "Pulling Elasticsearch and Kibana images ..."
 	$(KAMU_CONTAINER_RUNTIME_TYPE) pull docker.io/library/elasticsearch:9.2.1
 	$(KAMU_CONTAINER_RUNTIME_TYPE) pull docker.io/library/kibana:9.2.1
+
+	@echo "Stopping and removing existing Elasticsearch and Kibana containers, if any ..."
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-elasticsearch || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-elasticsearch || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-kibana || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-kibana || true
+
+	@echo "Starting Elasticsearch container..."
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run \
 		--name kamu-elasticsearch \
 		--network kamu-elastic-net \
@@ -213,6 +225,8 @@ elasticsearch-setup:
 		-v kamu-elastic-data:/usr/share/elasticsearch/data \
 		-d \
 		docker.io/library/elasticsearch:9.2.1
+
+	@echo "Starting Kibana container..."
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run \
 		--name kamu-kibana \
 		--network kamu-elastic-net \
@@ -221,8 +235,10 @@ elasticsearch-setup:
   		-e "NODE_OPTIONS=--max-old-space-size=512" \
 		-p 5601:5601 \
 		-d \
-		docker.io/library/kibana:9.2.1	
-	sleep 20  # Letting the containers to start
+		docker.io/library/kibana:9.2.1
+
+	$(MAKE) elasticsearch-wait
+	$(MAKE) elasticsearch-test-gc
 
 # Stops and removes the Elasticsearch and Kibana containers + network
 .PHONY: elasticsearch-stop
@@ -236,6 +252,42 @@ elasticsearch-stop:
 elasticsearch-clean:
 	$(MAKE) elasticsearch-stop
 	$(KAMU_CONTAINER_RUNTIME_TYPE) volume rm kamu-elastic-data || true
+
+# Waits for Elasticsearch to become available
+.PHONY: elasticsearch-wait
+elasticsearch-wait:
+	@echo "Waiting for Elasticsearch at $(ES_URL) (timeout: $(ES_TIMEOUT_SECS)s)..."
+	@start_time=$$(date +%s); \
+	attempt=1; \
+	while true; do \
+		echo "Attempt $$attempt: Checking Elasticsearch..."; \
+		if curl -fsS "$(ES_URL)/_cluster/health" >/dev/null 2>&1; then \
+			echo "Elasticsearch is up"; \
+			break; \
+		fi; \
+		now=$$(date +%s); \
+		if [ $$((now - start_time)) -ge $(ES_TIMEOUT_SECS) ]; then \
+			echo "Timed out waiting for Elasticsearch"; \
+			exit 1; \
+		fi; \
+		attempt=$$((attempt + 1)); \
+		sleep $(ES_POLL_INTERVAL_SECS); \
+	done	
+
+# Runs cleanup of all test indices in the local Elasticsearch instance
+.PHONY: elasticsearch-test-gc
+elasticsearch-test-gc:
+	@echo "GC Elasticsearch test artifacts for prefix: $(ES_TEST_PREFIX)"
+
+	@echo "Deleting aliases..."
+	@curl -fsS "$(ES_URL)/_cat/aliases?h=alias,index" 2>/dev/null | \
+		awk '$$1 ~ /^$(ES_TEST_PREFIX)/ {print $$1}' | sort -u | \
+		xargs -r -I{} sh -c 'echo "  Removing alias {}"; curl -fsS -X POST "$(ES_URL)/_aliases" -H "Content-Type: application/json" -d "{\"actions\":[{\"remove\":{\"index\":\"*\",\"alias\":\"{}\"}}]}" >/dev/null' || true
+
+	@echo "Deleting indices..."
+	@curl -fsS "$(ES_URL)/_cat/indices/$(ES_TEST_PREFIX)*?h=index" 2>/dev/null | \
+		grep -E "^$(ES_TEST_PREFIX)" | \
+		xargs -r -I{} sh -c 'echo "  DELETE index {}"; curl -fsS -X DELETE "$(ES_URL)/{}?ignore_unavailable=true" >/dev/null' || true
 
 ###############################################################################
 # Podman cleanups (run from time to time to preserve tests performance)

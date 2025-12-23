@@ -16,6 +16,10 @@ use crate::ElasticsearchClientConfig;
 
 const DEFAULT_ELASTICSEARCH_USER: &str = "elastic";
 
+const ES_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+const ES_PROPAGATION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const ES_SHARD_READY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ElasticsearchClient {
@@ -157,6 +161,7 @@ impl ElasticsearchClient {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_list_indices_by_prefix, skip_all, fields(prefix))]
     pub async fn list_indices_by_prefix(
         &self,
         prefix: &str,
@@ -184,12 +189,14 @@ impl ElasticsearchClient {
         Ok(indices)
     }
 
-    #[tracing::instrument(level = "debug", name = ElasticsearchClient_refresh_indices, skip_all, fields(index_names = ?index_names))]
+    #[tracing::instrument(level = "debug", name = ElasticsearchClient_refresh_indices, skip_all)]
     pub async fn refresh_indices(
         &self,
         index_names: &[&str],
     ) -> Result<(), ElasticsearchClientError> {
         use elasticsearch::indices::IndicesRefreshParts;
+
+        tracing::debug!(index_names = ?index_names, "Refreshing Elasticsearch indices");
 
         let response = self
             .client
@@ -208,10 +215,7 @@ impl ElasticsearchClient {
         index_name: &str,
         body: serde_json::Value,
     ) -> Result<(), ElasticsearchClientError> {
-        tracing::debug!(index_name, body = ?body, "Creating Elasticsearch index");
-
-        let started = std::time::Instant::now();
-        tracing::info!(len = body.to_string().len(), "Creating index...");
+        tracing::info!(index_name, body = ?body, "Creating Elasticsearch index");
 
         let response = self
             .client
@@ -219,21 +223,49 @@ impl ElasticsearchClient {
             .create(elasticsearch::indices::IndicesCreateParts::Index(
                 index_name,
             ))
+            .wait_for_active_shards("1")
             .body(body)
             .send()
             .await?;
 
-        tracing::info!(elapsed = ?started.elapsed(), "Create index returned");
-
         let _ = ensure_client_response(response).await?;
+
+        // After create returns successfully,
+        // wait until the index is actually queryable.
+        self.wait_for_index_queryable(index_name).await?;
+
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", name = ElasticsearchClient_delete_indices_bulk, skip_all, fields(index_names = ?index_names))]
+    /// Wait until the primary shard for a brand new index is started (or at
+    /// least queryable).
+    ///
+    /// This is intentionally pragmatic: we probe with a cheap operation and
+    /// retry on 503/no-shard.
+    async fn wait_for_index_queryable(
+        &self,
+        index_name: &str,
+    ) -> Result<(), ElasticsearchClientError> {
+        // A cheap probe that exercises shard readiness
+        self.retry_transient(
+            "wait_for_index_queryable",
+            ES_SHARD_READY_TIMEOUT,
+            || async {
+                // COUNT is cheap and sufficient to validate queryability.
+                let _n = self.documents_in_index(index_name).await?;
+                Ok(())
+            },
+        )
+        .await
+    }
+
+    #[tracing::instrument(level = "info", name = ElasticsearchClient_delete_indices_bulk, skip_all)]
     pub async fn delete_indices_bulk(
         &self,
         index_names: &[&str],
     ) -> Result<(), ElasticsearchClientError> {
+        tracing::warn!(index_names = ?index_names, "Deleting Elasticsearch indices");
+
         use elasticsearch::indices::IndicesDeleteParts;
 
         let response = self
@@ -287,6 +319,21 @@ impl ElasticsearchClient {
         to_index: &str,
         maybe_filter_json: Option<serde_json::Value>,
     ) -> Result<(), ElasticsearchClientError> {
+        use elasticsearch::indices::IndicesExistsAliasParts;
+
+        // Check if alias exists
+        // Removing non-existing alias may cause an error
+        let alias_exists = {
+            let resp = self
+                .client
+                .indices()
+                .exists_alias(IndicesExistsAliasParts::Name(&[alias_name]))
+                .send()
+                .await?;
+            resp.status_code() == 200
+        };
+
+        // Build add alias action
         let mut add_command_json = serde_json::json!({
             "index": to_index,
             "alias": alias_name,
@@ -296,12 +343,21 @@ impl ElasticsearchClient {
             add_command_json["filter"] = filter_json;
         }
 
-        let body = serde_json::json!({
-            "actions": [
+        // Existing alias? Remove + Add new
+        let actions = if alias_exists {
+            serde_json::json!([
                 { "remove": { "index": "*", "alias": alias_name } },
                 { "add": add_command_json }
-            ]
-        });
+            ])
+        } else {
+            // New alias? Just Add
+            serde_json::json!([
+                { "add": add_command_json }
+            ])
+        };
+
+        // Final alias assignment command body
+        let body = serde_json::json!({ "actions": actions });
 
         tracing::debug!(
             alias_name,
@@ -320,7 +376,39 @@ impl ElasticsearchClient {
 
         let _ = ensure_client_response(response).await?;
 
+        // Ensure cluster-state propagation:
+        // callers can safely use alias immediately after.
+        self.wait_for_alias(alias_name).await?;
+
         Ok(())
+    }
+
+    /// Wait until alias is visible in cluster state.
+    async fn wait_for_alias(&self, alias_name: &str) -> Result<(), ElasticsearchClientError> {
+        use elasticsearch::indices::IndicesExistsAliasParts;
+
+        self.retry_transient("wait_for_alias", ES_PROPAGATION_TIMEOUT, || async {
+            let resp = self
+                .client
+                .indices()
+                .exists_alias(IndicesExistsAliasParts::Name(&[alias_name]))
+                .send()
+                .await?;
+
+            match resp.status_code() {
+                elasticsearch::http::StatusCode::OK => Ok(()),
+                elasticsearch::http::StatusCode::NOT_FOUND => {
+                    Err(ElasticsearchClientError::IndexNotFound {
+                        index: alias_name.to_owned(),
+                    })
+                }
+                _ => {
+                    let _ = ensure_client_response(resp).await?;
+                    Ok(())
+                }
+            }
+        })
+        .await
     }
 
     #[tracing::instrument(level = "debug", name = ElasticsearchClient_resolve_alias_indices, skip_all, fields(alias_name))]
@@ -493,6 +581,94 @@ impl ElasticsearchClient {
             .await?;
 
         handle_bulk_response(response, index_name, "update").await
+    }
+
+    // Retry helper for short, bounded eventual-consistency windows in ES.
+    async fn retry_transient<T, Fut, F>(
+        &self,
+        op_name: &'static str,
+        timeout: std::time::Duration,
+        mut f: F,
+    ) -> Result<T, ElasticsearchClientError>
+    where
+        F: FnMut() -> Fut,
+        Fut: std::future::Future<Output = Result<T, ElasticsearchClientError>>,
+    {
+        let deadline = std::time::Instant::now() + timeout;
+        let mut attempt_index: u32 = 0;
+        let mut last_err: Option<ElasticsearchClientError> = None;
+
+        loop {
+            tracing::debug!(operation = op_name, attempt_index, "Attempting operation");
+            match f().await {
+                Ok(v) => {
+                    tracing::debug!(operation = op_name, "Operation succeeded");
+                    return Ok(v);
+                }
+                Err(e)
+                    if Self::is_transient_es_error(&e) && std::time::Instant::now() < deadline =>
+                {
+                    tracing::warn!(
+                        operation = op_name,
+                        error = ?e,
+                        deadline = ?deadline,
+                        attempt_index,
+                        "Transient Elasticsearch error detected, retrying..."
+                    );
+
+                    attempt_index += 1;
+                    last_err = Some(e);
+
+                    tokio::time::sleep(ES_POLL_INTERVAL).await;
+                }
+                Err(e) => {
+                    // Keep the last transient error if we have one and we timed out.
+                    tracing::error!(
+                        operation = op_name,
+                        error = ?e,
+                        "Elasticsearch operation failed"
+                    );
+                    return Err(last_err.unwrap_or(e));
+                }
+            }
+        }
+    }
+
+    fn is_transient_es_error(e: &ElasticsearchClientError) -> bool {
+        match e {
+            // Classic alias/index propagation window.
+            ElasticsearchClientError::IndexNotFound { .. } => true,
+
+            // Shard not started yet / initial allocation window.
+            ElasticsearchClientError::BadResponse {
+                status,
+                error_type,
+                body,
+                ..
+            } => {
+                // 503 + typical error types for shard unavailability
+                if *status == elasticsearch::http::StatusCode::SERVICE_UNAVAILABLE {
+                    if error_type == "search_phase_execution_exception"
+                        || error_type == "no_shard_available_action_exception"
+                    {
+                        return true;
+                    }
+
+                    // Defensive: sometimes the root cause is only in the JSON body.
+                    // Keep this lightweight (no deep parsing assumptions).
+                    let s = body.to_string();
+                    if s.contains("no_shard_available_action_exception")
+                        || s.contains("all shards failed")
+                        || s.contains("primary shard is not active")
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+
+            _ => false,
+        }
     }
 }
 

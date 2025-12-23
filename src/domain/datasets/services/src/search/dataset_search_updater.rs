@@ -60,8 +60,12 @@ impl DatasetSearchUpdater {
             .int_err()?;
 
         // Prepare dataset search document
-        let dataset_document =
-            index_dataset_from_scratch(dataset, &created_message.owner_account_id).await?;
+        let dataset_document = index_dataset_from_scratch(
+            created_message.event_time,
+            dataset,
+            &created_message.owner_account_id,
+        )
+        .await?;
 
         // Sent it to the full text search service for indexing
         self.search_service
@@ -97,6 +101,7 @@ impl DatasetSearchUpdater {
 
         // Prepare partial update to dataset search document
         let partial_update = partial_update_for_new_interval(
+            updated_message.event_time,
             dataset,
             &entry.owner_id,
             &updated_message.new_block_hash,
@@ -255,10 +260,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetSearchUpdater {
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
                 // We only care about head updates for full text search.
-                // Also, skip initial setting of head, that is handled with dataset message.
-                if updated_message.block_ref != odf::BlockRef::Head
-                    || updated_message.maybe_prev_block_hash.is_none()
-                {
+                if updated_message.block_ref != odf::BlockRef::Head {
                     return Ok(());
                 }
 

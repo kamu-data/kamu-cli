@@ -60,21 +60,11 @@ impl EsTestContext {
         };
 
         // Reuse client across tests to speed up execution
+        // (helps with `cargo test`, but not with `argo nextest run`)
         let client = ELASTICSEARCH_CLIENT
             .get_or_init(|| async {
                 // Initialize client
                 let client = ElasticsearchClient::init(&client_config).unwrap();
-
-                // Clean up any leftover test indices from previous runs
-                let all_test_index_names = client
-                    .list_indices_by_prefix(INDEX_PREFIX_TEMPLATE)
-                    .await
-                    .unwrap();
-                if !all_test_index_names.is_empty() {
-                    let refs: Vec<&str> = all_test_index_names.iter().map(String::as_str).collect();
-                    client.delete_indices_bulk(&refs).await.unwrap();
-                }
-
                 Arc::new(client)
             })
             .await
@@ -119,26 +109,32 @@ impl EsTestContext {
     }
 
     pub async fn refresh_indices(&self) {
+        // List all indices with the test prefix
         let test_index_names = self
             .client
             .list_indices_by_prefix(&self.index_prefix)
             .await
             .unwrap();
 
+        // Convert to refs
         let refs: Vec<&str> = test_index_names.iter().map(String::as_str).collect();
 
+        // Refresh them - this is potentially a long waiting
         self.client.refresh_indices(&refs).await.unwrap();
     }
 
     pub async fn cleanup(self: Arc<Self>) {
+        // List all indices with the test prefix
         let test_index_names = self
             .client
             .list_indices_by_prefix(&self.index_prefix)
             .await
             .unwrap();
 
+        // Convert to refs
         let refs: Vec<&str> = test_index_names.iter().map(String::as_str).collect();
 
+        // Delete them
         let _ = self.client.delete_indices_bulk(&refs).await;
     }
 }
