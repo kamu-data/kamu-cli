@@ -231,8 +231,9 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 
     let account_1 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-1");
     let account_2 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-2");
+    let account_3_subject = Account::test(odf::AccountID::new_generated_ed25519().1, "kamu");
 
-    for account in [&account_1, &account_2] {
+    for account in [&&account_1, &account_2, &account_3_subject] {
         harness.account_repo.save_account(account).await.unwrap();
     }
 
@@ -240,10 +241,14 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         account_1_dataset_1_handle,
         account_1_dataset_2_handle,
         account_2_dataset_3_handle,
+        account_3_subject_dataset_4_handle,
+        account_3_subject_dataset_5_not_created_handle,
     ] = [
         (&account_1, "dataset-1"),
         (&account_1, "dataset-2"),
         (&account_2, "dataset-3"),
+        (&account_3_subject, "dataset-4"),
+        (&account_3_subject, "dataset-5"),
     ]
     .map(|(account, dataset_name)| {
         let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
@@ -258,6 +263,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         (&account_1_dataset_1_handle, &account_1),
         (&account_1_dataset_2_handle, &account_1),
         (&account_2_dataset_3_handle, &account_2),
+        (&account_3_subject_dataset_4_handle, &account_3_subject),
     ] {
         harness
             .dataset_entry_writer
@@ -273,13 +279,16 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     }
 
     // IDs
-    let not_found_dataset_id_ref = odf::DatasetID::new_generated_ed25519().1.into_local_ref();
-
     {
+        let not_found_dataset_id_ref = account_3_subject_dataset_5_not_created_handle
+            .id
+            .as_local_ref();
+
         let refs = [
             &account_1_dataset_1_handle.id.as_local_ref(),
             &account_1_dataset_2_handle.id.as_local_ref(),
             &account_2_dataset_3_handle.id.as_local_ref(),
+            &account_3_subject_dataset_4_handle.id.as_local_ref(),
             &not_found_dataset_id_ref,
         ];
 
@@ -303,6 +312,10 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                     account_2_dataset_3_handle.id.as_local_ref(),
                     account_2_dataset_3_handle.clone()
                 ),
+                (
+                    account_3_subject_dataset_4_handle.id.as_local_ref(),
+                    account_3_subject_dataset_4_handle.clone()
+                ),
             ],
             *resolution.resolved_handles
         );
@@ -315,7 +328,58 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     }
 
     // Aliases
-    // todo
+    {
+        let refs = [
+            &account_1_dataset_1_handle.alias.as_local_ref(),
+            &account_1_dataset_2_handle.alias.as_local_ref(),
+            &account_2_dataset_3_handle.alias.as_local_ref(),
+            &account_3_subject_dataset_4_handle.alias.as_local_ref(),
+            &account_3_subject_dataset_5_not_created_handle
+                .alias
+                .as_local_ref(),
+        ];
+
+        let resolution = harness
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&refs)
+            .await
+            .unwrap();
+
+        match tenancy_config {
+            TenancyConfig::SingleTenant => {
+                assert_eq!(
+                    [(
+                        account_3_subject_dataset_4_handle.alias.as_local_ref(),
+                        account_3_subject_dataset_4_handle.clone()
+                    ),],
+                    *resolution.resolved_handles
+                );
+            }
+            TenancyConfig::MultiTenant => {
+                assert_eq!(
+                    [
+                        (
+                            account_1_dataset_1_handle.alias.as_local_ref(),
+                            account_1_dataset_1_handle.clone()
+                        ),
+                        (
+                            account_1_dataset_2_handle.alias.as_local_ref(),
+                            account_1_dataset_2_handle.clone()
+                        ),
+                        (
+                            account_2_dataset_3_handle.alias.as_local_ref(),
+                            account_2_dataset_3_handle.clone()
+                        ),
+                        (
+                            account_3_subject_dataset_4_handle.alias.as_local_ref(),
+                            account_3_subject_dataset_4_handle.clone()
+                        ),
+                    ],
+                    *resolution.resolved_handles
+                );
+            }
+        }
+    }
 
     // Handles
     // todo
