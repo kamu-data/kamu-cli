@@ -4577,7 +4577,7 @@ input SetAccountQuotasInput {
 }
 
 interface SetAccountQuotasResult {
-	success: Boolean!
+	isSuccess: Boolean!
 	message: String!
 }
 

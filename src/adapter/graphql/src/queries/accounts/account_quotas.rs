@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::{Account, AccountQuotaService, GetAccountQuotaError, QuotaType};
+use kamu_datasets_services::QuotaDefaultsConfig;
 
 use crate::prelude::*;
 
@@ -64,14 +65,17 @@ impl<'a> AccountQuotasUsageStorage<'a> {
 
     /// Total bytes limit for this account.
     pub async fn limit_total_bytes(&self, ctx: &Context<'_>) -> Result<u64> {
-        let quota_service = from_catalog_n!(ctx, dyn AccountQuotaService);
+        let (quota_service, quota_defaults) =
+            from_catalog_n!(ctx, dyn AccountQuotaService, QuotaDefaultsConfig);
 
-        let quota = quota_service
+        match quota_service
             .get_account_quota(&self.account.id, QuotaType::storage_space())
             .await
-            .map_err(map_get_quota_error)?;
-
-        Ok(quota.quota_payload.value)
+        {
+            Ok(quota) => Ok(quota.quota_payload.value),
+            Err(GetAccountQuotaError::NotFound(_)) => Ok(quota_defaults.storage),
+            Err(e) => Err(map_get_quota_error(e)),
+        }
     }
 }
 

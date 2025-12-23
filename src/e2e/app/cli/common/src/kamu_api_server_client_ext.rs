@@ -259,7 +259,7 @@ impl AccountApi<'_> {
                           quotas {
                             setAccountQuotas(quotas: { storage: { limitTotalBytes: $limitBytes } }) {
                               __typename
-                              success
+                              isSuccess
                             }
                           }
                         }
@@ -281,7 +281,7 @@ impl AccountApi<'_> {
             "Setting account quota failed: {response:?}"
         );
         let data = response.data.into_json().unwrap();
-        let is_success = data["accounts"]["byName"]["quotas"]["setAccountQuotas"]["success"]
+        let is_success = data["accounts"]["byName"]["quotas"]["setAccountQuotas"]["isSuccess"]
             .as_bool()
             .unwrap_or(false);
         assert!(is_success, "Unexpected response: {data:?}");
