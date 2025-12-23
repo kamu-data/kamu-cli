@@ -232,6 +232,8 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     let account_1 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-1");
     let account_2 = Account::test(odf::AccountID::new_generated_ed25519().1, "account-2");
     let account_3_subject = Account::test(odf::AccountID::new_generated_ed25519().1, "kamu");
+    let account_4_not_created =
+        Account::test(odf::AccountID::new_generated_ed25519().1, "account-4");
 
     for account in [&&account_1, &account_2, &account_3_subject] {
         harness.account_repo.save_account(account).await.unwrap();
@@ -243,12 +245,14 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         account_2_dataset_3_handle,
         account_3_subject_dataset_4_handle,
         account_3_subject_dataset_5_not_created_handle,
+        account_4_dataset_6_not_created_handle,
     ] = [
         (&account_1, "dataset-1"),
         (&account_1, "dataset-2"),
         (&account_2, "dataset-3"),
         (&account_3_subject, "dataset-4"),
         (&account_3_subject, "dataset-5-not-created"),
+        (&account_4_not_created, "dataset-6-not-created"),
     ]
     .map(|(account, dataset_name)| {
         let dataset_id = odf::DatasetID::new_seeded_ed25519(dataset_name.as_bytes());
@@ -280,16 +284,15 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 
     // IDs
     {
-        let not_found_dataset_id_ref = account_3_subject_dataset_5_not_created_handle
-            .id
-            .as_local_ref();
-
         let refs = [
             &account_1_dataset_1_handle.id.as_local_ref(),
             &account_1_dataset_2_handle.id.as_local_ref(),
             &account_2_dataset_3_handle.id.as_local_ref(),
             &account_3_subject_dataset_4_handle.id.as_local_ref(),
-            &not_found_dataset_id_ref,
+            &account_3_subject_dataset_5_not_created_handle
+                .id
+                .as_local_ref(),
+            &account_4_dataset_6_not_created_handle.id.as_local_ref(),
         ];
 
         let resolution = harness
@@ -311,6 +314,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 
                         unresolved_refs:
                         - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
+                        - did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547: Dataset not found: did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547
                         "#
                     ),
                     resolution_report(resolution)
@@ -328,6 +332,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 
                         unresolved_refs:
                         - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
+                        - did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547: Dataset not found: did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547
                         "#
                     ),
                     resolution_report(resolution)
@@ -346,6 +351,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
             &account_3_subject_dataset_5_not_created_handle
                 .alias
                 .as_local_ref(),
+            &account_4_dataset_6_not_created_handle.alias.as_local_ref(),
         ];
 
         let resolution = harness
@@ -367,6 +373,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - dataset-2: Dataset not found: dataset-2
                         - dataset-3: Dataset not found: dataset-3
                         - dataset-5-not-created: Dataset not found: dataset-5-not-created
+                        - dataset-6-not-created: Dataset not found: dataset-6-not-created
                         "#
                     ),
                     resolution_report(resolution)
@@ -383,6 +390,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - kamu/dataset-4: kamu/dataset-4
 
                         unresolved_refs:
+                        - account-4/dataset-6-not-created: Dataset not found: account-4/dataset-6-not-created
                         - kamu/dataset-5-not-created: Dataset not found: kamu/dataset-5-not-created
                         "#
                     ),
@@ -400,6 +408,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
             &account_2_dataset_3_handle.as_local_ref(),
             &account_3_subject_dataset_4_handle.as_local_ref(),
             &account_3_subject_dataset_5_not_created_handle.as_local_ref(),
+            &account_4_dataset_6_not_created_handle.as_local_ref(),
         ];
 
         let resolution = harness
@@ -419,6 +428,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - dataset-3: dataset-3
                         - dataset-4: dataset-4
                         - dataset-5-not-created: dataset-5-not-created
+                        - dataset-6-not-created: dataset-6-not-created
 
                         unresolved_refs:
                         "#
@@ -434,6 +444,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - account-1/dataset-1: account-1/dataset-1
                         - account-1/dataset-2: account-1/dataset-2
                         - account-2/dataset-3: account-2/dataset-3
+                        - account-4/dataset-6-not-created: account-4/dataset-6-not-created
                         - kamu/dataset-4: kamu/dataset-4
                         - kamu/dataset-5-not-created: kamu/dataset-5-not-created
 
@@ -447,7 +458,104 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     }
 
     // Mixed
-    // todo
+    {
+        let refs = [
+            // IDs
+            &account_1_dataset_1_handle.id.as_local_ref(),
+            &account_1_dataset_2_handle.id.as_local_ref(),
+            &account_2_dataset_3_handle.id.as_local_ref(),
+            &account_3_subject_dataset_4_handle.id.as_local_ref(),
+            &account_3_subject_dataset_5_not_created_handle
+                .id
+                .as_local_ref(),
+            &account_4_dataset_6_not_created_handle.id.as_local_ref(),
+            // Aliases
+            &account_1_dataset_1_handle.alias.as_local_ref(),
+            &account_1_dataset_2_handle.alias.as_local_ref(),
+            &account_2_dataset_3_handle.alias.as_local_ref(),
+            &account_3_subject_dataset_4_handle.alias.as_local_ref(),
+            &account_3_subject_dataset_5_not_created_handle
+                .alias
+                .as_local_ref(),
+            &account_4_dataset_6_not_created_handle.alias.as_local_ref(),
+            // Handles
+            &account_1_dataset_1_handle.as_local_ref(),
+            &account_1_dataset_2_handle.as_local_ref(),
+            &account_2_dataset_3_handle.as_local_ref(),
+            &account_3_subject_dataset_4_handle.as_local_ref(),
+            &account_3_subject_dataset_5_not_created_handle.as_local_ref(),
+            &account_4_dataset_6_not_created_handle.as_local_ref(),
+        ];
+
+        let resolution = harness
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&refs)
+            .await
+            .unwrap();
+
+        match tenancy_config {
+            TenancyConfig::SingleTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - did:odf:fed01961b8b13a41f25e7971e0b0ca41f25e76218461736772ad7648e896ab6cad925: dataset-1
+                        - did:odf:fed01961b8b13a41f25e7a81e8b0ca41f25e782184617369728d7648e6f26b6cdd525: dataset-2
+                        - did:odf:fed01961b8b13a41f25e7b91e0b0da41f25e7a218461736b726d7648e4de2b5ccd125: dataset-3
+                        - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: dataset-4
+                        - dataset-1: dataset-1
+                        - dataset-2: dataset-2
+                        - dataset-3: dataset-3
+                        - dataset-4: dataset-4
+                        - dataset-4: dataset-4
+                        - dataset-5-not-created: dataset-5-not-created
+                        - dataset-6-not-created: dataset-6-not-created
+
+                        unresolved_refs:
+                        - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
+                        - did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547: Dataset not found: did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547
+                        - dataset-1: Dataset not found: dataset-1
+                        - dataset-2: Dataset not found: dataset-2
+                        - dataset-3: Dataset not found: dataset-3
+                        - dataset-5-not-created: Dataset not found: dataset-5-not-created
+                        - dataset-6-not-created: Dataset not found: dataset-6-not-created
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+            TenancyConfig::MultiTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - did:odf:fed01961b8b13a41f25e7971e0b0ca41f25e76218461736772ad7648e896ab6cad925: account-1/dataset-1
+                        - did:odf:fed01961b8b13a41f25e7a81e8b0ca41f25e782184617369728d7648e6f26b6cdd525: account-1/dataset-2
+                        - did:odf:fed01961b8b13a41f25e7b91e0b0da41f25e7a218461736b726d7648e4de2b5ccd125: account-2/dataset-3
+                        - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: kamu/dataset-4
+                        - account-1/dataset-1: account-1/dataset-1
+                        - account-1/dataset-1: account-1/dataset-1
+                        - account-1/dataset-2: account-1/dataset-2
+                        - account-1/dataset-2: account-1/dataset-2
+                        - account-2/dataset-3: account-2/dataset-3
+                        - account-2/dataset-3: account-2/dataset-3
+                        - account-4/dataset-6-not-created: account-4/dataset-6-not-created
+                        - kamu/dataset-4: kamu/dataset-4
+                        - kamu/dataset-4: kamu/dataset-4
+                        - kamu/dataset-5-not-created: kamu/dataset-5-not-created
+
+                        unresolved_refs:
+                        - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
+                        - did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547: Dataset not found: did:odf:fed01961b8b13a41f25e75dabac2d742cd18898cd47318f9ebf848d88b2e2173a2547
+                        - account-4/dataset-6-not-created: Dataset not found: account-4/dataset-6-not-created
+                        - kamu/dataset-5-not-created: Dataset not found: kamu/dataset-5-not-created
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
