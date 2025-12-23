@@ -222,7 +222,7 @@ elasticsearch-setup:
 		-p 5601:5601 \
 		-d \
 		docker.io/library/kibana:9.2.1	
-	sleep 10  # Letting the containers to start
+	sleep 20  # Letting the containers to start
 
 # Stops and removes the Elasticsearch and Kibana containers + network
 .PHONY: elasticsearch-stop
