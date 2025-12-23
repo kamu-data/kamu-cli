@@ -251,7 +251,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         (&account_3_subject, "dataset-5"),
     ]
     .map(|(account, dataset_name)| {
-        let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(dataset_name.as_bytes());
         let dataset_alias = tenancy_config.make_alias(
             account.account_name.clone(),
             odf::DatasetName::new_unchecked(dataset_name),
@@ -298,33 +298,42 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
             .await
             .unwrap();
 
-        assert_eq!(
-            [
-                (
-                    account_1_dataset_1_handle.id.as_local_ref(),
-                    account_1_dataset_1_handle.clone()
-                ),
-                (
-                    account_1_dataset_2_handle.id.as_local_ref(),
-                    account_1_dataset_2_handle.clone()
-                ),
-                (
-                    account_2_dataset_3_handle.id.as_local_ref(),
-                    account_2_dataset_3_handle.clone()
-                ),
-                (
-                    account_3_subject_dataset_4_handle.id.as_local_ref(),
-                    account_3_subject_dataset_4_handle.clone()
-                ),
-            ],
-            *resolution.resolved_handles
-        );
-        assert_matches!(
-            &resolution.unresolved_refs[..],
-            [(unresolved_ref, odf::DatasetRefUnresolvedError::NotFound(e))]
-                if *unresolved_ref == not_found_dataset_id_ref
-                    && e.dataset_ref == not_found_dataset_id_ref
-        );
+        match tenancy_config {
+            TenancyConfig::SingleTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - did:odf:fed01961b8b13a41f25e7971e0b0ca41f25e76218461736772ad7648e896ab6cad925: dataset-1
+                        - did:odf:fed01961b8b13a41f25e7a81e8b0ca41f25e782184617369728d7648e6f26b6cdd525: dataset-2
+                        - did:odf:fed01961b8b13a41f25e7b91e0b0da41f25e7a218461736b726d7648e4de2b5ccd125: dataset-3
+                        - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: dataset-4
+
+                        unresolved_refs:
+                        - did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925: Dataset not found: did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+            TenancyConfig::MultiTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - did:odf:fed01961b8b13a41f25e7971e0b0ca41f25e76218461736772ad7648e896ab6cad925: account-1/dataset-1
+                        - did:odf:fed01961b8b13a41f25e7a81e8b0ca41f25e782184617369728d7648e6f26b6cdd525: account-1/dataset-2
+                        - did:odf:fed01961b8b13a41f25e7b91e0b0da41f25e7a218461736b726d7648e4de2b5ccd125: account-2/dataset-3
+                        - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: kamu/dataset-4
+
+                        unresolved_refs:
+                        - did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925: Dataset not found: did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+        }
     }
 
     // Aliases
@@ -348,34 +357,36 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         match tenancy_config {
             TenancyConfig::SingleTenant => {
                 assert_eq!(
-                    [(
-                        account_3_subject_dataset_4_handle.alias.as_local_ref(),
-                        account_3_subject_dataset_4_handle.clone()
-                    ),],
-                    *resolution.resolved_handles
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - dataset-4: dataset-4
+
+                        unresolved_refs:
+                        - dataset-1: Dataset not found: dataset-1
+                        - dataset-2: Dataset not found: dataset-2
+                        - dataset-3: Dataset not found: dataset-3
+                        - dataset-5: Dataset not found: dataset-5
+                        "#
+                    ),
+                    resolution_report(resolution)
                 );
             }
             TenancyConfig::MultiTenant => {
                 assert_eq!(
-                    [
-                        (
-                            account_1_dataset_1_handle.alias.as_local_ref(),
-                            account_1_dataset_1_handle.clone()
-                        ),
-                        (
-                            account_1_dataset_2_handle.alias.as_local_ref(),
-                            account_1_dataset_2_handle.clone()
-                        ),
-                        (
-                            account_2_dataset_3_handle.alias.as_local_ref(),
-                            account_2_dataset_3_handle.clone()
-                        ),
-                        (
-                            account_3_subject_dataset_4_handle.alias.as_local_ref(),
-                            account_3_subject_dataset_4_handle.clone()
-                        ),
-                    ],
-                    *resolution.resolved_handles
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - account-1/dataset-1: account-1/dataset-1
+                        - account-1/dataset-2: account-1/dataset-2
+                        - account-2/dataset-3: account-2/dataset-3
+                        - kamu/dataset-4: kamu/dataset-4
+
+                        unresolved_refs:
+                        - kamu/dataset-5: Dataset not found: kamu/dataset-5
+                        "#
+                    ),
+                    resolution_report(resolution)
                 );
             }
         }
@@ -385,6 +396,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     // todo
 
     // Mixed
+    // todo
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -514,6 +526,33 @@ impl DatasetEntryServiceHarness {
 
 fn frozen_time_point() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn resolution_report(
+    mut resolution: odf::dataset::ResolveDatasetHandlesByRefsResponse,
+    // dataset_handle_map: &HashMap<odf::DatasetID, odf::DatasetAlias>,
+) -> String {
+    use std::fmt::Write;
+
+    resolution
+        .resolved_handles
+        .sort_by(|(left_ref, _), (right_ref, _)| left_ref.cmp(right_ref));
+    resolution
+        .unresolved_refs
+        .sort_by(|(left_id, _), (right_id, _)| left_id.cmp(right_id));
+
+    let mut res = "resolved_handles:\n".to_string();
+    for (dataset_ref, dataset_handle) in resolution.resolved_handles {
+        writeln!(&mut res, "- {dataset_ref}: {dataset_handle}").unwrap();
+    }
+    res += "\nunresolved_refs:\n";
+    for (dataset_ref, e) in resolution.unresolved_refs {
+        writeln!(&mut res, "- {dataset_ref}: {e}").unwrap();
+    }
+
+    res
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
