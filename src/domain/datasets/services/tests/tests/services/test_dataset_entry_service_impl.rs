@@ -248,7 +248,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
         (&account_1, "dataset-2"),
         (&account_2, "dataset-3"),
         (&account_3_subject, "dataset-4"),
-        (&account_3_subject, "dataset-5"),
+        (&account_3_subject, "dataset-5-not-created"),
     ]
     .map(|(account, dataset_name)| {
         let dataset_id = odf::DatasetID::new_seeded_ed25519(dataset_name.as_bytes());
@@ -310,7 +310,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: dataset-4
 
                         unresolved_refs:
-                        - did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925: Dataset not found: did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925
+                        - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
                         "#
                     ),
                     resolution_report(resolution)
@@ -327,7 +327,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - did:odf:fed01961b8b13a41f25e7c21e8b09a41f25e74218461736d734d7648e23beb7c7dd25: kamu/dataset-4
 
                         unresolved_refs:
-                        - did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925: Dataset not found: did:odf:fed01961b8b13a41f25e7d31e0b0aa41f25e76218461736f732d7648e017ab7c6d925
+                        - did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47: Dataset not found: did:odf:fed01961b8b13a41f25e74cab2c2d742cd18878cd47318f7ec5848d888c9e17371d47
                         "#
                     ),
                     resolution_report(resolution)
@@ -366,7 +366,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - dataset-1: Dataset not found: dataset-1
                         - dataset-2: Dataset not found: dataset-2
                         - dataset-3: Dataset not found: dataset-3
-                        - dataset-5: Dataset not found: dataset-5
+                        - dataset-5-not-created: Dataset not found: dataset-5-not-created
                         "#
                     ),
                     resolution_report(resolution)
@@ -383,7 +383,7 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
                         - kamu/dataset-4: kamu/dataset-4
 
                         unresolved_refs:
-                        - kamu/dataset-5: Dataset not found: kamu/dataset-5
+                        - kamu/dataset-5-not-created: Dataset not found: kamu/dataset-5-not-created
                         "#
                     ),
                     resolution_report(resolution)
@@ -393,7 +393,58 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     }
 
     // Handles
-    // todo
+    {
+        let refs = [
+            &account_1_dataset_1_handle.as_local_ref(),
+            &account_1_dataset_2_handle.as_local_ref(),
+            &account_2_dataset_3_handle.as_local_ref(),
+            &account_3_subject_dataset_4_handle.as_local_ref(),
+            &account_3_subject_dataset_5_not_created_handle.as_local_ref(),
+        ];
+
+        let resolution = harness
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&refs)
+            .await
+            .unwrap();
+
+        match tenancy_config {
+            TenancyConfig::SingleTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - dataset-1: dataset-1
+                        - dataset-2: dataset-2
+                        - dataset-3: dataset-3
+                        - dataset-4: dataset-4
+                        - dataset-5-not-created: dataset-5-not-created
+
+                        unresolved_refs:
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+            TenancyConfig::MultiTenant => {
+                assert_eq!(
+                    indoc::indoc!(
+                        r#"
+                        resolved_handles:
+                        - account-1/dataset-1: account-1/dataset-1
+                        - account-1/dataset-2: account-1/dataset-2
+                        - account-2/dataset-3: account-2/dataset-3
+                        - kamu/dataset-4: kamu/dataset-4
+                        - kamu/dataset-5-not-created: kamu/dataset-5-not-created
+
+                        unresolved_refs:
+                        "#
+                    ),
+                    resolution_report(resolution)
+                );
+            }
+        }
+    }
 
     // Mixed
     // todo
