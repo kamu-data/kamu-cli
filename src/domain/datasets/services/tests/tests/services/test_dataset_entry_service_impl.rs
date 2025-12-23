@@ -556,6 +556,58 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
             }
         }
     }
+
+    // Special case (multi-tenant): mixed aliases (w/ and w/o account names)
+    match tenancy_config {
+        TenancyConfig::SingleTenant => {}
+        TenancyConfig::MultiTenant => {
+            let refs = [
+                // w/ account names
+                &account_1_dataset_1_handle.alias.as_local_ref(),
+                &account_1_dataset_2_handle.alias.as_local_ref(),
+                &account_2_dataset_3_handle.alias.as_local_ref(),
+                // w/o account names
+                &{
+                    let mut alias = account_3_subject_dataset_4_handle.alias.clone();
+                    alias.account_name = None;
+                    alias.as_local_ref()
+                },
+                &{
+                    let mut alias = account_3_subject_dataset_5_not_created_handle.alias.clone();
+                    alias.account_name = None;
+                    alias.as_local_ref()
+                },
+                &{
+                    let mut alias = account_4_dataset_6_not_created_handle.alias.clone();
+                    alias.account_name = None;
+                    alias.as_local_ref()
+                },
+            ];
+
+            let resolution = harness
+                .dataset_registry
+                .resolve_dataset_handles_by_refs(&refs)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                indoc::indoc!(
+                    r#"
+                    resolved_handles:
+                    - account-1/dataset-1: account-1/dataset-1
+                    - account-1/dataset-2: account-1/dataset-2
+                    - account-2/dataset-3: account-2/dataset-3
+                    - kamu/dataset-4: kamu/dataset-4
+
+                    unresolved_refs:
+                    - kamu/dataset-5-not-created: Dataset not found: kamu/dataset-5-not-created
+                    - kamu/dataset-6-not-created: Dataset not found: kamu/dataset-6-not-created
+                    "#
+                ),
+                resolution_report(resolution)
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
