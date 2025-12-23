@@ -18,7 +18,6 @@ use database_common::{
     EntityPageStreamer,
     PaginationOpts,
 };
-use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
@@ -70,10 +69,10 @@ struct DatasetsCache {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn DatasetEntryService)]
-#[interface(dyn DatasetEntryWriter)]
-#[interface(dyn DatasetRegistry)]
+#[dill::component(pub)]
+#[dill::interface(dyn DatasetEntryService)]
+#[dill::interface(dyn DatasetEntryWriter)]
+#[dill::interface(dyn DatasetRegistry)]
 impl DatasetEntryServiceImpl {
     pub fn new(
         time_source: Arc<dyn SystemTimeSource>,
@@ -165,20 +164,11 @@ impl DatasetEntryServiceImpl {
     ) -> Result<HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>>, InternalError> {
         let mut res = HashMap::new();
 
-        let is_multi_tenant = *self.tenancy_config == TenancyConfig::MultiTenant;
-
         for dataset_alias in dataset_aliases {
-            let account_name = match &dataset_alias.account_name {
-                Some(account_name) if is_multi_tenant => account_name,
-                None if !is_multi_tenant => self.current_account_subject.account_name_or_default(),
-                _ => {
-                    return Err(format!(
-                        "Mixed presence of single-tenant and multi-tenant aliases: {}",
-                        itertools::join(dataset_aliases, ",")
-                    )
-                    .int_err());
-                }
-            };
+            let account_name = dataset_alias
+                .account_name
+                .as_ref()
+                .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
 
             let owner_dataset_aliases = res.entry(account_name).or_insert_with(Vec::new);
             owner_dataset_aliases.push(*dataset_alias);
@@ -191,52 +181,13 @@ impl DatasetEntryServiceImpl {
         &self,
         maybe_account_names: &[Option<&odf::AccountName>],
     ) -> Result<ResolveAccountIdsByMaybeNamesResponse, InternalError> {
-        let mut single_tenant_count = 0;
-        let mut multi_tenant_count = 0;
-
         let account_names = maybe_account_names
             .iter()
-            .map(|maybe_account_name| match maybe_account_name {
-                Some(account_name) => {
-                    multi_tenant_count += 1;
-                    account_name
-                }
-                None => {
-                    single_tenant_count += 1;
-                    self.current_account_subject.account_name_or_default()
-                }
+            .map(|maybe_account_name| {
+                maybe_account_name
+                    .unwrap_or_else(|| self.current_account_subject.account_name_or_default())
             })
             .collect::<Vec<_>>();
-
-        // Early return checks
-        if single_tenant_count > 0 {
-            return if multi_tenant_count > 0 {
-                Err(format!(
-                    "Simultaneous presence of single-tenant and multi-tenant account names: {}",
-                    itertools::join(
-                        maybe_account_names
-                            .iter()
-                            .map(|maybe_account_name| { format!("{maybe_account_name:?}") }),
-                        ","
-                    )
-                )
-                .int_err())
-            } else {
-                // Edge case: trying to resolve a slice of empty names [None, None, None] in
-                // single-tenant mode.
-                let account_name = self.current_account_subject.account_name_or_default();
-                let account = self
-                    .account_svc
-                    .get_account_by_name(account_name)
-                    .await
-                    .int_err()?;
-
-                Ok(ResolveAccountIdsByMaybeNamesResponse {
-                    resolved_account_ids: vec![(account.account_name, account.id)],
-                    unresolved_account_names: Vec::new(),
-                })
-            };
-        }
 
         // 1. Read all available data from the cache
         let cached_name_id_pairs = {
@@ -741,7 +692,6 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
         }
     }
 
-    // TODO: tests
     #[tracing::instrument(level = "debug", skip_all, fields(dataset_refs_count = dataset_refs.len()))]
     async fn resolve_dataset_handles_by_refs(
         &self,
