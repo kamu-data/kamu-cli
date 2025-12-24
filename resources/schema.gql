@@ -3208,6 +3208,11 @@ type MoleculeActivityFileUpdatedV2 {
 	entry: MoleculeDataRoomEntry!
 }
 
+enum MoleculeActivityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
 	systemTime: DateTime!
@@ -3564,6 +3569,7 @@ input MoleculeProjectActivityFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byKinds: [MoleculeActivityKindInput!]
 }
 
 type MoleculeProjectConnection {
