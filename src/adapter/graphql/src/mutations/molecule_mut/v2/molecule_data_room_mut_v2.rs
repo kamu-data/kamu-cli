@@ -844,7 +844,6 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         content_text: Option<String>,
-        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -893,6 +892,11 @@ impl MoleculeDataRoomMutV2 {
             ));
         };
 
+        let existing_encryption_metadata = existing_file_entry
+            .detailed_info
+            .encryption_metadata
+            .clone();
+
         // 1. Update the versioned dataset.
         let updated_versioned_file_entry = update_versioned_file_metadata_uc
             .execute(
@@ -908,7 +912,7 @@ impl MoleculeDataRoomMutV2 {
                 },
                 MoleculeVersionedFileEntryDetailedInfo {
                     content_text,
-                    encryption_metadata: encryption_metadata.map(Into::into),
+                    encryption_metadata: existing_encryption_metadata,
                 },
             )
             .await

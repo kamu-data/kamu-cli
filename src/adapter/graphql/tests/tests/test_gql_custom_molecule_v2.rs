@@ -3363,7 +3363,7 @@ async fn test_molecule_v2_data_room_operations() {
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
@@ -3376,7 +3376,6 @@ async fn test_molecule_v2_data_room_operations() {
                     categories: $categories
                     tags: $tags
                     contentText: $contentText
-                    encryptionMetadata: $encryptionMetadata
                   ) {
                     isSuccess
                     message
@@ -3404,17 +3403,6 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1-updated",
-                    "accessControlConditions": "EM2-updated",
-                    "encryptedBy": "EM3-updated",
-                    "encryptedAt": "EM4-updated",
-                    "chain": "EM5-updated",
-                    "litSdkVersion": "EM6-updated",
-                    "litNetwork": "EM7-updated",
-                    "templateName": "EM8-updated",
-                    "contractVersion": "EM9-updated",
-                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3449,17 +3437,6 @@ async fn test_molecule_v2_data_room_operations() {
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1-updated",
-                    "accessControlConditions": "EM2-updated",
-                    "encryptedBy": "EM3-updated",
-                    "encryptedAt": "EM4-updated",
-                    "chain": "EM5-updated",
-                    "litSdkVersion": "EM6-updated",
-                    "litNetwork": "EM7-updated",
-                    "templateName": "EM8-updated",
-                    "contractVersion": "EM9-updated",
-                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3559,7 +3536,7 @@ async fn test_molecule_v2_data_room_operations() {
             "categories": ["test-category-1", "test-category-2"],
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
-            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1-updated\",\"accessControlConditions\":\"EM2-updated\",\"encryptedBy\":\"EM3-updated\",\"encryptedAt\":\"EM4-updated\",\"chain\":\"EM5-updated\",\"litSdkVersion\":\"EM6-updated\",\"litNetwork\":\"EM7-updated\",\"templateName\":\"EM8-updated\",\"contractVersion\":\"EM9-updated\"}",
+            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1\",\"accessControlConditions\":\"EM2\",\"encryptedBy\":\"EM3\",\"encryptedAt\":\"EM4\",\"chain\":\"EM5\",\"litSdkVersion\":\"EM6\",\"litNetwork\":\"EM7\",\"templateName\":\"EM8\",\"contractVersion\":\"EM9\"}",
             "molecule_access_level": "holders",
             "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
