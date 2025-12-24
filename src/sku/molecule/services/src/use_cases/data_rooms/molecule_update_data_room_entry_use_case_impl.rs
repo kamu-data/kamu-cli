@@ -36,7 +36,7 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
         level = "debug",
         name = MoleculeUpdateDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference)
+        fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference, ?expected_head)
     )]
     async fn execute(
         &self,
@@ -45,6 +45,7 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
         reference: odf::DatasetID,
+        expected_head: Option<odf::Multihash>,
         denormalized_latest_file_info: MoleculeDenormalizeFileToDataRoom,
         content_text: Option<&str>,
     ) -> Result<MoleculeDataRoomEntry, MoleculeUpdateDataRoomEntryError> {
@@ -56,7 +57,7 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
                 path.clone(),
                 path.clone(),
                 Some(denormalized_latest_file_info.to_collection_extra_data_fields()),
-                None,
+                expected_head,
             )
             .await
             .map_err(|e| match e {
