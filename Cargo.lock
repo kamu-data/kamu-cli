@@ -145,9 +145,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alloy"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f07655fedc35188f3c50ff8fc6ee45703ae14ef1bc7ae7d80e23a747012184e3"
+checksum = "f609fb6392508278b276906d6247ea44f5777e448db95444fa39e89b7aee896a"
 dependencies = [
  "alloy-consensus",
  "alloy-contract",
@@ -168,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-chains"
-version = "0.2.23"
+version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35d744058a9daa51a8cf22a3009607498fcf82d3cf4c5444dd8056cdf651f471"
+checksum = "b163ff4acf0eac29af05a911397cc418a76e153467b859398adc26cb9335a611"
 dependencies = [
  "alloy-primitives",
  "num_enum",
@@ -179,9 +179,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e318e25fb719e747a7e8db1654170fc185024f3ed5b10f86c08d448a912f6e2"
+checksum = "f3dcd2b4e208ce5477de90ccdcbd4bde2c8fb06af49a443974e92bb8f2c5e93f"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -206,9 +206,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus-any"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364380a845193a317bcb7a5398fc86cdb66c47ebe010771dde05f6869bf9e64a"
+checksum = "ee5655f234985f5ab1e31bef7e02ed11f0a899468cf3300e061e1b96e9e11de0"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -220,9 +220,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-contract"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08d39c80ffc806f27a76ed42f3351a455f3dc4f81d6ff92c8aad2cf36b7d3a34"
+checksum = "7f01b6d8e5b4f3222aaf7f18613a7292e2fbc9163fe120649cd1b078ca534349"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -310,9 +310,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4c4d7c5839d9f3a467900c625416b24328450c65702eb3d8caff8813e4d1d33"
+checksum = "6847d641141b92a1557094aa6c236cbe49c06fb24144d4a21fe6acb970c15888"
 dependencies = [
  "alloy-eip2124",
  "alloy-eip2930",
@@ -333,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-genesis"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ba4b1be0988c11f0095a2380aa596e35533276b8fa6c9e06961bbfe0aebcac5"
+checksum = "fe3192fca2eb0b0c4b122b3c2d8254496b88a4e810558dddd3ea2f30ad9469df"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -360,9 +360,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-json-rpc"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f72cf87cda808e593381fb9f005ffa4d2475552b7a6c5ac33d087bf77d82abd0"
+checksum = "d4ab3330e491053e9608b2a315f147357bb8acb9377a988c1203f2e8e2b296c9"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -375,9 +375,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-network"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12aeb37b6f2e61b93b1c3d34d01ee720207c76fe447e2a2c217e433ac75b17f5"
+checksum = "c1e22ff194b1e34b4defd1e257e3fe4dce0eee37451c7757a1510d6b23e7379a"
 dependencies = [
  "alloy-consensus",
  "alloy-consensus-any",
@@ -401,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-network-primitives"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abd29ace62872083e30929cd9b282d82723196d196db589f3ceda67edcc05552"
+checksum = "b8a6cbb9f431bdad294eebb5af9b293d6979e633bfe5468d1e87c1421a858265"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -443,9 +443,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-provider"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b710636d7126e08003b8217e24c09f0cca0b46d62f650a841736891b1ed1fc1"
+checksum = "3f5dde1abc3d582e53d139904fcdd8b2103f0bd03e8f2acb4292edbbaeaa7e6e"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -484,9 +484,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-pubsub"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd4c64eb250a18101d22ae622357c6b505e158e9165d4c7974d59082a600c5e"
+checksum = "acbfe0a3c553a027f722185fb574124d205147fffb309cae52d0a2094f076887"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -528,9 +528,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-client"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0882e72d2c1c0c79dcf4ab60a67472d3f009a949f774d4c17d0bdb669cfde05"
+checksum = "5a94bdef2710322c6770be08689fee0878c2ad75615b8fc40e05d7f3c9618c0b"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -553,9 +553,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cf1398cb33aacb139a960fa3d8cf8b1202079f320e77e952a0b95967bf7a9f"
+checksum = "811a573c8080e1b492d488e6a240ec5dd7677d7167e91ce9cb4d0ec1fcac8027"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
@@ -565,9 +565,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-any"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a63fb40ed24e4c92505f488f9dd256e2afaed17faa1b7a221086ebba74f4122"
+checksum = "12df0b34551ca2eab8ec83b56cb709ee5da991737282180d354a659b907f00dc"
 dependencies = [
  "alloy-consensus-any",
  "alloy-rpc-types-eth",
@@ -576,9 +576,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-eth"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eae0c7c40da20684548cbc8577b6b7447f7bf4ddbac363df95e3da220e41e72"
+checksum = "b7f9f130511b8632686dfe6f9909b38d7ae4c68de3ce17d28991400646a39b25"
 dependencies = [
  "alloy-consensus",
  "alloy-consensus-any",
@@ -597,9 +597,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0df1987ed0ff2d0159d76b52e7ddfc4e4fbddacc54d2fbee765e0d14d7c01b5"
+checksum = "067b718d2e6ac1bb889341fcc7a250cfa49bcd3ba4f23923f1c1eb1f2b10cb7c"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -608,9 +608,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff69deedee7232d7ce5330259025b868c5e6a52fa8dffda2c861fb3a5889b24"
+checksum = "acff6b251740ef473932386d3b71657d3825daebf2217fb41a7ef676229225d4"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -696,9 +696,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be98b07210d24acf5b793c99b759e9a696e4a2e67593aec0487ae3b3e1a2478c"
+checksum = "bec1fb08ee484e615f24867c0b154fff5722bb00176102a16868c6532b7c3623"
 dependencies = [
  "alloy-json-rpc",
  "auto_impl",
@@ -719,9 +719,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-http"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4198a1ee82e562cab85e7f3d5921aab725d9bd154b6ad5017f82df1695877c97"
+checksum = "64b722073c76f2de7e118d546ee1921c50710f97feb32aed50db94cfa5b663e1"
 dependencies = [
  "alloy-json-rpc",
  "alloy-transport",
@@ -734,15 +734,14 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-ws"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ad2344a12398d7105e3722c9b7a7044ea837128e11d453604dec6e3731a86e2"
+checksum = "942210908f0c56941097f5653a5f334546940e6fd9073495b257e52216469feb"
 dependencies = [
  "alloy-pubsub",
  "alloy-transport",
  "futures",
  "http 1.4.0",
- "rustls 0.23.35",
  "serde_json",
  "tokio",
  "tokio-tungstenite 0.26.2",
@@ -768,9 +767,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-tx-macros"
-version = "1.1.3"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "333544408503f42d7d3792bfc0f7218b643d968a03d2c0ed383ae558fb4a76d0"
+checksum = "04950a13cc4209d8e9b78f306e87782466bad8538c94324702d061ff03e211c9"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",
@@ -1577,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "async-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "internal-error",
@@ -2021,9 +2020,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-runtime"
-version = "1.9.6"
+version = "1.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65fda37911905ea4d3141a01364bc5509a0f32ae3f3b22d6e330c0abfb62d247"
+checksum = "a392db6c583ea4a912538afb86b7be7c5d8887d91604f50eb55c262ee1b4a5f5"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http 0.62.6",
@@ -2980,7 +2979,7 @@ dependencies = [
 
 [[package]]
 name = "common-macros"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -3080,7 +3079,7 @@ checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "container-runtime"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -3363,7 +3362,7 @@ dependencies = [
 
 [[package]]
 name = "crypto-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -3586,7 +3585,7 @@ dependencies = [
 
 [[package]]
 name = "database-common"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3613,7 +3612,7 @@ dependencies = [
 
 [[package]]
 name = "database-common-macros"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -4768,7 +4767,7 @@ dependencies = [
 
 [[package]]
 name = "email-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "serde",
  "thiserror 2.0.17",
@@ -4870,7 +4869,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.254.1"
+version = "0.255.0"
 
 [[package]]
 name = "env_filter"
@@ -4939,7 +4938,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4955,7 +4954,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -5056,7 +5055,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "file-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "serde",
 ]
@@ -5435,7 +5434,7 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "graphql-http"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-graphql",
  "axum 0.8.8",
@@ -5892,7 +5891,7 @@ dependencies = [
 
 [[package]]
 name = "http-common"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "axum 0.8.8",
  "http 1.4.0",
@@ -6313,7 +6312,7 @@ dependencies = [
 
 [[package]]
 name = "init-on-startup"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "bon",
@@ -6355,7 +6354,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "thiserror 2.0.17",
 ]
@@ -6761,7 +6760,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "alloy",
  "async-recursion",
@@ -6843,7 +6842,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "base32",
@@ -6876,7 +6875,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6897,7 +6896,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-mysql"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6920,7 +6919,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6943,7 +6942,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "argon2",
  "chrono",
@@ -6962,7 +6961,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "bon",
@@ -7005,7 +7004,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -7028,7 +7027,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso-rebac"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7062,7 +7061,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-web3"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7092,7 +7091,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -7125,7 +7124,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flow-dataset"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7158,7 +7157,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flow-webhook"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7194,7 +7193,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -7271,7 +7270,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
@@ -7347,7 +7346,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "dill",
@@ -7364,7 +7363,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-odata"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "axum 0.8.8",
@@ -7409,7 +7408,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-task-dataset"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "common-macros",
@@ -7428,7 +7427,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-task-webhook"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7448,7 +7447,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "internal-error",
@@ -7464,7 +7463,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common-macros",
@@ -7478,7 +7477,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -7494,7 +7493,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "dill",
  "kamu-auth-rebac",
@@ -7503,7 +7502,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7529,7 +7528,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -7546,7 +7545,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "alloy-primitives",
  "async-trait",
@@ -7562,7 +7561,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7577,7 +7576,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7595,7 +7594,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "dill",
@@ -7605,7 +7604,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7620,7 +7619,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7638,7 +7637,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow-flight",
  "async-graphql",
@@ -7790,7 +7789,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -7820,7 +7819,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common-macros"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "quote",
  "syn 2.0.111",
@@ -7828,7 +7827,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "database-common",
  "indoc 2.0.7",
@@ -7841,7 +7840,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "database-common",
  "indoc 2.0.7",
@@ -7854,7 +7853,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -7884,7 +7883,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "indoc 2.0.7",
  "kamu-cli-e2e-common",
@@ -7896,7 +7895,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-puppet"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "assert_cmd",
  "async-trait",
@@ -7916,7 +7915,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -7950,7 +7949,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datafusion-cli"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -7971,7 +7970,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -8001,7 +8000,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "cheap-clone",
@@ -8023,7 +8022,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8047,7 +8046,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -8066,7 +8065,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8123,7 +8122,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8148,7 +8147,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8177,7 +8176,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8201,7 +8200,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8226,7 +8225,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "csv",
@@ -8249,7 +8248,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8292,7 +8291,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8317,7 +8316,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8350,7 +8349,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common-macros",
@@ -8366,7 +8365,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8386,7 +8385,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "dill",
@@ -8399,7 +8398,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8418,7 +8417,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "clap",
@@ -8436,7 +8435,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -8451,7 +8450,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-elasticsearch"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "canonical_json",
@@ -8475,7 +8474,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-elasticsearch-macros"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8484,7 +8483,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-openai"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-openai",
  "async-trait",
@@ -8498,7 +8497,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-qdrant"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "container-runtime",
@@ -8514,7 +8513,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "common-macros",
@@ -8536,7 +8535,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8558,7 +8557,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -8575,7 +8574,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8595,7 +8594,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -8608,7 +8607,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8641,7 +8640,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8662,7 +8661,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -8688,7 +8687,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8708,7 +8707,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-postgres"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8732,7 +8731,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-repo-tests"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -8749,7 +8748,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-services"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -8787,7 +8786,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-sqlite"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -9036,9 +9035,9 @@ dependencies = [
 
 [[package]]
 name = "libz-rs-sys"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15413ef615ad868d4d65dce091cb233b229419c7c0c4bcaa746c0901c49ff39c"
+checksum = "c10501e7805cee23da17c7790e59df2870c0d4043ec6d03f67d31e2b53e77415"
 dependencies = [
  "zlib-rs",
 ]
@@ -9325,7 +9324,7 @@ dependencies = [
 
 [[package]]
 name = "messaging-outbox"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -9503,7 +9502,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "base64",
  "bs58 0.5.1",
@@ -9866,7 +9865,7 @@ dependencies = [
 
 [[package]]
 name = "observability"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "axum 0.8.8",
@@ -9953,7 +9952,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "opendatafabric"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "opendatafabric-data-utils",
  "opendatafabric-dataset",
@@ -9968,7 +9967,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-data-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -9995,7 +9994,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-dataset"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -10021,7 +10020,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-dataset-impl"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow",
  "async-stream",
@@ -10063,7 +10062,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-metadata"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "arrow",
  "base64",
@@ -10095,7 +10094,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -10117,7 +10116,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-http"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -10140,7 +10139,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-inmem"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -10156,7 +10155,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-lfs"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -10176,7 +10175,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-s3"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -11413,7 +11412,7 @@ dependencies = [
 
 [[package]]
 name = "random-strings"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "rand 0.9.2",
 ]
@@ -11627,9 +11626,9 @@ checksum = "51743d3e274e2b18df81c4dc6caf8a5b8e15dbe799e0dca05c7617380094e884"
 
 [[package]]
 name = "reqwest"
-version = "0.12.26"
+version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b4c14b2d9afca6a60277086b0cc6a6ae0b568f6f7916c943a8cdc79f8be240f"
+checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64",
  "bytes",
@@ -11969,9 +11968,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd15f8a2c5551a84d56efdc1cd049089e409ac19a3072d5037a17fd70719ff3e"
+checksum = "146c9e247ccc180c1f61615433868c99f3de3ae256a30a43b49f67c2d9171f34"
 dependencies = [
  "bitflags",
  "errno",
@@ -12132,7 +12131,7 @@ checksum = "700de91d5fd6091442d00fdd9ee790af6d4f0f480562b0f5a1e8f59e90aafe73"
 
 [[package]]
 name = "s3-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-utils",
  "aws-config",
@@ -12374,15 +12373,15 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.146"
+version = "1.0.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "217ca874ae0207aac254aa02c957ded05585a90892cc8d87f9e5fa49669dadd8"
+checksum = "6af14725505314343e673e9ecb7cd7e8a36aa9791eb936235a3567cc31447ae4"
 dependencies = [
  "itoa",
  "memchr",
- "ryu",
  "serde",
  "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -12473,7 +12472,7 @@ dependencies = [
 
 [[package]]
 name = "server-console"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-graphql",
  "axum 0.8.8",
@@ -13375,9 +13374,9 @@ checksum = "b1dd07eb858a2067e2f3c7155d54e929265c264e6f37efe3ee7a8d1b5a1dd0ba"
 
 [[package]]
 name = "tempfile"
-version = "3.23.0"
+version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d31c77bdf42a745371d260a26ca7163f1e0924b64afa0b688e61b5a9fa02f16"
+checksum = "655da9c7eb6305c55742045d5a8d2037996d61d8de95806335c7c86ce0f82e9c"
 dependencies = [
  "fastrand",
  "getrandom 0.3.4",
@@ -13440,7 +13439,7 @@ dependencies = [
 
 [[package]]
 name = "test-utils"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "axum 0.8.8",
  "container-runtime",
@@ -13574,7 +13573,7 @@ dependencies = [
 
 [[package]]
 name = "time-source"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -14064,7 +14063,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.254.1"
+version = "0.255.0"
 dependencies = [
  "conv",
  "serde",
@@ -15312,9 +15311,15 @@ dependencies = [
 
 [[package]]
 name = "zlib-rs"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51f936044d677be1a1168fae1d03b583a285a5dd9d8cbf7b24c23aa1fc775235"
+checksum = "40990edd51aae2c2b6907af74ffb635029d5788228222c4bb811e9351c0caad3"
+
+[[package]]
+name = "zmij"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dccf46b25b205e4bebe1d5258a991df1cc17801017a845cb5b3fe0269781aa"
 
 [[package]]
 name = "zopfli"
