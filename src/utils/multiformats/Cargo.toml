@@ -39,8 +39,11 @@ hex = { version = "0.4", default-features = false, features = [] }
 rand = { version = "0.9", default-features = false, features = [
     "std",
     "std_rng",
+    "small_rng",
 ] }
-rand_core = "0.6"
+rand_core = { version = "0.6", default-features = false, features = [
+    "getrandom",
+] }
 sha3 = { version = "0.10", default-features = false, features = [] }
 serde = { version = "1", default-features = false, features = [] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
@@ -55,4 +58,7 @@ serde_json = { optional = true, version = "1", default-features = false }
 
 
 [dev-dependencies]
-pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
