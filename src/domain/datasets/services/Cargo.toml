@@ -87,11 +87,13 @@ kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 odf = { workspace = true, features = ["testing"] }
+test-utils = { workspace = true }
 
 indoc = "2"
 mockall = "0.14"
 oop = "0.0.2"
-pretty_assertions = { version = "1" }
+paste = { version = "1", default-features = false }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
 rstest = { version = "0.26", default-features = false, features = [] }
 serde_json = "1"
 tempfile = "3"
