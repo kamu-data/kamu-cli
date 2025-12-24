@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 
-use crate::{MoleculeDataRoomActivity, MoleculeGlobalAnnouncement};
+use crate::{MoleculeActivitiesFilters, MoleculeDataRoomActivity, MoleculeGlobalAnnouncement};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,23 +29,6 @@ pub trait MoleculeViewGlobalActivitiesUseCase: Send + Sync {
 
 pub type MoleculeGlobalActivityListing = EntityPageListing<MoleculeGlobalActivity>;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug)]
-pub struct MoleculeActivitiesFilters {
-    pub by_tags: Option<Vec<String>>,
-    pub by_categories: Option<Vec<String>>,
-    pub by_access_levels: Option<Vec<String>>,
-    pub by_kinds: Option<Vec<MoleculeActivityKind>>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MoleculeActivityKind {
-    DataRoomActivity,
-    Announcement,
-}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum MoleculeGlobalActivity {

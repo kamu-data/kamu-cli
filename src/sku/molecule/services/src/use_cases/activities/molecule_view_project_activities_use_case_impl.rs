@@ -30,22 +30,6 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
-            Some(filters) => (
-                filters.by_tags,
-                filters.by_categories,
-                filters.by_access_levels,
-                filters.by_kinds,
-            ),
-            None => (None, None, None, None),
-        };
-
-        if let Some(by_kinds) = &by_kinds {
-            if !by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
-                return Ok(MoleculeProjectActivityListing::default());
-            }
-        }
-
         // Get read access to data room
         let data_room_reader = self
             .accessor_factory
@@ -62,8 +46,9 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             return Ok(MoleculeProjectActivityListing::default());
         };
 
-        let maybe_filter =
-            utils::molecule_fields_filter(None, by_tags, by_categories, by_access_levels);
+        let maybe_filter = filters.and_then(|f| {
+            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
+        });
         let df = if let Some(filter) = maybe_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
                 .int_err()?
@@ -160,30 +145,14 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
-            Some(filters) => (
-                filters.by_tags,
-                filters.by_categories,
-                filters.by_access_levels,
-                filters.by_kinds,
-            ),
-            None => (None, None, None, None),
-        };
-
-        if let Some(by_kinds) = &by_kinds {
-            if !by_kinds.contains(&MoleculeActivityKind::Announcement) {
-                return Ok(MoleculeProjectActivityListing::default());
-            }
-        }
-
         let announcements_listing = self
             .view_project_announcements_uc
             .execute(
                 molecule_project,
-                Some(MoleculeAnnouncementsFilters {
-                    by_tags,
-                    by_categories,
-                    by_access_levels,
+                filters.map(|filters| MoleculeAnnouncementsFilters {
+                    by_tags: filters.by_tags,
+                    by_categories: filters.by_categories,
+                    by_access_levels: filters.by_access_levels,
                 }),
                 None,
             )
@@ -221,10 +190,52 @@ impl MoleculeViewProjectActivitiesUseCase for MoleculeViewProjectActivitiesUseCa
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+        // Helper to conditionally fetch data
+        async fn fetch_or_empty<Fut>(
+            enabled: bool,
+            fut: Fut,
+        ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>
+        where
+            Fut: std::future::Future<
+                    Output = Result<
+                        MoleculeProjectActivityListing,
+                        MoleculeViewDataRoomActivitiesError,
+                    >,
+                >,
+        {
+            if enabled {
+                fut.await
+            } else {
+                Ok(MoleculeProjectActivityListing::default())
+            }
+        }
+
+        let by_kinds = filters
+            .as_ref()
+            .and_then(|f| f.by_kinds.as_deref())
+            .unwrap_or(&[]);
+
+        let fetch_data_room =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
+        let fetch_announcements =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+
+        if !fetch_data_room && !fetch_announcements {
+            return Ok(MoleculeProjectActivityListing::default());
+        }
+
+        let data_room_fut = fetch_or_empty(
+            fetch_data_room,
             self.get_data_room_activities_listing(molecule_project, filters.clone()),
-            self.get_announcement_activities_listing(molecule_project, filters),
-        )?;
+        );
+
+        let announcements_fut = fetch_or_empty(
+            fetch_announcements,
+            self.get_announcement_activities_listing(molecule_project, filters.clone()),
+        );
+
+        let (mut data_room_listing, mut announcement_activities_listing) =
+            tokio::try_join!(data_room_fut, announcements_fut)?;
 
         // Get the total count before pagination
         let total_count =

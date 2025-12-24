@@ -3208,6 +3208,11 @@ type MoleculeActivityFileUpdatedV2 {
 	entry: MoleculeDataRoomEntry!
 }
 
+enum MoleculeActivityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
 	systemTime: DateTime!
@@ -3764,11 +3769,6 @@ type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & M
 	limit: Int
 	isSuccess: Boolean!
 	message: String!
-}
-
-enum MoleculeActivityKindInput {
-	FILE
-	ANNOUNCEMENT
 }
 
 enum MoleculeSearchEntityKindInput {
