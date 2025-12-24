@@ -437,7 +437,7 @@ impl DataType {
                     t => {
                         return Err(UnsupportedSchema::new(format!(
                             "Expected Int32/Int64 type for run ends but got: {t:?}"
-                        )))
+                        )));
                     }
                 };
 
