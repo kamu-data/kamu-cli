@@ -30,6 +30,22 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
+            Some(filters) => (
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_kinds,
+            ),
+            None => (None, None, None, None),
+        };
+
+        if let Some(by_kinds) = &by_kinds {
+            if !by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
+                return Ok(MoleculeProjectActivityListing::default());
+            }
+        }
+
         // Get read access to data room
         let data_room_reader = self
             .accessor_factory
@@ -46,9 +62,8 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             return Ok(MoleculeProjectActivityListing::default());
         };
 
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
-        });
+        let maybe_filter =
+            utils::molecule_fields_filter(None, by_tags, by_categories, by_access_levels);
         let df = if let Some(filter) = maybe_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
                 .int_err()?
@@ -145,14 +160,30 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
+            Some(filters) => (
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_kinds,
+            ),
+            None => (None, None, None, None),
+        };
+
+        if let Some(by_kinds) = &by_kinds {
+            if !by_kinds.contains(&MoleculeActivityKind::Announcement) {
+                return Ok(MoleculeProjectActivityListing::default());
+            }
+        }
+
         let announcements_listing = self
             .view_project_announcements_uc
             .execute(
                 molecule_project,
-                filters.map(|filters| MoleculeAnnouncementsFilters {
-                    by_tags: filters.by_tags,
-                    by_categories: filters.by_categories,
-                    by_access_levels: filters.by_access_levels,
+                Some(MoleculeAnnouncementsFilters {
+                    by_tags,
+                    by_categories,
+                    by_access_levels,
                 }),
                 None,
             )

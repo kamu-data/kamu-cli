@@ -36,8 +36,16 @@ pub struct MoleculeActivitiesFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_kinds: Option<Vec<MoleculeActivityKind>>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MoleculeActivityKind {
+    DataRoomActivity,
+    Announcement,
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub enum MoleculeGlobalActivity {

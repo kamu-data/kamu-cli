@@ -3559,6 +3559,7 @@ input MoleculeProjectActivityFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byKinds: [MoleculeActivityKindInput!]
 }
 
 type MoleculeProjectConnection {
@@ -3763,6 +3764,11 @@ type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & M
 	limit: Int
 	isSuccess: Boolean!
 	message: String!
+}
+
+enum MoleculeActivityKindInput {
+	FILE
+	ANNOUNCEMENT
 }
 
 enum MoleculeSearchEntityKindInput {

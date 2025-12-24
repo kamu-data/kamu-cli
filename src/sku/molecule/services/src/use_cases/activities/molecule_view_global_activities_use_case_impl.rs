@@ -32,6 +32,22 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
+        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
+            Some(filters) => (
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_kinds,
+            ),
+            None => (None, None, None, None),
+        };
+
+        if let Some(by_kinds) = &by_kinds {
+            if !by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
+                return Ok(MoleculeGlobalActivityListing::default());
+            }
+        }
+
         // Get read access to global activities dataset
         let data_room_activities_reader = match self
             .global_data_room_activities_service
@@ -62,9 +78,8 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         };
 
         // Apply filters, if present
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
-        });
+        let maybe_filter =
+            utils::molecule_fields_filter(None, by_tags, by_categories, by_access_levels);
         let df = if let Some(filter) = maybe_filter {
             kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
                 .int_err()?
@@ -93,19 +108,31 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
+        let (by_tags, by_categories, by_access_levels, by_kinds) = match filters {
+            Some(filters) => (
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_kinds,
+            ),
+            None => (None, None, None, None),
+        };
+
+        if let Some(by_kinds) = &by_kinds {
+            if !by_kinds.contains(&MoleculeActivityKind::Announcement) {
+                return Ok(MoleculeGlobalActivityListing::default());
+            }
+        }
+
         let announcements_listing = self
             .view_global_announcements_uc
             .execute(
                 molecule_subject,
-                if let Some(filters) = filters {
-                    Some(MoleculeAnnouncementsFilters {
-                        by_tags: filters.by_tags,
-                        by_categories: filters.by_categories,
-                        by_access_levels: filters.by_access_levels,
-                    })
-                } else {
-                    None
-                },
+                Some(MoleculeAnnouncementsFilters {
+                    by_tags,
+                    by_categories,
+                    by_access_levels,
+                }),
                 None,
             )
             .await
