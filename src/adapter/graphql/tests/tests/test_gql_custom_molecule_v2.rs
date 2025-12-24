@@ -13,7 +13,7 @@ use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::LoggedAccount;
 use kamu_core::*;
-use kamu_datasets::DatasetRegistryExt;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
@@ -3381,6 +3381,11 @@ async fn test_molecule_v2_data_room_operations() {
                 ) {
                     isSuccess
                     message
+                    __typename
+                    ... on UpdateVersionErrorCasFailed {
+                        expectedHead
+                        actualHead
+                    }
                   }
                 }
               }
@@ -3389,6 +3394,23 @@ async fn test_molecule_v2_data_room_operations() {
         }
         "#
     );
+
+    let dataset_registry = harness
+        .catalog_authorized
+        .get_one::<dyn DatasetRegistry>()
+        .unwrap();
+    let file_1_dataset_id = odf::DatasetID::from_did_str(file_1_did).unwrap();
+    let file_1_dataset = dataset_registry
+        .get_dataset_by_ref(&file_1_dataset_id.as_local_ref())
+        .await
+        .unwrap();
+    let file_1_head_before_update = file_1_dataset
+        .as_metadata_chain()
+        .try_get_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .unwrap();
+    let cas_expected_head = file_1_head_before_update;
 
     // Non-existent file
     let random_dataset_id = odf::DatasetID::new_generated_ed25519().1;
@@ -3430,6 +3452,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "updateFileMetadata": {
                                 "isSuccess": false,
                                 "message": "Data room entry not found by ref",
+                                "__typename": "MoleculeDataRoomUpdateEntryByRefNotFound",
                             }
                         }
                     }
@@ -3476,6 +3499,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "updateFileMetadata": {
                                 "isSuccess": true,
                                 "message": "",
+                                "__typename": "MoleculeDataRoomUpdateFileMetadataResultSuccess",
                             }
                         }
                     }
@@ -3484,49 +3508,54 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
     // CAS failure when expected head mismatches
+    let cas_failure_res = GraphQLQueryRequest::new(
+        UPDATE_METADATA_QUERY,
+        async_graphql::Variables::from_json(json!({
+            "ipnftUid": ipnft_uid,
+            "ref": file_1_did,
+            "expectedHead": cas_expected_head.to_string(),
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+            "description": "Plain text file that was updated... again",
+            "categories": ["test-category-1", "test-category-2"],
+            "tags": ["test-tag1", "test-tag2", "test-tag3"],
+            "contentText": "bye bye bye",
+            "encryptionMetadata": {
+                "dataToEncryptHash": "EM1-updated",
+                "accessControlConditions": "EM2-updated",
+                "encryptedBy": "EM3-updated",
+                "encryptedAt": "EM4-updated",
+                "chain": "EM5-updated",
+                "litSdkVersion": "EM6-updated",
+                "litNetwork": "EM7-updated",
+                "templateName": "EM8-updated",
+                "contractVersion": "EM9-updated",
+            },
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .data
+    .into_json()
+    .unwrap();
+
+    let cas_failure_payload =
+        &cas_failure_res["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"];
     assert_eq!(
-        GraphQLQueryRequest::new(
-            UPDATE_METADATA_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-                "ref": file_1_did,
-                "expectedHead": "did:odf:any",
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
-                "description": "Plain text file that was updated... again",
-                "categories": ["test-category-1", "test-category-2"],
-                "tags": ["test-tag1", "test-tag2", "test-tag3"],
-                "contentText": "bye bye bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1-updated",
-                    "accessControlConditions": "EM2-updated",
-                    "encryptedBy": "EM3-updated",
-                    "encryptedAt": "EM4-updated",
-                    "chain": "EM5-updated",
-                    "litSdkVersion": "EM6-updated",
-                    "litNetwork": "EM7-updated",
-                    "templateName": "EM8-updated",
-                    "contractVersion": "EM9-updated",
-                },
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": {
-                        "dataRoom": {
-                            "updateFileMetadata": {
-                                "isSuccess": false,
-                                "message": "Data room linking: CAS failed",
-                            }
-                        }
-                    }
-                }
-            }
-        })
+        cas_failure_payload["__typename"],
+        "UpdateVersionErrorCasFailed"
+    );
+    assert_eq!(
+        cas_failure_payload["message"],
+        "Expected head didn't match, dataset was likely updated concurrently"
+    );
+    assert_eq!(
+        cas_failure_payload["expectedHead"],
+        cas_expected_head.to_string()
+    );
+    assert!(
+        cas_failure_payload["actualHead"].is_string()
+            && cas_failure_payload["actualHead"] != cas_failure_payload["expectedHead"]
     );
     assert_eq!(
         GraphQLQueryRequest::new(
