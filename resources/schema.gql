@@ -3208,6 +3208,11 @@ type MoleculeActivityFileUpdatedV2 {
 	entry: MoleculeDataRoomEntry!
 }
 
+enum MoleculeActivityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
 type MoleculeAnnouncementEntry {
 	project: MoleculeProjectV2!
 	systemTime: DateTime!
@@ -3383,7 +3388,12 @@ type MoleculeDataRoomMutV2 {
 	"""
 	Updates the metadata of a file in the data room.
 	"""
-	updateFileMetadata(ref: DatasetID!, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomUpdateFileMetadataResult!
+	updateFileMetadata(		ref: DatasetID!,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String
+	): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
 type MoleculeDataRoomPathOccupied implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult {
@@ -3559,6 +3569,7 @@ input MoleculeProjectActivityFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byKinds: [MoleculeActivityKindInput!]
 }
 
 type MoleculeProjectConnection {

@@ -324,6 +324,7 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 existing_data_room_entry.path.clone().into_v1(),
                 existing_data_room_entry.reference.clone(),
+                None,
                 versioned_file_entry.to_denormalized(),
                 versioned_file_entry.detailed_info.content_text.as_deref(),
             )
@@ -837,6 +838,8 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
+        #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
+        expected_head: Option<Multihash<'static>>,
         // TODO: not optional?
         access_level: MoleculeAccessLevel,
         change_by: String,
@@ -844,7 +847,6 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         content_text: Option<String>,
-        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -864,6 +866,7 @@ impl MoleculeDataRoomMutV2 {
         );
 
         let event_time = time_source.now();
+        let expected_head = expected_head.map(Into::into);
 
         // 0. Get existing data room entry record and latest versioned file data
 
@@ -893,12 +896,18 @@ impl MoleculeDataRoomMutV2 {
             ));
         };
 
+        let existing_encryption_metadata = existing_file_entry
+            .detailed_info
+            .encryption_metadata
+            .clone();
+
         // 1. Update the versioned dataset.
-        let updated_versioned_file_entry = update_versioned_file_metadata_uc
+        let updated_versioned_file_entry = match update_versioned_file_metadata_uc
             .execute(
                 reference.as_ref(),
                 existing_file_entry,
                 Some(event_time),
+                expected_head.clone(),
                 MoleculeVersionedFileEntryBasicInfo {
                     access_level,
                     change_by,
@@ -908,17 +917,30 @@ impl MoleculeDataRoomMutV2 {
                 },
                 MoleculeVersionedFileEntryDetailedInfo {
                     content_text,
-                    encryption_metadata: encryption_metadata.map(Into::into),
+                    encryption_metadata: existing_encryption_metadata,
                 },
             )
             .await
-            .map_err(|e| {
-                use MoleculeUpdateVersionedFileMetadataError as E;
-                match e {
-                    E::Access(e) => GqlError::Access(e),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateVersionedFileMetadataError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateVersionedFileMetadataError::RefCASFailed(err)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ));
+            }
+            Err(MoleculeUpdateVersionedFileMetadataError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateVersionedFileMetadataError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         let new_denormalized_file_info = updated_versioned_file_entry.to_denormalized();
 
@@ -931,6 +953,7 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 existing_data_room_entry.path.clone().into_v1(),
                 reference.into(),
+                expected_head,
                 new_denormalized_file_info.clone(),
                 updated_versioned_file_entry
                     .detailed_info

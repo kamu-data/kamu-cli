@@ -13,7 +13,7 @@ use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::LoggedAccount;
 use kamu_core::*;
-use kamu_datasets::DatasetRegistryExt;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
@@ -3363,23 +3363,28 @@ async fn test_molecule_v2_data_room_operations() {
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
             v2 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
+                    expectedHead: $expectedHead
                     accessLevel: $accessLevel
                     changeBy: $changeBy
                     description: $description
                     categories: $categories
                     tags: $tags
                     contentText: $contentText
-                    encryptionMetadata: $encryptionMetadata
                   ) {
                     isSuccess
                     message
+                    __typename
+                    ... on UpdateVersionErrorCasFailed {
+                        expectedHead
+                        actualHead
+                    }
                   }
                 }
               }
@@ -3388,6 +3393,23 @@ async fn test_molecule_v2_data_room_operations() {
         }
         "#
     );
+
+    let dataset_registry = harness
+        .catalog_authorized
+        .get_one::<dyn DatasetRegistry>()
+        .unwrap();
+    let file_1_dataset_id = odf::DatasetID::from_did_str(file_1_did).unwrap();
+    let file_1_dataset = dataset_registry
+        .get_dataset_by_ref(&file_1_dataset_id.as_local_ref())
+        .await
+        .unwrap();
+    let file_1_head_before_update = file_1_dataset
+        .as_metadata_chain()
+        .try_get_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .unwrap();
+    let cas_expected_head = file_1_head_before_update;
 
     // Non-existent file
     let random_dataset_id = odf::DatasetID::new_generated_ed25519().1;
@@ -3398,23 +3420,13 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "ref": random_dataset_id.to_string(),
+                "expectedHead": null,
                 "accessLevel": "holder",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "description": "Plain text file that was updated... again",
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1-updated",
-                    "accessControlConditions": "EM2-updated",
-                    "encryptedBy": "EM3-updated",
-                    "encryptedAt": "EM4-updated",
-                    "chain": "EM5-updated",
-                    "litSdkVersion": "EM6-updated",
-                    "litNetwork": "EM7-updated",
-                    "templateName": "EM8-updated",
-                    "contractVersion": "EM9-updated",
-                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3428,6 +3440,7 @@ async fn test_molecule_v2_data_room_operations() {
                             "updateFileMetadata": {
                                 "isSuccess": false,
                                 "message": "Data room entry not found by ref",
+                                "__typename": "MoleculeDataRoomUpdateEntryByRefNotFound",
                             }
                         }
                     }
@@ -3443,23 +3456,13 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "ref": file_1_did,
+                "expectedHead": null,
                 "accessLevel": "holders",
                 "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "description": "Plain text file that was updated... again",
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
                 "contentText": "bye bye bye",
-                "encryptionMetadata": {
-                    "dataToEncryptHash": "EM1-updated",
-                    "accessControlConditions": "EM2-updated",
-                    "encryptedBy": "EM3-updated",
-                    "encryptedAt": "EM4-updated",
-                    "chain": "EM5-updated",
-                    "litSdkVersion": "EM6-updated",
-                    "litNetwork": "EM7-updated",
-                    "templateName": "EM8-updated",
-                    "contractVersion": "EM9-updated",
-                },
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3473,12 +3476,63 @@ async fn test_molecule_v2_data_room_operations() {
                             "updateFileMetadata": {
                                 "isSuccess": true,
                                 "message": "",
+                                "__typename": "MoleculeDataRoomUpdateFileMetadataResultSuccess",
                             }
                         }
                     }
                 }
             }
         })
+    );
+    // CAS failure when expected head mismatches
+    let cas_failure_res = GraphQLQueryRequest::new(
+        UPDATE_METADATA_QUERY,
+        async_graphql::Variables::from_json(json!({
+            "ipnftUid": ipnft_uid,
+            "ref": file_1_did,
+            "expectedHead": cas_expected_head.to_string(),
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+            "description": "Plain text file that was updated... again",
+            "categories": ["test-category-1", "test-category-2"],
+            "tags": ["test-tag1", "test-tag2", "test-tag3"],
+            "contentText": "bye bye bye",
+            "encryptionMetadata": {
+                "dataToEncryptHash": "EM1-updated",
+                "accessControlConditions": "EM2-updated",
+                "encryptedBy": "EM3-updated",
+                "encryptedAt": "EM4-updated",
+                "chain": "EM5-updated",
+                "litSdkVersion": "EM6-updated",
+                "litNetwork": "EM7-updated",
+                "templateName": "EM8-updated",
+                "contractVersion": "EM9-updated",
+            },
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .data
+    .into_json()
+    .unwrap();
+
+    let cas_failure_payload =
+        &cas_failure_res["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"];
+    assert_eq!(
+        cas_failure_payload["__typename"],
+        "UpdateVersionErrorCasFailed"
+    );
+    assert_eq!(
+        cas_failure_payload["message"],
+        "Expected head didn't match, dataset was likely updated concurrently"
+    );
+    assert_eq!(
+        cas_failure_payload["expectedHead"],
+        cas_expected_head.to_string()
+    );
+    assert!(
+        cas_failure_payload["actualHead"].is_string()
+            && cas_failure_payload["actualHead"] != cas_failure_payload["expectedHead"]
     );
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -3559,7 +3613,7 @@ async fn test_molecule_v2_data_room_operations() {
             "categories": ["test-category-1", "test-category-2"],
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
-            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1-updated\",\"accessControlConditions\":\"EM2-updated\",\"encryptedBy\":\"EM3-updated\",\"encryptedAt\":\"EM4-updated\",\"chain\":\"EM5-updated\",\"litSdkVersion\":\"EM6-updated\",\"litNetwork\":\"EM7-updated\",\"templateName\":\"EM8-updated\",\"contractVersion\":\"EM9-updated\"}",
+            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1\",\"accessControlConditions\":\"EM2\",\"encryptedBy\":\"EM3\",\"encryptedAt\":\"EM4\",\"chain\":\"EM5\",\"litSdkVersion\":\"EM6\",\"litNetwork\":\"EM7\",\"templateName\":\"EM8\",\"contractVersion\":\"EM9\"}",
             "molecule_access_level": "holders",
             "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
@@ -6211,6 +6265,152 @@ async fn test_molecule_v2_activity() {
         })
     );
 
+    let expected_global_file_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileRemovedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+
+    let expected_global_announcement_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityAnnouncementV2",
+            "announcement": {
+                "id": project_2_announcement_1_id,
+                "headline": "Test announcement 2",
+                "body": "Blah blah 2",
+                "attachments": [],
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag2"],
+            }
+        },
+        {
+            "__typename": "MoleculeActivityAnnouncementV2",
+            "announcement": {
+                "id": project_1_announcement_1_id,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [
+                    project_1_file_1_dataset_id,
+                    project_1_file_2_dataset_id,
+                ],
+                "accessLevel": "public",
+                "changeBy": USER_1,
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
+            }
+        },
+    ]);
+
+    // Filters: byKinds -> only FILE
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_global_file_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only ANNOUNCEMENT
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["ANNOUNCEMENT"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": expected_global_announcement_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
     /////////////////////
     // Project filters //
     /////////////////////
@@ -6296,6 +6496,91 @@ async fn test_molecule_v2_activity() {
             }
         },
     ]);
+
+    let expected_project_file_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileRemovedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdatedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAddedV2",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+
+    let expected_project_announcement_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityAnnouncementV2",
+            "announcement": {
+                "id": project_1_announcement_1_id,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [
+                    project_1_file_1_dataset_id,
+                    project_1_file_2_dataset_id,
+                ],
+                "accessLevel": "public",
+                "changeBy": USER_1,
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
+            }
+        },
+    ]);
     // Filters without values
     assert_eq!(
         GraphQLQueryRequest::new(
@@ -6345,6 +6630,60 @@ async fn test_molecule_v2_activity() {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byKinds": ["FILE"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_activity_nodes
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only ANNOUNCEMENT
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byKinds": ["ANNOUNCEMENT"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_announcement_activity_nodes
                         }
                     }
                 }
