@@ -9922,7 +9922,6 @@ dependencies = [
 name = "opendatafabric-dataset"
 version = "0.255.0"
 dependencies = [
- "async-stream",
  "async-trait",
  "bytes",
  "cheap-clone",
