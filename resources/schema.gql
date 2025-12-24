@@ -3387,7 +3387,7 @@ type MoleculeDataRoomMutV2 {
 		"""
 		Expected head block hash to prevent concurrent updates
 		"""
-		expectedHead: Multihash,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: MoleculeEncryptionMetadataInput
+		expectedHead: Multihash,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String
 	): MoleculeDataRoomUpdateFileMetadataResult!
 }
 
@@ -4582,7 +4582,7 @@ input SetAccountQuotasInput {
 }
 
 interface SetAccountQuotasResult {
-	success: Boolean!
+	isSuccess: Boolean!
 	message: String!
 }
 

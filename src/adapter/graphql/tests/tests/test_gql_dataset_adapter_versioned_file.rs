@@ -702,7 +702,7 @@ async fn test_versioned_file_quota_exceeded() {
                 me {
                   quotas {
                     setAccountQuotas(quotas: { storage: { limitTotalBytes: 3000 } }) {
-                      success
+                      isSuccess
                     }
                   }
                 }

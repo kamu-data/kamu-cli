@@ -71,7 +71,7 @@ pub struct SetAccountQuotasStorageInput {
 
 #[derive(Interface, Debug)]
 #[graphql(
-    field(name = "success", ty = "bool"),
+    field(name = "is_success", ty = "bool"),
     field(name = "message", ty = "String")
 )]
 pub enum SetAccountQuotasResult {
@@ -86,7 +86,7 @@ pub struct SetAccountQuotasResultSuccess {
 
 #[ComplexObject]
 impl SetAccountQuotasResultSuccess {
-    pub async fn success(&self) -> bool {
+    pub async fn is_success(&self) -> bool {
         true
     }
 }
@@ -98,7 +98,7 @@ pub struct SetAccountQuotasResultInvalidInput {
 
 #[ComplexObject]
 impl SetAccountQuotasResultInvalidInput {
-    pub async fn success(&self) -> bool {
+    pub async fn is_success(&self) -> bool {
         false
     }
 }
