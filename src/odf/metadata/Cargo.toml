@@ -67,15 +67,15 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # gRPC
-prost = { version = "0.13", default-features = false, features = [
+prost = { version = "0.14", default-features = false, features = [
     "std",
     "derive",
 ] }
-tonic = { version = "0.12", default-features = false, features = [
+tonic = { version = "0.14", default-features = false, features = [
     "transport",
     "codegen",
-    "prost",
 ] }
+tonic-prost = { version = "0.14", default-features = false }
 
 # Optional
 arrow = { optional = true, version = "56", default-features = false, features = [
