@@ -73,11 +73,10 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 let mut denorm =
                     MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)
                         .int_err()?;
-                denorm.change_by = change_by.clone();
+                denorm.change_by.clone_from(&change_by);
                 Ok(denorm.to_collection_extra_data_fields())
             })
             .transpose()?;
-
         let result = self
             .data_room_collection_service
             .move_data_room_collection_entry_by_path(

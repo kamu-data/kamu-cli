@@ -44,9 +44,10 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
+        change_by: String,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError> {
-        let result = self
+        let mut result = self
             .data_room_collection_service
             .remove_data_room_collection_entry_by_path(
                 &molecule_project.data_room_dataset_id,
@@ -70,6 +71,17 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                     MoleculeRemoveDataRoomEntryError::Internal(e)
                 }
             })?;
+
+        if let MoleculeUpdateDataRoomEntryResult::Success(success) = &mut result {
+            for (_op, record) in &mut success.inserted_records {
+                let mut denorm = MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
+                    record.extra_data.clone(),
+                )
+                .int_err()?;
+                denorm.change_by.clone_from(&change_by);
+                record.extra_data = denorm.to_collection_extra_data_fields();
+            }
+        }
 
         match result {
             MoleculeUpdateDataRoomEntryResult::Success(success) => {

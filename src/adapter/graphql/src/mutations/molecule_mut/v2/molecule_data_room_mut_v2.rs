@@ -11,10 +11,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
-use internal_error::ResultIntoInternal;
 use kamu::domain;
 use kamu_accounts::{CurrentAccountSubject, QuotaError};
-use kamu_datasets::{CollectionEntryRecord, ContentArgs};
+use kamu_datasets::ContentArgs;
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
     MoleculeAppendGlobalDataRoomActivityUseCase,
@@ -420,23 +419,6 @@ impl MoleculeDataRoomMutV2 {
         Ok(maybe_data_room_entry)
     }
 
-    fn override_change_by(
-        inserted_records: Vec<(odf::metadata::OperationType, CollectionEntryRecord)>,
-        change_by: &str,
-    ) -> Result<Vec<(odf::metadata::OperationType, CollectionEntryRecord)>> {
-        inserted_records
-            .into_iter()
-            .map(|(op, mut record)| {
-                let mut denorm = kamu_molecule_domain::MoleculeDenormalizeFileToDataRoom::
-                    try_from_extra_data_fields(record.extra_data)
-                    .int_err()?;
-                denorm.change_by = change_by.to_string();
-                record.extra_data = denorm.to_collection_extra_data_fields();
-                Ok((op, record))
-            })
-            .collect()
-    }
-
     async fn append_global_data_room_activity(
         &self,
         ctx: &Context<'_>,
@@ -744,18 +726,17 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 from_path.into_v1_scalar().into(),
                 to_path.into_v1_scalar().into(),
-                change_by.clone(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await
         {
             Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
-                let inserted_records = Self::override_change_by(r.inserted_records, &change_by)?;
                 self.append_global_data_room_activity(
                     ctx,
                     event_time,
-                    inserted_records,
+                    r.inserted_records,
                     MoleculeDataRoomFileActivityType::Updated,
                 )
                 .await?;
@@ -813,17 +794,17 @@ impl MoleculeDataRoomMutV2 {
                 &self.project.entity,
                 Some(event_time),
                 path.clone().into_v1_scalar().into(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await
         {
             Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
                 // TODO: asynchronous write of activity log
-                let inserted_records = Self::override_change_by(r.inserted_records, &change_by)?;
                 self.append_global_data_room_activity(
                     ctx,
                     event_time,
-                    inserted_records,
+                    r.inserted_records,
                     MoleculeDataRoomFileActivityType::Removed,
                 )
                 .await?;
