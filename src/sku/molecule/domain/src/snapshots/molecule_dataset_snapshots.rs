@@ -113,9 +113,9 @@ impl MoleculeDatasetSnapshots {
     pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "data-room";
         // Extra columns
-        const COLUMN_NAME_CHANGE_BY: &str = "change_by";
+        const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
         // Denormalized values from the latest file state
-        const COLUMN_NAME_ACCESS_LEVEL: &str = "access_level";
+        const COLUMN_NAME_ACCESS_LEVEL: &str = "molecule_access_level";
         const COLUMN_NAME_CONTENT_TYPE: &str = "content_type";
         const COLUMN_NAME_CONTENT_HASH: &str = "content_hash";
         const COLUMN_NAME_CONTENT_LENGTH: &str = "content_length";
@@ -151,8 +151,8 @@ impl MoleculeDatasetSnapshots {
 
     pub fn versioned_file_v2(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
         // Extra columns
-        const COLUMN_NAME_ACCESS_LEVEL: &str = "access_level";
-        const COLUMN_NAME_CHANGE_BY: &str = "change_by";
+        const COLUMN_NAME_ACCESS_LEVEL: &str = "molecule_access_level";
+        const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
         // Extended metadata
         const COLUMN_NAME_DESCRIPTION: &str = "description";
         const COLUMN_NAME_CATEGORIES: &str = "categories";
@@ -198,8 +198,8 @@ impl MoleculeDatasetSnapshots {
                 DataField::string("body"),
                 // TODO: Link as odf::DatasetIDs not just strings
                 DataField::list("attachments", DataType::string()),
-                DataField::string("access_level"),
-                DataField::string("change_by"),
+                DataField::string("molecule_access_level"),
+                DataField::string("molecule_change_by"),
                 // NOTE: These were added in V2 and must be optional for schema compatibility
                 DataField::list("categories", DataType::string()).optional(),
                 DataField::list("tags", DataType::string()).optional(),
@@ -222,8 +222,8 @@ impl MoleculeDatasetSnapshots {
                                 "headline STRING NOT NULL",
                                 "body STRING NOT NULL",
                                 "attachments Array<STRING> NOT NULL",
-                                "access_level STRING NOT NULL",
-                                "change_by STRING NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
                                 "categories Array<STRING> NOT NULL",
                                 "tags Array<STRING> NOT NULL",
                             ]
@@ -301,8 +301,8 @@ impl MoleculeDatasetSnapshots {
                 DataField::string("body"),
                 // TODO: Link as odf::DatasetIDs not just strings
                 DataField::list("attachments", DataType::string()),
-                DataField::string("access_level"),
-                DataField::string("change_by"),
+                DataField::string("molecule_access_level"),
+                DataField::string("molecule_change_by"),
                 DataField::list("categories", DataType::string()),
                 DataField::list("tags", DataType::string()),
             ])
@@ -326,8 +326,8 @@ impl MoleculeDatasetSnapshots {
                                 "headline STRING NOT NULL",
                                 "body STRING NOT NULL",
                                 "attachments Array<STRING> NOT NULL",
-                                "access_level STRING NOT NULL",
-                                "change_by STRING NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
                                 "categories Array<STRING> NOT NULL",
                                 "tags Array<STRING> NOT NULL",
                             ]
@@ -400,8 +400,8 @@ impl MoleculeDatasetSnapshots {
                 DataField::string("path"),
                 DataField::string("ref"),
                 DataField::u32("version"),
-                DataField::string("change_by"),
-                DataField::string("access_level"),
+                DataField::string("molecule_change_by"),
+                DataField::string("molecule_access_level"),
                 DataField::string("content_type").optional(),
                 DataField::u64("content_length"),
                 DataField::string("content_hash"),
@@ -428,8 +428,8 @@ impl MoleculeDatasetSnapshots {
                                 "path STRING NOT NULL",
                                 "ref STRING NOT NULL",
                                 "version INT UNSIGNED NOT NULL",
-                                "change_by STRING NOT NULL",
-                                "access_level STRING NOT NULL",
+                                "molecule_change_by STRING NOT NULL",
+                                "molecule_access_level STRING NOT NULL",
                                 "content_type STRING",
                                 "content_length BIGINT UNSIGNED NOT NULL",
                                 "content_hash STRING NOT NULL",

@@ -405,7 +405,7 @@ async fn test_molecule_v1_data_room_operations() {
                     "path": "/foo",
                     "ref": test_file_did,
                     "extraData": {
-                        "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
                     },
                 },
             }))),
@@ -471,14 +471,14 @@ async fn test_molecule_v1_data_room_operations() {
                 }
             },
             "extraData": {
-                "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 // V2 fields
                 "categories": null,
                 "content_hash": null,
                 "content_length": null,
                 "content_type": null,
                 "description": null,
-                "access_level": null,
+                "molecule_access_level": null,
                 "tags": null,
                 "version": null,
             },
@@ -593,8 +593,8 @@ async fn test_molecule_v1_announcements_operations() {
             $headline: String!,
             $body: String!,
             $attachments: [String!],
-            $accessLevel: String!,
-            $changeBy: String!,
+            $moleculeAccessLevel: String!,
+            $moleculeChangeBy: String!,
         ) {
             molecule {
                 project(ipnftUid: $ipnftUid) {
@@ -602,8 +602,8 @@ async fn test_molecule_v1_announcements_operations() {
                         headline: $headline,
                         body: $body,
                         attachments: $attachments,
-                        accessLevel: $accessLevel,
-                        changeBy: $changeBy,
+                        moleculeAccessLevel: $moleculeAccessLevel,
+                        moleculeChangeBy: $moleculeChangeBy,
                     ) {
                         isSuccess
                         message
@@ -620,8 +620,8 @@ async fn test_molecule_v1_announcements_operations() {
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "headline": "Test announcement 1",
                 "body": "Blah blah",
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -643,8 +643,8 @@ async fn test_molecule_v1_announcements_operations() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah",
                 "attachments": [test_file_1],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -666,8 +666,8 @@ async fn test_molecule_v1_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": [test_file_1, test_file_2],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -689,8 +689,8 @@ async fn test_molecule_v1_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": ["x"],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -712,8 +712,8 @@ async fn test_molecule_v1_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": [odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string()],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -755,12 +755,12 @@ async fn test_molecule_v1_announcements_operations() {
         json!(
             [
                 {
-                    "access_level": "holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [],
                     "body": "Blah blah",
                     "categories": [],
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "event_time": any,
                     "headline": "Test announcement 1",
                     "offset": 0,
@@ -769,12 +769,12 @@ async fn test_molecule_v1_announcements_operations() {
                     "tags": [],
                 },
                 {
-                    "access_level": "holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [test_file_1],
                     "body": "Blah blah",
                     "categories": [],
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "event_time": any,
                     "headline": "Test announcement 2",
                     "offset": 1,
@@ -783,12 +783,12 @@ async fn test_molecule_v1_announcements_operations() {
                     "tags": [],
                 },
                 {
-                    "access_level": "holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [test_file_1, test_file_2],
                     "body": "Blah blah",
                     "categories": [],
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "event_time": any,
                     "headline": "Test announcement 3",
                     "offset": 2,
@@ -943,7 +943,7 @@ async fn test_molecule_v1_activity() {
                     "path": "/foo",
                     "ref": test_file_1,
                     "extraData": {
-                        "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
                     },
                 },
             })),
@@ -967,7 +967,7 @@ async fn test_molecule_v1_activity() {
                     "path": "/bar",
                     "ref": test_file_2,
                     "extraData": {
-                        "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
                     },
                 },
             })),
@@ -1043,7 +1043,7 @@ async fn test_molecule_v1_activity() {
                 "pathFrom": "/foo",
                 "pathTo": "/foo",
                 "extraData": {
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD"
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD"
                 },
             }))),
         )
@@ -1066,8 +1066,8 @@ async fn test_molecule_v1_activity() {
             $headline: String!,
             $body: String!,
             $attachments: [String!],
-            $accessLevel: String!,
-            $changeBy: String!,
+            $moleculeAccessLevel: String!,
+            $moleculeChangeBy: String!,
         ) {
             molecule {
                 project(ipnftUid: $ipnftUid) {
@@ -1075,8 +1075,8 @@ async fn test_molecule_v1_activity() {
                         headline: $headline,
                         body: $body,
                         attachments: $attachments,
-                        accessLevel: $accessLevel,
-                        changeBy: $changeBy,
+                        moleculeAccessLevel: $moleculeAccessLevel,
+                        moleculeChangeBy: $moleculeChangeBy,
                     ) {
                         isSuccess
                         message
@@ -1094,8 +1094,8 @@ async fn test_molecule_v1_activity() {
                 "headline": "Test announcement 1",
                 "body": "Blah blah",
                 "attachments": [test_file_1, test_file_2],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -1241,8 +1241,8 @@ async fn test_molecule_v1_activity() {
                     "categories": [],
                     "event_time": &any,
                     "headline": "Test announcement 1",
-                    "access_level": "holders",
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "system_time": &any,
                     "tags": [],
                 },
@@ -1322,8 +1322,8 @@ async fn test_molecule_v1_activity() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah bleh",
                 "attachments": [],
-                "accessLevel": "holders",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
@@ -1408,8 +1408,8 @@ async fn test_molecule_v1_activity() {
                     "categories": [],
                     "event_time": &any,
                     "headline": "Test announcement 2",
-                    "access_level": "holders",
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "system_time": &any,
                     "tags": [],
                 },
@@ -1426,8 +1426,8 @@ async fn test_molecule_v1_activity() {
                     "body": "Blah blah",
                     "event_time": &any,
                     "headline": "Test announcement 1",
-                    "access_level": "holders",
-                    "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "molecule_access_level": "holders",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                     "system_time": &any,
                     "tags": [],
                 },

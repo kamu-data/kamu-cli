@@ -35,12 +35,12 @@ content:
           opendatafabric.org/description: DID that references another dataset
           opendatafabric.org/type:
             kind: Did
-      - name: change_by
+      - name: molecule_change_by
         type:
           kind: Option
           inner:
             kind: String
-      - name: access_level
+      - name: molecule_access_level
         type:
           kind: Option
           inner:
@@ -99,8 +99,8 @@ content:
       - event_time TIMESTAMP
       - path STRING
       - ref STRING
-      - change_by STRING
-      - access_level STRING
+      - molecule_change_by STRING
+      - molecule_access_level STRING
       - content_type STRING
       - content_hash STRING
       - content_length INT

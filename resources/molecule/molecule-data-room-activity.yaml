@@ -38,10 +38,10 @@ content:
       - name: version
         type:
           kind: UInt32
-      - name: change_by
+      - name: molecule_change_by
         type:
           kind: String
-      - name: access_level
+      - name: molecule_access_level
         type:
           kind: String
       - name: content_type
@@ -81,8 +81,8 @@ content:
       - path STRING NOT NULL
       - ref STRING NOT NULL
       - version INT UNSIGNED NOT NULL
-      - change_by STRING NOT NULL
-      - access_level STRING NOT NULL
+      - molecule_change_by STRING NOT NULL
+      - molecule_access_level STRING NOT NULL
       - content_type STRING
       - content_length BIGINT UNSIGNED NOT NULL
       - content_hash STRING NOT NULL

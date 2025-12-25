@@ -130,9 +130,11 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
     pub version: u32,
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
     // TODO: enum?
+    #[serde(rename = "molecule_access_level")]
     pub access_level: String,
 
     pub content_type: Option<MediaType>,

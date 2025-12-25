@@ -37,10 +37,10 @@ content:
           kind: List
           itemType:
             kind: String
-      - name: access_level
+      - name: molecule_access_level
         type:
           kind: String
-      - name: change_by
+      - name: molecule_change_by
         type:
           kind: String
       - name: categories
@@ -67,8 +67,8 @@ content:
       - headline STRING NOT NULL
       - body STRING NOT NULL
       - attachments Array<STRING> NOT NULL
-      - access_level STRING NOT NULL
-      - change_by STRING NOT NULL
+      - molecule_access_level STRING NOT NULL
+      - molecule_change_by STRING NOT NULL
       - categories Array<STRING> NOT NULL
       - tags Array<STRING> NOT NULL
     merge:

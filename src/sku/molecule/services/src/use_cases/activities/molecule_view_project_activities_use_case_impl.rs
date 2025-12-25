@@ -64,8 +64,9 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         let vocab = odf::metadata::DatasetVocabulary::default();
         let df = df
             .filter(
-                // We ignore all records with `access_level == null` as those are pre V2 migration
-                col("access_level").is_not_null().and(
+                // We ignore all records with `molecule_access_level == null` as those are pre
+                // V2 migration
+                col("molecule_access_level").is_not_null().and(
                     // For any data room update, we always have two entries: -C and +C.
                     // We can ignore all -C entries.
                     col(vocab.operation_type_column.as_str())

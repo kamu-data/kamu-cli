@@ -145,9 +145,11 @@ pub struct MoleculeAnnouncementPayloadRecord {
     pub attachments: Vec<odf::DatasetID>,
 
     // TODO: enum?
+    #[serde(rename = "molecule_access_level")]
     pub access_level: String,
 
     // NOTE: This should be odf::AccountID, but kept as String for safety.
+    #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
     // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
