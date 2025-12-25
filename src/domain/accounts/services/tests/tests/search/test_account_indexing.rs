@@ -9,23 +9,24 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use dill::Component;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::*;
 use kamu_search::*;
-use kamu_search_elasticsearch::testing::{EsTestContext, SearchTestResponse};
-use kamu_search_services::{SearchIndexer, SearchServiceImpl};
+use kamu_search_elasticsearch::testing::{
+    ElasticsearchBaseHarness,
+    ElasticsearchTestContext,
+    SearchTestResponse,
+};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use time_source::SystemTimeSourceStub;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_account_index_initially_empty(ctx: Arc<EsTestContext>) {
+async fn test_account_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) {
     let harness = AccountIndexingHarness::new(ctx).await;
 
     let accounts_index_response = harness.view_accounts_index().await;
@@ -36,7 +37,7 @@ async fn test_account_index_initially_empty(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_creating_accounts_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = AccountIndexingHarness::new(ctx).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
@@ -61,21 +62,21 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alice",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alice",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "bob",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "bob",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -85,7 +86,7 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_updating_account_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = AccountIndexingHarness::new(ctx).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
@@ -116,21 +117,21 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alicia",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alicia",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "robert",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "robert",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -140,7 +141,7 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_deleting_account_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = AccountIndexingHarness::new(ctx).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
@@ -166,15 +167,15 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alice",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alice",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -182,37 +183,36 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(ElasticsearchBaseHarness, es_base_harness)]
 struct AccountIndexingHarness {
-    fixed_time: chrono::DateTime<Utc>,
-    ctx: Arc<EsTestContext>,
+    es_base_harness: ElasticsearchBaseHarness,
     catalog: dill::Catalog,
 }
 
 impl AccountIndexingHarness {
-    pub async fn new(ctx: Arc<EsTestContext>) -> Self {
-        let mut b = dill::CatalogBuilder::new_chained(ctx.catalog());
-        b.add::<CreateAccountUseCaseImpl>()
-            .add::<UpdateAccountUseCaseImpl>()
-            .add::<DeleteAccountUseCaseImpl>()
-            .add::<InMemoryAccountRepository>()
-            .add::<InMemoryDidSecretKeyRepository>()
-            .add_value(DidSecretEncryptionConfig::sample())
-            .add::<AccountServiceImpl>()
-            .add::<AccountAuthorizationHelperImpl>()
-            .add::<kamu_auth_rebac_services::RebacServiceImpl>()
-            .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
-            .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
-            .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
-            .add::<AccountSearchSchemaProvider>()
-            .add::<AccountSearchUpdater>()
-            .add::<SearchIndexer>()
-            .add::<SearchServiceImpl>()
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<SystemTimeSourceStub>();
+    pub async fn new(ctx: Arc<ElasticsearchTestContext>) -> Self {
+        let es_base_harness = ElasticsearchBaseHarness::new(ctx);
+
+        let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
+        b.add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
+        .add::<CreateAccountUseCaseImpl>()
+        .add::<UpdateAccountUseCaseImpl>()
+        .add::<DeleteAccountUseCaseImpl>()
+        .add::<InMemoryAccountRepository>()
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
+        .add::<AccountServiceImpl>()
+        .add::<AccountAuthorizationHelperImpl>()
+        .add::<kamu_auth_rebac_services::RebacServiceImpl>()
+        .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
+        .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
+        .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
+        .add::<AccountSearchSchemaProvider>()
+        .add::<AccountSearchUpdater>();
 
         register_message_dispatcher::<AccountLifecycleMessage>(
             &mut b,
@@ -221,24 +221,17 @@ impl AccountIndexingHarness {
 
         let catalog = b.build();
 
-        let fixed_time = Utc::now();
-        let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
-        time_source.set(fixed_time);
-
-        use init_on_startup::InitOnStartup;
-        let indexer = catalog.get_one::<SearchIndexer>().unwrap();
-        indexer.run_initialization().await.unwrap();
+        ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
 
         Self {
-            fixed_time,
-            ctx,
+            es_base_harness,
             catalog,
         }
     }
 
     pub async fn create_account(&self, account_name: &str) {
         let account = Account {
-            registered_at: self.fixed_time,
+            registered_at: self.fixed_time(),
             ..Account::test(self.account_id_from_name(account_name), account_name)
         };
 
@@ -309,9 +302,9 @@ impl AccountIndexingHarness {
     }
 
     pub async fn view_accounts_index(&self) -> SearchTestResponse {
-        self.ctx.refresh_indices().await;
+        self.es_ctx().refresh_indices().await;
 
-        let search_repo = self.ctx.search_repo();
+        let search_repo = self.es_ctx().search_repo();
 
         let seach_response = search_repo
             .search(SearchRequest {

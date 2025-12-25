@@ -19,7 +19,7 @@ use kamu_datasets::CommitDatasetEventUseCase;
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
-use time_source::SystemTimeSourceStub;
+use time_source::{SystemTimeSourceHarnessMode, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -41,7 +41,9 @@ async fn test_commit_dataset_event() {
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo.clone()]),
     )
     .await;
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     let foo_old_head = foo.head.clone();
@@ -100,7 +102,9 @@ async fn test_commit_event_unauthorized() {
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     )
     .await;
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     let res = harness
@@ -138,9 +142,15 @@ async fn test_commit_event_with_same_dependencies() {
     )
     .await;
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .create_derived_dataset(
+            &harness.catalog,
+            &alias_bar,
+            vec![foo.dataset_handle.as_local_ref()],
+        )
         .await;
     harness.reset_collected_outbox_messages();
 
@@ -215,10 +225,18 @@ async fn test_commit_event_with_new_dependencies() {
     )
     .await;
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness.create_root_dataset(&alias_bar).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+    let bar = harness
+        .create_root_dataset(&harness.catalog, &alias_bar)
+        .await;
     let baz = harness
-        .create_derived_dataset(&alias_baz, vec![foo.dataset_handle.as_local_ref()])
+        .create_derived_dataset(
+            &harness.catalog,
+            &alias_baz,
+            vec![foo.dataset_handle.as_local_ref()],
+        )
         .await;
     harness.reset_collected_outbox_messages();
 
@@ -285,6 +303,7 @@ async fn test_commit_event_with_new_dependencies() {
 struct CommitDatasetEventUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
+    catalog: dill::Catalog,
 }
 
 impl CommitDatasetEventUseCaseHarness {
@@ -294,22 +313,26 @@ impl CommitDatasetEventUseCaseHarness {
     ) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
-                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-                )),
+                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Stub(
+                    SystemTimeSourceStub::new_set(
+                        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                    ),
+                ),
                 maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
                 maybe_mock_did_generator: Some(mock_did_generator),
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
 
-        let catalog = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog())
-            .add::<CommitDatasetEventUseCaseImpl>()
-            .build();
+        let catalog =
+            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog())
+                .add::<CommitDatasetEventUseCaseImpl>()
+                .build();
 
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
+            catalog,
         }
     }
 }

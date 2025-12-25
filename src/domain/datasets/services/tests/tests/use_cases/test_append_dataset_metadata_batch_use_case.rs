@@ -18,7 +18,7 @@ use kamu_datasets::AppendDatasetMetadataBatchUseCase;
 use kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
-use time_source::SystemTimeSourceStub;
+use time_source::{SystemTimeSourceHarnessMode, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -36,7 +36,9 @@ async fn test_append_dataset_metadata_batch() {
         MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id.clone()]),
     )
     .await;
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     let foo_old_head = foo.head.clone();
@@ -120,10 +122,15 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
         ]),
     )
     .await;
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness.create_root_dataset(&alias_bar).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+    let bar = harness
+        .create_root_dataset(&harness.catalog, &alias_bar)
+        .await;
     let baz = harness
         .create_derived_dataset(
+            &harness.catalog,
             &alias_baz,
             vec![
                 foo.dataset_handle.as_local_ref(),
@@ -214,11 +221,19 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
         ]),
     )
     .await;
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
         .await;
-    let baz = harness.create_root_dataset(&alias_baz).await;
+    let bar = harness
+        .create_derived_dataset(
+            &harness.catalog,
+            &alias_bar,
+            vec![foo.dataset_handle.as_local_ref()],
+        )
+        .await;
+    let baz = harness
+        .create_root_dataset(&harness.catalog, &alias_baz)
+        .await;
     harness.reset_collected_outbox_messages();
 
     let bar_old_head = bar.head.clone();
@@ -293,27 +308,32 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 struct AppendDatasetMetadataBatchUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>,
+    catalog: dill::Catalog,
 }
 
 impl AppendDatasetMetadataBatchUseCaseHarness {
     async fn new(mock_did_generator: MockDidGenerator) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
-                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-                )),
+                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Stub(
+                    SystemTimeSourceStub::new_set(
+                        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                    ),
+                ),
                 maybe_mock_did_generator: Some(mock_did_generator),
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
 
-        let catalog = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog())
-            .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .build();
+        let catalog =
+            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog())
+                .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+                .build();
 
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
+            catalog,
         }
     }
 }

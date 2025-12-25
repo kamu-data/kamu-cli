@@ -19,7 +19,7 @@ use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
-use time_source::SystemTimeSourceStub;
+use time_source::{SystemTimeSourceHarnessMode, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -314,15 +314,18 @@ impl CreateFromSnapshotUseCaseHarness {
     async fn new(maybe_mock_did_generator: Option<MockDidGenerator>) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
-                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-                )),
+                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Stub(
+                    SystemTimeSourceStub::new_set(
+                        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                    ),
+                ),
                 maybe_mock_did_generator,
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
 
-        let mut b = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog());
+        let mut b =
+            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog());
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>();
 

@@ -9,40 +9,29 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
-use dill::Component;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME_STR,
-    DidSecretEncryptionConfig,
-};
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::AccountServiceImpl;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
-use kamu_core::{DidGeneratorDefault, TenancyConfig};
+use chrono::{DateTime, Utc};
+use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_core::TenancyConfig;
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use kamu_search::*;
-use kamu_search_elasticsearch::testing::{EsTestContext, SearchTestResponse};
-use kamu_search_services::{SearchIndexer, SearchServiceImpl};
-use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use time_source::SystemTimeSourceStub;
+use kamu_search_elasticsearch::testing::{
+    ElasticsearchBaseHarness,
+    ElasticsearchTestContext,
+    SearchTestResponse,
+};
+use time_source::SystemTimeSourceHarnessMode;
+
+use crate::tests::use_cases::dataset_base_use_case_harness::{
+    DatasetBaseUseCaseHarness,
+    DatasetBaseUseCaseHarnessOpts,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_dataset_index_initially_empty(ctx: Arc<EsTestContext>) {
+async fn test_dataset_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::new(ctx).await;
 
     let dataset_index_response = harness.view_datasets_index().await;
@@ -53,14 +42,20 @@ async fn test_dataset_index_initially_empty(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_creating_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_creating_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::new(ctx).await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
     for dataset_name in &dataset_names {
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
-        dataset_ids.push(harness.create_root_dataset(&alias).await.dataset_handle.id);
+        dataset_ids.push(
+            harness
+                .create_root_dataset(&harness.catalog, &alias)
+                .await
+                .dataset_handle
+                .id,
+        );
     }
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -80,30 +75,30 @@ async fn test_creating_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "alpha",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "beta",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -113,20 +108,28 @@ async fn test_creating_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_renaming_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::new(ctx).await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
     for dataset_name in &dataset_names {
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
-        dataset_ids.push(harness.create_root_dataset(&alias).await.dataset_handle.id);
+        dataset_ids.push(
+            harness
+                .create_root_dataset(&harness.catalog, &alias)
+                .await
+                .dataset_handle
+                .id,
+        );
     }
 
     harness
-        .rename_dataset(&dataset_ids[1], "beta-renamed")
+        .rename_dataset(&harness.catalog, &dataset_ids[1], "beta-renamed")
         .await;
-    harness.rename_dataset(&dataset_ids[0], "test-alpha").await;
+    harness
+        .rename_dataset(&harness.catalog, &dataset_ids[0], "test-alpha")
+        .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
 
@@ -147,30 +150,30 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "beta-renamed",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta-renamed",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "test-alpha",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "test-alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -180,18 +183,26 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_deleting_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
+async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::new(ctx).await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
     for dataset_name in &dataset_names {
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
-        dataset_ids.push(harness.create_root_dataset(&alias).await.dataset_handle.id);
+        dataset_ids.push(
+            harness
+                .create_root_dataset(&harness.catalog, &alias)
+                .await
+                .dataset_handle
+                .id,
+        );
     }
 
     // Delete "beta" dataset
-    harness.delete_dataset(&dataset_ids[1]).await;
+    harness
+        .delete_dataset(&harness.catalog, &dataset_ids[1])
+        .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
 
@@ -207,21 +218,21 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
         [
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "alpha",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
-                dataset_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
-                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time.to_rfc3339(),
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
     );
@@ -229,130 +240,51 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<EsTestContext>) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct DatasetIndexingHarness {
-    _tempdir: tempfile::TempDir,
-    fixed_time: chrono::DateTime<Utc>,
-    ctx: Arc<EsTestContext>,
+    es_base_harness: ElasticsearchBaseHarness,
+    dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     catalog: dill::Catalog,
 }
 
 impl DatasetIndexingHarness {
-    pub async fn new(ctx: Arc<EsTestContext>) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+    pub async fn new(ctx: Arc<ElasticsearchTestContext>) -> Self {
+        let es_base_harness = ElasticsearchBaseHarness::new(ctx);
 
-        let mut b = dill::CatalogBuilder::new_chained(ctx.catalog());
+        let dataset_base_use_case_harness =
+            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
+                maybe_base_catalog: Some(es_base_harness.catalog()),
+                tenancy_config: TenancyConfig::SingleTenant,
+                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Inherited,
+                ..Default::default()
+            })
+            .await;
 
-        use odf::dataset::DatasetStorageUnitLocalFs;
-        b.add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir));
-        b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
-        b.add_value(MetadataChainDbBackedConfig::default());
-
+        let mut b =
+            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog());
         b.add::<DatasetSearchSchemaProvider>()
-            .add::<DatasetSearchUpdater>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<InMemoryDidSecretKeyRepository>()
-            .add::<InMemoryDatasetKeyBlockRepository>()
-            .add::<InMemoryDatasetDataBlockRepository>()
-            .add::<InMemoryDatasetReferenceRepository>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DatasetReferenceServiceImpl>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseHelper>()
-            .add::<DeleteDatasetUseCaseImpl>()
-            .add::<RenameDatasetUseCaseImpl>()
-            .add::<DidGeneratorDefault>()
-            .add_value(DidSecretEncryptionConfig::sample())
-            .add::<AccountServiceImpl>()
-            .add::<InMemoryAccountRepository>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
-            .add::<RebacDatasetRegistryFacadeImpl>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<SearchIndexer>()
-            .add::<SearchServiceImpl>()
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<SystemTimeSourceStub>();
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-        );
-
-        register_message_dispatcher::<DatasetReferenceMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-        );
+            .add::<DatasetSearchUpdater>();
 
         let catalog = b.build();
 
-        let fixed_time = Utc::now();
-        let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
-        time_source.set(fixed_time);
-
-        use init_on_startup::InitOnStartup;
-        let indexer = catalog.get_one::<SearchIndexer>().unwrap();
-        indexer.run_initialization().await.unwrap();
+        ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
 
         Self {
-            _tempdir: tempdir,
-            fixed_time,
-            ctx,
+            es_base_harness,
+            dataset_base_use_case_harness,
             catalog,
         }
     }
 
-    pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
-        let use_case = self
-            .catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        use odf::metadata::testing::MetadataFactory;
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build();
-
-        use_case
-            .execute(snapshot, CreateDatasetUseCaseOptions::default())
-            .await
-            .unwrap()
-    }
-
-    pub async fn rename_dataset(&self, dataset_id: &odf::DatasetID, new_name: &str) {
-        let use_case = self.catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
-
-        use_case
-            .execute(
-                &dataset_id.as_local_ref(),
-                &odf::DatasetName::new_unchecked(new_name),
-            )
-            .await
-            .unwrap();
-    }
-
-    pub async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
-        let use_case = self.catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
-
-        use_case
-            .execute_via_ref(&dataset_id.as_local_ref())
-            .await
-            .unwrap();
+    #[inline]
+    pub fn fixed_time(&self) -> DateTime<Utc> {
+        self.es_base_harness.fixed_time()
     }
 
     pub async fn view_datasets_index(&self) -> SearchTestResponse {
-        self.ctx.refresh_indices().await;
+        self.es_base_harness.es_ctx().refresh_indices().await;
 
-        let search_repo = self.ctx.search_repo();
+        let search_repo = self.es_base_harness.es_ctx().search_repo();
 
         let seach_response = search_repo
             .search(SearchRequest {

@@ -29,7 +29,7 @@ use time_source::*;
 
 pub struct DatasetBaseUseCaseHarness {
     _temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    intermediate_catalog: Catalog,
     _did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -37,7 +37,7 @@ pub struct DatasetBaseUseCaseHarness {
 }
 
 impl DatasetBaseUseCaseHarness {
-    pub async fn new(opts: DatasetBaseUseCaseHarnessOpts) -> Self {
+    pub async fn new(opts: DatasetBaseUseCaseHarnessOpts<'_>) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
         let datasets_dir = temp_dir.path().join("datasets");
@@ -46,8 +46,12 @@ impl DatasetBaseUseCaseHarness {
         let run_info_dir = temp_dir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
 
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new();
+        let intermediate_catalog = {
+            let mut b = if let Some(base_catalog) = opts.maybe_base_catalog {
+                CatalogBuilder::new_chained(base_catalog)
+            } else {
+                CatalogBuilder::new()
+            };
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
@@ -95,11 +99,17 @@ impl DatasetBaseUseCaseHarness {
                 b.add::<DidGeneratorDefault>();
             }
 
-            if let Some(system_time_source_stub) = opts.maybe_system_time_source_stub {
-                b.add_value(system_time_source_stub)
-                    .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
-            } else {
-                b.add::<SystemTimeSourceDefault>();
+            match opts.system_time_source_harness_mode {
+                SystemTimeSourceHarnessMode::Inherited => {
+                    /* Do nothing, assume present in the base catalog */
+                }
+                SystemTimeSourceHarnessMode::Default => {
+                    b.add::<SystemTimeSourceDefault>();
+                }
+                SystemTimeSourceHarnessMode::Stub(stub) => {
+                    b.add_value(stub)
+                        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+                }
             }
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
@@ -125,21 +135,23 @@ impl DatasetBaseUseCaseHarness {
             b.build()
         };
 
-        let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+        let account_repo = intermediate_catalog
+            .get_one::<dyn AccountRepository>()
+            .unwrap();
         account_repo.save_account(&Account::dummy()).await.unwrap();
 
         Self {
             _temp_dir: temp_dir,
-            _did_generator: catalog.get_one().unwrap(),
-            system_time_source: catalog.get_one().unwrap(),
-            dataset_registry: catalog.get_one().unwrap(),
-            test_dataset_outbox_listener: catalog.get_one().unwrap(),
-            catalog,
+            _did_generator: intermediate_catalog.get_one().unwrap(),
+            system_time_source: intermediate_catalog.get_one().unwrap(),
+            dataset_registry: intermediate_catalog.get_one().unwrap(),
+            test_dataset_outbox_listener: intermediate_catalog.get_one().unwrap(),
+            intermediate_catalog,
         }
     }
 
-    pub fn catalog(&self) -> &Catalog {
-        &self.catalog
+    pub fn intermediate_catalog(&self) -> &Catalog {
+        &self.intermediate_catalog
     }
 
     pub fn system_time_source(&self) -> &dyn SystemTimeSource {
@@ -156,8 +168,12 @@ impl DatasetBaseUseCaseHarness {
         Ok(())
     }
 
-    pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
-        let mut b = CatalogBuilder::new_chained(&self.catalog);
+    pub async fn create_root_dataset(
+        &self,
+        catalog: &dill::Catalog,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        let mut b = CatalogBuilder::new_chained(catalog);
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseHelper>();
 
@@ -181,10 +197,11 @@ impl DatasetBaseUseCaseHarness {
 
     pub async fn create_derived_dataset(
         &self,
+        catalog: &dill::Catalog,
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> CreateDatasetResult {
-        let mut b = CatalogBuilder::new_chained(&self.catalog);
+        let mut b = CatalogBuilder::new_chained(catalog);
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseHelper>();
 
@@ -210,6 +227,40 @@ impl DatasetBaseUseCaseHarness {
             .unwrap()
     }
 
+    pub async fn rename_dataset(
+        &self,
+        catalog: &dill::Catalog,
+        dataset_id: &odf::DatasetID,
+        new_name: &str,
+    ) {
+        let mut b = CatalogBuilder::new_chained(catalog);
+        b.add::<RenameDatasetUseCaseImpl>();
+
+        let catalog = b.build();
+        let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
+
+        use_case
+            .execute(
+                &dataset_id.as_local_ref(),
+                &odf::DatasetName::new_unchecked(new_name),
+            )
+            .await
+            .unwrap();
+    }
+
+    pub async fn delete_dataset(&self, catalog: &dill::Catalog, dataset_id: &odf::DatasetID) {
+        let mut b = CatalogBuilder::new_chained(catalog);
+        b.add::<DeleteDatasetUseCaseImpl>();
+
+        let catalog = b.build();
+        let use_case = catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+
+        use_case
+            .execute_via_ref(&dataset_id.as_local_ref())
+            .await
+            .unwrap();
+    }
+
     pub fn collected_outbox_messages(&self) -> String {
         format!("{}", self.test_dataset_outbox_listener.as_ref())
     }
@@ -222,11 +273,12 @@ impl DatasetBaseUseCaseHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub struct DatasetBaseUseCaseHarnessOpts {
+pub struct DatasetBaseUseCaseHarnessOpts<'a> {
+    pub maybe_base_catalog: Option<&'a dill::Catalog>,
     pub tenancy_config: TenancyConfig,
     pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
-    pub maybe_system_time_source_stub: Option<SystemTimeSourceStub>,
+    pub system_time_source_harness_mode: SystemTimeSourceHarnessMode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

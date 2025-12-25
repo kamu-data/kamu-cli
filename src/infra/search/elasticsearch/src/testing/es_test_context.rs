@@ -33,7 +33,7 @@ const ELASTICSEARCH_TIMEOUT_SECS: u64 = 180;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EsTestContext {
+pub struct ElasticsearchTestContext {
     catalog: dill::Catalog,
     client: Arc<ElasticsearchClient>,
     search_repo: Arc<ElasticsearchRepository>,
@@ -42,7 +42,7 @@ pub struct EsTestContext {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl EsTestContext {
+impl ElasticsearchTestContext {
     pub async fn new(_test_name: &str) -> Self {
         // Read configuration from environment variables
         let es_url = std::env::var(ENV_ELASTICSEARCH_URL)
@@ -141,13 +141,13 @@ impl EsTestContext {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn es_test<T, Fut, E>(test_name: &str, f: T) -> Result<(), E>
+pub async fn elasticsearch_test<T, Fut, E>(test_name: &str, f: T) -> Result<(), E>
 where
-    T: FnOnce(Arc<EsTestContext>) -> Fut,
+    T: FnOnce(Arc<ElasticsearchTestContext>) -> Fut,
     Fut: std::future::Future<Output = Result<(), E>>,
 {
     // Initialize context
-    let ctx = Arc::new(EsTestContext::new(test_name).await);
+    let ctx = Arc::new(ElasticsearchTestContext::new(test_name).await);
 
     // Execute test body
     let res = f(ctx.clone()).await;
