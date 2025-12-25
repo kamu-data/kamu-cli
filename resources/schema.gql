@@ -3264,7 +3264,7 @@ type MoleculeAnnouncementsDatasetMutV2 {
 		"""
 		List of dataset DIDs to link
 		"""
-		attachments: [DatasetID!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!,		categories: [String!]!,		tags: [String!]!
+		attachments: [DatasetID!],		accessLevel: String!,		changeBy: String!,		categories: [String!]!,		tags: [String!]!
 	): CreateAnnouncementResult!
 }
 
@@ -3685,7 +3685,7 @@ type MoleculeProjectMut {
 		"""
 		List of dataset DIDs to link
 		"""
-		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
+		attachments: [String!],		accessLevel: String!,		changeBy: String!
 	): CreateAnnouncementResult!
 }
 
