@@ -253,7 +253,7 @@ const MOVE_ENTRY_QUERY: &str = indoc!(
 );
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $moleculeAccessLevel: String!, $moleculeChangeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
@@ -262,8 +262,8 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
                 headline: $headline
                 body: $body
                 attachments: $attachments
-                moleculeAccessLevel: $moleculeAccessLevel
-                moleculeChangeBy: $moleculeChangeBy
+                accessLevel: $accessLevel
+                changeBy: $changeBy
                 categories: $categories
                 tags: $tags
               ) {
@@ -3790,8 +3790,8 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
                 "headline": "Quota limited",
                 "body": "This should fail",
                 "attachments": [],
-                "moleculeAccessLevel": "public",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "categories": [],
                 "tags": [],
             })),
@@ -4018,8 +4018,8 @@ async fn test_molecule_v2_announcements_operations() {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
-                "moleculeAccessLevel": "public",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag1", "test-tag2", "test-tag3"],
             })),
@@ -4061,8 +4061,8 @@ async fn test_molecule_v2_announcements_operations() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [project_1_file_1_dataset_id],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                "accessLevel": "holders",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
             })),
@@ -4107,8 +4107,8 @@ async fn test_molecule_v2_announcements_operations() {
                     project_1_file_1_dataset_id,
                     project_1_file_2_dataset_id,
                 ],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                "accessLevel": "holders",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
                 "categories": [],
                 "tags": ["test-tag1"],
             })),
@@ -4154,8 +4154,8 @@ async fn test_molecule_v2_announcements_operations() {
                     project_1_file_2_dataset_id,
                     odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string(),
                 ],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "holders",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "categories": [],
                 "tags": ["test-tag1"],
             })),
@@ -5610,8 +5610,8 @@ async fn test_molecule_v2_activity() {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
-                "moleculeAccessLevel": "public",
-                "moleculeChangeBy": USER_1,
+                "accessLevel": "public",
+                "changeBy": USER_1,
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
             })),
@@ -6077,8 +6077,8 @@ async fn test_molecule_v2_activity() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": USER_2,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
             })),
@@ -9138,8 +9138,8 @@ async fn test_molecule_v2_search() {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1 text",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
-                "moleculeAccessLevel": "public",
-                "moleculeChangeBy": USER_1,
+                "accessLevel": "public",
+                "changeBy": USER_1,
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
             })),
@@ -9234,8 +9234,8 @@ async fn test_molecule_v2_search() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2 text",
                 "attachments": [],
-                "moleculeAccessLevel": "holders",
-                "moleculeChangeBy": USER_2,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
             })),
@@ -10068,8 +10068,8 @@ async fn test_molecule_v2_dump_dataset_snapshots() {
             "headline": "Test announcement",
             "body": "Blah blah",
             "attachments": [],
-            "moleculeAccessLevel": "holders",
-            "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             "categories": [],
             "tags": [],
         })),
