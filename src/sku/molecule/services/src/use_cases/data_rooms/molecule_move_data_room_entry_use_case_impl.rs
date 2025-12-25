@@ -16,7 +16,11 @@ use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::{MoleculeDataRoomCollectionService, MoleculeDataRoomCollectionWriteError};
+use crate::{
+    MoleculeDataRoomCollectionReadError,
+    MoleculeDataRoomCollectionService,
+    MoleculeDataRoomCollectionWriteError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,8 +49,36 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
         source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
+        change_by: String,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeMoveDataRoomEntryError> {
+        let extra_data = self
+            .data_room_collection_service
+            .find_data_room_collection_entry_by_path(
+                &molecule_project.data_room_dataset_id,
+                None,
+                path_from.clone(),
+            )
+            .await
+            .map_err(|e| match e {
+                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
+                MoleculeDataRoomCollectionReadError::Access(e) => {
+                    MoleculeMoveDataRoomEntryError::Access(e)
+                }
+                MoleculeDataRoomCollectionReadError::Internal(e) => {
+                    MoleculeMoveDataRoomEntryError::Internal(e)
+                }
+            })?
+            .map(|entry| -> Result<_, MoleculeMoveDataRoomEntryError> {
+                let mut denorm = MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
+                    entry.extra_data,
+                )
+                .int_err()?;
+                denorm.change_by = change_by.clone();
+                Ok(denorm.to_collection_extra_data_fields())
+            })
+            .transpose()?;
+
         let result = self
             .data_room_collection_service
             .move_data_room_collection_entry_by_path(
@@ -54,7 +86,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 source_event_time,
                 path_from.clone(),
                 path_to.clone(),
-                None,
+                extra_data,
                 expected_head,
             )
             .await

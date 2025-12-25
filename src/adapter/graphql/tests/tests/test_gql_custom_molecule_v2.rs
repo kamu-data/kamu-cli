@@ -235,12 +235,12 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 );
 const MOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!) {
+    mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
-              moveEntry(fromPath: $fromPath, toPath: $toPath) {
+              moveEntry(fromPath: $fromPath, toPath: $toPath, changeBy: $changeBy) {
                 isSuccess
                 message
               }
@@ -283,12 +283,12 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
 );
 const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!) {
+    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
-              removeEntry(path: $path) {
+              removeEntry(path: $path, changeBy: $changeBy) {
                 isSuccess
                 message
               }
@@ -2242,6 +2242,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "ipnftUid": ipnft_uid,
                 "fromPath": "/non-existent-path.txt",
                 "toPath": "/2025/foo.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2271,6 +2272,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "ipnftUid": ipnft_uid,
                 "fromPath": "/foo.txt",
                 "toPath": "/baz.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -2300,6 +2302,7 @@ async fn test_molecule_v2_data_room_operations() {
                 "ipnftUid": ipnft_uid,
                 "fromPath": "/foo.txt",
                 "toPath": "/2025/foo.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3164,6 +3167,7 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "path": "/non-existent-path.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -3192,6 +3196,7 @@ async fn test_molecule_v2_data_room_operations() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": ipnft_uid,
                 "path": "/baz.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -5493,6 +5498,7 @@ async fn test_molecule_v2_activity() {
                 "ipnftUid": PROJECT_1_UID,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -5899,6 +5905,7 @@ async fn test_molecule_v2_activity() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": PROJECT_1_UID,
                 "path": "/bar.txt",
+                "changeBy": USER_2,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -9108,6 +9115,7 @@ async fn test_molecule_v2_search() {
                 "ipnftUid": PROJECT_1_UID,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
+                "changeBy": USER_1,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -9179,6 +9187,7 @@ async fn test_molecule_v2_search() {
             async_graphql::Variables::from_json(json!({
                 "ipnftUid": PROJECT_1_UID,
                 "path": "/bar.txt",
+                "changeBy": USER_2,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
