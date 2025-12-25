@@ -70,10 +70,9 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                 }
             })?
             .map(|entry| -> Result<_, MoleculeMoveDataRoomEntryError> {
-                let mut denorm = MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
-                    entry.extra_data,
-                )
-                .int_err()?;
+                let mut denorm =
+                    MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)
+                        .int_err()?;
                 denorm.change_by = change_by.clone();
                 Ok(denorm.to_collection_extra_data_fields())
             })

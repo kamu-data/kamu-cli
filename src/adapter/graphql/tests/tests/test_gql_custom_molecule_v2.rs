@@ -25,6 +25,11 @@ use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
+const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const CREATE_PROJECT: &str = indoc!(
     r#"
     mutation (
@@ -2328,7 +2333,7 @@ async fn test_molecule_v2_data_room_operations() {
         {
             "path": "/2025/foo.txt",
             "ref": file_1_did,
-            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+            "changeBy": USER_1,
             "asVersionedFile": {
                 "latest": {
                     "accessLevel": "public",
@@ -2399,7 +2404,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "accessLevel": "public",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": USER_1,
                     }
                 },
                 {
@@ -2408,7 +2413,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "path": "/foo.txt",
                         "ref": file_1_did,
                         "accessLevel": "public",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": USER_2,
                     }
                 },
                 {
@@ -2525,7 +2530,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -2595,7 +2600,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -2735,7 +2740,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -2875,7 +2880,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -2945,7 +2950,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -3110,7 +3115,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -3236,7 +3241,7 @@ async fn test_molecule_v2_data_room_operations() {
                 {
                     "path": "/2025/foo.txt",
                     "ref": file_1_did,
-                    "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                    "changeBy": USER_1,
                     "asVersionedFile": {
                         "latest": {
                             "accessLevel": "public",
@@ -3285,7 +3290,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "accessLevel": "public",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": USER_1,
                     }
                 },
                 {
@@ -3294,7 +3299,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "path": "/foo.txt",
                         "ref": file_1_did,
                         "accessLevel": "public",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": USER_2,
                     }
                 },
                 {
@@ -3652,7 +3657,7 @@ async fn test_molecule_v2_data_room_operations() {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
                         "accessLevel": "public",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                        "changeBy": USER_1,
                     }
                 },
                 {
