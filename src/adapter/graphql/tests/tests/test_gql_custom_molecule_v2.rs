@@ -3614,8 +3614,8 @@ async fn test_molecule_v2_data_room_operations() {
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
             "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1\",\"accessControlConditions\":\"EM2\",\"encryptedBy\":\"EM3\",\"encryptedAt\":\"EM4\",\"chain\":\"EM5\",\"litSdkVersion\":\"EM6\",\"litNetwork\":\"EM7\",\"templateName\":\"EM8\",\"contractVersion\":\"EM9\"}",
-            "molecule_access_level": "holders",
-            "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+            "access_level": "holders",
+            "change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
         })
     );

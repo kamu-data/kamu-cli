@@ -91,9 +91,7 @@ impl MoleculeVersionedFileEntry {
 
 #[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeVersionedFileEntryBasicInfo {
-    #[serde(rename = "molecule_access_level")]
     pub access_level: String,
-    #[serde(rename = "molecule_change_by")]
     pub change_by: String,
     pub description: Option<String>,
     pub categories: Vec<String>,

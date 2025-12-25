@@ -42,7 +42,7 @@ pub fn molecule_fields_filter(
     });
     let maybe_access_levels_filter = by_access_levels.and_then(|values| {
         NonEmpty::from_vec(values).map(|values| Filter {
-            field_name: "molecule_access_level".to_string(),
+            field_name: "access_level".to_string(),
             values,
             is_array: false,
         })

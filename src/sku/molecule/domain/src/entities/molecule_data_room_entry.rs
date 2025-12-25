@@ -85,9 +85,7 @@ pub struct MoleculeDenormalizeFileToDataRoom {
     pub content_length: usize,
     pub content_hash: odf::Multihash,
 
-    #[serde(rename = "molecule_access_level")]
     pub access_level: String,
-    #[serde(rename = "molecule_change_by")]
     pub change_by: String,
     pub description: Option<String>,
     pub categories: Vec<String>,

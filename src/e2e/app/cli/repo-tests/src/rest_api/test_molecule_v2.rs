@@ -157,8 +157,8 @@ pub async fn test_molecule_v2_announcements_quota_exceeded(
                 "headline": "quota",
                 "body": "exceeded",
                 "attachments": [],
-                "moleculeAccessLevel": "public",
-                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
                 "categories": ["news"],
                 "tags": ["quota"],
             }))),
@@ -244,7 +244,7 @@ const DATA_ROOM_UPLOAD: &str = indoc!(
 
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $moleculeAccessLevel: String!, $moleculeChangeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
         v2 {
           project(ipnftUid: $ipnftUid) {
@@ -253,8 +253,8 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
                 headline: $headline
                 body: $body
                 attachments: $attachments
-                moleculeAccessLevel: $moleculeAccessLevel
-                moleculeChangeBy: $moleculeChangeBy
+                accessLevel: $accessLevel
+                changeBy: $changeBy
                 categories: $categories
                 tags: $tags
               ) {

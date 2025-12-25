@@ -49,12 +49,12 @@ content:
             kind: String
         extra:
           opendatafabric.org/description: Media type associated with the linked object
-      - name: molecule_access_level
+      - name: access_level
         type:
           kind: Option
           inner:
             kind: String
-      - name: molecule_change_by
+      - name: change_by
         type:
           kind: Option
           inner:
@@ -104,8 +104,8 @@ content:
       - content_hash STRING
       - content_length BIGINT
       - content_type STRING
-      - molecule_access_level STRING
-      - molecule_change_by STRING
+      - access_level STRING
+      - change_by STRING
       - description STRING
       - categories ARRAY<STRING>
       - tags ARRAY<STRING>

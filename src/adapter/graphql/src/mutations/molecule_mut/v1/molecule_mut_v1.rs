@@ -183,8 +183,8 @@ impl MoleculeProjectMut {
             "headline": headline,
             "body": body,
             "attachments": attachments,
-            "molecule_access_level": molecule_access_level,
-            "molecule_change_by": molecule_change_by,
+            "access_level": molecule_access_level,
+            "change_by": molecule_change_by,
             // V2:
             "categories": [],
             "tags": [],
