@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER;
 use kamu_search::{SearchEntitySchemaProvider, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +19,7 @@ use kamu_search::{SearchEntitySchemaProvider, SearchRepository};
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: "dev.kamu.search.SearchIndexer",
-    depends_on: &[JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER],
+    depends_on: &[],
     requires_transaction: true,
 })]
 pub struct SearchIndexer {

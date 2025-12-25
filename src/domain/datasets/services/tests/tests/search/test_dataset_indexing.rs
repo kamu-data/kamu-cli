@@ -20,7 +20,7 @@ use kamu_search_elasticsearch::testing::{
     ElasticsearchTestContext,
     SearchTestResponse,
 };
-use time_source::SystemTimeSourceHarnessMode;
+use time_source::SystemTimeSourceProvider;
 
 use crate::tests::use_cases::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -255,7 +255,7 @@ impl DatasetIndexingHarness {
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
                 maybe_base_catalog: Some(es_base_harness.catalog()),
                 tenancy_config: TenancyConfig::SingleTenant,
-                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Inherited,
+                system_time_source_provider: SystemTimeSourceProvider::Inherited,
                 ..Default::default()
             })
             .await;

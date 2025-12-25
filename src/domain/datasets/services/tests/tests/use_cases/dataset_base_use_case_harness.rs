@@ -99,18 +99,7 @@ impl DatasetBaseUseCaseHarness {
                 b.add::<DidGeneratorDefault>();
             }
 
-            match opts.system_time_source_harness_mode {
-                SystemTimeSourceHarnessMode::Inherited => {
-                    /* Do nothing, assume present in the base catalog */
-                }
-                SystemTimeSourceHarnessMode::Default => {
-                    b.add::<SystemTimeSourceDefault>();
-                }
-                SystemTimeSourceHarnessMode::Stub(stub) => {
-                    b.add_value(stub)
-                        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
-                }
-            }
+            opts.system_time_source_provider.embed_into_catalog(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -278,7 +267,7 @@ pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub tenancy_config: TenancyConfig,
     pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
-    pub system_time_source_harness_mode: SystemTimeSourceHarnessMode,
+    pub system_time_source_provider: SystemTimeSourceProvider,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

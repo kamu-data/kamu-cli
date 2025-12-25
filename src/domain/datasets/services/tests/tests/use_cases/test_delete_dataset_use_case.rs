@@ -15,7 +15,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{DeleteDatasetError, DeleteDatasetUseCase};
 use kamu_datasets_services::DeleteDatasetUseCaseImpl;
-use time_source::{SystemTimeSourceHarnessMode, SystemTimeSourceStub};
+use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -259,7 +259,7 @@ impl DeleteUseCaseHarness {
     ) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Stub(
+                system_time_source_provider: SystemTimeSourceProvider::Stub(
                     SystemTimeSourceStub::new_set(
                         Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                     ),

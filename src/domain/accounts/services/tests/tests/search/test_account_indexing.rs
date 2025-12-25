@@ -9,10 +9,9 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use dill::Component;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::*;
 use kamu_search::*;
 use kamu_search_elasticsearch::testing::{
@@ -22,12 +21,14 @@ use kamu_search_elasticsearch::testing::{
 };
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 
+use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_account_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = AccountIndexingHarness::new(ctx).await;
+    let harness = AccountIndexingHarness::new(ctx, None).await;
 
     let accounts_index_response = harness.view_accounts_index().await;
     assert_eq!(accounts_index_response.total_hits(), 0);
@@ -37,12 +38,63 @@ async fn test_account_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) 
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_predefined_accounts_appear_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let registered_at = Utc::now();
+
+    let predefined_account_config = {
+        let mut p = PredefinedAccountsConfig::new();
+        p.predefined = vec![
+            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("john-doe"))
+                .set_registered_at(registered_at)
+                .set_display_name("John Doe".to_string()),
+            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("jane-smith"))
+                .set_registered_at(registered_at),
+        ];
+        p
+    };
+
+    let harness = AccountIndexingHarness::new(ctx, Some(predefined_account_config)).await;
+
+    let accounts_index_response = harness.view_accounts_index().await;
+    assert_eq!(accounts_index_response.total_hits(), 2);
+
+    pretty_assertions::assert_eq!(
+        accounts_index_response.ids(),
+        vec![
+            AccountBaseUseCaseHarness::account_id_from_name("jane-smith").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("john-doe").to_string(),
+        ]
+    );
+
+    pretty_assertions::assert_eq!(
+        accounts_index_response.entities(),
+        [
+            serde_json::json!({
+                account_search_schema::fields::ACCOUNT_NAME: "jane-smith",
+                account_search_schema::fields::CREATED_AT: registered_at.to_rfc3339(),
+                account_search_schema::fields::DISPLAY_NAME: "jane-smith",
+                account_search_schema::fields::UPDATED_AT: registered_at.to_rfc3339(),
+            }),
+            serde_json::json!({
+                account_search_schema::fields::ACCOUNT_NAME: "john-doe",
+                account_search_schema::fields::CREATED_AT: registered_at.to_rfc3339(),
+                account_search_schema::fields::DISPLAY_NAME: "John Doe",
+                account_search_schema::fields::UPDATED_AT: registered_at.to_rfc3339(),
+            }),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = AccountIndexingHarness::new(ctx).await;
+    let harness = AccountIndexingHarness::new(ctx, None).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
     for account_name in &account_names {
-        harness.create_account(account_name).await;
+        harness.create_account(&harness.catalog, account_name).await;
     }
 
     let accounts_index_response = harness.view_accounts_index().await;
@@ -53,7 +105,7 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         accounts_index_response.ids(),
         account_names
             .iter()
-            .map(|name| harness.account_id_from_name(name).to_string())
+            .map(|name| AccountBaseUseCaseHarness::account_id_from_name(name).to_string())
             .collect::<Vec<_>>()
     );
 
@@ -87,15 +139,19 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = AccountIndexingHarness::new(ctx).await;
+    let harness = AccountIndexingHarness::new(ctx, None).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
     for account_name in &account_names {
-        harness.create_account(account_name).await;
+        harness.create_account(&harness.catalog, account_name).await;
     }
 
-    harness.rename_account("bob", "robert").await;
-    harness.rename_account("alice", "alicia").await;
+    harness
+        .rename_account(&harness.catalog, "bob", "robert")
+        .await;
+    harness
+        .rename_account(&harness.catalog, "alice", "alicia")
+        .await;
 
     let accounts_index_response = harness.view_accounts_index().await;
 
@@ -106,9 +162,9 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
         vec![
             // Althouhgh renamed, IDs remain the same.
             // However, the order changes, as we sort by account_name
-            harness.account_id_from_name("alice").to_string(),
-            harness.account_id_from_name("charlie").to_string(),
-            harness.account_id_from_name("bob").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("alice").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("charlie").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("bob").to_string(),
         ]
     );
 
@@ -142,14 +198,14 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = AccountIndexingHarness::new(ctx).await;
+    let harness = AccountIndexingHarness::new(ctx, None).await;
 
     let account_names = vec!["alice", "bob", "charlie"];
     for account_name in &account_names {
-        harness.create_account(account_name).await;
+        harness.create_account(&harness.catalog, account_name).await;
     }
 
-    harness.delete_account("bob").await;
+    harness.delete_account(&harness.catalog, "bob").await;
 
     let accounts_index_response = harness.view_accounts_index().await;
     assert_eq!(accounts_index_response.total_hits(), 2);
@@ -157,8 +213,8 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
     pretty_assertions::assert_eq!(
         accounts_index_response.ids(),
         vec![
-            harness.account_id_from_name("alice").to_string(),
-            harness.account_id_from_name("charlie").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("alice").to_string(),
+            AccountBaseUseCaseHarness::account_id_from_name("charlie").to_string(),
         ]
     );
 
@@ -183,36 +239,37 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(ElasticsearchBaseHarness, es_base_harness)]
+#[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct AccountIndexingHarness {
     es_base_harness: ElasticsearchBaseHarness,
+    account_base_harness: AccountBaseUseCaseHarness,
     catalog: dill::Catalog,
 }
 
 impl AccountIndexingHarness {
-    pub async fn new(ctx: Arc<ElasticsearchTestContext>) -> Self {
+    pub async fn new(
+        ctx: Arc<ElasticsearchTestContext>,
+        maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
+    ) -> Self {
         let es_base_harness = ElasticsearchBaseHarness::new(ctx);
 
-        let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
+        let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
+            maybe_base_catalog: Some(es_base_harness.catalog()),
+            system_time_source_provider: time_source::SystemTimeSourceProvider::Inherited,
+            maybe_predefined_accounts_config,
+            ..Default::default()
+        });
+
+        let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_builder(
             messaging_outbox::OutboxImmediateImpl::builder()
                 .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
         )
         .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<CreateAccountUseCaseImpl>()
-        .add::<UpdateAccountUseCaseImpl>()
-        .add::<DeleteAccountUseCaseImpl>()
-        .add::<InMemoryAccountRepository>()
-        .add::<InMemoryDidSecretKeyRepository>()
-        .add_value(DidSecretEncryptionConfig::sample())
-        .add::<AccountServiceImpl>()
-        .add::<AccountAuthorizationHelperImpl>()
-        .add::<kamu_auth_rebac_services::RebacServiceImpl>()
-        .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
-        .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
-        .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
         .add::<AccountSearchSchemaProvider>()
         .add::<AccountSearchUpdater>();
+
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         register_message_dispatcher::<AccountLifecycleMessage>(
             &mut b,
@@ -221,90 +278,26 @@ impl AccountIndexingHarness {
 
         let catalog = b.build();
 
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+
         ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
 
         Self {
             es_base_harness,
+            account_base_harness,
             catalog,
         }
     }
 
-    pub async fn create_account(&self, account_name: &str) {
-        let account = Account {
-            registered_at: self.fixed_time(),
-            ..Account::test(self.account_id_from_name(account_name), account_name)
-        };
-
-        let create_account_uc = self.catalog.get_one::<dyn CreateAccountUseCase>().unwrap();
-        create_account_uc
-            .execute(&account, &TEST_PASSWORD, false /* quiet */)
-            .await
-            .unwrap();
-    }
-
-    pub async fn rename_account(&self, old_name: &str, new_name: &str) {
-        // Locate account
-        let account_svc = self.catalog.get_one::<dyn AccountService>().unwrap();
-        let account = account_svc
-            .account_by_name(&odf::AccountName::new_unchecked(old_name))
-            .await
-            .unwrap()
-            .unwrap();
-
-        // Prepare updated account
-        let mut updated_account = account.clone();
-        updated_account.account_name = odf::AccountName::new_unchecked(new_name);
-        updated_account.display_name = new_name.to_string();
-
-        // Execute update on user's behalf in authenticated context
-        {
-            let mut b = dill::CatalogBuilder::new_chained(&self.catalog);
-            b.add_value(CurrentAccountSubject::logged(
-                account.id.clone(),
-                account.account_name.clone(),
-            ));
-            let authenticated_catalog = b.build();
-
-            let update_account_uc = authenticated_catalog
-                .get_one::<dyn UpdateAccountUseCase>()
-                .unwrap();
-            update_account_uc.execute(&updated_account).await.unwrap();
-        }
-    }
-
-    pub async fn delete_account(&self, account_name: &str) {
-        // Locate account
-        let account_svc = self.catalog.get_one::<dyn AccountService>().unwrap();
-        let account = account_svc
-            .account_by_name(&odf::AccountName::new_unchecked(account_name))
-            .await
-            .unwrap()
-            .unwrap();
-
-        // Execute delete on user's behalf in authenticated context
-        {
-            let mut b = dill::CatalogBuilder::new_chained(&self.catalog);
-            b.add_value(CurrentAccountSubject::logged(
-                account.id.clone(),
-                account.account_name.clone(),
-            ));
-            let authenticated_catalog = b.build();
-
-            let delete_account_uc = authenticated_catalog
-                .get_one::<dyn DeleteAccountUseCase>()
-                .unwrap();
-            delete_account_uc.execute(&account).await.unwrap();
-        }
-    }
-
-    pub fn account_id_from_name(&self, account_name: &str) -> odf::AccountID {
-        odf::AccountID::new_seeded_ed25519(account_name.as_bytes())
+    #[inline]
+    pub fn fixed_time(&self) -> DateTime<Utc> {
+        self.es_base_harness.fixed_time()
     }
 
     pub async fn view_accounts_index(&self) -> SearchTestResponse {
-        self.es_ctx().refresh_indices().await;
+        self.es_base_harness.es_ctx().refresh_indices().await;
 
-        let search_repo = self.es_ctx().search_repo();
+        let search_repo = self.es_base_harness.es_ctx().search_repo();
 
         let seach_response = search_repo
             .search(SearchRequest {

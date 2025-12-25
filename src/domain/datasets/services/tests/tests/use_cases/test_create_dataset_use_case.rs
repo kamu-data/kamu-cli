@@ -17,7 +17,7 @@ use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
-use time_source::{SystemTimeSourceHarnessMode, SystemTimeSourceStub};
+use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -108,7 +108,7 @@ impl CreateUseCaseHarness {
     async fn new(predefined_dataset_id: odf::DatasetID) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                system_time_source_harness_mode: SystemTimeSourceHarnessMode::Stub(
+                system_time_source_provider: SystemTimeSourceProvider::Stub(
                     SystemTimeSourceStub::new_set(
                         Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                     ),
