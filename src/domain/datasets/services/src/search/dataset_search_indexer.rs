@@ -59,28 +59,9 @@ pub(crate) async fn index_dataset_from_scratch(
                 .int_err()?
                 .system_time;
 
-            // Convert FieldUpdate to Option for JSON serialization
-            // For full indexing, Absent means the chain has no such event (use null)
-            let schema_fields_value = match schema_fields {
-                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-                SearchFieldUpdate::Present(v) => Some(v),
-            };
-            let description_value = match description {
-                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-                SearchFieldUpdate::Present(v) => Some(v),
-            };
-            let keywords_value = match keywords {
-                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-                SearchFieldUpdate::Present(v) => Some(v),
-            };
-            let attachments_value = match attachments {
-                SearchFieldUpdate::Absent | SearchFieldUpdate::Empty => None,
-                SearchFieldUpdate::Present(v) => Some(v),
-            };
-
-            // Prepare full text search document
+            // Prepare full text search document with mandatory fields
             let alias = dataset.get_alias();
-            Ok(serde_json::json!({
+            let mut index_doc: serde_json::Value = serde_json::json!({
                 fields::DATASET_NAME: alias.dataset_name.to_string(),
                 fields::ALIAS: alias.to_string(),
                 fields::OWNER_NAME: alias
@@ -95,11 +76,24 @@ pub(crate) async fn index_dataset_from_scratch(
                 },
                 fields::CREATED_AT: seed_event_time.to_rfc3339(),
                 fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
-                fields::SCHEMA_FIELDS: schema_fields_value,
-                fields::DESCRIPTION: description_value,
-                fields::KEYWORDS: keywords_value,
-                fields::ATTACHMENTS: attachments_value,
-            }))
+            });
+
+            // Add optional fields only if present
+            let index_doc_mut = index_doc.as_object_mut().unwrap();
+            if let SearchFieldUpdate::Present(v) = schema_fields {
+                index_doc_mut.insert(fields::SCHEMA_FIELDS.to_string(), serde_json::json!(v));
+            }
+            if let SearchFieldUpdate::Present(v) = description {
+                index_doc_mut.insert(fields::DESCRIPTION.to_string(), serde_json::json!(v));
+            }
+            if let SearchFieldUpdate::Present(v) = keywords {
+                index_doc_mut.insert(fields::KEYWORDS.to_string(), serde_json::json!(v));
+            }
+            if let SearchFieldUpdate::Present(v) = attachments {
+                index_doc_mut.insert(fields::ATTACHMENTS.to_string(), serde_json::json!(v));
+            }
+
+            Ok(index_doc)
         }
 
         Err(AcceptVisitorError::Traversal(IterBlocksError::RefNotFound(_))) => {

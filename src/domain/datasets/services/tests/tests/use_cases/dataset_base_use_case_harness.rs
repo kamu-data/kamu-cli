@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder, Component};
+use dill::{Catalog, CatalogBuilder};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -56,11 +56,6 @@ impl DatasetBaseUseCaseHarness {
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
                 .add_value(CurrentAccountSubject::new_test())
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(ConsumerFilter::AllConsumers),
-                )
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
@@ -98,6 +93,8 @@ impl DatasetBaseUseCaseHarness {
             } else {
                 b.add::<DidGeneratorDefault>();
             }
+
+            opts.outbox_provider.embed_into_catalog(&mut b);
 
             opts.system_time_source_provider.embed_into_catalog(&mut b);
 
@@ -261,13 +258,27 @@ impl DatasetBaseUseCaseHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
 pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_base_catalog: Option<&'a dill::Catalog>,
     pub tenancy_config: TenancyConfig,
     pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
+    pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
+}
+
+impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
+    fn default() -> Self {
+        Self {
+            maybe_base_catalog: None,
+            tenancy_config: TenancyConfig::SingleTenant,
+            maybe_mock_dataset_action_authorizer: None,
+            maybe_mock_did_generator: None,
+            // Use immediate outbox in all dataset use case harnesses
+            outbox_provider: OutboxProvider::Immediate,
+            system_time_source_provider: SystemTimeSourceProvider::Default,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -32,7 +32,8 @@ pub struct SearchIndexer {
 #[common_macros::method_names_consts]
 impl SearchIndexer {
     #[tracing::instrument(level = "info", name = SearchIndexer_ensure_indexes_exist, skip_all)]
-    async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
+    // Public for tests only
+    pub async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
         // Request schemas from all providers and ensure indexes exist
         for provider in &self.entity_schema_providers {
             let schemas = provider.provide_schemas();
