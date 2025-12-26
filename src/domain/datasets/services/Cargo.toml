@@ -87,6 +87,7 @@ kamu-search-elasticsearch = { workspace = true, default-features = false, featur
 kamu-search-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
+bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.14"
 oop = "0.0.2"

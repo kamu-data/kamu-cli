@@ -8070,6 +8070,7 @@ version = "0.255.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bon",
  "bytes",
  "cheap-clone",
  "chrono",

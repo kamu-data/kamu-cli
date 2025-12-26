@@ -9,11 +9,15 @@
 
 use std::sync::Arc;
 
+use bon::bon;
 use chrono::{DateTime, Utc};
 use database_common::NoOpDatabasePlugin;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::*;
+use kamu_accounts_services::*;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::*;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -39,7 +43,11 @@ use crate::tests::use_cases::dataset_base_use_case_harness::{
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_dataset_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = DatasetIndexingHarness::new(ctx, None).await;
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let dataset_index_response = harness.view_datasets_index().await;
     assert_eq!(dataset_index_response.total_hits(), 0);
@@ -49,7 +57,7 @@ async fn test_dataset_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) 
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_predefined_datasets_indexed_properly(ctx: Arc<ElasticsearchTestContext>) {
+async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTestContext>) {
     let aliases = vec![
         odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar")),
         odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
@@ -59,7 +67,12 @@ async fn test_predefined_datasets_indexed_properly(ctx: Arc<ElasticsearchTestCon
         aliases: aliases.clone(),
     };
 
-    let harness = DatasetIndexingHarness::new(ctx, Some(predefined_datasets_config)).await;
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .maybe_predefined_datasets_config(predefined_datasets_config)
+        .build()
+        .await;
 
     let dataset_index_response = harness.view_datasets_index().await;
     assert_eq!(dataset_index_response.total_hits(), 2);
@@ -104,8 +117,87 @@ async fn test_predefined_datasets_indexed_properly(ctx: Arc<ElasticsearchTestCon
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTestContext>) {
+    let account_names = vec![
+        odf::AccountName::new_unchecked("alice"),
+        odf::AccountName::new_unchecked("bob"),
+    ];
+
+    let aliases = vec![
+        odf::DatasetAlias::new(
+            Some(account_names[0].clone()),
+            odf::DatasetName::new_unchecked("bar"),
+        ),
+        odf::DatasetAlias::new(
+            Some(account_names[1].clone()),
+            odf::DatasetName::new_unchecked("foo"),
+        ),
+    ];
+
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .maybe_predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: account_names
+                .into_iter()
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .maybe_predefined_datasets_config(PredefinedDatasetsConfig {
+            aliases: aliases.clone(),
+        })
+        .build()
+        .await;
+
+    let dataset_index_response = harness.view_datasets_index().await;
+    assert_eq!(dataset_index_response.total_hits(), 2);
+
+    pretty_assertions::assert_eq!(
+        dataset_index_response.ids(),
+        aliases
+            .iter()
+            .map(|alias| {
+                odf::DatasetID::new_seeded_ed25519(alias.dataset_name.as_str().as_bytes())
+                    .to_string()
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    pretty_assertions::assert_eq!(
+        dataset_index_response.entities(),
+        [
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "alice/bar",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "bar",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "alice",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "bob/foo",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "foo",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "bob",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            })
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_creating_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = DatasetIndexingHarness::new(ctx, None).await;
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
@@ -171,7 +263,11 @@ async fn test_creating_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = DatasetIndexingHarness::new(ctx, None).await;
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
@@ -246,7 +342,11 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
-    let harness = DatasetIndexingHarness::new(ctx, None).await;
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let dataset_names = vec!["alpha", "beta", "gamma"];
     let mut dataset_ids = Vec::with_capacity(dataset_names.len());
@@ -309,19 +409,23 @@ struct DatasetIndexingHarness {
     catalog: dill::Catalog,
 }
 
+#[bon]
 impl DatasetIndexingHarness {
-    pub async fn new(
+    #[builder]
+    async fn new(
         ctx: Arc<ElasticsearchTestContext>,
-        maybe_predefined_datasets: Option<PredefinedDatasetsConfig>,
+        tenancy_config: TenancyConfig,
+        maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
+        maybe_predefined_datasets_config: Option<PredefinedDatasetsConfig>,
     ) -> Self {
         let es_base_harness = ElasticsearchBaseHarness::new(ctx);
 
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
                 maybe_base_catalog: Some(es_base_harness.catalog()),
-                tenancy_config: TenancyConfig::SingleTenant,
-                system_time_source_provider: SystemTimeSourceProvider::Inherited,
+                tenancy_config,
                 outbox_provider: OutboxProvider::PauseableImmediate,
+                system_time_source_provider: SystemTimeSourceProvider::Inherited,
                 ..Default::default()
             })
             .await;
@@ -331,12 +435,17 @@ impl DatasetIndexingHarness {
         b.add::<DatasetSearchSchemaProvider>()
             .add::<DatasetSearchUpdater>();
 
-        let run_predefined_datasets_registration = maybe_predefined_datasets.is_some();
-        if let Some(predefined_datasets) = maybe_predefined_datasets {
-            b.add::<CreateDatasetUseCaseImpl>();
-            b.add::<CreateDatasetUseCaseHelper>();
-            b.add::<PredefinedDatasetsRegistrator>();
-            b.add_value(predefined_datasets);
+        let run_predefined_accounts_registration = maybe_predefined_accounts_config.is_some();
+        if let Some(predefined_accounts_config) = maybe_predefined_accounts_config {
+            b.add::<PredefinedAccountsRegistrator>()
+                .add::<LoginPasswordAuthProvider>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add::<CreateAccountUseCaseImpl>()
+                .add::<UpdateAccountUseCaseImpl>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
+                .add_value(predefined_accounts_config);
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -348,8 +457,29 @@ impl DatasetIndexingHarness {
         let search_indexer = catalog.get_one::<SearchIndexer>().unwrap();
         search_indexer.ensure_indexes_exist().await.unwrap();
 
+        // Run predefined accounts registration, if specified
+        if run_predefined_accounts_registration {
+            let predefined_accounts_registrator =
+                catalog.get_one::<PredefinedAccountsRegistrator>().unwrap();
+            predefined_accounts_registrator
+                .run_initialization()
+                .await
+                .unwrap();
+        }
+
         // Run predefined datasets registration, if specified
-        if run_predefined_datasets_registration {
+        if let Some(predefined_datasets_config) = maybe_predefined_datasets_config {
+            let catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(
+                    dataset_base_use_case_harness.no_subject_catalog(),
+                );
+                b.add::<CreateDatasetUseCaseImpl>();
+                b.add::<CreateDatasetUseCaseHelper>();
+                b.add_value(predefined_datasets_config);
+                b.add::<PredefinedDatasetsRegistrator>();
+                b.build()
+            };
+
             let predefined_datasets_registrator =
                 catalog.get_one::<PredefinedDatasetsRegistrator>().unwrap();
             predefined_datasets_registrator
@@ -413,10 +543,10 @@ struct PredefinedDatasetsConfig {
     requires_transaction: true,
 })]
 struct PredefinedDatasetsRegistrator {
-    create_dataset_use_case: Arc<dyn CreateDatasetUseCase>,
     time_source: Arc<dyn SystemTimeSource>,
     config: Arc<PredefinedDatasetsConfig>,
     pausable_outbox: Arc<PausableImmediateOutboxImpl>,
+    catalog: dill::Catalog,
 }
 
 #[async_trait::async_trait]
@@ -427,7 +557,21 @@ impl InitOnStartup for PredefinedDatasetsRegistrator {
 
         // Create predefined datasets in silense
         for alias in &self.config.aliases {
-            self.create_dataset_use_case
+            let user_specific_catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(&self.catalog);
+                if let Some(account_name) = &alias.account_name {
+                    b.add_value(CurrentAccountSubject::new_test_with(&account_name));
+                } else {
+                    b.add_value(CurrentAccountSubject::new_test());
+                }
+                b.build()
+            };
+
+            let create_dataset_use_case = user_specific_catalog
+                .get_one::<dyn CreateDatasetUseCase>()
+                .unwrap();
+
+            create_dataset_use_case
                 .execute(
                     alias,
                     MetadataFactory::metadata_block(

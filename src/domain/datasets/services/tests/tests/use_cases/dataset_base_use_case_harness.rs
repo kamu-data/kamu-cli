@@ -29,6 +29,7 @@ use time_source::*;
 
 pub struct DatasetBaseUseCaseHarness {
     _temp_dir: tempfile::TempDir,
+    no_subject_catalog: Catalog,
     intermediate_catalog: Catalog,
     _did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
@@ -46,7 +47,7 @@ impl DatasetBaseUseCaseHarness {
         let run_info_dir = temp_dir.path().join("run");
         std::fs::create_dir(&run_info_dir).unwrap();
 
-        let intermediate_catalog = {
+        let no_subject_catalog = {
             let mut b = if let Some(base_catalog) = opts.maybe_base_catalog {
                 CatalogBuilder::new_chained(base_catalog)
             } else {
@@ -55,7 +56,6 @@ impl DatasetBaseUseCaseHarness {
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
-                .add_value(CurrentAccountSubject::new_test())
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
@@ -121,6 +121,12 @@ impl DatasetBaseUseCaseHarness {
             b.build()
         };
 
+        let intermediate_catalog = {
+            let mut b = CatalogBuilder::new_chained(&no_subject_catalog);
+            b.add_value(CurrentAccountSubject::new_test());
+            b.build()
+        };
+
         let account_repo = intermediate_catalog
             .get_one::<dyn AccountRepository>()
             .unwrap();
@@ -132,12 +138,17 @@ impl DatasetBaseUseCaseHarness {
             system_time_source: intermediate_catalog.get_one().unwrap(),
             dataset_registry: intermediate_catalog.get_one().unwrap(),
             test_dataset_outbox_listener: intermediate_catalog.get_one().unwrap(),
+            no_subject_catalog,
             intermediate_catalog,
         }
     }
 
     pub fn intermediate_catalog(&self) -> &Catalog {
         &self.intermediate_catalog
+    }
+
+    pub fn no_subject_catalog(&self) -> &Catalog {
+        &self.no_subject_catalog
     }
 
     pub fn system_time_source(&self) -> &dyn SystemTimeSource {
