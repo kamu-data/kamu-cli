@@ -24,6 +24,7 @@ pub trait MoleculeRemoveDataRoomEntryUseCase: Send + Sync {
         molecule_project: &MoleculeProject,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
+        change_by: String,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError>;
 }

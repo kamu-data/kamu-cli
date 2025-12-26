@@ -679,6 +679,7 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         from_path: CollectionPathV2<'static>,
         to_path: CollectionPathV2<'static>,
+        change_by: String,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
@@ -725,6 +726,7 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 from_path.into_v1_scalar().into(),
                 to_path.into_v1_scalar().into(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await
@@ -773,6 +775,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         path: CollectionPathV2<'static>,
+        change_by: String,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
@@ -791,6 +794,7 @@ impl MoleculeDataRoomMutV2 {
                 &self.project.entity,
                 Some(event_time),
                 path.clone().into_v1_scalar().into(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await

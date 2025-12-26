@@ -3380,11 +3380,11 @@ type MoleculeDataRoomMutV2 {
 	"""
 	Moves an entry in the data room.
 	"""
-	moveEntry(fromPath: CollectionPathV2!, toPath: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
+	moveEntry(fromPath: CollectionPathV2!, toPath: CollectionPathV2!, changeBy: String!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
 	"""
 	Removes an entry from the data room.
 	"""
-	removeEntry(path: CollectionPathV2!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
+	removeEntry(path: CollectionPathV2!, changeBy: String!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
 	"""
 	Updates the metadata of a file in the data room.
 	"""
