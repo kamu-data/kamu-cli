@@ -11,7 +11,7 @@ use async_graphql::{Request, Variables};
 use base64::Engine as _;
 use indoc::indoc;
 use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
-use serde_json::json;
+use serde_json::{Value, json};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -187,6 +187,225 @@ pub async fn test_molecule_v2_announcements_quota_exceeded(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_molecule_v2_activity_change_by_for_remove(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    const USER_ACCOUNT: &str = "molecule";
+    const USER_PASSWORD: &str = "molecule.dev";
+    const USER_DID: &str = "did:ethr:0xE2eActivityUser";
+    const ADMIN_DID: &str = "did:ethr:0xE2eActivityAdmin";
+
+    const IPNFT_ADDRESS: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1";
+    const IPNFT_TOKEN_ID: &str = "1300";
+    let ipnft_uid = format!("{IPNFT_ADDRESS}_{IPNFT_TOKEN_ID}");
+
+    let path = "/activity-entry.txt";
+    let tag = "e2e-activity-tag";
+    let category = "e2e-activity-category";
+
+    kamu_api_server_client
+        .auth()
+        .login_with_password(USER_ACCOUNT, USER_PASSWORD)
+        .await;
+
+    // Create project
+    let create_project_res = kamu_api_server_client
+        .graphql_api_call_ex(
+            Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
+                "ipnftSymbol": "activity-remove-e2e",
+                "ipnftUid": ipnft_uid,
+                "ipnftAddress": IPNFT_ADDRESS,
+                "ipnftTokenId": IPNFT_TOKEN_ID,
+            }))),
+        )
+        .await;
+    assert!(
+        create_project_res.errors.is_empty(),
+        "Project creation failed: {create_project_res:?}"
+    );
+    let create_payload = create_project_res
+        .data
+        .clone()
+        .into_json()
+        .unwrap_or_default();
+    assert_eq!(
+        create_payload["molecule"]["v2"]["createProject"]["isSuccess"],
+        json!(true),
+        "{create_payload:?}"
+    );
+
+    // Upload initial file (change_by = user)
+    let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(b"hello world");
+    let upload_res = kamu_api_server_client
+        .graphql_api_call_ex(
+            Request::new(CREATE_VERSIONED_FILE).variables(Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "path": path,
+                "content": encoded,
+                "contentType": "text/plain",
+                "changeBy": USER_DID,
+                "accessLevel": "public",
+                "description": "initial",
+                "categories": [category],
+                "tags": [tag],
+                "contentText": "hello world",
+                "encryptionMetadata": Value::Null,
+            }))),
+        )
+        .await;
+    assert!(
+        upload_res.errors.is_empty(),
+        "Upload mutation failed: {upload_res:?}"
+    );
+    let upload_json = upload_res.data.into_json().unwrap_or_default();
+    let file_ref = upload_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+        ["ref"]
+        .as_str()
+        .expect("ref missing")
+        .to_string();
+
+    // Update metadata (change_by = user)
+    let update_res = kamu_api_server_client
+        .graphql_api_call_ex(
+            Request::new(UPDATE_METADATA_QUERY).variables(Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "ref": file_ref,
+                "expectedHead": Value::Null,
+                "changeBy": USER_DID,
+                "accessLevel": "public",
+                "description": "updated description",
+                "categories": [category],
+                "tags": [tag],
+                "contentText": "updated",
+            }))),
+        )
+        .await;
+    assert!(
+        update_res.errors.is_empty(),
+        "Update metadata failed: {update_res:?}"
+    );
+    let update_json = update_res.data.into_json().unwrap_or_default();
+    assert_eq!(
+        update_json["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"]["isSuccess"],
+        json!(true),
+        "{update_json:?}"
+    );
+
+    // Remove entry with admin changeBy (still authorized as project owner)
+    let remove_res = kamu_api_server_client
+        .graphql_api_call_ex(
+            Request::new(REMOVE_ENTRY_QUERY).variables(Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "path": path,
+                "changeBy": ADMIN_DID,
+            }))),
+        )
+        .await;
+    assert!(
+        remove_res.errors.is_empty(),
+        "Remove entry failed: {remove_res:?}"
+    );
+    let remove_json = remove_res.data.into_json().unwrap_or_default();
+    assert_eq!(
+        remove_json["molecule"]["v2"]["project"]["dataRoom"]["removeEntry"]["isSuccess"],
+        json!(true),
+        "{remove_json:?}"
+    );
+
+    // Project activity (should surface admin changeBy on remove)
+    let project_activity = kamu_api_server_client
+        .graphql_api_call_ex(Request::new(LIST_PROJECT_ACTIVITY_QUERY).variables(
+            Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "filters": {
+                    "byTags": [tag],
+                },
+            })),
+        ))
+        .await;
+    assert!(
+        project_activity.errors.is_empty(),
+        "Project activity query failed: {project_activity:?}"
+    );
+    let project_nodes = project_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+        ["project"]["activity"]["nodes"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        project_nodes.len(),
+        3,
+        "Unexpected project activity: {project_nodes:?}"
+    );
+    assert_eq!(
+        project_nodes[0]["__typename"],
+        json!("MoleculeActivityFileRemovedV2"),
+        "{project_nodes:?}"
+    );
+    assert_eq!(
+        project_nodes[0]["entry"]["changeBy"],
+        json!(ADMIN_DID),
+        "Project remove changeBy mismatch: {project_nodes:?}"
+    );
+    assert_eq!(
+        project_nodes[1]["entry"]["changeBy"],
+        json!(USER_DID),
+        "Update changeBy mismatch: {project_nodes:?}"
+    );
+    assert_eq!(
+        project_nodes[2]["entry"]["changeBy"],
+        json!(USER_DID),
+        "Add changeBy mismatch: {project_nodes:?}"
+    );
+
+    // Global activity should mirror the same changeBy values
+    let global_activity = kamu_api_server_client
+        .graphql_api_call_ex(Request::new(LIST_GLOBAL_ACTIVITY_QUERY).variables(
+            Variables::from_json(json!({
+                "filters": {
+                    "byTags": [tag],
+                },
+            })),
+        ))
+        .await;
+    assert!(
+        global_activity.errors.is_empty(),
+        "Global activity query failed: {global_activity:?}"
+    );
+    let global_nodes = global_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+        ["activity"]["nodes"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        global_nodes.len(),
+        3,
+        "Unexpected global activity: {global_nodes:?}"
+    );
+    assert_eq!(
+        global_nodes[0]["__typename"],
+        json!("MoleculeActivityFileRemovedV2"),
+        "{global_nodes:?}"
+    );
+    assert_eq!(
+        global_nodes[0]["entry"]["changeBy"],
+        json!(ADMIN_DID),
+        "Global remove changeBy mismatch: {global_nodes:?}"
+    );
+    assert_eq!(
+        global_nodes[1]["entry"]["changeBy"],
+        json!(USER_DID),
+        "Global update changeBy mismatch: {global_nodes:?}"
+    );
+    assert_eq!(
+        global_nodes[2]["entry"]["changeBy"],
+        json!(USER_DID),
+        "Global add changeBy mismatch: {global_nodes:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Queries
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -242,6 +461,119 @@ const DATA_ROOM_UPLOAD: &str = indoc!(
     "#
 );
 
+// TODO: find a way to output tags/categories
+const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
+    r#"
+    query ($filters: MoleculeProjectActivityFilters) {
+      molecule {
+        v2 {
+          activity(filters: $filters) {
+            nodes {
+              ... on MoleculeActivityFileAddedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  accessLevel
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityFileUpdatedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  accessLevel
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityFileRemovedV2 {
+                __typename
+                entry {
+                  path
+                  ref
+                  accessLevel
+                  changeBy
+                }
+              }
+              ... on MoleculeActivityAnnouncementV2 {
+                __typename
+                announcement {
+                  id
+                  headline
+                  body
+                  attachments
+                  accessLevel
+                  changeBy
+                  categories
+                  tags
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
+const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
+    r#"
+    query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            activity(filters: $filters) {
+              nodes {
+                ... on MoleculeActivityFileAddedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    accessLevel
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityFileUpdatedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    accessLevel
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityFileRemovedV2 {
+                  __typename
+                  entry {
+                    path
+                    ref
+                    accessLevel
+                    changeBy
+                  }
+                }
+                ... on MoleculeActivityAnnouncementV2 {
+                  __typename
+                  announcement {
+                    id
+                    headline
+                    body
+                    attachments
+                    accessLevel
+                    changeBy
+                    categories
+                    tags
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
@@ -261,6 +593,95 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
                 isSuccess
                 message
                 __typename
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
+const CREATE_VERSIONED_FILE: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              uploadFile(
+                path: $path
+                content: $content
+                contentType: $contentType
+                changeBy: $changeBy
+                accessLevel: $accessLevel
+                description: $description
+                categories: $categories
+                tags: $tags
+                contentText: $contentText
+                encryptionMetadata: $encryptionMetadata
+              ) {
+                isSuccess
+                message
+                ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                  entry {
+                    ref
+                    path
+                    changeBy
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
+const UPDATE_METADATA_QUERY: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              updateFileMetadata(
+                ref: $ref
+                expectedHead: $expectedHead
+                accessLevel: $accessLevel
+                changeBy: $changeBy
+                description: $description
+                categories: $categories
+                tags: $tags
+                contentText: $contentText
+              ) {
+                isSuccess
+                message
+                __typename
+                ... on UpdateVersionErrorCasFailed {
+                    expectedHead
+                    actualHead
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
+
+const REMOVE_ENTRY_QUERY: &str = indoc!(
+    r#"
+    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
+      molecule {
+        v2 {
+          project(ipnftUid: $ipnftUid) {
+            dataRoom {
+              removeEntry(path: $path, changeBy: $changeBy) {
+                isSuccess
+                message
               }
             }
           }

@@ -83,6 +83,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         // For any data room update, we always have two entries: -C and +C.
         let mut nodes = Vec::with_capacity(records.len());
         let mut record_iter = records.into_iter().peekable();
+        let mut last_retract_entry: Option<MoleculeDataRoomEntry> = None;
 
         while let Some(current) = record_iter.next() {
             let (offset, op, entry) =
@@ -117,8 +118,37 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                         MoleculeDataRoomFileActivityType::Added
                     }
                 }
-                OperationType::Retract => MoleculeDataRoomFileActivityType::Removed,
-                OperationType::CorrectTo => MoleculeDataRoomFileActivityType::Updated,
+                OperationType::Retract => {
+                    last_retract_entry = Some(entry.clone());
+                    MoleculeDataRoomFileActivityType::Removed
+                }
+                OperationType::CorrectTo => {
+                    // Ignore synthetic corrections that only change `change_by` right before
+                    // retract
+                    if op == OperationType::CorrectTo {
+                        let next_is_only_change_by_diff = if let Some(next) = record_iter.peek() {
+                            let (_, _, next_entry) =
+                                MoleculeDataRoomEntry::from_changelog_entry_json(
+                                    next.clone(),
+                                    &vocab,
+                                )?;
+
+                            Self::is_only_change_by_diff(&entry, &next_entry)
+                        } else {
+                            false
+                        };
+
+                        let match_retract_system_time = last_retract_entry
+                            .as_ref()
+                            .map(|prev| prev.system_time == entry.system_time)
+                            .unwrap_or(false);
+
+                        if next_is_only_change_by_diff || match_retract_system_time {
+                            continue;
+                        }
+                    }
+                    MoleculeDataRoomFileActivityType::Updated
+                }
                 OperationType::CorrectFrom => {
                     unreachable!()
                 }
@@ -138,6 +168,24 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             total_count: nodes.len(),
             list: nodes,
         })
+    }
+
+    fn is_only_change_by_diff(a: &MoleculeDataRoomEntry, b: &MoleculeDataRoomEntry) -> bool {
+        if a.path != b.path || a.reference != b.reference {
+            return false;
+        }
+
+        let lhs = &a.denormalized_latest_file_info;
+        let rhs = &b.denormalized_latest_file_info;
+
+        lhs.version == rhs.version
+            && lhs.content_type == rhs.content_type
+            && lhs.content_length == rhs.content_length
+            && lhs.content_hash == rhs.content_hash
+            && lhs.access_level == rhs.access_level
+            && lhs.description == rhs.description
+            && lhs.categories == rhs.categories
+            && lhs.tags == rhs.tags
     }
 
     async fn get_announcement_activities_listing(
