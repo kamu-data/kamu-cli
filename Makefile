@@ -438,15 +438,15 @@ codegen-engine-tonic:
 		--tonic_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
-	$(call insert_text_into_beginning, "// Generated with protoc=$(shell protoc --version)", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
-	$(call insert_text_into_beginning, "// Generated with protoc-gen-prost=$(strip $(shell protoc-gen-prost --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
-	$(call insert_text_into_beginning, "// Generated with protoc-gen-tonic=$(strip $(shell protoc-gen-tonic --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc=$(shell protoc --version)", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-prost=$(strip $(shell protoc-gen-prost --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-tonic=$(strip $(shell protoc-gen-tonic --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
 
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.tonic.rs
 
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.tonic.rs")
 
 
 .PHONY: codegen-graphql

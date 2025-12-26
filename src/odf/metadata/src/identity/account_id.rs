@@ -21,11 +21,7 @@ pub const MAX_ACCOUNT_ID_STRING_REPR_LEN: usize = {
     #[cfg(not(feature = "did-pkh"))]
     let b = a;
 
-    if a > b {
-        a
-    } else {
-        b
-    }
+    if a > b { a } else { b }
 };
 
 pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
@@ -39,11 +35,7 @@ pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
     #[cfg(not(feature = "did-pkh"))]
     let b = a;
 
-    if a > b {
-        a
-    } else {
-        b
-    }
+    if a > b { a } else { b }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,10 +316,12 @@ impl utoipa::PartialSchema for AccountID {
                 .examples([
                     json!(AccountID::new_seeded_ed25519(b"account")),
                     #[cfg(feature = "did-pkh")]
-                    json!(AccountID::parse_caip10_account_id(
-                        "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
-                    )
-                    .unwrap()),
+                    json!(
+                        AccountID::parse_caip10_account_id(
+                            "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+                        )
+                        .unwrap()
+                    ),
                 ])
                 .build(),
         )

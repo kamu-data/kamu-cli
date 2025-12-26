@@ -230,11 +230,7 @@ impl<'a> DataSchemaDiff<'a> {
             }
         };
 
-        if eq {
-            None
-        } else {
-            Some(item.clone())
-        }
+        if eq { None } else { Some(item.clone()) }
     }
 
     fn filter_equivalent_type_items(
@@ -290,11 +286,7 @@ impl<'a> DataSchemaDiff<'a> {
             }
         };
 
-        if eq {
-            None
-        } else {
-            Some(type_diff.clone())
-        }
+        if eq { None } else { Some(type_diff.clone()) }
     }
 
     fn is_superset(&self, opts: &DataSchemaCmpOptions) -> bool {
@@ -874,7 +866,7 @@ mod test {
 
         // Both list items optionality and optionality of list field itself changed
         let lhs = DataSchema::new(vec![
-            DataField::list("foo", DataType::u32().optional()).optional()
+            DataField::list("foo", DataType::u32().optional()).optional(),
         ]);
         let rhs = DataSchema::new(vec![DataField::list("foo", DataType::u32())]);
         let diff = DataSchema::diff(&lhs, &rhs);

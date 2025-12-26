@@ -15,8 +15,8 @@ use std::{cmp, fmt, ops};
 
 use super::grammar::Grammar;
 use super::{DatasetRef, DatasetRefAny, DatasetRefRemote};
-use crate::formats::*;
 use crate::DatasetHandle;
+use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Macro helpers
