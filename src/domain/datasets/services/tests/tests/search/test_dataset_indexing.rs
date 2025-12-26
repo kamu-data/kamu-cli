@@ -15,6 +15,7 @@ use database_common::NoOpDatabasePlugin;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_accounts::*;
+use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
@@ -205,7 +206,7 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.catalog, &alias)
+                .create_root_dataset(&harness.system_user_catalog, &alias)
                 .await
                 .dataset_handle
                 .id,
@@ -276,33 +277,11 @@ async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         .build()
         .await;
 
-    let names = vec![("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")];
-    let mut dataset_ids = Vec::with_capacity(names.len());
-    for (account_name, dataset_name) in &names {
-        let account_name = odf::AccountName::new_unchecked(account_name);
-        let user_catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(
-                &harness.dataset_base_use_case_harness.no_subject_catalog(),
-            );
-            b.add_value(CurrentAccountSubject::new_test_with(&account_name));
-            b.build()
-        };
-
-        let alias = odf::DatasetAlias::new(
-            Some(account_name.clone()),
-            odf::DatasetName::new_unchecked(dataset_name),
-        );
-        dataset_ids.push(
-            harness
-                .create_root_dataset(&user_catalog, &alias)
-                .await
-                .dataset_handle
-                .id,
-        );
-    }
+    let dataset_ids = harness
+        .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
+        .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-
     assert_eq!(datasets_index_response.total_hits(), 3);
 
     pretty_assertions::assert_eq!(
@@ -364,7 +343,7 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.catalog, &alias)
+                .create_root_dataset(&harness.system_user_catalog, &alias)
                 .await
                 .dataset_handle
                 .id,
@@ -372,10 +351,14 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
     }
 
     harness
-        .rename_dataset(&harness.catalog, &dataset_ids[1], "beta-renamed")
+        .rename_dataset(
+            &harness.system_user_catalog,
+            &dataset_ids[1],
+            "beta-renamed",
+        )
         .await;
     harness
-        .rename_dataset(&harness.catalog, &dataset_ids[0], "test-alpha")
+        .rename_dataset(&harness.system_user_catalog, &dataset_ids[0], "test-alpha")
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -443,7 +426,7 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.catalog, &alias)
+                .create_root_dataset(&harness.system_user_catalog, &alias)
                 .await
                 .dataset_handle
                 .id,
@@ -452,7 +435,7 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 
     // Delete "beta" dataset
     harness
-        .delete_dataset(&harness.catalog, &dataset_ids[1])
+        .delete_dataset(&harness.system_user_catalog, &dataset_ids[1])
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -491,11 +474,129 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .maybe_predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: ["alice", "bob"]
+                .into_iter()
+                .map(odf::AccountName::new_unchecked)
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .build()
+        .await;
+
+    let dataset_ids = harness
+        .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
+        .await;
+
+    harness.rename_account("alice", "alicia").await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 3);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.ids(),
+        dataset_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+    );
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "alicia/alpha",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "alpha",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                // ID remains the same
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "alicia",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "bob/beta",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "beta",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "bob",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "alicia/gamma",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "gamma",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                // ID remains the same
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "alicia",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .maybe_predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: ["alice", "bob"]
+                .into_iter()
+                .map(odf::AccountName::new_unchecked)
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .build()
+        .await;
+
+    let dataset_ids = harness
+        .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
+        .await;
+
+    harness.delete_account("alice").await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.ids(),
+        vec![dataset_ids[1].to_string()],
+    );
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "bob/beta",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "beta",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+            dataset_search_schema::fields::OWNER_NAME: "bob",
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+        }),]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct DatasetIndexingHarness {
     es_base_harness: ElasticsearchBaseHarness,
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
-    catalog: dill::Catalog,
+    no_subject_catalog: dill::Catalog,
+    system_user_catalog: dill::Catalog,
 }
 
 #[bon]
@@ -519,35 +620,58 @@ impl DatasetIndexingHarness {
             })
             .await;
 
-        let mut b =
-            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog());
-        b.add::<DatasetSearchSchemaProvider>()
-            .add::<DatasetSearchUpdater>();
+        fn build_dataset_indexing_catalog(base: &dill::Catalog) -> dill::Catalog {
+            let mut b = dill::CatalogBuilder::new_chained(base);
 
-        let run_predefined_accounts_registration = maybe_predefined_accounts_config.is_some();
-        if let Some(predefined_accounts_config) = maybe_predefined_accounts_config {
-            b.add::<PredefinedAccountsRegistrator>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<RebacServiceImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add::<CreateAccountUseCaseImpl>()
-                .add::<UpdateAccountUseCaseImpl>()
-                .add_value(DefaultAccountProperties::default())
-                .add_value(DefaultDatasetProperties::default())
-                .add_value(predefined_accounts_config);
+            // Search
+            b.add::<DatasetSearchSchemaProvider>();
+            b.add::<DatasetSearchUpdater>();
+
+            // Supplementary use cases
+            b.add::<DatasetAccountLifecycleHandler>();
+            b.add::<DeleteDatasetUseCaseImpl>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            register_message_dispatcher::<AccountLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+            );
+
+            b.build()
         }
 
-        NoOpDatabasePlugin::init_database_components(&mut b);
+        let no_subject_catalog =
+            build_dataset_indexing_catalog(dataset_base_use_case_harness.no_subject_catalog());
 
-        let catalog = b.build();
+        let system_user_catalog =
+            build_dataset_indexing_catalog(dataset_base_use_case_harness.intermediate_catalog());
 
         // Ensure search indexes exist: this is not a normal startup path,
         //  but tests need it for "predefined" content
-        let search_indexer = catalog.get_one::<SearchIndexer>().unwrap();
+        let search_indexer = system_user_catalog.get_one::<SearchIndexer>().unwrap();
         search_indexer.ensure_indexes_exist().await.unwrap();
 
+        // Force outbox from system user catalog,
+        // so that handlers work on system user's behalf
+        let _ = system_user_catalog.get_one::<dyn Outbox>().unwrap();
+
         // Run predefined accounts registration, if specified
-        if run_predefined_accounts_registration {
+        if let Some(predefined_accounts_config) = maybe_predefined_accounts_config {
+            let catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(&no_subject_catalog);
+                b.add_value(predefined_accounts_config);
+                b.add::<PredefinedAccountsRegistrator>();
+                b.add::<LoginPasswordAuthProvider>();
+                b.add::<RebacServiceImpl>();
+                b.add::<InMemoryRebacRepository>();
+                b.add::<CreateAccountUseCaseImpl>();
+                b.add::<UpdateAccountUseCaseImpl>();
+                b.add_value(DefaultAccountProperties::default());
+                b.add_value(DefaultDatasetProperties::default());
+                b.build()
+            };
+
             let predefined_accounts_registrator =
                 catalog.get_one::<PredefinedAccountsRegistrator>().unwrap();
             predefined_accounts_registrator
@@ -559,9 +683,7 @@ impl DatasetIndexingHarness {
         // Run predefined datasets registration, if specified
         if let Some(predefined_datasets_config) = maybe_predefined_datasets_config {
             let catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(
-                    dataset_base_use_case_harness.no_subject_catalog(),
-                );
+                let mut b = dill::CatalogBuilder::new_chained(&no_subject_catalog);
                 b.add::<CreateDatasetUseCaseImpl>();
                 b.add::<CreateDatasetUseCaseHelper>();
                 b.add_value(predefined_datasets_config);
@@ -578,21 +700,131 @@ impl DatasetIndexingHarness {
         }
 
         // Ensure search indexes are up to date after predefined datasets creation
-        ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
+        ElasticsearchBaseHarness::run_initial_indexing(&system_user_catalog).await;
 
         Self {
             es_base_harness,
             dataset_base_use_case_harness,
-            catalog,
+            no_subject_catalog,
+            system_user_catalog,
         }
     }
 
     #[inline]
-    pub fn fixed_time(&self) -> DateTime<Utc> {
+    fn fixed_time(&self) -> DateTime<Utc> {
         self.es_base_harness.fixed_time()
     }
 
-    pub async fn view_datasets_index(&self) -> SearchTestResponse {
+    async fn create_mt_datasets(
+        &self,
+        account_dataset_names: &[(&str, &str)],
+    ) -> Vec<odf::DatasetID> {
+        let mut dataset_ids = Vec::with_capacity(account_dataset_names.len());
+        for (account_name, dataset_name) in account_dataset_names {
+            let account_name = odf::AccountName::new_unchecked(account_name);
+
+            let user_specific_catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                b.add_value(CurrentAccountSubject::new_test_with(&account_name));
+                b.build()
+            };
+
+            let alias = odf::DatasetAlias::new(
+                Some(account_name.clone()),
+                odf::DatasetName::new_unchecked(dataset_name),
+            );
+            dataset_ids.push(
+                self.create_root_dataset(&user_specific_catalog, &alias)
+                    .await
+                    .dataset_handle
+                    .id,
+            );
+        }
+
+        dataset_ids
+    }
+
+    async fn rename_account(&self, old_name: &str, new_name: &str) {
+        let old_name = odf::AccountName::new_unchecked(old_name);
+        let new_name = odf::AccountName::new_unchecked(new_name);
+
+        // Locate account
+        let account_svc = self
+            .no_subject_catalog
+            .get_one::<dyn AccountService>()
+            .unwrap();
+        let account = account_svc
+            .account_by_name(&old_name)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Prepare updated account
+        let mut updated_account = account.clone();
+        updated_account.display_name = new_name.to_string();
+        updated_account.account_name = new_name;
+
+        // Execute update on user's behalf in authenticated context
+        {
+            let user_specific_catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                b.add_value(CurrentAccountSubject::new_test_with(&old_name));
+                b.add::<AccountAuthorizationHelperImpl>();
+                b.add::<UpdateAccountUseCaseImpl>();
+
+                b.add::<RebacServiceImpl>();
+                b.add::<InMemoryRebacRepository>();
+                b.add_value(DefaultAccountProperties::default());
+                b.add_value(DefaultDatasetProperties::default());
+
+                b.build()
+            };
+
+            let update_account_uc = user_specific_catalog
+                .get_one::<dyn UpdateAccountUseCase>()
+                .unwrap();
+            update_account_uc.execute(&updated_account).await.unwrap();
+        };
+    }
+
+    async fn delete_account(&self, account_name_str: &str) {
+        let account_name = odf::AccountName::new_unchecked(account_name_str);
+
+        // Locate account
+        let account_svc = self
+            .no_subject_catalog
+            .get_one::<dyn AccountService>()
+            .unwrap();
+        let account = account_svc
+            .account_by_name(&account_name)
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Execute deletion on user's behalf in authenticated context
+        {
+            let user_specific_catalog = {
+                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                b.add_value(CurrentAccountSubject::new_test_with(&account_name));
+                b.add::<AccountAuthorizationHelperImpl>();
+                b.add::<DeleteAccountUseCaseImpl>();
+
+                b.add::<RebacServiceImpl>();
+                b.add::<InMemoryRebacRepository>();
+                b.add_value(DefaultAccountProperties::default());
+                b.add_value(DefaultDatasetProperties::default());
+
+                b.build()
+            };
+
+            let delete_account_uc = user_specific_catalog
+                .get_one::<dyn DeleteAccountUseCase>()
+                .unwrap();
+            delete_account_uc.execute(&account).await.unwrap();
+        };
+    }
+
+    async fn view_datasets_index(&self) -> SearchTestResponse {
         self.es_base_harness.es_ctx().refresh_indices().await;
 
         let search_repo = self.es_base_harness.es_ctx().search_repo();

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder};
+use dill::{Catalog, CatalogBuilder, InjectionError};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -170,14 +170,19 @@ impl DatasetBaseUseCaseHarness {
         catalog: &dill::Catalog,
         alias: &odf::DatasetAlias,
     ) -> CreateDatasetResult {
-        let mut b = CatalogBuilder::new_chained(catalog);
-        b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
-        b.add::<CreateDatasetUseCaseHelper>();
-
-        let catalog = b.build();
-        let use_case = catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
+        let use_case = match catalog.get_one::<dyn CreateDatasetFromSnapshotUseCase>() {
+            Ok(use_case) => use_case,
+            Err(InjectionError::Unregistered(_)) => {
+                let mut b = CatalogBuilder::new_chained(catalog);
+                b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+                b.add::<CreateDatasetUseCaseHelper>();
+                let catalog = b.build();
+                catalog
+                    .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+                    .unwrap()
+            }
+            Err(e) => panic!("Failed to get CreateDatasetFromSnapshotUseCase: {e}"),
+        };
 
         use odf::metadata::testing::MetadataFactory;
         let snapshot = MetadataFactory::dataset_snapshot()
@@ -198,14 +203,19 @@ impl DatasetBaseUseCaseHarness {
         alias: &odf::DatasetAlias,
         input_dataset_refs: Vec<odf::DatasetRef>,
     ) -> CreateDatasetResult {
-        let mut b = CatalogBuilder::new_chained(catalog);
-        b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
-        b.add::<CreateDatasetUseCaseHelper>();
-
-        let catalog = b.build();
-        let use_case = catalog
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
+        let use_case = match catalog.get_one::<dyn CreateDatasetFromSnapshotUseCase>() {
+            Ok(use_case) => use_case,
+            Err(InjectionError::Unregistered(_)) => {
+                let mut b = CatalogBuilder::new_chained(catalog);
+                b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
+                b.add::<CreateDatasetUseCaseHelper>();
+                let catalog = b.build();
+                catalog
+                    .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+                    .unwrap()
+            }
+            Err(e) => panic!("Failed to get CreateDatasetFromSnapshotUseCase: {e}"),
+        };
 
         use odf::metadata::testing::MetadataFactory;
         let snapshot = MetadataFactory::dataset_snapshot()
@@ -230,11 +240,16 @@ impl DatasetBaseUseCaseHarness {
         dataset_id: &odf::DatasetID,
         new_name: &str,
     ) {
-        let mut b = CatalogBuilder::new_chained(catalog);
-        b.add::<RenameDatasetUseCaseImpl>();
-
-        let catalog = b.build();
-        let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
+        let use_case = match catalog.get_one::<dyn RenameDatasetUseCase>() {
+            Ok(use_case) => use_case,
+            Err(InjectionError::Unregistered(_)) => {
+                let mut b = CatalogBuilder::new_chained(catalog);
+                b.add::<RenameDatasetUseCaseImpl>();
+                let catalog = b.build();
+                catalog.get_one::<dyn RenameDatasetUseCase>().unwrap()
+            }
+            Err(e) => panic!("Failed to get RenameDatasetUseCase: {e}"),
+        };
 
         use_case
             .execute(
@@ -246,11 +261,16 @@ impl DatasetBaseUseCaseHarness {
     }
 
     pub async fn delete_dataset(&self, catalog: &dill::Catalog, dataset_id: &odf::DatasetID) {
-        let mut b = CatalogBuilder::new_chained(catalog);
-        b.add::<DeleteDatasetUseCaseImpl>();
-
-        let catalog = b.build();
-        let use_case = catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap();
+        let use_case = match catalog.get_one::<dyn DeleteDatasetUseCase>() {
+            Ok(use_case) => use_case,
+            Err(InjectionError::Unregistered(_)) => {
+                let mut b = CatalogBuilder::new_chained(catalog);
+                b.add::<DeleteDatasetUseCaseImpl>();
+                let catalog = b.build();
+                catalog.get_one::<dyn DeleteDatasetUseCase>().unwrap()
+            }
+            Err(e) => panic!("Failed to get DeleteDatasetUseCase: {e}"),
+        };
 
         use_case
             .execute_via_ref(&dataset_id.as_local_ref())
