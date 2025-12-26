@@ -192,7 +192,7 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
 
 #[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_creating_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::builder()
         .ctx(ctx)
         .tenancy_config(TenancyConfig::SingleTenant)
@@ -252,6 +252,95 @@ async fn test_creating_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .maybe_predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: ["alice", "bob"]
+                .into_iter()
+                .map(odf::AccountName::new_unchecked)
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .build()
+        .await;
+
+    let names = vec![("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")];
+    let mut dataset_ids = Vec::with_capacity(names.len());
+    for (account_name, dataset_name) in &names {
+        let account_name = odf::AccountName::new_unchecked(account_name);
+        let user_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(
+                &harness.dataset_base_use_case_harness.no_subject_catalog(),
+            );
+            b.add_value(CurrentAccountSubject::new_test_with(&account_name));
+            b.build()
+        };
+
+        let alias = odf::DatasetAlias::new(
+            Some(account_name.clone()),
+            odf::DatasetName::new_unchecked(dataset_name),
+        );
+        dataset_ids.push(
+            harness
+                .create_root_dataset(&user_catalog, &alias)
+                .await
+                .dataset_handle
+                .id,
+        );
+    }
+
+    let datasets_index_response = harness.view_datasets_index().await;
+
+    assert_eq!(datasets_index_response.total_hits(), 3);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.ids(),
+        dataset_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+    );
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "alice/alpha",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "alpha",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "alice",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "bob/beta",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "beta",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "bob",
+                dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            }),
+            serde_json::json!({
+                dataset_search_schema::fields::ALIAS: "alice/gamma",
+                dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                dataset_search_schema::fields::DATASET_NAME: "gamma",
+                dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_NAME: "alice",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             }),
         ]
