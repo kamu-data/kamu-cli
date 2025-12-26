@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::datasource::file_format::file_compression_type::FileCompressionType;
@@ -35,9 +34,7 @@ impl ReaderCsv {
         conf: odf::metadata::ReadStepCsv,
     ) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
-                .await?
-                .map(Arc::new),
+            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
             conf,
         })
@@ -132,6 +129,7 @@ impl Reader for ReaderCsv {
             // TODO: Expose in ODF
             newlines_in_values: false,
             null_regex: None,
+            truncated_rows: false,
         };
 
         let df = self
