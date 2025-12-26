@@ -133,7 +133,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                                     &vocab,
                                 )?;
 
-                            Self::is_only_change_by_diff(&entry, &next_entry)
+                            entry.is_only_change_by_diff(&next_entry)
                         } else {
                             false
                         };
@@ -168,24 +168,6 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             total_count: nodes.len(),
             list: nodes,
         })
-    }
-
-    fn is_only_change_by_diff(a: &MoleculeDataRoomEntry, b: &MoleculeDataRoomEntry) -> bool {
-        if a.path != b.path || a.reference != b.reference {
-            return false;
-        }
-
-        let lhs = &a.denormalized_latest_file_info;
-        let rhs = &b.denormalized_latest_file_info;
-
-        lhs.version == rhs.version
-            && lhs.content_type == rhs.content_type
-            && lhs.content_length == rhs.content_length
-            && lhs.content_hash == rhs.content_hash
-            && lhs.access_level == rhs.access_level
-            && lhs.description == rhs.description
-            && lhs.categories == rhs.categories
-            && lhs.tags == rhs.tags
     }
 
     async fn get_announcement_activities_listing(
