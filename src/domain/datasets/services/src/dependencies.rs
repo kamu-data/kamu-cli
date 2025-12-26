@@ -15,6 +15,9 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
+    b.add::<DatasetSearchSchemaProvider>();
+    b.add::<DatasetSearchUpdater>();
+
     if needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();

@@ -63,6 +63,7 @@ async fn test_subscription_scheduled_on_dataset_update() {
         .post_message(
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
             DatasetReferenceMessage::updated(
+                Utc::now(),
                 &dataset_id,
                 &odf::BlockRef::Head,
                 Some(&old_hash),
@@ -125,6 +126,7 @@ async fn test_subscriptions_in_different_statuses() {
         .post_message(
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
             DatasetReferenceMessage::updated(
+                Utc::now(),
                 &dataset_id,
                 &odf::BlockRef::Head,
                 Some(&old_hash),
@@ -163,6 +165,7 @@ async fn test_update_in_wrong_dataset() {
         .post_message(
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
             DatasetReferenceMessage::updated(
+                Utc::now(),
                 &dataset_id_2,
                 &odf::BlockRef::Head,
                 Some(&old_hash),
@@ -210,6 +213,7 @@ async fn test_subscription_non_matching_event_type() {
         .post_message(
             MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
             DatasetReferenceMessage::updated(
+                Utc::now(),
                 &dataset_id,
                 &odf::BlockRef::Head,
                 Some(&old_hash),

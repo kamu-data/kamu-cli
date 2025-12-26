@@ -23,6 +23,7 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         account: &Account,
         password: &Password,
+        quiet: bool,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(

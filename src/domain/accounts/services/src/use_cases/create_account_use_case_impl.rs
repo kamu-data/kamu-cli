@@ -115,8 +115,10 @@ impl CreateAccountUseCaseImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
                 AccountLifecycleMessage::created(
+                    new_account.registered_at,
                     new_account.id.clone(),
                     new_account.email.clone(),
+                    new_account.account_name.clone(),
                     new_account.display_name.clone(),
                 ),
             )
@@ -132,8 +134,13 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         &self,
         account: &Account,
         password: &Password,
+        quiet: bool,
     ) -> Result<Account, CreateAccountError> {
         self.save_account(account, password).await?;
+
+        if !quiet {
+            self.notify_account_created(account).await?;
+        }
 
         Ok(account.clone())
     }
