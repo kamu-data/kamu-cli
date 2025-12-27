@@ -43,7 +43,7 @@ regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
 async-graphql = { version = "7", default-features = false }
-base64 = { version = "0.21", default-features = false, features = ["std"] }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "50", default-features = false, features = [] }
 indoc = "2"

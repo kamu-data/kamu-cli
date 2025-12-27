@@ -16,11 +16,7 @@ pub struct Grammar;
 /// See: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
 impl Grammar {
     fn match_non_eof(s: &str) -> Option<(&str, &str)> {
-        if s.is_empty() {
-            None
-        } else {
-            Some(("", s))
-        }
+        if s.is_empty() { None } else { Some(("", s)) }
     }
 
     fn match_zero_or_many(
