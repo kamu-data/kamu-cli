@@ -19,9 +19,10 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
-## Unreleased
+## [0.255.0] - 2025-12-22
 ### Added
 - Support for re-defining the `AddPushSource`
+- New migrations to add account quotas table
 ### Changed
 - GQL: `byIds` and `byRefs` endpoints will return results in the same order as inputs (including duplicates) to allow `zip`'ing them on the client side
 - Schema nullability coercion now works for `List` field elements
