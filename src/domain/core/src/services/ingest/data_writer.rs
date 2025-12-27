@@ -97,11 +97,13 @@ pub struct WriteDataResult {
 #[derive(Debug)]
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
-    /// Set when `SetDataSchema` event needs to be committed
+    /// Set when the [`SetDataSchema`](odf::schema::DataSchema) event needs to
+    /// be committed
     pub new_schema: Option<odf::schema::DataSchema>,
-    /// Set when `AddData` event needs to be committed
+    /// Set when the [`AddData`](odf::dataset::AddDataParams) event needs to be
+    /// committed
     pub add_data: Option<odf::dataset::AddDataParams>,
-    /// Set when commmit will contains some data
+    /// Set when the commit will contain some data
     pub data_file: Option<OwnedFile>,
 }
 

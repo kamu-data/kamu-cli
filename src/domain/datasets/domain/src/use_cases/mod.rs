@@ -7,24 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod append_dataset_metadata_batch_use_case;
-mod commit_dataset_event_use_case;
-mod create_dataset_from_snapshot_use_case;
-mod create_dataset_use_case;
-mod delete_dataset_use_case;
-mod get_dataset_downstream_dependencies_use_case;
-mod get_dataset_upstream_dependencies_use_case;
-mod rename_dataset_use_case;
-mod update_collection_entries_use_case;
-mod update_version_file_use_case;
+mod collections;
+mod datasets;
+mod versioned_files;
 
-pub use append_dataset_metadata_batch_use_case::*;
-pub use commit_dataset_event_use_case::*;
-pub use create_dataset_from_snapshot_use_case::*;
-pub use create_dataset_use_case::*;
-pub use delete_dataset_use_case::*;
-pub use get_dataset_downstream_dependencies_use_case::*;
-pub use get_dataset_upstream_dependencies_use_case::*;
-pub use rename_dataset_use_case::*;
-pub use update_collection_entries_use_case::*;
-pub use update_version_file_use_case::*;
+pub use collections::*;
+pub use datasets::*;
+pub use versioned_files::*;

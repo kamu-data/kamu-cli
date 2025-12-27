@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::CreateDatasetResult;
@@ -91,23 +92,53 @@ impl std::fmt::Debug for ResolvedDataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WriteCheckedDataset<'a>(pub &'a ResolvedDataset);
+#[derive(Clone)]
+pub struct WriteCheckedDataset<'a>(Cow<'a, ResolvedDataset>);
+
+impl WriteCheckedDataset<'_> {
+    pub fn from_ref(dataset: &ResolvedDataset) -> WriteCheckedDataset<'_> {
+        WriteCheckedDataset(Cow::Borrowed(dataset))
+    }
+
+    pub fn from_owned(dataset: ResolvedDataset) -> WriteCheckedDataset<'static> {
+        WriteCheckedDataset(Cow::Owned(dataset))
+    }
+
+    pub fn into_inner(self) -> ResolvedDataset {
+        self.0.into_owned()
+    }
+}
 
 impl std::ops::Deref for WriteCheckedDataset<'_> {
     type Target = ResolvedDataset;
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.0.as_ref()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReadCheckedDataset<'a>(pub &'a ResolvedDataset);
+#[derive(Clone)]
+pub struct ReadCheckedDataset<'a>(Cow<'a, ResolvedDataset>);
+
+impl ReadCheckedDataset<'_> {
+    pub fn from_ref(dataset: &ResolvedDataset) -> ReadCheckedDataset<'_> {
+        ReadCheckedDataset(Cow::Borrowed(dataset))
+    }
+
+    pub fn from_owned(dataset: ResolvedDataset) -> ReadCheckedDataset<'static> {
+        ReadCheckedDataset(Cow::Owned(dataset))
+    }
+
+    pub fn into_inner(self) -> ResolvedDataset {
+        self.0.into_owned()
+    }
+}
 
 impl std::ops::Deref for ReadCheckedDataset<'_> {
     type Target = ResolvedDataset;
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.0.as_ref()
     }
 }
 

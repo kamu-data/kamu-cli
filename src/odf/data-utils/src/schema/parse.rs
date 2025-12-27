@@ -32,12 +32,7 @@ use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 pub fn parse_ddl_to_odf_schema(
     ddl: &str,
 ) -> Result<odf_metadata::schema::DataSchema, odf_metadata::UnsupportedSchema> {
-    use datafusion::sql::sqlparser::ast::{
-        ColumnOption,
-        ColumnOptionDef,
-        DataType as SqlDataType,
-        Statement,
-    };
+    use datafusion::sql::sqlparser::ast::{ColumnOption, ColumnOptionDef, Statement};
     use odf_metadata::schema::*;
 
     let sql = format!("create table x ({ddl})");
@@ -53,121 +48,7 @@ pub fn parse_ddl_to_odf_schema(
     let mut fields = Vec::new();
 
     for col in create_table.columns {
-        let mut data_type = match col.data_type {
-            SqlDataType::Bool | SqlDataType::Boolean => DataType::bool().optional(),
-            SqlDataType::Signed
-            | SqlDataType::SignedInteger
-            | SqlDataType::Int(_)
-            | SqlDataType::Integer(_)
-            | SqlDataType::Int32 => DataType::i32().optional(),
-            SqlDataType::IntegerUnsigned(_)
-            | SqlDataType::IntUnsigned(_)
-            | SqlDataType::Unsigned
-            | SqlDataType::UnsignedInteger
-            | SqlDataType::UInt32 => DataType::u32().optional(),
-            SqlDataType::BigInt(_) => DataType::i64().optional(),
-            SqlDataType::BigIntUnsigned(_) => DataType::u64().optional(),
-            SqlDataType::Float(_) | SqlDataType::Float32 => DataType::f32().optional(),
-            SqlDataType::Double(_) => DataType::f64().optional(),
-            SqlDataType::Date => DataType::date(),
-            SqlDataType::Timestamp(_, _) => DataType::timestamp_millis_utc().optional(),
-            SqlDataType::String(_)
-            | SqlDataType::Varchar(_)
-            | SqlDataType::Text
-            | SqlDataType::TinyText
-            | SqlDataType::MediumText
-            | SqlDataType::LongText
-            | SqlDataType::FixedString(_) => DataType::string().optional(),
-            SqlDataType::Table(_)
-            | SqlDataType::Character(_)
-            | SqlDataType::Char(_)
-            | SqlDataType::CharacterVarying(_)
-            | SqlDataType::CharVarying(_)
-            | SqlDataType::Nvarchar(_)
-            | SqlDataType::Uuid
-            | SqlDataType::CharacterLargeObject(_)
-            | SqlDataType::CharLargeObject(_)
-            | SqlDataType::Clob(_)
-            | SqlDataType::Binary(_)
-            | SqlDataType::Varbinary(_)
-            | SqlDataType::Blob(_)
-            | SqlDataType::TinyBlob
-            | SqlDataType::MediumBlob
-            | SqlDataType::LongBlob
-            | SqlDataType::Bytes(_)
-            | SqlDataType::Numeric(_)
-            | SqlDataType::Decimal(_)
-            | SqlDataType::BigNumeric(_)
-            | SqlDataType::BigDecimal(_)
-            | SqlDataType::Dec(_)
-            | SqlDataType::TinyInt(_)
-            | SqlDataType::TinyIntUnsigned(_)
-            | SqlDataType::UTinyInt
-            | SqlDataType::Int2(_)
-            | SqlDataType::Int2Unsigned(_)
-            | SqlDataType::SmallInt(_)
-            | SqlDataType::SmallIntUnsigned(_)
-            | SqlDataType::USmallInt
-            | SqlDataType::MediumInt(_)
-            | SqlDataType::MediumIntUnsigned(_)
-            | SqlDataType::Int4(_)
-            | SqlDataType::Int8(_)
-            | SqlDataType::Int16
-            | SqlDataType::Int64
-            | SqlDataType::Int128
-            | SqlDataType::Int256
-            | SqlDataType::Int4Unsigned(_)
-            | SqlDataType::UInt8
-            | SqlDataType::UInt16
-            | SqlDataType::UInt64
-            | SqlDataType::UInt128
-            | SqlDataType::UInt256
-            | SqlDataType::Int8Unsigned(_)
-            | SqlDataType::Float4
-            | SqlDataType::Float64
-            | SqlDataType::Real
-            | SqlDataType::Float8
-            | SqlDataType::DoublePrecision
-            | SqlDataType::Date32
-            | SqlDataType::Time(_, _)
-            | SqlDataType::Datetime(_)
-            | SqlDataType::Datetime64(_, _)
-            | SqlDataType::Interval
-            | SqlDataType::JSON
-            | SqlDataType::JSONB
-            | SqlDataType::Regclass
-            | SqlDataType::Bytea
-            | SqlDataType::Bit(_)
-            | SqlDataType::BitVarying(_)
-            | SqlDataType::VarBit(_)
-            | SqlDataType::Custom(_, _)
-            | SqlDataType::Array(_)
-            | SqlDataType::Map(_, _)
-            | SqlDataType::Tuple(_)
-            | SqlDataType::Nested(_)
-            | SqlDataType::Enum(_, _)
-            | SqlDataType::Set(_)
-            | SqlDataType::Struct(_, _)
-            | SqlDataType::Union(_)
-            | SqlDataType::Nullable(_)
-            | SqlDataType::LowCardinality(_)
-            | SqlDataType::Unspecified
-            | SqlDataType::Trigger
-            | SqlDataType::AnyType
-            | SqlDataType::GeometricType(_)
-            | SqlDataType::NamedTable { .. }
-            | SqlDataType::HugeInt
-            | SqlDataType::UHugeInt
-            | SqlDataType::UBigInt
-            | SqlDataType::TimestampNtz
-            | SqlDataType::TsVector
-            | SqlDataType::TsQuery => {
-                return Err(UnsupportedSchema::new(format!(
-                    "Unsupported SQL type when converting to ODF schema: {}",
-                    col.data_type
-                )));
-            }
-        };
+        let mut data_type = convert_sql_to_odf_data_type(&col.data_type)?;
 
         for opt in col.options {
             data_type = match opt {
@@ -187,6 +68,145 @@ pub fn parse_ddl_to_odf_schema(
     }
 
     Ok(DataSchema::new(fields))
+}
+
+fn convert_sql_to_odf_data_type(
+    data_type: &datafusion::sql::sqlparser::ast::DataType,
+) -> Result<odf_metadata::schema::DataType, odf_metadata::UnsupportedSchema> {
+    use datafusion::sql::sqlparser::ast::{ArrayElemTypeDef, DataType as SqlDataType};
+    use odf_metadata::schema::*;
+
+    let res = match data_type {
+        SqlDataType::Bool | SqlDataType::Boolean => DataType::bool().optional(),
+        SqlDataType::Signed
+        | SqlDataType::SignedInteger
+        | SqlDataType::Int(_)
+        | SqlDataType::Integer(_)
+        | SqlDataType::Int32 => DataType::i32().optional(),
+        SqlDataType::IntegerUnsigned(_)
+        | SqlDataType::IntUnsigned(_)
+        | SqlDataType::Unsigned
+        | SqlDataType::UnsignedInteger
+        | SqlDataType::UInt32 => DataType::u32().optional(),
+        SqlDataType::BigInt(_) => DataType::i64().optional(),
+        SqlDataType::BigIntUnsigned(_) => DataType::u64().optional(),
+        SqlDataType::Float(_) | SqlDataType::Float32 => DataType::f32().optional(),
+        SqlDataType::Double(_) => DataType::f64().optional(),
+        SqlDataType::Date => DataType::date(),
+        SqlDataType::Timestamp(_, _) => DataType::timestamp_millis_utc().optional(),
+        SqlDataType::String(_)
+        | SqlDataType::Varchar(_)
+        | SqlDataType::Text
+        | SqlDataType::TinyText
+        | SqlDataType::MediumText
+        | SqlDataType::LongText
+        | SqlDataType::FixedString(_) => DataType::string().optional(),
+        SqlDataType::Array(elem_type) => {
+            let inner = match elem_type {
+                ArrayElemTypeDef::AngleBracket(elem_type) => {
+                    convert_sql_to_odf_data_type(elem_type)?
+                }
+                ArrayElemTypeDef::None
+                | ArrayElemTypeDef::SquareBracket(_, _)
+                | ArrayElemTypeDef::Parenthesis(_) => {
+                    return Err(UnsupportedSchema::new(format!(
+                        "Unsupported SQL type when converting to ODF schema: {data_type}"
+                    )));
+                }
+            };
+
+            DataType::list(inner).optional()
+        }
+        SqlDataType::Table(_)
+        | SqlDataType::Character(_)
+        | SqlDataType::Char(_)
+        | SqlDataType::CharacterVarying(_)
+        | SqlDataType::CharVarying(_)
+        | SqlDataType::Nvarchar(_)
+        | SqlDataType::Uuid
+        | SqlDataType::CharacterLargeObject(_)
+        | SqlDataType::CharLargeObject(_)
+        | SqlDataType::Clob(_)
+        | SqlDataType::Binary(_)
+        | SqlDataType::Varbinary(_)
+        | SqlDataType::Blob(_)
+        | SqlDataType::TinyBlob
+        | SqlDataType::MediumBlob
+        | SqlDataType::LongBlob
+        | SqlDataType::Bytes(_)
+        | SqlDataType::Numeric(_)
+        | SqlDataType::Decimal(_)
+        | SqlDataType::BigNumeric(_)
+        | SqlDataType::BigDecimal(_)
+        | SqlDataType::Dec(_)
+        | SqlDataType::TinyInt(_)
+        | SqlDataType::TinyIntUnsigned(_)
+        | SqlDataType::UTinyInt
+        | SqlDataType::Int2(_)
+        | SqlDataType::Int2Unsigned(_)
+        | SqlDataType::SmallInt(_)
+        | SqlDataType::SmallIntUnsigned(_)
+        | SqlDataType::USmallInt
+        | SqlDataType::MediumInt(_)
+        | SqlDataType::MediumIntUnsigned(_)
+        | SqlDataType::Int4(_)
+        | SqlDataType::Int8(_)
+        | SqlDataType::Int16
+        | SqlDataType::Int64
+        | SqlDataType::Int128
+        | SqlDataType::Int256
+        | SqlDataType::Int4Unsigned(_)
+        | SqlDataType::UInt8
+        | SqlDataType::UInt16
+        | SqlDataType::UInt64
+        | SqlDataType::UInt128
+        | SqlDataType::UInt256
+        | SqlDataType::Int8Unsigned(_)
+        | SqlDataType::Float4
+        | SqlDataType::Float64
+        | SqlDataType::Real
+        | SqlDataType::Float8
+        | SqlDataType::DoublePrecision
+        | SqlDataType::Date32
+        | SqlDataType::Time(_, _)
+        | SqlDataType::Datetime(_)
+        | SqlDataType::Datetime64(_, _)
+        | SqlDataType::Interval
+        | SqlDataType::JSON
+        | SqlDataType::JSONB
+        | SqlDataType::Regclass
+        | SqlDataType::Bytea
+        | SqlDataType::Bit(_)
+        | SqlDataType::BitVarying(_)
+        | SqlDataType::VarBit(_)
+        | SqlDataType::Custom(_, _)
+        | SqlDataType::Map(_, _)
+        | SqlDataType::Tuple(_)
+        | SqlDataType::Nested(_)
+        | SqlDataType::Enum(_, _)
+        | SqlDataType::Set(_)
+        | SqlDataType::Struct(_, _)
+        | SqlDataType::Union(_)
+        | SqlDataType::Nullable(_)
+        | SqlDataType::LowCardinality(_)
+        | SqlDataType::Unspecified
+        | SqlDataType::Trigger
+        | SqlDataType::AnyType
+        | SqlDataType::GeometricType(_)
+        | SqlDataType::NamedTable { .. }
+        | SqlDataType::HugeInt
+        | SqlDataType::UHugeInt
+        | SqlDataType::UBigInt
+        | SqlDataType::TimestampNtz
+        | SqlDataType::TsVector
+        | SqlDataType::TsQuery => {
+            return Err(UnsupportedSchema::new(format!(
+                "Unsupported SQL type when converting to ODF schema: {data_type}"
+            )));
+        }
+    };
+
+    Ok(res)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

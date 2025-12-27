@@ -5159,6 +5159,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "format-utils"
+version = "0.255.0"
+dependencies = [
+ "pretty_assertions",
+]
+
+[[package]]
 name = "fraction"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6776,6 +6783,8 @@ dependencies = [
  "itertools 0.14.0",
  "kamu",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
@@ -6829,6 +6838,7 @@ dependencies = [
  "crypto-utils",
  "database-common",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "jsonwebtoken",
@@ -6842,6 +6852,7 @@ dependencies = [
  "reusable",
  "secrecy",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.27.2",
@@ -6859,6 +6870,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -6904,11 +6916,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -6925,6 +6939,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "kamu-accounts",
  "kamu-accounts-services",
@@ -6947,6 +6962,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "event-sourcing",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
@@ -6956,7 +6972,6 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
- "kamu-datasets",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -6984,11 +6999,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -7209,6 +7226,8 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
@@ -7686,6 +7705,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-openai",
  "kamu-search-qdrant",
@@ -7825,6 +7845,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.255.0"
 dependencies = [
  "async-graphql",
+ "base64",
  "chrono",
  "database-common",
  "datafusion",
@@ -7898,7 +7919,9 @@ dependencies = [
  "file-utils",
  "futures",
  "internal-error",
+ "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "mockall",
  "object_store",
  "opendatafabric",
@@ -7947,12 +7970,16 @@ dependencies = [
  "chrono",
  "crypto-utils",
  "database-common",
+ "derive_more",
  "file-utils",
+ "format-utils",
  "futures",
  "internal-error",
+ "kamu-accounts",
  "merge",
  "messaging-outbox",
  "mockall",
+ "nonempty",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -7963,6 +7990,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "urlencoding",
  "uuid",
 ]
 
@@ -8067,20 +8095,25 @@ dependencies = [
  "nutype",
  "oop",
  "opendatafabric",
+ "paste",
  "petgraph 0.8.3",
  "pretty_assertions",
+ "rstest",
  "s3-utils",
  "secrecy",
  "serde",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-log",
+ "test-utils",
  "thiserror 2.0.17",
  "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
  "url",
+ "urlencoding",
  "uuid",
 ]
 
@@ -8377,6 +8410,65 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-molecule-domain"
+version = "0.255.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "file-utils",
+ "format-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.255.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "file-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-molecule-domain",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.17",
+ "time-source",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -9507,6 +9599,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "nonempty"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
 
 [[package]]
 name = "nu-ansi-term"
@@ -11566,6 +11664,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "replace_with"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11790,6 +11894,32 @@ dependencies = [
  "num-traits",
  "serde",
  "smallvec",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.111",
+ "unicode-ident",
 ]
 
 [[package]]

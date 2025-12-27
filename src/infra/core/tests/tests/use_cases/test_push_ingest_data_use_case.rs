@@ -14,8 +14,16 @@ use bytes::Bytes;
 use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    QuotaDefaultsConfig,
+};
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,6 +193,7 @@ async fn test_push_ingest_data_execute_multi() {
             old_head,
             new_head,
             num_blocks,
+            system_time: _,
         } => {
             assert_eq!(old_head, initial_head);
             assert_ne!(new_head, old_head);
@@ -229,6 +238,14 @@ impl PushIngestDataUseCaseHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(QuotaDefaultsConfig::default())
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();
