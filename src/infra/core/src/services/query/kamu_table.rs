@@ -190,6 +190,7 @@ impl KamuTable {
             parquet_pruning: None,
             skip_metadata: None,
             file_decryption_properties: None,
+            metadata_size_hint: None,
         };
 
         use datafusion::execution::context::DataFilePaths;

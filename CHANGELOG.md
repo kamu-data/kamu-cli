@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unrelease
+### Changed
+- Upgraded core to `datafusion v51`
+- Upgraded to `kamu-engine-datafusion v0.9.0` based on latest `datafusion`
+
 ## [0.255.0] - 2025-12-22
 ### Added
 - Support for re-defining the `AddPushSource`

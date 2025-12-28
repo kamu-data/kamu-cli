@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
@@ -31,9 +30,7 @@ impl ReaderParquet {
         conf: odf::metadata::ReadStepParquet,
     ) -> Result<Self, ReadError> {
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref())
-                .await?
-                .map(Arc::new),
+            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
         })
     }
@@ -57,6 +54,7 @@ impl Reader for ReaderParquet {
             skip_metadata: None,
             file_sort_order: Vec::new(),
             file_decryption_properties: None,
+            metadata_size_hint: None,
         };
 
         let df = self
