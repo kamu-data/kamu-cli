@@ -9,8 +9,10 @@
 
 #![feature(error_generic_member_access)]
 
+mod domain;
 mod repos;
 mod services;
 
+pub use domain::*;
 pub use repos::*;
 pub use services::*;

@@ -108,7 +108,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
             }
 
             AccountLifecycleMessage::Created(_)
-            | AccountLifecycleMessage::Renamed(_)
+            | AccountLifecycleMessage::Updated(_)
             | AccountLifecycleMessage::PasswordChanged(_) => {
                 // No action required
                 Ok(())

@@ -55,7 +55,7 @@ axum-extra = { version = "0.10", features = [
 async-trait = "0.1"
 base64 = { version = "0.22", default-features = false }
 bytes = "1"
-canonical_json = { version = "0.5.0", default-features = false }
+canonical_json = { version = "0.5", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 datafusion = { version = "50", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = { version = "0.14", default-features = false }

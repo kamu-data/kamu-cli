@@ -174,6 +174,11 @@ impl AccountConfig {
         self
     }
 
+    pub fn set_registered_at(mut self, registered_at: DateTime<Utc>) -> Self {
+        self.registered_at = registered_at;
+        self
+    }
+
     pub fn get_id(&self) -> odf::AccountID {
         if let Some(id) = &self.id {
             id.clone()

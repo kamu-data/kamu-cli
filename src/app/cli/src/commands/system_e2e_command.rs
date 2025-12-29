@@ -83,7 +83,7 @@ impl Command for SystemE2ECommand {
                     let account = (&account_config).into();
 
                     self.create_account_use_case
-                        .execute(&account, &account_config.password)
+                        .execute(&account, &account_config.password, true /* quiet */)
                         .await
                         .int_err()?;
 

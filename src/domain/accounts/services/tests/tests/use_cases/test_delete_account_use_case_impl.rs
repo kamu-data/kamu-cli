@@ -13,6 +13,8 @@ use std::sync::Arc;
 use kamu_accounts::*;
 use messaging_outbox::{MockOutbox, Outbox};
 
+use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const ADMIN: &str = "admin";
@@ -34,7 +36,10 @@ async fn test_delete_own_account() {
     let regular_user_account = harness.get_account_by_name(&REGULAR_USER).await;
 
     assert_matches!(
-        harness.use_case.execute(&regular_user_account).await,
+        harness
+            .delete_account_use_case
+            .execute(&regular_user_account)
+            .await,
         Ok(())
     );
 
@@ -42,7 +47,10 @@ async fn test_delete_own_account() {
 
     // Idempotence
     assert_matches!(
-        harness.use_case.execute(&regular_user_account).await,
+        harness
+            .delete_account_use_case
+            .execute(&regular_user_account)
+            .await,
         Ok(())
     );
 }
@@ -61,7 +69,10 @@ async fn test_admin_delete_other_account() {
     let regular_user_account = harness.get_account_by_name(&REGULAR_USER).await;
 
     assert_matches!(
-        harness.use_case.execute(&regular_user_account).await,
+        harness
+            .delete_account_use_case
+            .execute(&regular_user_account)
+            .await,
         Ok(())
     );
 
@@ -69,7 +80,10 @@ async fn test_admin_delete_other_account() {
 
     // Idempotence
     assert_matches!(
-        harness.use_case.execute(&regular_user_account).await,
+        harness
+            .delete_account_use_case
+            .execute(&regular_user_account)
+            .await,
         Ok(())
     );
 }
@@ -87,7 +101,7 @@ async fn test_anonymous_try_to_delete_account() {
     let regular_user_account = harness.get_account_by_name(&REGULAR_USER).await;
 
     assert_matches!(
-        harness.use_case.execute(&regular_user_account).await,
+        harness.delete_account_use_case.execute(&regular_user_account).await,
         Err(DeleteAccountError::Access(odf::AccessError::Unauthenticated(e)))
             if e.to_string() == format!("Anonymous is not authorized to delete account '{REGULAR_USER}'")
     );
@@ -106,7 +120,7 @@ async fn test_non_admin_try_to_delete_other_account() {
     let admin_user_account = harness.get_account_by_name(&ADMIN).await;
 
     assert_matches!(
-        harness.use_case.execute(&admin_user_account).await,
+        harness.delete_account_use_case.execute(&admin_user_account).await,
         Err(DeleteAccountError::Access(odf::AccessError::Unauthenticated(e)))
             if e.to_string() == format!("Account '{REGULAR_USER}' is not authorized to delete account '{ADMIN}'")
     );
@@ -114,15 +128,14 @@ async fn test_non_admin_try_to_delete_other_account() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct DeleteAccountUseCaseImplHarness {
-    use_case: Arc<dyn DeleteAccountUseCase>,
-    account_service: Arc<dyn AccountService>,
+    account_base_harness: AccountBaseUseCaseHarness,
+    delete_account_use_case: Arc<dyn DeleteAccountUseCase>,
 }
 
 impl DeleteAccountUseCaseImplHarness {
     async fn new(current_account_subject: CurrentAccountSubject, outbox: MockOutbox) -> Self {
-        let mut b = dill::CatalogBuilder::new();
-
         let predefined_account_config = {
             let mut p = PredefinedAccountsConfig::new();
             p.predefined = vec![
@@ -133,25 +146,16 @@ impl DeleteAccountUseCaseImplHarness {
             p
         };
 
-        b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
-        b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
-        b.add::<kamu_accounts_services::AccountServiceImpl>();
-        b.add::<kamu_accounts_services::DeleteAccountUseCaseImpl>();
-        b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
-        b.add::<kamu_accounts_services::PredefinedAccountsRegistrator>();
-        b.add::<kamu_accounts_services::UpdateAccountUseCaseImpl>();
-        b.add::<kamu_accounts_services::CreateAccountUseCaseImpl>();
-        b.add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>();
-        b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
-        b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
+        let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
+            maybe_predefined_accounts_config: Some(predefined_account_config),
+            ..Default::default()
+        });
+
+        let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
+
         b.add_value(outbox);
         b.bind::<dyn Outbox, MockOutbox>();
-        b.add::<time_source::SystemTimeSourceDefault>();
-        b.add_value(DidSecretEncryptionConfig::sample());
         b.add_value(current_account_subject);
-        b.add_value(kamu_auth_rebac_services::DefaultAccountProperties::default());
-        b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default());
-        b.add_value(predefined_account_config);
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -160,25 +164,9 @@ impl DeleteAccountUseCaseImplHarness {
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
-            use_case: catalog.get_one().unwrap(),
-            account_service: catalog.get_one().unwrap(),
+            account_base_harness,
+            delete_account_use_case: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn get_account_by_name(&self, account_name: &impl AsRef<str>) -> Account {
-        self.account_service
-            .account_by_name(&odf::AccountName::new_unchecked(account_name))
-            .await
-            .unwrap()
-            .unwrap()
-    }
-
-    async fn account_exists(&self, account_name: &impl AsRef<str>) -> bool {
-        self.account_service
-            .find_account_id_by_name(&odf::AccountName::new_unchecked(account_name))
-            .await
-            .unwrap()
-            .is_some()
     }
 
     fn expect_outbox_account_deleted(mock_outbox: &mut MockOutbox) {
@@ -193,7 +181,7 @@ impl DeleteAccountUseCaseImplHarness {
                             .unwrap();
                     matches!(message_res, AccountLifecycleMessage::Deleted(_))
                 }),
-                eq(1),
+                eq(2),
             )
             .returning(|_, _, _| Ok(()));
     }
