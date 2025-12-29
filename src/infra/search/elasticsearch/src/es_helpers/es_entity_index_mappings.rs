@@ -52,9 +52,23 @@ impl ElasticsearchIndexMappings {
                     "type": "stemmer",
                     "language": "english",
                 },
-                "english_stop": {
+                "kamu_english_stop": {
                     "type": "stop",
-                    "language": "english",
+                    "stopwords": [
+                        // a, an, and, are, as, at, be, but, by, for, if, in, into,
+                        // is, it, no, not, of, on, or, such, that, the, their, then,
+                        // there, these, they, this, to, was, will, with
+                        "_english_",
+                        "than",
+                        "then",
+                        "however",
+                        "therefore",
+                        "thus",
+                        "also",
+                        "just",
+                        "very",
+                        "quite"
+                    ]
                 }
             },
             "normalizer": {
@@ -118,8 +132,8 @@ impl ElasticsearchIndexMappings {
                         "lowercase",
                         "asciifolding",
                         "english_possessive_stemmer",
-                        "english_stemmer",
-                        "english_stop",
+                        "kamu_english_stop",
+                        "english_stemmer",  // keep after stop to avoid stemming stop words
                     ],
                 },
             }
@@ -251,6 +265,7 @@ impl ElasticsearchIndexMappings {
         let mut mapping = serde_json::json!({
             "type": "text",
             "analyzer": "kamu_english_html",
+            "search_analyzer": "kamu_english_html",
         });
 
         if enable_positions {

@@ -7,4 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod es_dataset_base_harness;
+
 mod test_dataset_indexing;
+mod test_dataset_search;
