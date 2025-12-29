@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
     MoleculeProjectMessageReenabled,
     molecule_project_search_schema as project_schema,
 };
-use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
+use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
 use crate::search::indexers::{
@@ -41,7 +41,7 @@ use crate::search::indexers::{
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeProjectSearchUpdater {
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +49,7 @@ pub struct MoleculeProjectSearchUpdater {
 impl MoleculeProjectSearchUpdater {
     async fn handle_created_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         created_message: &MoleculeProjectMessageCreated,
     ) -> Result<(), InternalError> {
         let project_document = index_project_from_parts(
@@ -61,11 +61,11 @@ impl MoleculeProjectSearchUpdater {
             created_message.system_time,
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Index {
+                vec![SearchIndexUpdateOperation::Index {
                     id: created_message.ipnft_uid.clone(),
                     doc: project_document,
                 }],
@@ -77,7 +77,7 @@ impl MoleculeProjectSearchUpdater {
 
     async fn handle_disabled_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         disabled_message: &MoleculeProjectMessageDisabled,
     ) -> Result<(), InternalError> {
         let partial_update = partial_update_project_when_ban_status_changed(
@@ -85,11 +85,11 @@ impl MoleculeProjectSearchUpdater {
             disabled_message.event_time,
             disabled_message.system_time,
         );
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Update {
+                vec![SearchIndexUpdateOperation::Update {
                     id: disabled_message.ipnft_uid.clone(),
                     doc: partial_update,
                 }],
@@ -101,7 +101,7 @@ impl MoleculeProjectSearchUpdater {
 
     async fn handle_reenabled_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         reenabled_message: &MoleculeProjectMessageReenabled,
     ) -> Result<(), InternalError> {
         let partial_update = partial_update_project_when_ban_status_changed(
@@ -109,11 +109,11 @@ impl MoleculeProjectSearchUpdater {
             reenabled_message.event_time,
             reenabled_message.system_time,
         );
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 project_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Update {
+                vec![SearchIndexUpdateOperation::Update {
                     id: reenabled_message.ipnft_uid.clone(),
                     doc: partial_update,
                 }],
@@ -144,7 +144,7 @@ impl MessageConsumerT<MoleculeProjectMessage> for MoleculeProjectSearchUpdater {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received Molecule project message");
 
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: target_catalog,
         };
 

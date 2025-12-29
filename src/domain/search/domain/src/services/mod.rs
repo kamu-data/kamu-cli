@@ -9,12 +9,12 @@
 
 mod embeddings_chunker;
 mod embeddings_encoder;
-mod full_text_search_entity_schema_provider;
-mod full_text_search_service;
 mod natural_language_search_service;
+mod search_entity_schema_provider;
+mod search_service;
 
 pub use embeddings_chunker::*;
 pub use embeddings_encoder::*;
-pub use full_text_search_entity_schema_provider::*;
-pub use full_text_search_service::*;
 pub use natural_language_search_service::*;
+pub use search_entity_schema_provider::*;
+pub use search_service::*;

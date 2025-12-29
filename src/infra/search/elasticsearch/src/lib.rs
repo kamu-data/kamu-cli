@@ -10,10 +10,16 @@
 pub(crate) mod es_client;
 pub(crate) mod es_helpers;
 
-mod es_full_text_repo;
-mod es_full_text_repo_container;
-mod es_full_text_search_config;
+mod es_repo;
+mod es_repo_container;
+mod es_search_config;
 
-pub use es_full_text_repo::*;
-pub use es_full_text_repo_container::*;
-pub use es_full_text_search_config::*;
+#[cfg(feature = "testing")]
+pub mod testing;
+
+pub use es_repo::*;
+pub use es_repo_container::*;
+pub use es_search_config::*;
+// Re-export the test macro
+#[cfg(feature = "testing")]
+pub use kamu_search_elasticsearch_macros::test;

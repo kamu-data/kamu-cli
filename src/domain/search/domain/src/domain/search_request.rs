@@ -19,33 +19,33 @@ pub const DEFAULT_SEARCH_PAGE_SIZE: usize = 10;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub struct FullTextSearchRequest {
+pub struct SearchRequest {
     /// Free-text query
     pub query: Option<String>,
 
     /// Allowed entity types (empty means all)
-    pub entity_schemas: Vec<FullTextEntitySchemaName>,
+    pub entity_schemas: Vec<SearchEntitySchemaName>,
 
     /// Requested source fields. If empty, only IDs will be returned.
-    pub source: FullTextSearchRequestSourceSpec,
+    pub source: SearchRequestSourceSpec,
 
     /// Structured filter
-    pub filter: Option<FullTextSearchFilterExpr>,
+    pub filter: Option<SearchFilterExpr>,
 
     /// Sorting specification, Relevance by default
-    pub sort: Vec<FullTextSortSpec>,
+    pub sort: Vec<SearchSortSpec>,
 
     /// Pagination specification
-    pub page: FullTextPageSpec,
+    pub page: SearchPaginationSpec,
 
     /// Options
-    pub options: FullTextSearchOptions,
+    pub options: SearchOptions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub struct FullTextSearchOptions {
+pub struct SearchOptions {
     pub enable_explain: bool,
     pub enable_highlighting: bool,
 }
@@ -53,13 +53,13 @@ pub struct FullTextSearchOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub enum FullTextSearchRequestSourceSpec {
+pub enum SearchRequestSourceSpec {
     None,
 
     #[default]
     All,
 
-    Particular(Vec<FullTextSearchFieldPath>),
+    Particular(Vec<SearchFieldPath>),
 
     Complex {
         include_patterns: Vec<String>,
@@ -70,12 +70,12 @@ pub enum FullTextSearchRequestSourceSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct FullTextPageSpec {
+pub struct SearchPaginationSpec {
     pub limit: usize,
     pub offset: usize,
 }
 
-impl FullTextPageSpec {
+impl SearchPaginationSpec {
     pub fn max(offset: usize) -> Self {
         Self {
             limit: MAX_SEARCH_PAGE_SIZE,
@@ -84,7 +84,7 @@ impl FullTextPageSpec {
     }
 }
 
-impl From<Option<PaginationOpts>> for FullTextPageSpec {
+impl From<Option<PaginationOpts>> for SearchPaginationSpec {
     fn from(pagination: Option<PaginationOpts>) -> Self {
         match pagination {
             Some(p) => Self {
@@ -96,7 +96,7 @@ impl From<Option<PaginationOpts>> for FullTextPageSpec {
     }
 }
 
-impl Default for FullTextPageSpec {
+impl Default for SearchPaginationSpec {
     fn default() -> Self {
         Self {
             limit: DEFAULT_SEARCH_PAGE_SIZE,

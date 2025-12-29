@@ -33,7 +33,7 @@ pub const MESSAGE_CONSUMER_KAMU_DATASET_BLOCK_UPDATE_HANDLER: &str =
 pub const MESSAGE_CONSUMER_KAMU_DATASETS_LIFECYCLE_HANDLER: &str =
     "dev.kamu.domain.datasets.DatasetsLifecycleHandler";
 
-pub const MESSAGE_CONSUMER_KAMU_DATASETS_FULL_TEXT_SEARCH_UPDATER: &str =
-    "dev.kamu.domain.datasets.DatasetFullTextSearchUpdater";
+pub const MESSAGE_CONSUMER_KAMU_DATASETS_SEARCH_UPDATER: &str =
+    "dev.kamu.domain.datasets.DatasetSearchUpdater";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

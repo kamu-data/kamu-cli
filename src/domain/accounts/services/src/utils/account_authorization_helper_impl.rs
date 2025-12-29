@@ -51,6 +51,33 @@ pub trait AccountAuthorizationHelper: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(any(feature = "testing", test))]
+#[derive(Default)]
+pub enum AccountAuthorizationHelperTestProvider {
+    #[default]
+    Default,
+
+    Mock(MockAccountAuthorizationHelper),
+}
+
+#[cfg(any(feature = "testing", test))]
+impl AccountAuthorizationHelperTestProvider {
+    pub fn embed_into_catalog(self, target_catalog_builder: &mut dill::CatalogBuilder) {
+        match self {
+            AccountAuthorizationHelperTestProvider::Default => {
+                target_catalog_builder.add::<AccountAuthorizationHelperImpl>();
+            }
+            AccountAuthorizationHelperTestProvider::Mock(mock) => {
+                target_catalog_builder
+                    .add_value(mock)
+                    .bind::<dyn AccountAuthorizationHelper, MockAccountAuthorizationHelper>();
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component(pub)]
 #[dill::interface(dyn AccountAuthorizationHelper)]
 pub struct AccountAuthorizationHelperImpl {

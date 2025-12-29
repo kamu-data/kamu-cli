@@ -32,7 +32,7 @@ use crate::{
 pub struct MoleculeViewDataRoomEntriesUseCaseImpl {
     catalog: dill::Catalog,
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: &self.catalog,
         };
 
@@ -98,17 +98,17 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         );
 
         let search_results = self
-            .full_text_search_service
+            .search_service
             .search(
                 ctx,
-                FullTextSearchRequest {
+                SearchRequest {
                     query: None, // no textual query, just filtering
                     entity_schemas: vec![data_room_entry_schema::SCHEMA_NAME],
-                    source: FullTextSearchRequestSourceSpec::All,
+                    source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::PATH),
                     page: pagination.into(),
-                    options: FullTextSearchOptions::default(),
+                    options: SearchOptions::default(),
                 },
             )
             .await?;
@@ -128,7 +128,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         path_prefix: Option<&CollectionPath>,
         max_depth: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
-    ) -> FullTextSearchFilterExpr {
+    ) -> SearchFilterExpr {
         let mut and_clauses = vec![];
 
         // ipnft_uid equality
@@ -155,7 +155,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
             and_clauses.extend(map_molecule_data_room_entries_filters_to_search(filters));
         }
 
-        FullTextSearchFilterExpr::and_clauses(and_clauses)
+        SearchFilterExpr::and_clauses(and_clauses)
     }
 }
 

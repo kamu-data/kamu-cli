@@ -15,50 +15,43 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn FullTextSearchService)]
-pub struct FullTextSearchServiceImpl {
-    full_text_repo: Arc<dyn FullTextSearchRepository>,
+#[dill::interface(dyn SearchService)]
+pub struct SearchServiceImpl {
+    search_repo: Arc<dyn SearchRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FullTextSearchService for FullTextSearchServiceImpl {
-    async fn health(
-        &self,
-        _: FullTextSearchContext<'_>,
-    ) -> Result<serde_json::Value, InternalError> {
-        self.full_text_repo.health().await
+impl SearchService for SearchServiceImpl {
+    async fn health(&self, _: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
+        self.search_repo.health().await
     }
 
     async fn search(
         &self,
-        _: FullTextSearchContext<'_>,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError> {
-        self.full_text_repo.search(req).await
+        _: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_repo.search(req).await
     }
 
     async fn find_document_by_id(
         &self,
-        _: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        _: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
-        self.full_text_repo
-            .find_document_by_id(schema_name, id)
-            .await
+        self.search_repo.find_document_by_id(schema_name, id).await
     }
 
     async fn bulk_update(
         &self,
-        _: FullTextSearchContext<'_>,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        _: SearchContext<'_>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
-        self.full_text_repo
-            .bulk_update(schema_name, operations)
-            .await
+        self.search_repo.bulk_update(schema_name, operations).await
     }
 }
 

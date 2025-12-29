@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
     molecule_announcement_search_schema as announcement_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
+use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,7 @@ pub(crate) fn index_announcement_from_publication_record(
 pub(crate) async fn index_announcements(
     organization_account: &LoggedAccount,
     catalog: &dill::Catalog,
-    repo: &dyn FullTextSearchRepository,
+    repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
         organization_account_name = organization_account.account_name.as_str(),
@@ -123,7 +123,7 @@ pub(crate) async fn index_announcements(
                 &announcement,
             );
 
-            operations.push(FullTextUpdateOperation::Index {
+            operations.push(SearchIndexUpdateOperation::Index {
                 id: announcement.announcement.announcement_id.to_string(),
                 doc: document,
             });

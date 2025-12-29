@@ -31,7 +31,7 @@ use crate::search::indexers::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn kamu_search::FullTextSearchEntitySchemaProvider)]
+#[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct MoleculeSearchSchemaProvider {
     background_catalog: Arc<KamuBackgroundCatalog>,
     account_service: Arc<dyn AccountService>,
@@ -44,11 +44,11 @@ impl MoleculeSearchSchemaProvider {
     /// specific entity type.
     async fn index_across_organizations<F, Fut>(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
+        repo: Arc<dyn SearchRepository>,
         index_fn: F,
     ) -> Result<usize, InternalError>
     where
-        F: Fn(LoggedAccount, dill::Catalog, Arc<dyn FullTextSearchRepository>) -> Fut,
+        F: Fn(LoggedAccount, dill::Catalog, Arc<dyn SearchRepository>) -> Fut,
         Fut: std::future::Future<Output = Result<usize, InternalError>>,
     {
         let mut total_indexed = 0;
@@ -105,7 +105,7 @@ impl MoleculeSearchSchemaProvider {
     )]
     async fn index_projects(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
+        repo: Arc<dyn SearchRepository>,
     ) -> Result<usize, InternalError> {
         self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
             index_projects(&logged_account, &catalog, &*repo).await
@@ -120,7 +120,7 @@ impl MoleculeSearchSchemaProvider {
     )]
     async fn index_data_room_entries(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
+        repo: Arc<dyn SearchRepository>,
     ) -> Result<usize, InternalError> {
         self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
             index_data_room_entries(&logged_account, &catalog, &*repo).await
@@ -135,7 +135,7 @@ impl MoleculeSearchSchemaProvider {
     )]
     async fn index_announcements(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
+        repo: Arc<dyn SearchRepository>,
     ) -> Result<usize, InternalError> {
         self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
             index_announcements(&logged_account, &catalog, &*repo).await
@@ -150,7 +150,7 @@ impl MoleculeSearchSchemaProvider {
     )]
     async fn index_activities(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
+        repo: Arc<dyn SearchRepository>,
     ) -> Result<usize, InternalError> {
         self.index_across_organizations(repo, |logged_account, catalog, repo| async move {
             index_activities(&logged_account, &catalog, &*repo).await
@@ -162,12 +162,12 @@ impl MoleculeSearchSchemaProvider {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu_search::FullTextSearchEntitySchemaProvider for MoleculeSearchSchemaProvider {
+impl kamu_search::SearchEntitySchemaProvider for MoleculeSearchSchemaProvider {
     fn provider_name(&self) -> &'static str {
         "xyz.molecule.kamu.MoleculeFullTextSearchSchemaProvider"
     }
 
-    fn provide_schemas(&self) -> &[kamu_search::FullTextSearchEntitySchema] {
+    fn provide_schemas(&self) -> &[kamu_search::SearchEntitySchema] {
         &[
             project_schema::SCHEMA,
             data_room_entry_schema::SCHEMA,
@@ -178,8 +178,8 @@ impl kamu_search::FullTextSearchEntitySchemaProvider for MoleculeSearchSchemaPro
 
     async fn run_schema_initial_indexing(
         &self,
-        repo: Arc<dyn FullTextSearchRepository>,
-        schema: &FullTextSearchEntitySchema,
+        repo: Arc<dyn SearchRepository>,
+        schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
         let indexed_documents_count = match schema.schema_name {
             activity_schema::SCHEMA_NAME => self.index_activities(repo).await?,

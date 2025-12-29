@@ -38,7 +38,7 @@ pub struct MoleculeSearchUseCaseImpl {
     catalog: dill::Catalog,
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 impl MoleculeSearchUseCaseImpl {
@@ -284,7 +284,7 @@ impl MoleculeSearchUseCaseImpl {
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: &self.catalog,
         };
 
@@ -319,28 +319,28 @@ impl MoleculeSearchUseCaseImpl {
                 and_clauses.extend(map_molecule_search_filters(filters));
             }
 
-            FullTextSearchFilterExpr::and_clauses(and_clauses)
+            SearchFilterExpr::and_clauses(and_clauses)
         };
 
         let search_results = self
-            .full_text_search_service
+            .search_service
             .search(
                 ctx,
-                FullTextSearchRequest {
+                SearchRequest {
                     query: Some(prompt.to_string()),
                     entity_schemas,
-                    source: FullTextSearchRequestSourceSpec::All,
+                    source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: vec![
-                        FullTextSortSpec::Relevance,
-                        FullTextSortSpec::ByField {
+                        SearchSortSpec::Relevance,
+                        SearchSortSpec::ByField {
                             field: molecule_schema::fields::EVENT_TIME,
-                            direction: FullTextSortDirection::Descending,
+                            direction: SearchSortDirection::Descending,
                             nulls_first: false,
                         },
                     ],
                     page: pagination.into(),
-                    options: FullTextSearchOptions::default(),
+                    options: SearchOptions::default(),
                 },
             )
             .await?;

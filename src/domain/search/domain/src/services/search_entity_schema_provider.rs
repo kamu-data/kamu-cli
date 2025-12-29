@@ -7,23 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchConfig {
-    pub url: url::Url,
-    pub password: Option<String>,
-    pub index_prefix: String,
-    pub timeout_secs: u64,
-    pub enable_compression: bool,
-}
+use internal_error::InternalError;
+
+use crate::{SearchEntitySchema, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ElasticSearchFullTextSearchContainerConfig {
-    pub image: String,
-    pub start_timeout: std::time::Duration,
+#[async_trait::async_trait]
+pub trait SearchEntitySchemaProvider: Send + Sync {
+    fn provider_name(&self) -> &'static str;
+
+    fn provide_schemas(&self) -> &[SearchEntitySchema];
+
+    async fn run_schema_initial_indexing(
+        &self,
+        search_repo: Arc<dyn SearchRepository>,
+        schema: &SearchEntitySchema,
+    ) -> Result<usize, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

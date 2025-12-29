@@ -20,7 +20,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomMessageEntryUpdated,
     molecule_data_room_entry_search_schema as data_room_entry_schema,
 };
-use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
+use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
 use crate::search::indexers::index_data_room_entry_from_entity;
@@ -39,7 +39,7 @@ use crate::search::indexers::index_data_room_entry_from_entity;
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeDataRoomSearchUpdater {
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +47,7 @@ pub struct MoleculeDataRoomSearchUpdater {
 impl MoleculeDataRoomSearchUpdater {
     async fn handle_created_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         created_message: &MoleculeDataRoomMessageEntryCreated,
     ) -> Result<(), InternalError> {
         let data_room_entry_document = index_data_room_entry_from_entity(
@@ -57,11 +57,11 @@ impl MoleculeDataRoomSearchUpdater {
             created_message.content_text.as_ref(),
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Index {
+                vec![SearchIndexUpdateOperation::Index {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &created_message.ipnft_uid,
                         &created_message.data_room_entry.path,
@@ -76,7 +76,7 @@ impl MoleculeDataRoomSearchUpdater {
 
     async fn handle_updated_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         updated_message: &MoleculeDataRoomMessageEntryUpdated,
     ) -> Result<(), InternalError> {
         let data_room_entry_document = index_data_room_entry_from_entity(
@@ -86,11 +86,11 @@ impl MoleculeDataRoomSearchUpdater {
             updated_message.content_text.as_ref(),
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Update {
+                vec![SearchIndexUpdateOperation::Update {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &updated_message.ipnft_uid,
                         &updated_message.data_room_entry.path,
@@ -105,7 +105,7 @@ impl MoleculeDataRoomSearchUpdater {
 
     async fn handle_moved_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         moved_message: &MoleculeDataRoomMessageEntryMoved,
     ) -> Result<(), InternalError> {
         let old_id = data_room_entry_schema::unique_id_for_data_room_entry(
@@ -114,7 +114,7 @@ impl MoleculeDataRoomSearchUpdater {
         );
 
         let maybe_existing_document = self
-            .full_text_search_service
+            .search_service
             .find_document_by_id(ctx, data_room_entry_schema::SCHEMA_NAME, &old_id)
             .await?;
 
@@ -133,13 +133,13 @@ impl MoleculeDataRoomSearchUpdater {
             &moved_message.path_to,
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![
-                    FullTextUpdateOperation::Delete { id: old_id },
-                    FullTextUpdateOperation::Index {
+                    SearchIndexUpdateOperation::Delete { id: old_id },
+                    SearchIndexUpdateOperation::Index {
                         id: new_id,
                         doc: existing_document,
                     },
@@ -152,14 +152,14 @@ impl MoleculeDataRoomSearchUpdater {
 
     async fn handle_removed_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         removed_message: &MoleculeDataRoomMessageEntryRemoved,
     ) -> Result<(), InternalError> {
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 data_room_entry_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Delete {
+                vec![SearchIndexUpdateOperation::Delete {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
                         &removed_message.ipnft_uid,
                         &removed_message.path,
@@ -192,7 +192,7 @@ impl MessageConsumerT<MoleculeDataRoomMessage> for MoleculeDataRoomSearchUpdater
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received Molecule data room message");
 
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: target_catalog,
         };
 

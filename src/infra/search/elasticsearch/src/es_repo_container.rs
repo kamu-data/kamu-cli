@@ -17,27 +17,27 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Lazily spawns a local `ElasticSearch` container
+/// Lazily spawns a local `Elasticsearch` container
 /// that will be cleaned up on exit
-pub struct ElasticSearchFullTextRepoContainer {
+pub struct ElasticsearchContainerRepository {
     runtime: Arc<container_runtime::ContainerRuntime>,
-    config: Arc<ElasticSearchFullTextSearchContainerConfig>,
+    config: Arc<ElasticsearchContainerConfig>,
     state: tokio::sync::OnceCell<State>,
 }
 
 #[allow(dead_code)]
 struct State {
     container: container_runtime::ContainerProcess,
-    inner: ElasticSearchFullTextRepo,
+    inner: ElasticsearchRepository,
 }
 
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
-#[dill::interface(dyn FullTextSearchRepository)]
-impl ElasticSearchFullTextRepoContainer {
+#[dill::interface(dyn SearchRepository)]
+impl ElasticsearchContainerRepository {
     pub fn new(
         runtime: Arc<container_runtime::ContainerRuntime>,
-        config: Arc<ElasticSearchFullTextSearchContainerConfig>,
+        config: Arc<ElasticsearchContainerConfig>,
     ) -> Self {
         Self {
             runtime,
@@ -46,7 +46,7 @@ impl ElasticSearchFullTextRepoContainer {
         }
     }
 
-    async fn inner(&self) -> Result<&ElasticSearchFullTextRepo, InternalError> {
+    async fn inner(&self) -> Result<&ElasticsearchRepository, InternalError> {
         let state = self
             .state
             .get_or_try_init(async || self.init_state().await)
@@ -85,15 +85,19 @@ impl ElasticSearchFullTextRepoContainer {
             .int_err()?;
 
         let url = Url::parse(&format!("http://{runtime_host}:{rest_api_port}")).int_err()?;
-        tracing::info!("ElasticSearch container is starting at {url}");
+        tracing::info!("Elasticsearch container is starting at {url}");
 
-        let inner = ElasticSearchFullTextRepo::new(Arc::new(ElasticSearchFullTextSearchConfig {
-            url,
-            password: Some(DUMMY_PASSWORD.to_string()),
-            timeout_secs: 5,
-            enable_compression: false,
-            index_prefix: String::new(),
-        }));
+        let inner = ElasticsearchRepository::new(
+            Arc::new(ElasticsearchClientConfig {
+                url,
+                password: Some(DUMMY_PASSWORD.to_string()),
+                timeout_secs: 5,
+                enable_compression: false,
+            }),
+            Arc::new(ElasticsearchRepositoryConfig {
+                index_prefix: String::new(),
+            }),
+        );
 
         Ok(State { container, inner })
     }
@@ -102,22 +106,19 @@ impl ElasticSearchFullTextRepoContainer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
+impl SearchRepository for ElasticsearchContainerRepository {
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         self.inner().await?.health().await
     }
 
-    async fn search(
-        &self,
-        req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError> {
+    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
         self.inner().await?.search(req).await
     }
 
     async fn ensure_entity_index(
         &self,
-        schema: &FullTextSearchEntitySchema,
-    ) -> Result<(), FullTextSearchEnsureEntityIndexError> {
+        schema: &SearchEntitySchema,
+    ) -> Result<(), SearchEnsureEntityIndexError> {
         self.inner().await?.ensure_entity_index(schema).await
     }
 
@@ -127,15 +128,15 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
 
     async fn documents_of_kind(
         &self,
-        schema_name: FullTextEntitySchemaName,
+        schema_name: SearchEntitySchemaName,
     ) -> Result<u64, InternalError> {
         self.inner().await?.documents_of_kind(schema_name).await
     }
 
     async fn find_document_by_id(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        id: &FullTextEntityId,
+        schema_name: SearchEntitySchemaName,
+        id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
         self.inner()
             .await?
@@ -145,8 +146,8 @@ impl FullTextSearchRepository for ElasticSearchFullTextRepoContainer {
 
     async fn bulk_update(
         &self,
-        schema_name: FullTextEntitySchemaName,
-        operations: Vec<FullTextUpdateOperation>,
+        schema_name: SearchEntitySchemaName,
+        operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
         self.inner()
             .await?

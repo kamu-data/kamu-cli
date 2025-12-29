@@ -7,24 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::FullTextEntitySchemaName;
+use crate::SearchEntitySchemaName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub struct FullTextSearchResponse {
+pub struct SearchResponse {
     pub took_ms: u64,
     pub timeout: bool,
     pub total_hits: u64,
-    pub hits: Vec<FullTextSearchHit>,
+    pub hits: Vec<SearchHit>,
 }
 
 #[derive(Debug)]
-pub struct FullTextSearchHit {
+pub struct SearchHit {
     pub id: String,
-    pub schema_name: FullTextEntitySchemaName,
+    pub schema_name: SearchEntitySchemaName,
     pub score: Option<f64>,
-    pub highlights: Option<Vec<FullTextSearchHighlight>>,
+    pub highlights: Option<Vec<SearchHighlight>>,
     pub source: serde_json::Value,
     pub explanation: Option<serde_json::Value>,
 }
@@ -32,7 +32,7 @@ pub struct FullTextSearchHit {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct FullTextSearchHighlight {
+pub struct SearchHighlight {
     pub field: String,
     pub best_fragment: String,
 }

@@ -27,7 +27,7 @@ use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_
 pub struct MoleculeViewProjectAnnouncementsUseCaseImpl {
     catalog: dill::Catalog,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: &self.catalog,
         };
 
@@ -120,21 +120,21 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
                 and_clauses.extend(map_molecule_announcements_filters_to_search(filters));
             }
 
-            FullTextSearchFilterExpr::and_clauses(and_clauses)
+            SearchFilterExpr::and_clauses(and_clauses)
         };
 
         let search_results = self
-            .full_text_search_service
+            .search_service
             .search(
                 ctx,
-                FullTextSearchRequest {
+                SearchRequest {
                     query: None, // no textual query, just filtering
                     entity_schemas: vec![announcement_schema::SCHEMA_NAME],
-                    source: FullTextSearchRequestSourceSpec::All,
+                    source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
-                    options: FullTextSearchOptions::default(),
+                    options: SearchOptions::default(),
                 },
             )
             .await?;

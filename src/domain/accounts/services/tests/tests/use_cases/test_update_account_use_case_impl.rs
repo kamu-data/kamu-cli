@@ -13,15 +13,13 @@ use std::sync::Arc;
 use bon::bon;
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::utils::{AccountAuthorizationHelper, MockAccountAuthorizationHelper};
-use kamu_accounts_services::{
-    AccountServiceImpl,
-    CreateAccountUseCaseImpl,
-    UpdateAccountUseCaseImpl,
+use kamu_accounts_services::utils::{
+    AccountAuthorizationHelperTestProvider,
+    MockAccountAuthorizationHelper,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use time_source::SystemTimeSourceDefault;
+
+use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,13 +36,14 @@ async fn test_update_account_email_success() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_email_changed(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .mock_account_authorization_helper(MockAccountAuthorizationHelper::allowing())
+        .account_authorization_helper_provider(AccountAuthorizationHelperTestProvider::Mock(
+            MockAccountAuthorizationHelper::allowing(),
+        ))
         .mock_outbox(mock_outbox)
         .build()
         .await;
 
-    let account_name = odf::AccountName::new_unchecked("foo");
-    let created_account = harness.create_account(&account_name).await;
+    let created_account = harness.create_account(&harness.catalog, "foo").await;
 
     let new_email = email_utils::Email::parse("foo@example.com").unwrap();
     let account_to_update = Account {
@@ -58,12 +57,7 @@ async fn test_update_account_email_success() {
         .await
         .unwrap();
 
-    let account = harness
-        .account_service
-        .get_account_by_id(&created_account.id)
-        .await
-        .unwrap();
-
+    let account = harness.get_account_by_id(&created_account.id).await;
     assert_eq!(account.email, new_email);
 }
 
@@ -75,15 +69,15 @@ async fn test_update_account_email_duplicate_error() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .mock_account_authorization_helper(MockAccountAuthorizationHelper::allowing())
+        .account_authorization_helper_provider(AccountAuthorizationHelperTestProvider::Mock(
+            MockAccountAuthorizationHelper::allowing(),
+        ))
         .mock_outbox(mock_outbox)
         .build()
         .await;
 
-    let account_name_foo = odf::AccountName::new_unchecked("foo");
-    let account_name_bar = odf::AccountName::new_unchecked("bar");
-    let created_account_foo = harness.create_account(&account_name_foo).await;
-    let created_account_bar = harness.create_account(&account_name_bar).await;
+    let created_account_foo = harness.create_account(&harness.catalog, "foo").await;
+    let created_account_bar = harness.create_account(&harness.catalog, "bar").await;
     let account_to_update = Account {
         email: created_account_bar.email.clone(),
         ..created_account_foo.clone()
@@ -106,13 +100,14 @@ async fn test_update_account_display_name_success() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_display_name_changed(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .mock_account_authorization_helper(MockAccountAuthorizationHelper::allowing())
+        .account_authorization_helper_provider(AccountAuthorizationHelperTestProvider::Mock(
+            MockAccountAuthorizationHelper::allowing(),
+        ))
         .mock_outbox(mock_outbox)
         .build()
         .await;
 
-    let account_name = odf::AccountName::new_unchecked("foo");
-    let created_account = harness.create_account(&account_name).await;
+    let created_account = harness.create_account(&harness.catalog, "foo").await;
 
     let new_display_name = AccountDisplayName::from("Foo Bar");
     let account_to_update = Account {
@@ -126,11 +121,7 @@ async fn test_update_account_display_name_success() {
         .await
         .unwrap();
 
-    let account = harness
-        .account_service
-        .get_account_by_id(&created_account.id)
-        .await
-        .unwrap();
+    let account = harness.get_account_by_id(&created_account.id).await;
 
     assert_eq!(account.display_name, new_display_name);
 }
@@ -153,7 +144,8 @@ async fn test_rename_own_account() {
     };
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .predefined_account_config(predefined_account_config)
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&REGULAR_USER))
         .mock_outbox(outbox)
         .build()
@@ -191,7 +183,8 @@ async fn test_duplicate_name() {
     };
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .predefined_account_config(predefined_account_config)
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&REGULAR_USER))
         .mock_outbox(MockOutbox::new())
         .build()
@@ -234,7 +227,8 @@ async fn test_admin_renames_other_account() {
     };
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .predefined_account_config(predefined_account_config)
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&ADMIN))
         .mock_outbox(outbox)
         .build()
@@ -272,7 +266,8 @@ async fn test_anonymous_try_to_rename_account() {
     };
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .predefined_account_config(predefined_account_config)
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
         ))
@@ -304,7 +299,8 @@ async fn test_non_admin_try_to_rename_other_account() {
     };
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
-        .predefined_account_config(predefined_account_config)
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&REGULAR_USER))
         .mock_outbox(MockOutbox::new())
         .build()
@@ -321,50 +317,33 @@ async fn test_non_admin_try_to_rename_other_account() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct UpdateAccountUseCaseImplHarness {
-    create_use_case: Arc<dyn CreateAccountUseCase>,
+    account_base_harness: AccountBaseUseCaseHarness,
     update_use_case: Arc<dyn UpdateAccountUseCase>,
-    account_service: Arc<dyn AccountService>,
+    catalog: dill::Catalog,
 }
 
 #[bon]
 impl UpdateAccountUseCaseImplHarness {
     #[builder]
     async fn new(
-        mock_account_authorization_helper: Option<MockAccountAuthorizationHelper>,
+        account_authorization_helper_provider: AccountAuthorizationHelperTestProvider,
         mock_outbox: MockOutbox,
         current_account_subject: Option<CurrentAccountSubject>,
-        predefined_account_config: Option<PredefinedAccountsConfig>,
+        maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
     ) -> Self {
-        let mut b = dill::CatalogBuilder::new();
+        let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
+            account_authorization_helper_provider,
+            maybe_predefined_accounts_config,
+            ..Default::default()
+        });
 
-        b.add::<CreateAccountUseCaseImpl>();
-        b.add::<AccountServiceImpl>();
-        b.add::<InMemoryAccountRepository>();
-        b.add_value(DidSecretEncryptionConfig::sample());
-        b.add::<InMemoryDidSecretKeyRepository>();
-        b.add::<SystemTimeSourceDefault>();
-        b.add_value(mock_outbox);
-        b.bind::<dyn Outbox, MockOutbox>();
+        let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
+        b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
 
-        b.add::<UpdateAccountUseCaseImpl>();
         if let Some(current_account_subject) = current_account_subject {
             b.add_value(current_account_subject);
-        }
-        if let Some(predefined_account_config) = predefined_account_config {
-            b.add::<kamu_accounts_services::PredefinedAccountsRegistrator>();
-            b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
-            b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
-            b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
-            b.add_value(kamu_auth_rebac_services::DefaultAccountProperties::default());
-            b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default());
-            b.add_value(predefined_account_config);
-        }
-        if let Some(mock_account_authorization_helper) = mock_account_authorization_helper {
-            b.add_value(mock_account_authorization_helper)
-                .bind::<dyn AccountAuthorizationHelper, MockAccountAuthorizationHelper>();
-        } else {
-            b.add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>();
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -374,23 +353,10 @@ impl UpdateAccountUseCaseImplHarness {
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
-            create_use_case: catalog.get_one().unwrap(),
+            account_base_harness,
             update_use_case: catalog.get_one().unwrap(),
-            account_service: catalog.get_one().unwrap(),
+            catalog,
         }
-    }
-
-    async fn create_account(&self, account_name: &odf::AccountName) -> Account {
-        let creator_account = Account::dummy();
-
-        self.create_use_case
-            .execute_derived(
-                &creator_account,
-                account_name,
-                CreateAccountUseCaseOptions::default(),
-            )
-            .await
-            .unwrap()
     }
 
     pub fn expect_outbox_account_created(mock_outbox: &mut MockOutbox) {
@@ -462,13 +428,6 @@ impl UpdateAccountUseCaseImplHarness {
                 eq(2),
             )
             .returning(|_, _, _| Ok(()));
-    }
-
-    async fn find_account_by_name(&self, account_name: &impl AsRef<str>) -> Option<Account> {
-        self.account_service
-            .account_by_name(&odf::AccountName::new_unchecked(account_name))
-            .await
-            .unwrap()
     }
 }
 

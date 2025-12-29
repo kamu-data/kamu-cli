@@ -7,18 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::FullTextSearchHighlight;
+use kamu_search::SearchHighlight;
 
 use super::{FIELD_SUFFIX_KEYWORD, FIELD_SUFFIX_NGRAM, FIELD_SUFFIX_SUBSTR, FIELD_SUFFIX_TOKENS};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchHighlightExtractor {}
+pub struct ElasticsearchHighlightExtractor {}
 
-impl ElasticSearchHighlightExtractor {
-    pub fn extract_highlights(
-        highlight_json: &serde_json::Value,
-    ) -> Option<Vec<FullTextSearchHighlight>> {
+impl ElasticsearchHighlightExtractor {
+    pub fn extract_highlights(highlight_json: &serde_json::Value) -> Option<Vec<SearchHighlight>> {
         if let Some(highlight_obj) = highlight_json.as_object() {
             let mut highlights = Vec::new();
             let mut seen_fields = std::collections::HashSet::new();
@@ -40,7 +38,7 @@ impl ElasticSearchHighlightExtractor {
                         .and_then(|v| v.as_str().map(ToString::to_string))
                         .unwrap_or_default();
 
-                    highlights.push(FullTextSearchHighlight {
+                    highlights.push(SearchHighlight {
                         field: normalized_field,
                         best_fragment: first_fragment,
                     });

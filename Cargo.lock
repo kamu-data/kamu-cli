@@ -6998,14 +6998,18 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "messaging-outbox",
  "mockall",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "random-strings",
  "secrecy",
  "serde",
  "serde_json",
+ "test-group",
  "test-log",
  "thiserror 2.0.17",
  "time-source",
@@ -8094,8 +8098,10 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.255.0"
 dependencies = [
+ "arrow",
  "async-stream",
  "async-trait",
+ "bon",
  "bytes",
  "cheap-clone",
  "chrono",
@@ -8121,7 +8127,10 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-messaging-outbox-inmem",
  "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "messaging-outbox",
  "mockall",
  "nutype",
@@ -8137,6 +8146,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "tempfile",
+ "test-group",
  "test-log",
  "test-utils",
  "thiserror 2.0.17",
@@ -8545,20 +8555,36 @@ version = "0.255.0"
 dependencies = [
  "async-trait",
  "canonical_json",
+ "chrono",
  "common-macros",
  "container-runtime",
  "dill",
  "elasticsearch",
  "hex",
+ "init-on-startup",
  "internal-error",
  "kamu-search",
+ "kamu-search-elasticsearch-macros",
+ "kamu-search-services",
+ "messaging-outbox",
+ "random-strings",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.17",
+ "time-source",
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "kamu-search-elasticsearch-macros"
+version = "0.255.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
 ]
 
 [[package]]

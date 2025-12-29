@@ -16,7 +16,7 @@ use kamu_molecule_domain::{
     molecule_project_search_schema as project_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
+use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +37,7 @@ pub(crate) fn index_project_from_entity(
         project_schema::fields::IPNFT_SYMBOL: project.ipnft_symbol,
         molecule_schema::fields::IPNFT_UID: project.ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
-        kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: false,
+        kamu_search::SEARCH_FIELD_IS_BANNED: false,
     })
 }
 
@@ -58,7 +58,7 @@ pub(crate) fn index_project_from_parts(
         project_schema::fields::IPNFT_SYMBOL: ipnft_symbol,
         molecule_schema::fields::IPNFT_UID: ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
-        kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: false,
+        kamu_search::SEARCH_FIELD_IS_BANNED: false,
     })
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn partial_update_project_when_ban_status_changed(
     serde_json::json!({
         molecule_schema::fields::EVENT_TIME: event_time,
         molecule_schema::fields::SYSTEM_TIME: system_time,
-        kamu_search::FULL_TEXT_SEARCH_FIELD_IS_BANNED: is_banned,
+        kamu_search::SEARCH_FIELD_IS_BANNED: is_banned,
     })
 }
 
@@ -83,7 +83,7 @@ pub(crate) fn partial_update_project_when_ban_status_changed(
 pub(crate) async fn index_projects(
     organization_account: &LoggedAccount,
     catalog: &dill::Catalog,
-    repo: &dyn FullTextSearchRepository,
+    repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
         organization_account_name = organization_account.account_name.as_str(),
@@ -111,7 +111,7 @@ pub(crate) async fn index_projects(
 
         // Note: for now, use IPNFT UID as document ID
         // This should be revised after implementing non-tokenized projects
-        operations.push(FullTextUpdateOperation::Index {
+        operations.push(SearchIndexUpdateOperation::Index {
             id: project.ipnft_uid.clone(),
             doc: document,
         });

@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 use crate::search::schemas::molecule_search_schema_common as molecule_schema;
@@ -30,31 +30,31 @@ pub mod fields {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::IPNFT_SYMBOL,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: false,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
     molecule_schema::field_definitions::IPNFT_UID,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::PROJECT_ACCOUNT_ID,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: fields::IPNFT_SYMBOL,
     enable_banning: true,

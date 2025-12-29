@@ -87,9 +87,16 @@ kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-messaging-outbox-inmem = { workspace = true }
+kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
+    "testing",
+] }
+kamu-search-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 
+arrow = { version = "56", default-features = false }
+bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.14"
 oop = "0.0.2"
@@ -99,3 +106,4 @@ rstest = { version = "0.26", default-features = false, features = [] }
 serde_json = "1"
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

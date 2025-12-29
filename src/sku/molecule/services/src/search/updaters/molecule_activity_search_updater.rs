@@ -17,7 +17,7 @@ use kamu_molecule_domain::{
     MoleculeActivityMessagePublished,
     molecule_activity_search_schema as activity_schema,
 };
-use kamu_search::{FullTextSearchContext, FullTextSearchService, FullTextUpdateOperation};
+use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
 use crate::search::indexers::index_activity_from_data_room_publication_record;
@@ -36,7 +36,7 @@ use crate::search::indexers::index_activity_from_data_room_publication_record;
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeActivitySearchUpdater {
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ pub struct MoleculeActivitySearchUpdater {
 impl MoleculeActivitySearchUpdater {
     async fn handle_published_message(
         &self,
-        ctx: FullTextSearchContext<'_>,
+        ctx: SearchContext<'_>,
         published_message: &MoleculeActivityMessagePublished,
     ) -> Result<(), InternalError> {
         let activity_document = index_activity_from_data_room_publication_record(
@@ -59,11 +59,11 @@ impl MoleculeActivitySearchUpdater {
             published_message.offset,
         );
 
-        self.full_text_search_service
+        self.search_service
             .bulk_update(
                 ctx,
                 activity_schema::SCHEMA_NAME,
-                vec![FullTextUpdateOperation::Index {
+                vec![SearchIndexUpdateOperation::Index {
                     id,
                     doc: activity_document,
                 }],
@@ -94,7 +94,7 @@ impl MessageConsumerT<MoleculeActivityMessage> for MoleculeActivitySearchUpdater
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received Molecule activity message");
 
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: target_catalog,
         };
 

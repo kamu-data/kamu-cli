@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 use crate::search::schemas::molecule_search_schema_common as molecule_schema;
@@ -30,32 +30,32 @@ pub mod fields {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
     molecule_schema::field_definitions::IPNFT_UID,
     molecule_schema::field_definitions::REF,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: molecule_schema::fields::PATH,
-        role: FullTextSchemaFieldRole::Identifier {
+        role: SearchSchemaFieldRole::Identifier {
             // Path is an identifier in this index, not a filter
             hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::DEPTH,
-        role: FullTextSchemaFieldRole::Integer,
+        role: SearchSchemaFieldRole::Integer,
     },
     molecule_schema::field_definitions::VERSION,
     molecule_schema::field_definitions::CONTENT_TYPE,
     molecule_schema::field_definitions::CONTENT_HASH,
     molecule_schema::field_definitions::CONTENT_LENGTH,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::CONTENT_TEXT,
-        role: FullTextSchemaFieldRole::Prose {
+        role: SearchSchemaFieldRole::Prose {
             enable_positions: true,
         },
     },
@@ -68,10 +68,10 @@ const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: molecule_schema::fields::PATH,
     enable_banning: false,

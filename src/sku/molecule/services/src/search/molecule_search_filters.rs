@@ -20,7 +20,7 @@ use kamu_search::*;
 
 pub(crate) fn map_molecule_data_room_entries_filters_to_search(
     filters: MoleculeDataRoomEntriesFilters,
-) -> Vec<FullTextSearchFilterExpr> {
+) -> Vec<SearchFilterExpr> {
     let mut search_filters = vec![];
 
     if let Some(by_access_levels) = filters.by_access_levels
@@ -54,7 +54,7 @@ pub(crate) fn map_molecule_data_room_entries_filters_to_search(
 
 pub(crate) fn map_molecule_announcements_filters_to_search(
     filters: MoleculeAnnouncementsFilters,
-) -> Vec<FullTextSearchFilterExpr> {
+) -> Vec<SearchFilterExpr> {
     let mut search_filters = vec![];
 
     if let Some(by_access_levels) = filters.by_access_levels
@@ -88,7 +88,7 @@ pub(crate) fn map_molecule_announcements_filters_to_search(
 
 pub(crate) fn map_molecule_activities_filters_to_search(
     filters: MoleculeActivitiesFilters,
-) -> Vec<FullTextSearchFilterExpr> {
+) -> Vec<SearchFilterExpr> {
     let mut search_filters = vec![];
 
     if let Some(by_access_levels) = filters.by_access_levels
@@ -120,9 +120,7 @@ pub(crate) fn map_molecule_activities_filters_to_search(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_molecule_search_filters(
-    filters: MoleculeSearchFilters,
-) -> Vec<FullTextSearchFilterExpr> {
+pub(crate) fn map_molecule_search_filters(filters: MoleculeSearchFilters) -> Vec<SearchFilterExpr> {
     // Note: kinds are schema choice, not filter
 
     let mut search_filters = vec![];
@@ -162,3 +160,5 @@ pub(crate) fn map_molecule_search_filters(
 
     search_filters
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

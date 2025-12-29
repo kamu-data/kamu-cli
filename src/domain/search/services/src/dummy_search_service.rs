@@ -13,29 +13,26 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn FullTextSearchService)]
-pub struct DummyFullTextSearchService {}
+#[dill::interface(dyn SearchService)]
+pub struct DummySearchService {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FullTextSearchService for DummyFullTextSearchService {
-    async fn health(
-        &self,
-        _: FullTextSearchContext<'_>,
-    ) -> Result<serde_json::Value, InternalError> {
+impl SearchService for DummySearchService {
+    async fn health(&self, _: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
         Ok(serde_json::json!({
             "status": "ok",
-            "details": "This is a dummy full text search service"
+            "details": "This is a dummy search service"
         }))
     }
 
     async fn search(
         &self,
-        _: FullTextSearchContext<'_>,
-        _req: FullTextSearchRequest,
-    ) -> Result<FullTextSearchResponse, InternalError> {
-        Ok(FullTextSearchResponse {
+        _: SearchContext<'_>,
+        _req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        Ok(SearchResponse {
             took_ms: 0,
             timeout: false,
             total_hits: 0,
@@ -45,18 +42,18 @@ impl FullTextSearchService for DummyFullTextSearchService {
 
     async fn find_document_by_id(
         &self,
-        _ctx: FullTextSearchContext<'_>,
-        _schema_name: FullTextEntitySchemaName,
-        _id: &FullTextEntityId,
+        _ctx: SearchContext<'_>,
+        _schema_name: SearchEntitySchemaName,
+        _id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
         Ok(None)
     }
 
     async fn bulk_update(
         &self,
-        _ctx: FullTextSearchContext<'_>,
-        _schema_name: FullTextEntitySchemaName,
-        _operations: Vec<FullTextUpdateOperation>,
+        _ctx: SearchContext<'_>,
+        _schema_name: SearchEntitySchemaName,
+        _operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
         Ok(())
     }

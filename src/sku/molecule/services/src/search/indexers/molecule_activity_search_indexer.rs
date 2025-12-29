@@ -20,7 +20,7 @@ use kamu_molecule_domain::{
     molecule_activity_search_schema as activity_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
+use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +91,7 @@ pub(crate) fn index_activity_from_data_room_publication_record(
 pub(crate) async fn index_activities(
     organization_account: &LoggedAccount,
     catalog: &dill::Catalog,
-    repo: &dyn FullTextSearchRepository,
+    repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
         organization_account_name = organization_account.account_name.as_str(),
@@ -145,7 +145,7 @@ pub(crate) async fn index_activities(
                 data_room_activity.offset,
             );
 
-            operations.push(FullTextUpdateOperation::Index { id, doc: document });
+            operations.push(SearchIndexUpdateOperation::Index { id, doc: document });
         }
 
         // Bulk index the current page

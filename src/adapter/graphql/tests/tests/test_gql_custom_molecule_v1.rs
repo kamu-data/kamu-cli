@@ -1491,7 +1491,7 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
-            .add::<kamu_search_services::DummyFullTextSearchService>()
+            .add::<kamu_search_services::DummySearchService>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));

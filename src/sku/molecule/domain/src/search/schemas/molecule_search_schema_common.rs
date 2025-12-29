@@ -39,82 +39,82 @@ pub mod field_definitions {
 
     //
 
-    pub const EVENT_TIME: FullTextSchemaField = FullTextSchemaField {
+    pub const EVENT_TIME: SearchSchemaField = SearchSchemaField {
         path: fields::EVENT_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     };
 
-    pub const SYSTEM_TIME: FullTextSchemaField = FullTextSchemaField {
+    pub const SYSTEM_TIME: SearchSchemaField = SearchSchemaField {
         path: fields::SYSTEM_TIME,
-        role: FullTextSchemaFieldRole::DateTime,
+        role: SearchSchemaFieldRole::DateTime,
     };
 
-    pub const MOLECULE_ACCOUNT_ID: FullTextSchemaField = FullTextSchemaField {
+    pub const MOLECULE_ACCOUNT_ID: SearchSchemaField = SearchSchemaField {
         path: fields::MOLECULE_ACCOUNT_ID,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const IPNFT_UID: FullTextSchemaField = FullTextSchemaField {
+    pub const IPNFT_UID: SearchSchemaField = SearchSchemaField {
         path: fields::IPNFT_UID,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
     //
 
     // Note: no PATH definition, varies depending on the index
 
-    pub const REF: FullTextSchemaField = FullTextSchemaField {
+    pub const REF: SearchSchemaField = SearchSchemaField {
         path: fields::REF,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const VERSION: FullTextSchemaField = FullTextSchemaField {
+    pub const VERSION: SearchSchemaField = SearchSchemaField {
         path: fields::VERSION,
-        role: FullTextSchemaFieldRole::Integer,
+        role: SearchSchemaFieldRole::Integer,
     };
 
-    pub const CONTENT_TYPE: FullTextSchemaField = FullTextSchemaField {
+    pub const CONTENT_TYPE: SearchSchemaField = SearchSchemaField {
         path: fields::CONTENT_TYPE,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const CONTENT_HASH: FullTextSchemaField = FullTextSchemaField {
+    pub const CONTENT_HASH: SearchSchemaField = SearchSchemaField {
         path: fields::CONTENT_HASH,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const CONTENT_LENGTH: FullTextSchemaField = FullTextSchemaField {
+    pub const CONTENT_LENGTH: SearchSchemaField = SearchSchemaField {
         path: fields::CONTENT_LENGTH,
-        role: FullTextSchemaFieldRole::Integer,
+        role: SearchSchemaFieldRole::Integer,
     };
 
     //
 
-    pub const ACCESS_LEVEL: FullTextSchemaField = FullTextSchemaField {
+    pub const ACCESS_LEVEL: SearchSchemaField = SearchSchemaField {
         path: fields::ACCESS_LEVEL,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const CHANGE_BY: FullTextSchemaField = FullTextSchemaField {
+    pub const CHANGE_BY: SearchSchemaField = SearchSchemaField {
         path: fields::CHANGE_BY,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const DESCRIPTION: FullTextSchemaField = FullTextSchemaField {
+    pub const DESCRIPTION: SearchSchemaField = SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: FullTextSchemaFieldRole::Prose {
+        role: SearchSchemaFieldRole::Prose {
             enable_positions: true,
         },
     };
 
-    pub const CATEGORIES: FullTextSchemaField = FullTextSchemaField {
+    pub const CATEGORIES: SearchSchemaField = SearchSchemaField {
         path: fields::CATEGORIES,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const TAGS: FullTextSchemaField = FullTextSchemaField {
+    pub const TAGS: SearchSchemaField = SearchSchemaField {
         path: fields::TAGS,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     };
 }
 

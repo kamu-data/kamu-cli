@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod account_full_text_search_schema_helpers;
-mod account_full_text_search_schema_provider;
-mod account_full_text_search_updater;
+mod account_search_indexer;
+mod account_search_schema_provider;
+mod account_search_updater;
 
-pub use account_full_text_search_schema_provider::*;
-pub use account_full_text_search_updater::*;
+pub use account_search_schema_provider::*;
+pub use account_search_updater::*;

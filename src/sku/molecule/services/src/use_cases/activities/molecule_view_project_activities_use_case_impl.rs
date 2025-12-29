@@ -29,7 +29,7 @@ pub struct MoleculeViewProjectActivitiesUseCaseImpl {
     catalog: dill::Catalog,
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
     view_project_announcements_uc: Arc<dyn MoleculeViewProjectAnnouncementsUseCase>,
-    full_text_search_service: Arc<dyn FullTextSearchService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 impl MoleculeViewProjectActivitiesUseCaseImpl {
@@ -302,7 +302,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let ctx = FullTextSearchContext {
+        let ctx = SearchContext {
             catalog: &self.catalog,
         };
 
@@ -320,14 +320,14 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                 and_clauses.extend(map_molecule_activities_filters_to_search(filters));
             }
 
-            FullTextSearchFilterExpr::and_clauses(and_clauses)
+            SearchFilterExpr::and_clauses(and_clauses)
         };
 
         let search_results = self
-            .full_text_search_service
+            .search_service
             .search(
                 ctx,
-                FullTextSearchRequest {
+                SearchRequest {
                     query: None, // no textual query, just filtering
                     entity_schemas: vec![
                         // Query simultaneously both activities and announcements.
@@ -335,11 +335,11 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                         announcement_schema::SCHEMA_NAME,
                         activity_schema::SCHEMA_NAME,
                     ],
-                    source: FullTextSearchRequestSourceSpec::All,
+                    source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
-                    options: FullTextSearchOptions::default(),
+                    options: SearchOptions::default(),
                 },
             )
             .await?;

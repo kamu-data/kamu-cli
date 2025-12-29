@@ -1,6 +1,6 @@
 [package]
 name = "kamu-search-elasticsearch"
-description = "Implementation of full-text search using Elasticsearch"
+description = "Implementation of search capability using Elasticsearch"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -20,15 +20,36 @@ workspace = true
 [lib]
 doctest = false
 
+[features]
+default = []
+
+testing = [
+    "dep:chrono",
+    "dep:init-on-startup",
+    "dep:messaging-outbox",
+    "dep:random-strings", 
+    "dep:time-source",
+    "dep:kamu-search-elasticsearch-macros",
+    "dep:kamu-search-services"
+]
+
 
 [dependencies]
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
+init-on-startup = { workspace = true, optional = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true, optional = true }
+random-strings = { workspace = true, optional = true}
+time-source = { workspace = true, optional = true }
+
 kamu-search = { workspace = true }
+kamu-search-services = { workspace = true, optional = true }
+kamu-search-elasticsearch-macros = { workspace = true, optional = true}
 
 async-trait = { version = "0.1", default-features = false }
 canonical_json = { version = "0.5", default-features = false }
+chrono = { version = "0.4", default-features = false, optional = true }
 dill = { version = "0.14", default-features = false }
 elasticsearch = { version = "9.1.0-alpha.1", default-features = false, features = ["rustls-tls"] }
 hex = { version = "0.4", default-features = false }

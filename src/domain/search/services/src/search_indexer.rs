@@ -11,47 +11,47 @@ use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER;
-use kamu_search::{FullTextSearchEntitySchemaProvider, FullTextSearchRepository};
+use kamu_search::{SearchEntitySchemaProvider, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
-    job_name: "dev.kamu.search.FullTextSearchIndexer",
-    depends_on: &[JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER],
+    job_name: "dev.kamu.search.SearchIndexer",
+    depends_on: &[],
     requires_transaction: true,
 })]
-pub struct FullTextSearchIndexer {
-    full_text_repo: Arc<dyn FullTextSearchRepository>,
-    entity_schema_providers: Vec<Arc<dyn FullTextSearchEntitySchemaProvider>>,
+pub struct SearchIndexer {
+    search_repo: Arc<dyn SearchRepository>,
+    entity_schema_providers: Vec<Arc<dyn SearchEntitySchemaProvider>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
-impl FullTextSearchIndexer {
-    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_ensure_indexes_exist, skip_all)]
-    async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
+impl SearchIndexer {
+    #[tracing::instrument(level = "info", name = SearchIndexer_ensure_indexes_exist, skip_all)]
+    // Public for tests only
+    pub async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
         // Request schemas from all providers and ensure indexes exist
         for provider in &self.entity_schema_providers {
             let schemas = provider.provide_schemas();
             tracing::info!(
                 schemas_count = schemas.len(),
                 provider_name = provider.provider_name(),
-                "Registering full-text search entity schemas from provider",
+                "Registering search entity schemas from provider",
             );
 
             // Ensure indexes exist for each schema
             for schema in schemas {
-                match self.full_text_repo.ensure_entity_index(schema).await {
+                match self.search_repo.ensure_entity_index(schema).await {
                     Ok(outcome) => {
                         tracing::info!(
                             entity_kind = %schema.schema_name,
                             version = schema.version,
                             outcome = ?outcome,
-                            "Ensured up-to-date full-text search index for entity",
+                            "Ensured up-to-date search index for entity",
                         );
                     }
                     Err(e) => {
@@ -59,7 +59,7 @@ impl FullTextSearchIndexer {
                             entity_kind = %schema.schema_name,
                             error = ?e,
                             error_msg = %e,
-                            "Failed to ensure full-text search index for entity",
+                            "Failed to ensure search index for entity",
                         );
                         return Err(e.int_err());
                     }
@@ -70,13 +70,13 @@ impl FullTextSearchIndexer {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_indexing, skip_all)]
+    #[tracing::instrument(level = "info", name = SearchIndexer_run_indexing, skip_all)]
     async fn run_indexing(&self) -> Result<(), InternalError> {
         for provider in &self.entity_schema_providers {
             let schemas = provider.provide_schemas();
             for schema in schemas {
                 let num_existing_documents = self
-                    .full_text_repo
+                    .search_repo
                     .documents_of_kind(schema.schema_name)
                     .await?;
                 if num_existing_documents == 0 {
@@ -85,14 +85,14 @@ impl FullTextSearchIndexer {
                         "No existing documents found, running full reindexing",
                     );
                     match provider
-                        .run_schema_initial_indexing(self.full_text_repo.clone(), schema)
+                        .run_schema_initial_indexing(self.search_repo.clone(), schema)
                         .await
                     {
                         Ok(num_indexed) => {
                             tracing::info!(
                                 entity_kind = %schema.schema_name,
                                 num_indexed,
-                                "Completed full reindexing of full-text search index for entity",
+                                "Completed full reindexing of search index for entity",
                             );
                         }
                         Err(e) => {
@@ -100,7 +100,7 @@ impl FullTextSearchIndexer {
                                 entity_kind = %schema.schema_name,
                                 error = ?e,
                                 error_msg = %e,
-                                "Failed to run full reindexing of full-text search index for entity",
+                                "Failed to run full reindexing of search index for entity",
                             );
                             return Err(e);
                         }
@@ -123,8 +123,8 @@ impl FullTextSearchIndexer {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl InitOnStartup for FullTextSearchIndexer {
-    #[tracing::instrument(level = "info", name = FullTextSearchIndexer_run_initialization, skip_all)]
+impl InitOnStartup for SearchIndexer {
+    #[tracing::instrument(level = "info", name = SearchIndexer_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.ensure_indexes_exist().await?;
         self.run_indexing().await?;

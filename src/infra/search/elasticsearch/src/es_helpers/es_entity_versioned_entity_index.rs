@@ -11,36 +11,36 @@ use std::borrow::Cow;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_search::{
-    FULL_TEXT_SEARCH_FIELD_IS_BANNED,
-    FullTextEntitySchemaName,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SEARCH_FIELD_IS_BANNED,
+    SearchEntitySchema,
+    SearchEntitySchemaName,
+    SearchEntitySchemaUpgradeMode,
 };
 
-use super::ElasticSearchIndexMappings;
-use crate::ElasticSearchFullTextSearchConfig;
-use crate::es_client::ElasticSearchClient;
+use super::ElasticsearchIndexMappings;
+use crate::ElasticsearchRepositoryConfig;
+use crate::es_client::ElasticsearchClient;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ElasticSearchVersionedEntityIndex<'a> {
-    client: &'a ElasticSearchClient,
-    config: &'a ElasticSearchFullTextSearchConfig,
-    schema_name: FullTextEntitySchemaName,
+pub struct ElasticsearchVersionedEntityIndex<'a> {
+    client: &'a ElasticsearchClient,
+    repo_config: &'a ElasticsearchRepositoryConfig,
+    schema_name: SearchEntitySchemaName,
     version: u32,
 }
 
 #[common_macros::method_names_consts]
-impl<'a> ElasticSearchVersionedEntityIndex<'a> {
+impl<'a> ElasticsearchVersionedEntityIndex<'a> {
     pub fn new(
-        client: &'a ElasticSearchClient,
-        config: &'a ElasticSearchFullTextSearchConfig,
-        schema_name: FullTextEntitySchemaName,
+        client: &'a ElasticsearchClient,
+        repo_config: &'a ElasticsearchRepositoryConfig,
+        schema_name: SearchEntitySchemaName,
         version: u32,
     ) -> Self {
         Self {
             client,
-            config,
+            repo_config,
             schema_name,
             version,
         }
@@ -48,14 +48,14 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
     #[tracing::instrument(
         level = "info",
-        name = ElasticSearchVersionedEntityIndex_ensure_version_existence,
+        name = ElasticsearchVersionedEntityIndex_ensure_version_existence,
         skip_all,
         fields(schema_name = self.schema_name, version = self.version)
     )]
     pub async fn ensure_version_existence(
         &self,
-        mappings: ElasticSearchIndexMappings,
-        schema: &FullTextSearchEntitySchema,
+        mappings: ElasticsearchIndexMappings,
+        schema: &SearchEntitySchema,
     ) -> Result<EntityIndexEnsureOutcome, InternalError> {
         let alias_name = self.alias_name();
         let index_name = self.index_name();
@@ -157,7 +157,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                         .await?;
 
                     match schema.upgrade_mode {
-                        FullTextSearchEntitySchemaUpgradeMode::Reindex => {
+                        SearchEntitySchemaUpgradeMode::Reindex => {
                             // Try reindexing data from old index to new index
                             // Keep old data for retention, new index will have updated schema and
                             // will contain all previous data records
@@ -166,7 +166,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                                 .await
                                 .int_err()?;
                         }
-                        FullTextSearchEntitySchemaUpgradeMode::BreakingRecreate => {
+                        SearchEntitySchemaUpgradeMode::BreakingRecreate => {
                             // Keep old data for retention, but alias will point
                             // to new empty index,
                             // so reindexing from source is
@@ -219,10 +219,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
         }
     }
 
-    fn build_alias_filter_json(
-        &self,
-        schema: &FullTextSearchEntitySchema,
-    ) -> Option<serde_json::Value> {
+    fn build_alias_filter_json(&self, schema: &SearchEntitySchema) -> Option<serde_json::Value> {
         // Apply automatic banning filter in the alias if enabled in schema.
         // This will make banned documents invisible in search results.
         // Note that the documents will still exist in the index,
@@ -233,7 +230,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
                     "must_not": [
                         {
                             "term": {
-                                FULL_TEXT_SEARCH_FIELD_IS_BANNED: true
+                                SEARCH_FIELD_IS_BANNED: true
                             }
                         }
                     ]
@@ -245,19 +242,19 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     }
 
     pub fn alias_name(&self) -> String {
-        if self.config.index_prefix.is_empty() {
+        if self.repo_config.index_prefix.is_empty() {
             self.schema_name.to_string()
         } else {
             format!(
                 "{prefix}-{schema_name}",
-                prefix = self.config.index_prefix,
+                prefix = self.repo_config.index_prefix,
                 schema_name = self.schema_name
             )
         }
     }
 
     pub fn index_name(&self) -> String {
-        if self.config.index_prefix.is_empty() {
+        if self.repo_config.index_prefix.is_empty() {
             format!(
                 "{schema_name}-v{ver}",
                 schema_name = self.schema_name,
@@ -266,7 +263,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
         } else {
             format!(
                 "{prefix}-{schema_name}-{ver}",
-                prefix = self.config.index_prefix,
+                prefix = self.repo_config.index_prefix,
                 schema_name = self.schema_name,
                 ver = self.version
             )
@@ -295,7 +292,7 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
     async fn create_new_index(
         &self,
         index_name: &str,
-        mappings: &ElasticSearchIndexMappings,
+        mappings: &ElasticsearchIndexMappings,
         version_metadata: IndexVersionMetadata<'_>,
     ) -> Result<(), InternalError> {
         let mut mappings_json = mappings.mappings_json.clone();
@@ -308,10 +305,12 @@ impl<'a> ElasticSearchVersionedEntityIndex<'a> {
 
         let body = serde_json::json!({
             "settings": {
-                "analysis": ElasticSearchIndexMappings::build_analysis_settings_json(),
+                "analysis": ElasticsearchIndexMappings::build_analysis_settings_json(),
                 "index": {
                     "max_ngram_diff": 3
-                }
+                },
+                "number_of_shards": 1,
+                "number_of_replicas": 0,
             },
             "mappings": mappings_json,
         });
@@ -360,7 +359,7 @@ pub enum EntityIndexEnsureOutcome {
         existing_version: u32,
         to_index: String,
         new_version: u32,
-        upgrade_mode: FullTextSearchEntitySchemaUpgradeMode,
+        upgrade_mode: SearchEntitySchemaUpgradeMode,
     },
 }
 

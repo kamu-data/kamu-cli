@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,45 +21,47 @@ const SCHEMA_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const FIELD_ACCOUNT_NAME: &str = "account_name";
-pub const FIELD_DISPLAY_NAME: &str = "display_name";
-pub const FIELD_CREATED_AT: &str = "created_at";
-pub const FIELD_UPDATED_AT: &str = "updated_at";
+pub mod fields {
+    pub const ACCOUNT_NAME: &str = "account_name";
+    pub const DISPLAY_NAME: &str = "display_name";
+    pub const CREATED_AT: &str = "created_at";
+    pub const UPDATED_AT: &str = "updated_at";
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[FullTextSchemaField] = &[
-    FullTextSchemaField {
-        path: FIELD_ACCOUNT_NAME,
-        role: FullTextSchemaFieldRole::Identifier {
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
+    SearchSchemaField {
+        path: fields::ACCOUNT_NAME,
+        role: SearchSchemaFieldRole::Identifier {
             hierarchical: true,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    FullTextSchemaField {
-        path: FIELD_DISPLAY_NAME,
-        role: FullTextSchemaFieldRole::Name,
+    SearchSchemaField {
+        path: fields::DISPLAY_NAME,
+        role: SearchSchemaFieldRole::Name,
     },
-    FullTextSchemaField {
-        path: FIELD_CREATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+    SearchSchemaField {
+        path: fields::CREATED_AT,
+        role: SearchSchemaFieldRole::DateTime,
     },
-    FullTextSchemaField {
-        path: FIELD_UPDATED_AT,
-        role: FullTextSchemaFieldRole::DateTime,
+    SearchSchemaField {
+        path: fields::UPDATED_AT,
+        role: SearchSchemaFieldRole::DateTime,
     },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
-    title_field: FIELD_ACCOUNT_NAME,
+    title_field: fields::ACCOUNT_NAME,
     enable_banning: true,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

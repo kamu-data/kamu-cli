@@ -120,32 +120,32 @@ impl Search {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<FullTextSearchResponse> {
-        let full_text_search_service = from_catalog_n!(ctx, dyn kamu_search::FullTextSearchService);
+        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchService);
 
-        use kamu_accounts::account_full_text_search_schema as account_schema;
-        use kamu_datasets::dataset_full_text_search_schema as dataset_schema;
+        use kamu_accounts::account_search_schema as account_schema;
+        use kamu_datasets::dataset_search_schema as dataset_schema;
 
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::FullTextSearchContext { catalog };
+        let context = kamu_search::SearchContext { catalog };
 
         // Run actual search request
         let search_results = {
             use kamu_search::*;
 
-            full_text_search_service
+            search_service
                 .search(
                     context,
-                    FullTextSearchRequest {
+                    SearchRequest {
                         query: if prompt.is_empty() {
                             None
                         } else {
                             Some(prompt)
                         },
-                        source: FullTextSearchRequestSourceSpec::All,
+                        source: SearchRequestSourceSpec::All,
                         entity_schemas: vec![
                             account_schema::SCHEMA_NAME,
                             dataset_schema::SCHEMA_NAME,
@@ -153,11 +153,11 @@ impl Search {
                         filter: None,
                         // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
                         sort: vec![],
-                        page: FullTextPageSpec {
+                        page: SearchPaginationSpec {
                             limit: per_page,
                             offset: page * per_page,
                         },
-                        options: FullTextSearchOptions {
+                        options: SearchOptions {
                             enable_explain: false,
                             enable_highlighting: true,
                         },

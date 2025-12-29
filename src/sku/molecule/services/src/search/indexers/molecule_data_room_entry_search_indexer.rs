@@ -24,7 +24,7 @@ use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{FullTextSearchRepository, FullTextUpdateOperation};
+use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,7 +69,7 @@ pub(crate) fn index_data_room_entry_from_entity(
 pub(crate) async fn index_data_room_entries(
     organization_account: &LoggedAccount,
     catalog: &dill::Catalog,
-    repo: &dyn FullTextSearchRepository,
+    repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
         organization_account_name = organization_account.account_name.as_str(),
@@ -144,7 +144,7 @@ async fn process_projects_in_batches(
     molecule_account_id: &odf::AccountID,
     projects: &[MoleculeProject],
     dependencies: &IndexingDependencies,
-    repo: &dyn FullTextSearchRepository,
+    repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     use futures::stream::{FuturesUnordered, StreamExt};
 
@@ -304,7 +304,7 @@ async fn load_versioned_files_for_entries(
 
 fn index_project_data(
     project_data: ProjectIndexingData,
-    operations: &mut Vec<FullTextUpdateOperation>,
+    operations: &mut Vec<SearchIndexUpdateOperation>,
 ) -> Result<(), InternalError> {
     let data_room_entries = project_data.entries_result?;
 
@@ -327,7 +327,7 @@ fn index_project_data(
             content_text,
         );
 
-        operations.push(FullTextUpdateOperation::Index {
+        operations.push(SearchIndexUpdateOperation::Index {
             id: data_room_entry_schema::unique_id_for_data_room_entry(
                 &project_data.project.ipnft_uid,
                 &entry.path,

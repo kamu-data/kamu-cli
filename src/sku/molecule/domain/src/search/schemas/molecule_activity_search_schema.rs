@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_search::{
-    FullTextSchemaField,
-    FullTextSchemaFieldRole,
-    FullTextSearchEntitySchema,
-    FullTextSearchEntitySchemaUpgradeMode,
+    SearchEntitySchema,
+    SearchEntitySchemaUpgradeMode,
+    SearchSchemaField,
+    SearchSchemaFieldRole,
 };
 
 use crate::search::schemas::molecule_search_schema_common as molecule_schema;
@@ -30,22 +30,22 @@ pub mod fields {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
+const SCHEMA_FIELDS: &[kamu_search::SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::OFFSET,
-        role: FullTextSchemaFieldRole::Integer,
+        role: SearchSchemaFieldRole::Integer,
     },
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
     molecule_schema::field_definitions::IPNFT_UID,
-    FullTextSchemaField {
+    SearchSchemaField {
         path: fields::ACTIVITY_TYPE,
-        role: FullTextSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Keyword,
     },
-    FullTextSchemaField {
+    SearchSchemaField {
         path: molecule_schema::fields::PATH,
-        role: FullTextSchemaFieldRole::Keyword, // Not identifier in this index, filters only
+        role: SearchSchemaFieldRole::Keyword, // Not identifier in this index, filters only
     },
     molecule_schema::field_definitions::REF,
     molecule_schema::field_definitions::VERSION,
@@ -61,10 +61,10 @@ const SCHEMA_FIELDS: &[kamu_search::FullTextSchemaField] = &[
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SCHEMA: FullTextSearchEntitySchema = FullTextSearchEntitySchema {
+pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
-    upgrade_mode: FullTextSearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: "_id",
     enable_banning: false,
