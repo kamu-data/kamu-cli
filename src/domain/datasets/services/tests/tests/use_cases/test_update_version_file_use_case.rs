@@ -25,6 +25,8 @@ use kamu::{
     QueryServiceImpl,
     SessionContextBuilder,
 };
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{
     ContentArgs,
@@ -34,7 +36,12 @@ use kamu_datasets::{
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
-use kamu_datasets_services::UpdateVersionedFileUseCaseImpl;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    UpdateVersionedFileUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};
@@ -173,6 +180,14 @@ impl UpdateVersionFileCaseHarness {
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))

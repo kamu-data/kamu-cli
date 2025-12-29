@@ -11,9 +11,13 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{UpdateVersionedFileUseCase, WriteCheckedDataset};
+use kamu_datasets::{
+    UpdateVersionFileUseCaseError,
+    UpdateVersionedFileUseCase,
+    WriteCheckedDataset,
+};
 use kamu_molecule_domain::{
     MoleculeUpdateVersionedFileMetadataError,
     MoleculeUpdateVersionedFileMetadataUseCase,
@@ -73,6 +77,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
         versioned_file_dataset_id: &odf::DatasetID,
         existing_versioned_file_entry: MoleculeVersionedFileEntry,
         source_event_time: Option<DateTime<Utc>>,
+        expected_head: Option<odf::Multihash>,
         basic_info: MoleculeVersionedFileEntryBasicInfo,
         detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError> {
@@ -91,11 +96,24 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
                 write_checked_versioned_file_dataset,
                 source_event_time,
                 None,
-                None,
+                expected_head,
                 Some(entry_extra_data.to_fields()),
             )
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                UpdateVersionFileUseCaseError::Access(e) => {
+                    MoleculeUpdateVersionedFileMetadataError::Access(e)
+                }
+                UpdateVersionFileUseCaseError::RefCASFailed(e) => {
+                    MoleculeUpdateVersionedFileMetadataError::RefCASFailed(e)
+                }
+                UpdateVersionFileUseCaseError::QuotaExceeded(e) => {
+                    MoleculeUpdateVersionedFileMetadataError::QuotaExceeded(e)
+                }
+                UpdateVersionFileUseCaseError::Internal(e) => {
+                    MoleculeUpdateVersionedFileMetadataError::Internal(e)
+                }
+            })?;
 
         assert_eq!(
             existing_versioned_file_entry.content_hash,

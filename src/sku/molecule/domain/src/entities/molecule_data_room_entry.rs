@@ -80,6 +80,25 @@ impl MoleculeDataRoomEntry {
 
         Ok(data_room_entry)
     }
+
+    pub fn is_only_change_by_diff(&self, other: &Self) -> bool {
+        if self.path != other.path || self.reference != other.reference {
+            return false;
+        }
+
+        let lhs = &self.denormalized_latest_file_info;
+        let rhs = &other.denormalized_latest_file_info;
+
+        lhs.version == rhs.version
+            && lhs.content_type == rhs.content_type
+            && lhs.content_length == rhs.content_length
+            && lhs.content_hash == rhs.content_hash
+            && lhs.access_level == rhs.access_level
+            && lhs.description == rhs.description
+            && lhs.categories == rhs.categories
+            && lhs.tags == rhs.tags
+            && lhs.change_by != rhs.change_by
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

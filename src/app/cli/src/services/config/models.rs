@@ -16,6 +16,7 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets_services::QuotaDefaultsConfig;
 use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
 use merge::Merge;
 use merge::option::overwrite_none;
@@ -90,6 +91,10 @@ pub struct CLIConfig {
     /// Experimental and temporary configuration options
     #[merge(strategy = merge::option::overwrite_none)]
     pub extra: Option<ExtraConfig>,
+
+    /// Default quotas configured by type
+    #[merge(strategy = merge_recursive)]
+    pub quota_defaults: Option<QuotaDefaults>,
 }
 
 impl CLIConfig {
@@ -110,6 +115,7 @@ impl CLIConfig {
             uploads: None,
             did_encryption: None,
             extra: None,
+            quota_defaults: None,
         }
     }
 
@@ -134,6 +140,7 @@ impl CLIConfig {
             uploads: Some(UploadsConfig::sample()),
             did_encryption: Some(DidSecretEncryptionConfig::sample()),
             extra: Some(ExtraConfig::sample()),
+            quota_defaults: Some(QuotaDefaults::sample()),
         }
     }
 }
@@ -156,6 +163,7 @@ impl Default for CLIConfig {
             uploads: Some(UploadsConfig::default()),
             did_encryption: Some(DidSecretEncryptionConfig::default()),
             extra: Some(ExtraConfig::default()),
+            quota_defaults: Some(QuotaDefaults::default()),
         }
     }
 }
@@ -173,6 +181,34 @@ pub struct ExtraConfig {
 
 impl ExtraConfig {
     fn sample() -> Self {
+        Self::default()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Quota defaults
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct QuotaDefaults {
+    pub storage: Option<u64>,
+}
+
+impl Default for QuotaDefaults {
+    fn default() -> Self {
+        let defaults = QuotaDefaultsConfig::default();
+
+        Self {
+            storage: Some(defaults.storage),
+        }
+    }
+}
+
+impl QuotaDefaults {
+    pub fn sample() -> Self {
         Self::default()
     }
 }

@@ -39,10 +39,52 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+        // Helper to conditionally fetch data
+        async fn fetch_or_empty<Fut>(
+            enabled: bool,
+            fut: Fut,
+        ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>
+        where
+            Fut: std::future::Future<
+                    Output = Result<
+                        MoleculeProjectActivityListing,
+                        MoleculeViewDataRoomActivitiesError,
+                    >,
+                >,
+        {
+            if enabled {
+                fut.await
+            } else {
+                Ok(MoleculeProjectActivityListing::default())
+            }
+        }
+
+        let by_kinds = filters
+            .as_ref()
+            .and_then(|f| f.by_kinds.as_deref())
+            .unwrap_or(&[]);
+
+        let fetch_data_room =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
+        let fetch_announcements =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+
+        if !fetch_data_room && !fetch_announcements {
+            return Ok(MoleculeProjectActivityListing::default());
+        }
+
+        let data_room_fut = fetch_or_empty(
+            fetch_data_room,
             self.data_room_activities_listing_from_source(molecule_project, filters.clone()),
-            self.announcement_activities_listing_from_source(molecule_project, filters),
-        )?;
+        );
+
+        let announcements_fut = fetch_or_empty(
+            fetch_announcements,
+            self.announcement_activities_listing_from_source(molecule_project, filters.clone()),
+        );
+
+        let (mut data_room_listing, mut announcement_activities_listing) =
+            tokio::try_join!(data_room_fut, announcements_fut)?;
 
         // Get the total count before pagination
         let total_count =
@@ -129,6 +171,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         // For any data room update, we always have two entries: -C and +C.
         let mut nodes = Vec::with_capacity(records.len());
         let mut record_iter = records.into_iter().peekable();
+        let mut last_retract_entry: Option<MoleculeDataRoomEntry> = None;
 
         while let Some(current) = record_iter.next() {
             let (offset, op, entry) =
@@ -163,8 +206,37 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                         MoleculeDataRoomFileActivityType::Added
                     }
                 }
-                OperationType::Retract => MoleculeDataRoomFileActivityType::Removed,
-                OperationType::CorrectTo => MoleculeDataRoomFileActivityType::Updated,
+                OperationType::Retract => {
+                    last_retract_entry = Some(entry.clone());
+                    MoleculeDataRoomFileActivityType::Removed
+                }
+                OperationType::CorrectTo => {
+                    // Ignore synthetic corrections that only change `change_by` right before
+                    // retract
+                    if op == OperationType::CorrectTo {
+                        let next_is_only_change_by_diff = if let Some(next) = record_iter.peek() {
+                            let (_, _, next_entry) =
+                                MoleculeDataRoomEntry::from_changelog_entry_json(
+                                    next.clone(),
+                                    &vocab,
+                                )?;
+
+                            entry.is_only_change_by_diff(&next_entry)
+                        } else {
+                            false
+                        };
+
+                        let match_retract_system_time = last_retract_entry
+                            .as_ref()
+                            .map(|prev| prev.system_time == entry.system_time)
+                            .unwrap_or(false);
+
+                        if next_is_only_change_by_diff || match_retract_system_time {
+                            continue;
+                        }
+                    }
+                    MoleculeDataRoomFileActivityType::Updated
+                }
                 OperationType::CorrectFrom => {
                     unreachable!()
                 }

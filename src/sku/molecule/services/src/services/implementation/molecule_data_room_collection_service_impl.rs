@@ -118,6 +118,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
             }
             Err(UpdateCollectionEntriesUseCaseError::Access(e)) => Err(e.into()),
             Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(e)) => Err(e.into()),
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(e)) => Err(e.into()),
             Err(e @ UpdateCollectionEntriesUseCaseError::Internal(_)) => Err(e.int_err().into()),
         }
     }

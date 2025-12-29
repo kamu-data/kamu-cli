@@ -90,8 +90,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
 
         let push_res = global_data_room_activities_writer
             .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
-            .await
-            .int_err()?;
+            .await?;
 
         // Check commit status
         match push_res {

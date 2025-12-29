@@ -57,13 +57,15 @@ pub fn dev(cfg: Config) -> Guard {
     let (otel_layer, otlp_guard) = if cfg.otlp_endpoint.is_none() {
         (None, None)
     } else {
+        let (tracer, guard) = init_otel_tracer(&cfg);
+
         (
             Some(
                 tracing_opentelemetry::layer()
                     .with_error_records_to_exceptions(true)
-                    .with_tracer(init_otel_tracer(&cfg)),
+                    .with_tracer(tracer),
             ),
-            Some(OtlpGuard),
+            Some(guard),
         )
     };
 
@@ -103,13 +105,15 @@ pub fn service(cfg: Config) -> Guard {
     let (otel_layer, otlp_guard) = if cfg.otlp_endpoint.is_none() {
         (None, None)
     } else {
+        let (tracer, guard) = init_otel_tracer(&cfg);
+
         (
             Some(
                 tracing_opentelemetry::layer()
                     .with_error_records_to_exceptions(true)
-                    .with_tracer(init_otel_tracer(&cfg)),
+                    .with_tracer(tracer),
             ),
-            Some(OtlpGuard),
+            Some(guard),
         )
     };
 
@@ -132,39 +136,42 @@ pub fn service(cfg: Config) -> Guard {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "opentelemetry")]
-fn init_otel_tracer(cfg: &Config) -> opentelemetry_sdk::trace::Tracer {
+fn init_otel_tracer(cfg: &Config) -> (opentelemetry_sdk::trace::SdkTracer, OtlpGuard) {
     use std::time::Duration;
 
     use opentelemetry::KeyValue;
+    use opentelemetry::trace::TracerProvider;
     use opentelemetry_otlp::WithExportConfig as _;
     use opentelemetry_semantic_conventions::resource as otel_resource;
 
-    let otel_exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
+    let otel_exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
         .with_endpoint(cfg.otlp_endpoint.as_ref().unwrap())
-        .with_timeout(Duration::from_secs(5));
+        .with_timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
 
-    use opentelemetry::trace::TracerProvider;
-    opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(otel_exporter)
-        .with_trace_config(
-            opentelemetry_sdk::trace::Config::default()
-                .with_max_events_per_span(cfg.span_limits.max_events_per_span)
-                .with_max_attributes_per_span(cfg.span_limits.max_attributes_per_span)
-                .with_max_links_per_span(cfg.span_limits.max_links_per_span)
-                .with_max_attributes_per_event(cfg.span_limits.max_attributes_per_event)
-                .with_max_attributes_per_link(cfg.span_limits.max_attributes_per_link)
-                .with_resource(opentelemetry_sdk::Resource::new([
+    let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(otel_exporter)
+        .with_max_events_per_span(cfg.span_limits.max_events_per_span)
+        .with_max_attributes_per_span(cfg.span_limits.max_attributes_per_span)
+        .with_max_links_per_span(cfg.span_limits.max_links_per_span)
+        .with_max_attributes_per_event(cfg.span_limits.max_attributes_per_event)
+        .with_max_attributes_per_link(cfg.span_limits.max_attributes_per_link)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder_empty()
+                .with_attributes([
                     KeyValue::new(otel_resource::SERVICE_NAME, cfg.service_name.clone()),
                     KeyValue::new(otel_resource::SERVICE_VERSION, cfg.service_version.clone()),
-                ]))
-                .with_sampler(opentelemetry_sdk::trace::Sampler::AlwaysOn),
+                ])
+                .build(),
         )
-        .install_batch(opentelemetry_sdk::runtime::Tokio)
-        .expect("Creating tracer provider")
-        .tracer_builder(cfg.service_name.clone())
-        .build()
+        .with_sampler(opentelemetry_sdk::trace::Sampler::AlwaysOn)
+        .build();
+
+    let tracer = tracer_provider.tracer(cfg.service_name.clone());
+
+    (tracer, OtlpGuard { tracer_provider })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +185,14 @@ pub struct Guard {
     pub otlp_guard: Option<OtlpGuard>,
 }
 
-pub struct OtlpGuard;
+#[cfg(feature = "opentelemetry")]
+pub struct OtlpGuard {
+    pub tracer_provider: opentelemetry_sdk::trace::SdkTracerProvider,
+}
 
 #[cfg(feature = "opentelemetry")]
 impl Drop for OtlpGuard {
     fn drop(&mut self) {
-        opentelemetry::global::shutdown_tracer_provider();
+        let _ = self.tracer_provider.shutdown();
     }
 }

@@ -286,10 +286,12 @@ impl Account {
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
     }
 
-    /// Returns datasets belonging to this account
+    /// Returns account quotas
     #[tracing::instrument(level = "info", name = Account_quotas, skip_all)]
-    async fn quotas(&self, _ctx: &Context<'_>) -> Result<AccountQuotas<'_>> {
-        todo!()
+    async fn quotas(&self, ctx: &Context<'_>) -> Result<AccountQuotas<'_>> {
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
+        Ok(AccountQuotas::new(full_account_info))
     }
 }
 

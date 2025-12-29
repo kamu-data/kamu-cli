@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, QuotaError};
 use kamu_datasets::ContentArgs;
 use kamu_molecule_domain::{
     MoleculeAppendDataRoomActivityError,
@@ -23,6 +23,8 @@ use kamu_molecule_domain::{
     MoleculeCreateVersionedFileDatasetUseCase,
     MoleculeDataRoomActivityPayloadRecord,
     MoleculeDataRoomFileActivityType,
+    MoleculeFindDataRoomEntryError,
+    MoleculeFindDataRoomEntryUseCase,
     MoleculeMoveDataRoomEntryError,
     MoleculeMoveDataRoomEntryUseCase,
     MoleculeReadVersionedFileEntryError,
@@ -94,14 +96,39 @@ impl MoleculeDataRoomMutV2 {
             upload_versioned_file_version_uc,
             create_data_room_entry_uc,
             append_global_data_room_activity_uc,
+            find_data_room_entry_uc,
         ) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
             dyn MoleculeCreateVersionedFileDatasetUseCase,
             dyn MoleculeUploadVersionedFileVersionUseCase,
             dyn MoleculeCreateDataRoomEntryUseCase,
-            dyn MoleculeAppendGlobalDataRoomActivityUseCase
+            dyn MoleculeAppendGlobalDataRoomActivityUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        // 0. `path` must not be occupied.
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(&self.project.entity, None, path.clone().into_v1())
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -149,7 +176,7 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Add the file to the data room.
 
-        let data_room_entry = create_data_room_entry_uc
+        let data_room_entry = match create_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
@@ -160,13 +187,21 @@ impl MoleculeDataRoomMutV2 {
                 versioned_file_entry.detailed_info.content_text.as_deref(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeCreateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeCreateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                e @ MoleculeCreateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeCreateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeCreateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeCreateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeCreateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
@@ -187,21 +222,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: versioned_file_entry.basic_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
@@ -250,7 +289,7 @@ impl MoleculeDataRoomMutV2 {
             .get_latest_data_room_entry(ctx, reference.as_ref())
             .await?
         else {
-            todo!();
+            return Ok(MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference }.into());
         };
 
         // 2. Upload the next version to the specified dataset.
@@ -278,24 +317,33 @@ impl MoleculeDataRoomMutV2 {
 
         // 3. Update the file state in the data room.
 
-        let updated_data_room_entry = update_data_room_entry_uc
+        let updated_data_room_entry = match update_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
                 existing_data_room_entry.path.clone().into_v1(),
                 existing_data_room_entry.reference.clone(),
+                None,
                 versioned_file_entry.to_denormalized(),
                 versioned_file_entry.detailed_info.content_text.as_deref(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeUpdateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 4. Log the activity.
         // TODO: asynchronous write of activity log
@@ -316,21 +364,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: versioned_file_entry.basic_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomFinishUploadFileResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomFinishUploadFileResultSuccess {
@@ -418,21 +470,26 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // TODO: asynchronous write of activity log
-        append_global_data_room_activity_uc
+        match append_global_data_room_activity_uc
             .execute(
                 &molecule_subject,
                 Some(event_time),
                 data_room_activity_record,
             )
             .await
-            .map_err(|e| -> GqlError {
-                use MoleculeAppendDataRoomActivityError as E;
-
-                match e {
-                    E::Access(e) => e.into(),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        {
+            Ok(_) => {}
+            Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+            Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                let d = quota_result(e)?;
+                return Err(GqlError::gql(quota_exceeded_message(
+                    d.used, d.incoming, d.limit,
+                )));
+            }
+            Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        }
 
         Ok(())
     }
@@ -447,7 +504,7 @@ impl MoleculeDataRoomMutV2 {
     /// data room via a single transaction. Uploads a new version of content
     /// in-band, so should be used only for very small files.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_upload_file, skip_all)]
     async fn upload_file(
         &self,
         ctx: &Context<'_>,
@@ -622,15 +679,43 @@ impl MoleculeDataRoomMutV2 {
         ctx: &Context<'_>,
         from_path: CollectionPathV2<'static>,
         to_path: CollectionPathV2<'static>,
+        change_by: String,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomMoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (time_source, move_data_room_entry_uc) = from_catalog_n!(
+        let (time_source, move_data_room_entry_uc, find_data_room_entry_uc) = from_catalog_n!(
             ctx,
             dyn SystemTimeSource,
-            dyn MoleculeMoveDataRoomEntryUseCase
+            dyn MoleculeMoveDataRoomEntryUseCase,
+            dyn MoleculeFindDataRoomEntryUseCase
         );
+
+        let maybe_existing_data_room_entry = find_data_room_entry_uc
+            .execute_find_by_path(
+                &self.project.entity,
+                None,
+                to_path.clone().into_v1_scalar().into(),
+            )
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(e) => e.int_err().into(),
+                }
+            })?;
+
+        if let Some(existing_data_room_entry) = maybe_existing_data_room_entry {
+            return Ok(MoleculeDataRoomPathOccupied {
+                by_entry: MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    existing_data_room_entry,
+                    true,
+                ),
+            }
+            .into());
+        }
 
         let event_time = time_source.now();
 
@@ -641,6 +726,7 @@ impl MoleculeDataRoomMutV2 {
                 Some(event_time),
                 from_path.into_v1_scalar().into(),
                 to_path.into_v1_scalar().into(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await
@@ -665,7 +751,7 @@ impl MoleculeDataRoomMutV2 {
                 Ok(MoleculeDataRoomUpdateUpToDate.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(path)) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound {
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound {
                     path: CollectionPathV2::from_v1_unchecked(path),
                 }
                 .into())
@@ -673,6 +759,11 @@ impl MoleculeDataRoomMutV2 {
             Err(MoleculeMoveDataRoomEntryError::Access(e)) => Err(e.into()),
             Err(MoleculeMoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(MoleculeMoveDataRoomEntryError::QuotaExceeded(e)) => {
+                Ok(MoleculeDataRoomMoveEntryResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ))
             }
             Err(e @ MoleculeMoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -684,6 +775,7 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         path: CollectionPathV2<'static>,
+        change_by: String,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<MoleculeDataRoomRemoveEntryResult> {
         let molecule_subject = molecule_subject(ctx)?;
@@ -702,6 +794,7 @@ impl MoleculeDataRoomMutV2 {
                 &self.project.entity,
                 Some(event_time),
                 path.clone().into_v1_scalar().into(),
+                change_by,
                 expected_head.map(Into::into),
             )
             .await
@@ -723,7 +816,7 @@ impl MoleculeDataRoomMutV2 {
                 .into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::UpToDate) => {
-                Ok(MoleculeDataRoomUpdateEntryNotFound { path }.into())
+                Ok(MoleculeDataRoomUpdateEntryByPathNotFound { path }.into())
             }
             Ok(MoleculeUpdateDataRoomEntryResult::EntryNotFound(_)) => {
                 unreachable!(
@@ -733,6 +826,11 @@ impl MoleculeDataRoomMutV2 {
             Err(MoleculeRemoveDataRoomEntryError::Access(e)) => Err(e.into()),
             Err(MoleculeRemoveDataRoomEntryError::RefCASFailed(_)) => {
                 Err(GqlError::gql("Data room linking: CAS failed"))
+            }
+            Err(MoleculeRemoveDataRoomEntryError::QuotaExceeded(e)) => {
+                Ok(MoleculeDataRoomRemoveEntryResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ))
             }
             Err(e @ MoleculeRemoveDataRoomEntryError::Internal(_)) => Err(e.int_err().into()),
         }
@@ -744,6 +842,8 @@ impl MoleculeDataRoomMutV2 {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
+        #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
+        expected_head: Option<Multihash<'static>>,
         // TODO: not optional?
         access_level: MoleculeAccessLevel,
         change_by: String,
@@ -751,7 +851,6 @@ impl MoleculeDataRoomMutV2 {
         categories: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         content_text: Option<String>,
-        encryption_metadata: Option<MoleculeEncryptionMetadataInput>,
     ) -> Result<MoleculeDataRoomUpdateFileMetadataResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -771,6 +870,7 @@ impl MoleculeDataRoomMutV2 {
         );
 
         let event_time = time_source.now();
+        let expected_head = expected_head.map(Into::into);
 
         // 0. Get existing data room entry record and latest versioned file data
 
@@ -779,7 +879,7 @@ impl MoleculeDataRoomMutV2 {
             .await?
         else {
             return Ok(MoleculeDataRoomUpdateFileMetadataResult::EntryNotFound(
-                MoleculeDataRoomUpdateFileMetadataResultEntryNotFound { r#ref: reference },
+                MoleculeDataRoomUpdateEntryByRefNotFound { r#ref: reference },
             ));
         };
 
@@ -800,12 +900,18 @@ impl MoleculeDataRoomMutV2 {
             ));
         };
 
+        let existing_encryption_metadata = existing_file_entry
+            .detailed_info
+            .encryption_metadata
+            .clone();
+
         // 1. Update the versioned dataset.
-        let updated_versioned_file_entry = update_versioned_file_metadata_uc
+        let updated_versioned_file_entry = match update_versioned_file_metadata_uc
             .execute(
                 reference.as_ref(),
                 existing_file_entry,
                 Some(event_time),
+                expected_head.clone(),
                 MoleculeVersionedFileEntryBasicInfo {
                     access_level,
                     change_by,
@@ -815,29 +921,43 @@ impl MoleculeDataRoomMutV2 {
                 },
                 MoleculeVersionedFileEntryDetailedInfo {
                     content_text,
-                    encryption_metadata: encryption_metadata.map(Into::into),
+                    encryption_metadata: existing_encryption_metadata,
                 },
             )
             .await
-            .map_err(|e| {
-                use MoleculeUpdateVersionedFileMetadataError as E;
-                match e {
-                    E::Access(e) => GqlError::Access(e),
-                    e @ E::Internal(_) => e.int_err().into(),
-                }
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateVersionedFileMetadataError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateVersionedFileMetadataError::RefCASFailed(err)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::CasFailed(
+                    UpdateVersionErrorCasFailed {
+                        expected_head: err.expected.unwrap().into(),
+                        actual_head: err.actual.unwrap().into(),
+                    },
+                ));
+            }
+            Err(MoleculeUpdateVersionedFileMetadataError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateVersionedFileMetadataError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         let new_denormalized_file_info = updated_versioned_file_entry.to_denormalized();
 
         // 2. Update the file state in the data room.
 
-        let updated_data_room_entry = update_data_room_entry_uc
+        let updated_data_room_entry = match update_data_room_entry_uc
             .execute(
                 &molecule_subject,
                 &self.project.entity,
                 Some(event_time),
                 existing_data_room_entry.path.clone().into_v1(),
                 reference.into(),
+                expected_head,
                 new_denormalized_file_info.clone(),
                 updated_versioned_file_entry
                     .detailed_info
@@ -845,13 +965,21 @@ impl MoleculeDataRoomMutV2 {
                     .as_deref(),
             )
             .await
-            .map_err(|e| match e {
-                MoleculeUpdateDataRoomEntryError::Access(e) => e.into(),
-                MoleculeUpdateDataRoomEntryError::RefCASFailed(_) => {
-                    GqlError::gql("Data room linking: CAS failed")
-                }
-                e @ MoleculeUpdateDataRoomEntryError::Internal(_) => e.int_err().into(),
-            })?;
+        {
+            Ok(entry) => entry,
+            Err(MoleculeUpdateDataRoomEntryError::Access(e)) => return Err(e.into()),
+            Err(MoleculeUpdateDataRoomEntryError::RefCASFailed(_)) => {
+                return Err(GqlError::gql("Data room linking: CAS failed"));
+            }
+            Err(MoleculeUpdateDataRoomEntryError::QuotaExceeded(e)) => {
+                return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                    quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                ));
+            }
+            Err(e @ MoleculeUpdateDataRoomEntryError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
 
         // 3. Log the activity.
         // TODO: asynchronous write of activity log
@@ -872,21 +1000,25 @@ impl MoleculeDataRoomMutV2 {
                 tags: new_denormalized_file_info.tags,
             };
 
-            append_global_data_room_activity_uc
+            match append_global_data_room_activity_uc
                 .execute(
                     &molecule_subject,
                     Some(event_time),
                     data_room_activity_record,
                 )
                 .await
-                .map_err(|e| -> GqlError {
-                    use MoleculeAppendDataRoomActivityError as E;
-
-                    match e {
-                        E::Access(e) => e.into(),
-                        e @ E::Internal(_) => e.int_err().into(),
-                    }
-                })?;
+            {
+                Ok(_) => {}
+                Err(MoleculeAppendDataRoomActivityError::Access(e)) => return Err(e.into()),
+                Err(MoleculeAppendDataRoomActivityError::QuotaExceeded(e)) => {
+                    return Ok(MoleculeDataRoomUpdateFileMetadataResult::QuotaExceeded(
+                        quota_result(e).map(MoleculeQuotaExceeded::from)?,
+                    ));
+                }
+                Err(e @ MoleculeAppendDataRoomActivityError::Internal(_)) => {
+                    return Err(e.int_err().into());
+                }
+            }
         }
 
         Ok(MoleculeDataRoomUpdateFileMetadataResultSuccess {
@@ -910,6 +1042,9 @@ impl MoleculeDataRoomMutV2 {
 )]
 pub enum MoleculeDataRoomFinishUploadFileResult {
     Success(MoleculeDataRoomFinishUploadFileResultSuccess),
+    QuotaExceeded(MoleculeQuotaExceeded),
+    PathOccupied(MoleculeDataRoomPathOccupied),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
 }
 
 #[derive(SimpleObject)]
@@ -929,6 +1064,40 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
     }
 }
 
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomPathOccupied {
+    pub by_entry: MoleculeDataRoomEntry,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomPathOccupied {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "Path is occupied".to_string()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub r#ref: DatasetID<'static>,
+}
+
+#[ComplexObject]
+impl MoleculeDataRoomUpdateEntryByRefNotFound {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        "Data room entry not found by ref".into()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
@@ -938,8 +1107,10 @@ impl MoleculeDataRoomFinishUploadFileResultSuccess {
 )]
 pub enum MoleculeDataRoomMoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
     UpToDate(MoleculeDataRoomUpdateUpToDate),
+    QuotaExceeded(MoleculeQuotaExceeded),
+    PathOccupied(MoleculeDataRoomPathOccupied),
 }
 
 #[derive(SimpleObject)]
@@ -962,17 +1133,18 @@ impl MoleculeDataRoomUpdateSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomUpdateEntryNotFound {
+pub struct MoleculeDataRoomUpdateEntryByPathNotFound {
     pub path: CollectionPathV2<'static>,
 }
+
 #[ComplexObject]
-impl MoleculeDataRoomUpdateEntryNotFound {
+impl MoleculeDataRoomUpdateEntryByPathNotFound {
     pub async fn is_success(&self) -> bool {
         false
     }
 
     pub async fn message(&self) -> String {
-        "Data room entry not found".into()
+        "Data room entry not found by path".into()
     }
 }
 
@@ -997,7 +1169,8 @@ impl MoleculeDataRoomUpdateUpToDate {
 )]
 pub enum MoleculeDataRoomRemoveEntryResult {
     Success(MoleculeDataRoomUpdateSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByPathNotFound),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1010,10 +1183,11 @@ pub enum MoleculeDataRoomRemoveEntryResult {
 )]
 pub enum MoleculeDataRoomUpdateFileMetadataResult {
     Success(MoleculeDataRoomUpdateFileMetadataResultSuccess),
-    EntryNotFound(MoleculeDataRoomUpdateFileMetadataResultEntryNotFound),
+    EntryNotFound(MoleculeDataRoomUpdateEntryByRefNotFound),
     FileNotFound(MoleculeDataRoomUpdateFileMetadataResultFileNotFound),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
+    QuotaExceeded(MoleculeQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -1035,22 +1209,6 @@ impl MoleculeDataRoomUpdateFileMetadataResultSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub r#ref: DatasetID<'static>,
-}
-#[ComplexObject]
-impl MoleculeDataRoomUpdateFileMetadataResultEntryNotFound {
-    pub async fn is_success(&self) -> bool {
-        false
-    }
-
-    pub async fn message(&self) -> String {
-        "Data room entry not found".to_string()
-    }
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
 pub struct MoleculeDataRoomUpdateFileMetadataResultFileNotFound {
     pub r#ref: DatasetID<'static>,
 }
@@ -1066,3 +1224,63 @@ impl MoleculeDataRoomUpdateFileMetadataResultFileNotFound {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct MoleculeQuotaExceeded {
+    pub used: Option<u64>,
+    pub incoming: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+impl From<QuotaExceededDetails> for MoleculeQuotaExceeded {
+    fn from(value: QuotaExceededDetails) -> Self {
+        Self {
+            used: value.used,
+            incoming: value.incoming,
+            limit: value.limit,
+        }
+    }
+}
+
+#[ComplexObject]
+impl MoleculeQuotaExceeded {
+    async fn is_success(&self) -> bool {
+        false
+    }
+
+    async fn message(&self) -> String {
+        quota_exceeded_message(self.used, self.incoming, self.limit)
+    }
+}
+
+struct QuotaExceededDetails {
+    used: Option<u64>,
+    incoming: Option<u64>,
+    limit: Option<u64>,
+}
+
+fn quota_result(err: QuotaError) -> Result<QuotaExceededDetails, GqlError> {
+    match err {
+        QuotaError::Exceeded(e) => Ok(QuotaExceededDetails {
+            used: Some(e.used),
+            incoming: Some(e.incoming),
+            limit: Some(e.limit),
+        }),
+        QuotaError::NotConfigured => Ok(QuotaExceededDetails {
+            used: None,
+            incoming: None,
+            limit: None,
+        }),
+        QuotaError::Internal(e) => Err(e.into()),
+    }
+}
+
+fn quota_exceeded_message(used: Option<u64>, incoming: Option<u64>, limit: Option<u64>) -> String {
+    match (used, incoming, limit) {
+        (Some(used), Some(incoming), Some(limit)) => {
+            format!("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")
+        }
+        _ => "Quota exceeded".to_string(),
+    }
+}

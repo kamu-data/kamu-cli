@@ -35,6 +35,7 @@ format-utils = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["datafusion"] }
+kamu-accounts = { workspace = true }
 kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

@@ -215,6 +215,7 @@ pub struct MoleculeProjectActivityFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_kinds: Option<Vec<MoleculeActivityKindInput>>,
 }
 
 impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActivitiesFilters {
@@ -223,6 +224,25 @@ impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActi
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
+            by_kinds: value
+                .by_kinds
+                .map(|kinds| kinds.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MoleculeActivityKindInput {
+    File,
+    Announcement,
+}
+
+impl From<MoleculeActivityKindInput> for kamu_molecule_domain::MoleculeActivityKind {
+    fn from(value: MoleculeActivityKindInput) -> Self {
+        use kamu_molecule_domain::MoleculeActivityKind as Domain;
+        match value {
+            MoleculeActivityKindInput::File => Domain::DataRoomActivity,
+            MoleculeActivityKindInput::Announcement => Domain::Announcement,
         }
     }
 }

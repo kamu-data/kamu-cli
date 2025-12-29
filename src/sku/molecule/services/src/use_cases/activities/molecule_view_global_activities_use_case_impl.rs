@@ -41,10 +41,51 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
-        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+        async fn fetch_or_empty<Fut>(
+            enabled: bool,
+            fut: Fut,
+        ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError>
+        where
+            Fut: std::future::Future<
+                    Output = Result<
+                        MoleculeGlobalActivityListing,
+                        MoleculeViewGlobalActivitiesError,
+                    >,
+                >,
+        {
+            if enabled {
+                fut.await
+            } else {
+                Ok(MoleculeGlobalActivityListing::default())
+            }
+        }
+
+        let by_kinds = filters
+            .as_ref()
+            .and_then(|f| f.by_kinds.as_deref())
+            .unwrap_or(&[]);
+
+        let fetch_data_room =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
+        let fetch_announcements =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+
+        if !fetch_data_room && !fetch_announcements {
+            return Ok(MoleculeGlobalActivityListing::default());
+        }
+
+        let data_room_fut = fetch_or_empty(
+            fetch_data_room,
             self.global_data_room_activities_listing_from_source(molecule_subject, filters.clone()),
+        );
+
+        let announcements_fut = fetch_or_empty(
+            fetch_announcements,
             self.global_announcement_activities_listing_from_source(molecule_subject, filters),
-        )?;
+        );
+
+        let (mut data_room_listing, mut announcement_activities_listing) =
+            tokio::try_join!(data_room_fut, announcements_fut)?;
 
         // Get the total count before pagination
         let total_count =

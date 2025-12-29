@@ -48,6 +48,7 @@ pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool)
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();
+    b.add::<AccountQuotaCheckerStorageImpl>();
 
     b.add::<DatasetAliasUpdateHandler>();
     b.add::<DatasetBlockUpdateHandler>();

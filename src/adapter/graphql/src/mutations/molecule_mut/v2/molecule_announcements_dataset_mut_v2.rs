@@ -40,8 +40,8 @@ impl MoleculeAnnouncementsDatasetMutV2 {
         headline: String,
         body: String,
         #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<DatasetID<'_>>>,
-        molecule_access_level: MoleculeAccessLevel,
-        molecule_change_by: String,
+        access_level: MoleculeAccessLevel,
+        change_by: String,
         categories: Vec<String>,
         tags: Vec<String>,
     ) -> Result<v1::CreateAnnouncementResult> {
@@ -64,8 +64,8 @@ impl MoleculeAnnouncementsDatasetMutV2 {
                 .into_iter()
                 .map(Into::into)
                 .collect(),
-            change_by: molecule_change_by,
-            access_level: molecule_access_level,
+            change_by,
+            access_level,
             categories: Some(categories),
             tags: Some(tags),
         };
@@ -88,6 +88,11 @@ impl MoleculeAnnouncementsDatasetMutV2 {
             )),
             Err(E::NotFoundAttachments(e)) => Ok(v1::CreateAnnouncementResult::InvalidAttachment(
                 v1::CreateAnnouncementErrorInvalidAttachment {
+                    message: e.to_string(),
+                },
+            )),
+            Err(E::QuotaExceeded(e)) => Ok(v1::CreateAnnouncementResult::QuotaExceeded(
+                v1::CreateAnnouncementErrorQuotaExceeded {
                     message: e.to_string(),
                 },
             )),

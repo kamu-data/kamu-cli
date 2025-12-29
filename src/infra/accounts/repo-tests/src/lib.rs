@@ -10,6 +10,7 @@
 #![feature(assert_matches)]
 
 mod access_token_repository_test_utils;
+mod account_quota_event_store_test_suite;
 mod accounts_repository_test_utils;
 
 mod access_token_repository_test_suite;
@@ -20,6 +21,7 @@ mod password_hash_repository_test_suite;
 
 pub use access_token_repository_test_suite::*;
 pub(crate) use access_token_repository_test_utils::*;
+pub use account_quota_event_store_test_suite::*;
 pub use accounts_repository_test_suite::*;
 pub(crate) use accounts_repository_test_utils::*;
 pub use password_hash_repository_test_suite::*;

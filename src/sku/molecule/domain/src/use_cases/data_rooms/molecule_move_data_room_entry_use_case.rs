@@ -25,6 +25,7 @@ pub trait MoleculeMoveDataRoomEntryUseCase: Send + Sync {
         source_event_time: Option<DateTime<Utc>>,
         path_from: CollectionPath,
         path_to: CollectionPath,
+        change_by: String,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeMoveDataRoomEntryError>;
 }
@@ -38,6 +39,9 @@ pub enum MoleculeMoveDataRoomEntryError {
 
     #[error(transparent)]
     Access(#[from] odf::AccessError),
+
+    #[error(transparent)]
+    QuotaExceeded(#[from] kamu_accounts::QuotaError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

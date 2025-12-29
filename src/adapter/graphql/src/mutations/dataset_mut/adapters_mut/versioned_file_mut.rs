@@ -9,7 +9,7 @@
 
 use file_utils::MediaType;
 use kamu::domain;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, QuotaError};
 use kamu_datasets::{
     UpdateVersionFileUseCaseError,
     UpdateVersionedFileUseCase,
@@ -88,6 +88,23 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
+                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: Some(e.used),
+                        incoming: Some(e.incoming),
+                        limit: Some(e.limit),
+                    },
+                )),
+                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: None,
+                        incoming: None,
+                        limit: None,
+                    },
+                )),
+                QuotaError::Internal(e) => Err(e.into()),
+            },
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -183,6 +200,23 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
+                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: Some(e.used),
+                        incoming: Some(e.incoming),
+                        limit: Some(e.limit),
+                    },
+                )),
+                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: None,
+                        incoming: None,
+                        limit: None,
+                    },
+                )),
+                QuotaError::Internal(e) => Err(e.into()),
+            },
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -224,6 +258,23 @@ impl<'a> VersionedFileMut<'a> {
                     actual_head: err.actual.unwrap().into(),
                 }),
             ),
+            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
+                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: Some(e.used),
+                        incoming: Some(e.incoming),
+                        limit: Some(e.limit),
+                    },
+                )),
+                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
+                    UpdateVersionErrorQuotaExceeded {
+                        used: None,
+                        incoming: None,
+                        limit: None,
+                    },
+                )),
+                QuotaError::Internal(e) => Err(e.into()),
+            },
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -240,6 +291,7 @@ pub enum UpdateVersionResult {
     Success(UpdateVersionSuccess),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
+    QuotaExceeded(UpdateVersionErrorQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -285,6 +337,30 @@ pub struct UpdateVersionErrorInvalidExtraData {
 impl UpdateVersionErrorInvalidExtraData {
     pub async fn is_success(&self) -> bool {
         false
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct UpdateVersionErrorQuotaExceeded {
+    pub used: Option<u64>,
+    pub incoming: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[ComplexObject]
+impl UpdateVersionErrorQuotaExceeded {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+
+    pub async fn message(&self) -> String {
+        match (self.used, self.incoming, self.limit) {
+            (Some(used), Some(incoming), Some(limit)) => {
+                format!("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")
+            }
+            _ => "Quota exceeded".to_string(),
+        }
     }
 }
 

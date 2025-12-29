@@ -25,6 +25,7 @@ pub trait MoleculeUpdateVersionedFileMetadataUseCase: Send + Sync {
         versioned_file_dataset_id: &odf::DatasetID,
         existing_versioned_file_entry: MoleculeVersionedFileEntry,
         source_event_time: Option<DateTime<Utc>>,
+        expected_head: Option<odf::Multihash>,
         basic_info: MoleculeVersionedFileEntryBasicInfo,
         detailed_info: MoleculeVersionedFileEntryDetailedInfo,
     ) -> Result<MoleculeVersionedFileEntry, MoleculeUpdateVersionedFileMetadataError>;
@@ -36,6 +37,12 @@ pub trait MoleculeUpdateVersionedFileMetadataUseCase: Send + Sync {
 pub enum MoleculeUpdateVersionedFileMetadataError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
+
+    #[error(transparent)]
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
+    #[error(transparent)]
+    QuotaExceeded(#[from] kamu_accounts::QuotaError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
