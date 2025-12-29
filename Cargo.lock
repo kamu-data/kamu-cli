@@ -8468,7 +8468,6 @@ dependencies = [
  "kamu-search-elasticsearch-macros",
  "kamu-search-services",
  "messaging-outbox",
- "oop",
  "random-strings",
  "serde",
  "serde_json",

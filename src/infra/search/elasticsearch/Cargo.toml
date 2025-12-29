@@ -27,7 +27,6 @@ testing = [
     "dep:chrono",
     "dep:init-on-startup",
     "dep:messaging-outbox",
-    "dep:oop",
     "dep:random-strings", 
     "dep:time-source",
     "dep:kamu-search-elasticsearch-macros",
@@ -54,7 +53,6 @@ chrono = { version = "0.4", default-features = false, optional = true }
 dill = { version = "0.14", default-features = false }
 elasticsearch = { version = "9.1.0-alpha.1", default-features = false, features = ["rustls-tls"] }
 hex = { version = "0.4", default-features = false }
-oop = { version = "0.0.2", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"] }
 sha2 = { version = "0.10", default-features = false }
 serde_json = { version = "1", default-features = false }
