@@ -264,7 +264,7 @@ impl ElasticsearchClient {
         &self,
         index_names: &[&str],
     ) -> Result<(), ElasticsearchClientError> {
-        tracing::warn!(index_names = ?index_names, "Deleting Elasticsearch indices");
+        tracing::info!(index_names = ?index_names, "Deleting Elasticsearch indices");
 
         use elasticsearch::indices::IndicesDeleteParts;
 

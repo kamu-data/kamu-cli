@@ -47,39 +47,6 @@ pub struct DatasetSearchUpdater {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetSearchUpdater {
-    async fn handle_new_dataset(
-        &self,
-        ctx: SearchContext<'_>,
-        created_message: &DatasetLifecycleMessageCreated,
-    ) -> Result<(), InternalError> {
-        // Resolve dataset
-        let dataset = self
-            .dataset_registry
-            .get_dataset_by_id(&created_message.dataset_id)
-            .await
-            .int_err()?;
-
-        // Prepare dataset search document
-        let dataset_document = index_dataset_from_scratch(
-            created_message.event_time,
-            dataset,
-            &created_message.owner_account_id,
-        )
-        .await?;
-
-        // Sent it to the full text search service for indexing
-        self.search_service
-            .bulk_update(
-                ctx,
-                dataset_search_schema::SCHEMA_NAME,
-                vec![SearchIndexUpdateOperation::Index {
-                    id: created_message.dataset_id.to_string(),
-                    doc: dataset_document,
-                }],
-            )
-            .await
-    }
-
     async fn handle_dataset_ref_updated(
         &self,
         ctx: SearchContext<'_>,
@@ -99,27 +66,44 @@ impl DatasetSearchUpdater {
             .await
             .int_err()?;
 
-        // Prepare partial update to dataset search document
-        let partial_update = partial_update_for_new_interval(
-            updated_message.event_time,
-            dataset,
-            &entry.owner_id,
-            &updated_message.new_block_hash,
-            updated_message.maybe_prev_block_hash.as_ref(),
-        )
-        .await?;
-
-        // Send it to the full text search service for updating
-        self.search_service
-            .bulk_update(
-                ctx,
-                dataset_search_schema::SCHEMA_NAME,
-                vec![SearchIndexUpdateOperation::Update {
-                    id: updated_message.dataset_id.to_string(),
-                    doc: partial_update,
-                }],
+        // Did we have updates before?
+        if updated_message.maybe_prev_block_hash.is_some() {
+            // Prepare partial update to dataset search document
+            let partial_update = partial_update_for_new_interval(
+                dataset,
+                &entry.owner_id,
+                &updated_message.new_block_hash,
+                updated_message.maybe_prev_block_hash.as_ref(),
             )
-            .await
+            .await?;
+
+            // Send it to the full text search service for updating
+            self.search_service
+                .bulk_update(
+                    ctx,
+                    dataset_search_schema::SCHEMA_NAME,
+                    vec![SearchIndexUpdateOperation::Update {
+                        id: updated_message.dataset_id.to_string(),
+                        doc: partial_update,
+                    }],
+                )
+                .await
+        } else {
+            // This is the first ref update, reindex from scratch
+            let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
+
+            // Sent it to the full text search service for indexing
+            self.search_service
+                .bulk_update(
+                    ctx,
+                    dataset_search_schema::SCHEMA_NAME,
+                    vec![SearchIndexUpdateOperation::Index {
+                        id: updated_message.dataset_id.to_string(),
+                        doc: dataset_document,
+                    }],
+                )
+                .await
+        }
     }
 
     async fn handle_renamed_dataset(
@@ -221,8 +205,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetSearchUpdater {
         };
 
         match message {
-            DatasetLifecycleMessage::Created(created_message) => {
-                self.handle_new_dataset(ctx, created_message).await?;
+            DatasetLifecycleMessage::Created(_) => {
+                // Skip, we will use "set_ref" messages for indexing
             }
             DatasetLifecycleMessage::Renamed(renamed_message) => {
                 self.handle_renamed_dataset(ctx, renamed_message).await?;

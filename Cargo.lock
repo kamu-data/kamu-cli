@@ -8068,6 +8068,7 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.255.0"
 dependencies = [
+ "arrow",
  "async-stream",
  "async-trait",
  "bon",
@@ -8096,6 +8097,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-messaging-outbox-inmem",
  "kamu-search",
  "kamu-search-elasticsearch",
  "kamu-search-services",

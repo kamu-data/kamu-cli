@@ -81,12 +81,14 @@ kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-messaging-outbox-inmem = { workspace = true }
 kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
     "testing",
 ] }
 kamu-search-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
+arrow = { version = "56", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.14"

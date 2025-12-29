@@ -9,7 +9,7 @@
 
 use dill::Component;
 
-use crate::{DummyOutboxImpl, MockOutbox, Outbox};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,8 +18,10 @@ pub enum OutboxProvider {
     #[default]
     Dummy,
     Mock(MockOutbox),
-    Immediate,
-    PauseableImmediate,
+    Immediate {
+        force_immediate: bool,
+    },
+    Dispatching,
 }
 
 impl OutboxProvider {
@@ -33,24 +35,31 @@ impl OutboxProvider {
                     .add_value(mock_outbox)
                     .bind::<dyn Outbox, MockOutbox>();
             }
-            OutboxProvider::Immediate => {
-                use crate::{ConsumerFilter, OutboxImmediateImpl};
+            OutboxProvider::Immediate { force_immediate } => {
                 target_catalog_builder
-                    .add_builder(
-                        OutboxImmediateImpl::builder()
-                            .with_consumer_filter(ConsumerFilter::AllConsumers),
-                    )
+                    .add_builder(OutboxImmediateImpl::builder().with_consumer_filter(
+                        if force_immediate {
+                            ConsumerFilter::AllConsumers
+                        } else {
+                            ConsumerFilter::ImmediateConsumers
+                        },
+                    ))
                     .bind::<dyn crate::Outbox, OutboxImmediateImpl>();
             }
-            OutboxProvider::PauseableImmediate => {
-                use crate::{ConsumerFilter, OutboxImmediateImpl, PausableImmediateOutboxImpl};
+            OutboxProvider::Dispatching => {
+                // The most complete setup, but it still needs bindings for repositories.
+                // Not adding those here to avoid cyclic build dependencies.
                 target_catalog_builder
                     .add_builder(
                         OutboxImmediateImpl::builder()
-                            .with_consumer_filter(ConsumerFilter::AllConsumers),
+                            .with_consumer_filter(ConsumerFilter::ImmediateConsumers),
                     )
-                    .add::<PausableImmediateOutboxImpl>()
-                    .bind::<dyn Outbox, PausableImmediateOutboxImpl>();
+                    .add::<OutboxTransactionalImpl>()
+                    .add::<OutboxDispatchingImpl>()
+                    .bind::<dyn crate::Outbox, OutboxDispatchingImpl>()
+                    .add::<OutboxAgentImpl>()
+                    .add_value(OutboxConfig::default())
+                    .add::<OutboxAgentMetrics>();
             }
         }
     }

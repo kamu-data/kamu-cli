@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder, InjectionError};
-use kamu::testing::MockDatasetActionAuthorizer;
+use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
@@ -23,6 +24,7 @@ use kamu_datasets_services::testing::TestDatasetOutboxListener;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
+use odf::dataset::MetadataChainExt;
 use time_source::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,6 +236,65 @@ impl DatasetBaseUseCaseHarness {
             .unwrap()
     }
 
+    pub async fn append_dataset_metadata(
+        &self,
+        catalog: &dill::Catalog,
+        dataset: ResolvedDataset,
+        events: Vec<odf::MetadataEvent>,
+    ) -> Option<odf::Multihash> {
+        // Resolve or build use case
+        let use_case = match catalog.get_one::<dyn AppendDatasetMetadataBatchUseCase>() {
+            Ok(use_case) => use_case,
+            Err(InjectionError::Unregistered(_)) => {
+                let mut b = CatalogBuilder::new_chained(catalog);
+                b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
+                let catalog = b.build();
+                catalog
+                    .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
+                    .unwrap()
+            }
+            Err(e) => panic!("Failed to get AppendDatasetMetadataBatchUseCase: {e}"),
+        };
+
+        // Resove current head
+        let head = dataset
+            .as_metadata_chain()
+            .try_get_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
+            .unwrap();
+        let head_block = dataset.as_metadata_chain().get_block(&head).await.unwrap();
+
+        // Build new blocks with hashes
+        let mut prev_block_hash = head;
+        let mut prev_block_sequence_number = head_block.sequence_number;
+
+        let mut new_hashed_blocks = VecDeque::with_capacity(events.len());
+        for event in events {
+            let block = odf::MetadataBlock {
+                prev_block_hash: Some(prev_block_hash),
+                sequence_number: prev_block_sequence_number + 1,
+                event,
+                system_time: self.system_time_source.now(),
+            };
+            let hash = BaseRepoHarness::hash_from_block(&block);
+            new_hashed_blocks.push_back((hash.clone(), block));
+
+            prev_block_hash = hash;
+            prev_block_sequence_number += 1;
+        }
+
+        // Execute append use case
+        use_case
+            .execute(
+                dataset.as_ref(),
+                Box::new(new_hashed_blocks.into_iter()),
+                AppendDatasetMetadataBatchUseCaseOptions::default(),
+            )
+            .await
+            .unwrap()
+    }
+
     pub async fn rename_dataset(
         &self,
         catalog: &dill::Catalog,
@@ -306,7 +367,9 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
             maybe_mock_dataset_action_authorizer: None,
             maybe_mock_did_generator: None,
             // Use immediate outbox in all dataset use case harnesses
-            outbox_provider: OutboxProvider::Immediate,
+            outbox_provider: OutboxProvider::Immediate {
+                force_immediate: true,
+            },
             system_time_source_provider: SystemTimeSourceProvider::Default,
         }
     }

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
@@ -18,7 +17,6 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn index_dataset_from_scratch(
-    event_time: DateTime<Utc>,
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
 ) -> Result<serde_json::Value, InternalError> {
@@ -96,27 +94,6 @@ pub(crate) async fn index_dataset_from_scratch(
             Ok(index_doc)
         }
 
-        Err(AcceptVisitorError::Traversal(IterBlocksError::RefNotFound(_))) => {
-            // No "head" yet, might happen in tests only.
-            // Produce partial index
-            let alias = dataset.get_alias();
-            Ok(serde_json::json!({
-                fields::DATASET_NAME: alias.dataset_name.to_string(),
-                fields::ALIAS: alias.to_string(),
-                fields::OWNER_NAME: alias
-                    .account_name
-                    .as_ref()
-                    .map(std::string::ToString::to_string)
-                    .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-                fields::OWNER_ID: owner_id.to_string(),
-                fields::KIND: match dataset.get_kind() {
-                    odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
-                    odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
-                },
-                fields::CREATED_AT: event_time.to_rfc3339(),
-            }))
-        }
-
         Err(e) => Err(e.int_err()),
     }
 }
@@ -124,7 +101,6 @@ pub(crate) async fn index_dataset_from_scratch(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn partial_update_for_new_interval(
-    event_time: DateTime<Utc>,
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
     new_head: &odf::Multihash,
@@ -160,7 +136,7 @@ pub(crate) async fn partial_update_for_new_interval(
     match result {
         Ok(_) => {}
         Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
-            return index_dataset_from_scratch(event_time, dataset, owner_id).await;
+            return index_dataset_from_scratch(dataset, owner_id).await;
         }
         Err(e) => return Err(e.int_err()),
     }
@@ -222,6 +198,16 @@ fn extract_schema_field_names(
                 .schema
                 .fields
                 .iter()
+                .filter(|f| {
+                    // Only include fields that are not default vocabulary fields
+                    ![
+                        odf::metadata::DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
+                        odf::metadata::DatasetVocabulary::DEFAULT_OPERATION_TYPE_COLUMN_NAME,
+                        odf::metadata::DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
+                        odf::metadata::DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
+                    ]
+                    .contains(&f.name.as_str())
+                })
                 .map(|f| f.name.clone())
                 .collect();
             if schema_field_names.is_empty() {
@@ -302,8 +288,7 @@ pub(crate) async fn index_datasets(
             .int_err()?;
 
         // Index dataset
-        let dataset_document =
-            index_dataset_from_scratch(Utc::now(), dataset, &entry.owner_id).await?;
+        let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
         let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
         tracing::debug!(

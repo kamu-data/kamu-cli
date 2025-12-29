@@ -23,6 +23,10 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_messaging_outbox_inmem::{
+    InMemoryOutboxMessageConsumptionRepository,
+    InMemoryOutboxMessageRepository,
+};
 use kamu_search::*;
 use kamu_search_elasticsearch::testing::{
     ElasticsearchBaseHarness,
@@ -206,7 +210,7 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.system_user_catalog, &alias)
+                .create_root_dataset(harness.system_user_catalog(), &alias)
                 .await
                 .dataset_handle
                 .id,
@@ -343,22 +347,25 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.system_user_catalog, &alias)
+                .create_root_dataset(harness.system_user_catalog(), &alias)
                 .await
                 .dataset_handle
                 .id,
         );
     }
 
+    // Force outbox processing to ensure search index is up to date
+    harness.process_outbox_messages().await;
+
     harness
         .rename_dataset(
-            &harness.system_user_catalog,
+            harness.system_user_catalog(),
             &dataset_ids[1],
             "beta-renamed",
         )
         .await;
     harness
-        .rename_dataset(&harness.system_user_catalog, &dataset_ids[0], "test-alpha")
+        .rename_dataset(harness.system_user_catalog(), &dataset_ids[0], "test-alpha")
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -426,16 +433,19 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name));
         dataset_ids.push(
             harness
-                .create_root_dataset(&harness.system_user_catalog, &alias)
+                .create_root_dataset(harness.system_user_catalog(), &alias)
                 .await
                 .dataset_handle
                 .id,
         );
     }
 
+    // Force outbox processing to ensure search index is up to date
+    harness.process_outbox_messages().await;
+
     // Delete "beta" dataset
     harness
-        .delete_dataset(&harness.system_user_catalog, &dataset_ids[1])
+        .delete_dataset(harness.system_user_catalog(), &dataset_ids[1])
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -493,6 +503,9 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
     let dataset_ids = harness
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
+
+    // Force outbox processing to ensure search index is up to date
+    harness.process_outbox_messages().await;
 
     harness.rename_account("alice", "alicia").await;
 
@@ -565,6 +578,9 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
+    // Force outbox processing to ensure search index is up to date
+    harness.process_outbox_messages().await;
+
     harness.delete_account("alice").await;
 
     let datasets_index_response = harness.view_datasets_index().await;
@@ -591,12 +607,376 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let foo_created = harness
+        .create_root_dataset(harness.system_user_catalog(), &foo_alias)
+        .await;
+
+    use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![
+                odf::MetadataEvent::SetDataSchema(
+                    MetadataFactory::set_data_schema()
+                        .schema_from_arrow(&Schema::new(vec![
+                            Field::new("offset", DataType::Int64, false),
+                            Field::new("op", DataType::Int32, false),
+                            Field::new(
+                                "system_time",
+                                DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                                false,
+                            ),
+                            Field::new(
+                                "event_time",
+                                DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                                true,
+                            ),
+                            Field::new("city", DataType::Utf8, true),
+                            Field::new("population", DataType::Int64, true),
+                        ]))
+                        .build(),
+                ),
+                odf::MetadataEvent::SetAttachments(odf::metadata::SetAttachments {
+                    attachments: odf::metadata::Attachments::Embedded(
+                        odf::metadata::AttachmentsEmbedded {
+                            items: vec![odf::metadata::AttachmentEmbedded {
+                                path: "README.md".to_string(),
+                                content: "foo dataset readme".to_string(),
+                            }],
+                        },
+                    ),
+                }),
+                odf::MetadataEvent::SetInfo(
+                    MetadataFactory::set_info()
+                        .description("Nice root dataset")
+                        .keyword("test")
+                        .keyword("nice")
+                        .build(),
+                ),
+            ],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.ids(),
+        vec![foo_created.dataset_handle.id.to_string()],
+    );
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
+            dataset_search_schema::fields::KEYWORDS: vec!["test", "nice"],
+            dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
+            dataset_search_schema::fields::SCHEMA_FIELDS: vec![
+                "city",
+                "population",
+            ],
+        }),]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let foo_created = harness
+        .create_root_dataset(harness.system_user_catalog(), &foo_alias)
+        .await;
+
+    use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+    ////////////////////////////////////////////////////////////////
+    // 1. Append SetInfo: description + keywords
+    ////////////////////////////////////////////////////////////////
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![odf::MetadataEvent::SetInfo(
+                MetadataFactory::set_info()
+                    .description("Nice root dataset")
+                    .keyword("test")
+                    .keyword("nice")
+                    .build(),
+            )],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.ids(),
+        vec![foo_created.dataset_handle.id.to_string()],
+    );
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
+            dataset_search_schema::fields::KEYWORDS: vec!["test", "nice"],
+        }),]
+    );
+
+    ////////////////////////////////////////////////////////////////
+    // 2. Append SetDataSchema to existing fields
+    ////////////////////////////////////////////////////////////////
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![odf::MetadataEvent::SetDataSchema(
+                MetadataFactory::set_data_schema()
+                    .schema_from_arrow(&Schema::new(vec![
+                        Field::new("offset", DataType::Int64, false),
+                        Field::new("op", DataType::Int32, false),
+                        Field::new(
+                            "system_time",
+                            DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                            false,
+                        ),
+                        Field::new(
+                            "event_time",
+                            DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                            true,
+                        ),
+                        Field::new("city", DataType::Utf8, true),
+                        Field::new("population", DataType::Int64, true),
+                    ]))
+                    .build(),
+            )],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
+            dataset_search_schema::fields::KEYWORDS: vec!["test", "nice"],
+            dataset_search_schema::fields::SCHEMA_FIELDS: vec![
+                // Note: no default fields in the index intentionally
+                "city",
+                "population",
+            ],
+        }),]
+    );
+
+    ////////////////////////////////////////////////////////////////
+    // 3. Append SetAttachments + clear keywords
+    ////////////////////////////////////////////////////////////////
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![
+                odf::MetadataEvent::SetAttachments(odf::metadata::SetAttachments {
+                    attachments: odf::metadata::Attachments::Embedded(
+                        odf::metadata::AttachmentsEmbedded {
+                            items: vec![odf::metadata::AttachmentEmbedded {
+                                path: "README.md".to_string(),
+                                content: "foo dataset readme".to_string(),
+                            }],
+                        },
+                    ),
+                }),
+                odf::MetadataEvent::SetInfo(
+                    MetadataFactory::set_info()
+                        .description("Nice root dataset")
+                        .build(),
+                ),
+            ],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
+            dataset_search_schema::fields::KEYWORDS: serde_json::Value::Null,
+            dataset_search_schema::fields::SCHEMA_FIELDS: vec![
+                // Note: no default fields in the index intentionally
+                "city",
+                "population",
+            ],
+            dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
+        }),]
+    );
+
+    ////////////////////////////////////////////////////////////////
+    // 4. Clear description, but add a keyword
+    ////////////////////////////////////////////////////////////////
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![odf::MetadataEvent::SetInfo(
+                MetadataFactory::set_info()
+                    .keyword("updated-keyword")
+                    .build(),
+            )],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: serde_json::Value::Null,
+            dataset_search_schema::fields::KEYWORDS: serde_json::json!(["updated-keyword"]),
+            dataset_search_schema::fields::SCHEMA_FIELDS: vec![
+                // Note: no default fields in the index intentionally
+                "city",
+                "population",
+            ],
+            dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
+        }),]
+    );
+
+    ////////////////////////////////////////////////////////////////
+    // 5. Clear attachment, update schema
+    ////////////////////////////////////////////////////////////////
+
+    harness
+        .append_dataset_metadata(
+            harness.system_user_catalog(),
+            ResolvedDataset::from_created(&foo_created),
+            vec![
+                odf::MetadataEvent::SetAttachments(odf::metadata::SetAttachments {
+                    attachments: odf::metadata::Attachments::Embedded(
+                        odf::metadata::AttachmentsEmbedded { items: vec![] },
+                    ),
+                }),
+                odf::MetadataEvent::SetDataSchema(
+                    MetadataFactory::set_data_schema()
+                        .schema_from_arrow(&Schema::new(vec![
+                            Field::new("offset", DataType::Int64, false),
+                            Field::new("op", DataType::Int32, false),
+                            Field::new(
+                                "system_time",
+                                DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                                false,
+                            ),
+                            Field::new(
+                                "event_time",
+                                DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
+                                true,
+                            ),
+                            Field::new("city", DataType::Utf8, true),
+                            Field::new("population", DataType::Int64, true),
+                            Field::new("country", DataType::Utf8, true),
+                        ]))
+                        .build(),
+                ),
+            ],
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index().await;
+    assert_eq!(datasets_index_response.total_hits(), 1);
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DESCRIPTION: serde_json::Value::Null,
+            dataset_search_schema::fields::KEYWORDS: serde_json::json!(["updated-keyword"]),
+            dataset_search_schema::fields::SCHEMA_FIELDS: vec![
+                // Note: no default fields in the index intentionally
+                "city",
+                "population",
+                "country",
+            ],
+            dataset_search_schema::fields::ATTACHMENTS: serde_json::Value::Null,
+        }),]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct DatasetIndexingHarness {
     es_base_harness: ElasticsearchBaseHarness,
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
-    no_subject_catalog: dill::Catalog,
-    system_user_catalog: dill::Catalog,
+    outbox_agent: Arc<dyn OutboxAgent>,
 }
 
 #[bon]
@@ -610,18 +990,11 @@ impl DatasetIndexingHarness {
     ) -> Self {
         let es_base_harness = ElasticsearchBaseHarness::new(ctx);
 
-        let dataset_base_use_case_harness =
-            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                maybe_base_catalog: Some(es_base_harness.catalog()),
-                tenancy_config,
-                outbox_provider: OutboxProvider::PauseableImmediate,
-                system_time_source_provider: SystemTimeSourceProvider::Inherited,
-                ..Default::default()
-            })
-            .await;
-
-        fn build_dataset_indexing_catalog(base: &dill::Catalog) -> dill::Catalog {
-            let mut b = dill::CatalogBuilder::new_chained(base);
+        let indexing_catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
+            // Outbox repositories
+            b.add::<InMemoryOutboxMessageRepository>();
+            b.add::<InMemoryOutboxMessageConsumptionRepository>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();
@@ -631,35 +1004,38 @@ impl DatasetIndexingHarness {
             b.add::<DatasetAccountLifecycleHandler>();
             b.add::<DeleteDatasetUseCaseImpl>();
 
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
             register_message_dispatcher::<AccountLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
             );
 
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
             b.build()
-        }
+        };
 
-        let no_subject_catalog =
-            build_dataset_indexing_catalog(dataset_base_use_case_harness.no_subject_catalog());
+        let dataset_base_use_case_harness =
+            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
+                maybe_base_catalog: Some(&indexing_catalog),
+                tenancy_config,
+                outbox_provider: OutboxProvider::Dispatching,
+                system_time_source_provider: SystemTimeSourceProvider::Inherited,
+                ..Default::default()
+            })
+            .await;
 
-        let system_user_catalog =
-            build_dataset_indexing_catalog(dataset_base_use_case_harness.intermediate_catalog());
+        let no_subject_catalog = dataset_base_use_case_harness.no_subject_catalog();
+        let system_user_catalog = dataset_base_use_case_harness.intermediate_catalog();
 
         // Ensure search indexes exist: this is not a normal startup path,
         //  but tests need it for "predefined" content
         let search_indexer = system_user_catalog.get_one::<SearchIndexer>().unwrap();
         search_indexer.ensure_indexes_exist().await.unwrap();
 
-        // Force outbox from system user catalog,
-        // so that handlers work on system user's behalf
-        let _ = system_user_catalog.get_one::<dyn Outbox>().unwrap();
-
         // Run predefined accounts registration, if specified
         if let Some(predefined_accounts_config) = maybe_predefined_accounts_config {
             let catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(&no_subject_catalog);
+                let mut b = dill::CatalogBuilder::new_chained(no_subject_catalog);
                 b.add_value(predefined_accounts_config);
                 b.add::<PredefinedAccountsRegistrator>();
                 b.add::<LoginPasswordAuthProvider>();
@@ -683,7 +1059,7 @@ impl DatasetIndexingHarness {
         // Run predefined datasets registration, if specified
         if let Some(predefined_datasets_config) = maybe_predefined_datasets_config {
             let catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(&no_subject_catalog);
+                let mut b = dill::CatalogBuilder::new_chained(no_subject_catalog);
                 b.add::<CreateDatasetUseCaseImpl>();
                 b.add::<CreateDatasetUseCaseHelper>();
                 b.add_value(predefined_datasets_config);
@@ -699,20 +1075,33 @@ impl DatasetIndexingHarness {
                 .unwrap();
         }
 
+        // Initialize outbox agent
+        let outbox_agent = system_user_catalog.get_one::<dyn OutboxAgent>().unwrap();
+        outbox_agent.run_initialization().await.unwrap();
+
         // Ensure search indexes are up to date after predefined datasets creation
-        ElasticsearchBaseHarness::run_initial_indexing(&system_user_catalog).await;
+        ElasticsearchBaseHarness::run_initial_indexing(system_user_catalog).await;
 
         Self {
             es_base_harness,
             dataset_base_use_case_harness,
-            no_subject_catalog,
-            system_user_catalog,
+            outbox_agent,
         }
     }
 
     #[inline]
     fn fixed_time(&self) -> DateTime<Utc> {
         self.es_base_harness.fixed_time()
+    }
+
+    #[inline]
+    fn system_user_catalog(&self) -> &dill::Catalog {
+        self.dataset_base_use_case_harness.intermediate_catalog()
+    }
+
+    #[inline]
+    fn no_subject_catalog(&self) -> &dill::Catalog {
+        self.dataset_base_use_case_harness.no_subject_catalog()
     }
 
     async fn create_mt_datasets(
@@ -724,7 +1113,7 @@ impl DatasetIndexingHarness {
             let account_name = odf::AccountName::new_unchecked(account_name);
 
             let user_specific_catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
                 b.add_value(CurrentAccountSubject::new_test_with(&account_name));
                 b.build()
             };
@@ -750,7 +1139,7 @@ impl DatasetIndexingHarness {
 
         // Locate account
         let account_svc = self
-            .no_subject_catalog
+            .no_subject_catalog()
             .get_one::<dyn AccountService>()
             .unwrap();
         let account = account_svc
@@ -767,7 +1156,7 @@ impl DatasetIndexingHarness {
         // Execute update on user's behalf in authenticated context
         {
             let user_specific_catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
                 b.add_value(CurrentAccountSubject::new_test_with(&old_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<UpdateAccountUseCaseImpl>();
@@ -792,7 +1181,7 @@ impl DatasetIndexingHarness {
 
         // Locate account
         let account_svc = self
-            .no_subject_catalog
+            .no_subject_catalog()
             .get_one::<dyn AccountService>()
             .unwrap();
         let account = account_svc
@@ -804,7 +1193,7 @@ impl DatasetIndexingHarness {
         // Execute deletion on user's behalf in authenticated context
         {
             let user_specific_catalog = {
-                let mut b = dill::CatalogBuilder::new_chained(&self.no_subject_catalog);
+                let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
                 b.add_value(CurrentAccountSubject::new_test_with(&account_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<DeleteAccountUseCaseImpl>();
@@ -824,7 +1213,12 @@ impl DatasetIndexingHarness {
         };
     }
 
+    async fn process_outbox_messages(&self) {
+        self.outbox_agent.run_while_has_tasks().await.unwrap();
+    }
+
     async fn view_datasets_index(&self) -> SearchTestResponse {
+        self.process_outbox_messages().await;
         self.es_base_harness.es_ctx().refresh_indices().await;
 
         let search_repo = self.es_base_harness.es_ctx().search_repo();
@@ -866,16 +1260,12 @@ struct PredefinedDatasetsConfig {
 struct PredefinedDatasetsRegistrator {
     time_source: Arc<dyn SystemTimeSource>,
     config: Arc<PredefinedDatasetsConfig>,
-    pausable_outbox: Arc<PausableImmediateOutboxImpl>,
     catalog: dill::Catalog,
 }
 
 #[async_trait::async_trait]
 impl InitOnStartup for PredefinedDatasetsRegistrator {
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // Pause outbox notifications
-        self.pausable_outbox.pause();
-
         // Create predefined datasets in silense
         for alias in &self.config.aliases {
             let user_specific_catalog = {
@@ -911,9 +1301,6 @@ impl InitOnStartup for PredefinedDatasetsRegistrator {
                 .await
                 .unwrap();
         }
-
-        // Resume outbox notifications
-        self.pausable_outbox.resume();
 
         Ok(())
     }
