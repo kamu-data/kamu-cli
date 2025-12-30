@@ -103,7 +103,8 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
                 .handle_account_lifecycle_deleted_message(message)
                 .await
                 .map_err(ErrorIntoInternal::int_err)?,
-            AccountLifecycleMessage::Renamed(_)
+
+            AccountLifecycleMessage::Updated(_)
             | AccountLifecycleMessage::Created(_)
             | AccountLifecycleMessage::PasswordChanged(_) => {}
         }

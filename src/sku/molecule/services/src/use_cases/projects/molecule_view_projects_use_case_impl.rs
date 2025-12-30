@@ -12,6 +12,7 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::LoggedAccount;
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
 use crate::MoleculeProjectsService;
@@ -36,11 +37,24 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
         // Gain read access to projects dataset
-        let projects_reader = self
+        let projects_reader = match self
             .projects_service
             .reader(&molecule_subject.account_name)
             .await
-            .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>)?;
+        {
+            Ok(reader) => reader,
+
+            // No projects dataset yet is fine, just return empty listing
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) => {
+                return Ok(MoleculeProjectListing::default());
+            }
+
+            Err(e) => {
+                return Err(MoleculeDatasetErrorExt::adapt::<MoleculeViewProjectsError>(
+                    e,
+                ));
+            }
+        };
 
         // Load changelog projection DF
         let maybe_changelog_df = projects_reader

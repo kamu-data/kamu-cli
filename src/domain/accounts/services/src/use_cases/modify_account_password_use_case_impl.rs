@@ -21,6 +21,7 @@ use kamu_accounts::{
     Password,
 };
 use messaging_outbox::Outbox;
+use time_source::SystemTimeSource;
 
 use crate::utils;
 
@@ -32,6 +33,7 @@ pub struct ModifyAccountPasswordUseCaseImpl {
     account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl ModifyAccountPasswordUseCaseImpl {
@@ -42,6 +44,7 @@ impl ModifyAccountPasswordUseCaseImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
                 AccountLifecycleMessage::password_changed(
+                    self.time_source.now(),
                     account.id.clone(),
                     account.email.clone(),
                     account.display_name.clone(),

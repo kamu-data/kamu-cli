@@ -21,31 +21,19 @@ use kamu_datasets::{
     RenameDatasetUseCase,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn RenameDatasetUseCase)]
 pub struct RenameDatasetUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
+    time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
-}
-
-#[component(pub)]
-#[interface(dyn RenameDatasetUseCase)]
-impl RenameDatasetUseCaseImpl {
-    pub fn new(
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            rebac_dataset_registry_facade,
-            dataset_entry_writer,
-            outbox,
-        }
-    }
 }
 
 #[common_macros::method_names_consts]
@@ -96,7 +84,14 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::renamed(dataset_handle.id.clone(), new_name.clone()),
+                DatasetLifecycleMessage::renamed(
+                    self.time_source.now(),
+                    dataset_handle.id.clone(),
+                    odf::DatasetAlias::new(
+                        dataset_handle.alias.account_name.clone(),
+                        new_name.clone(),
+                    ),
+                ),
             )
             .await?;
 

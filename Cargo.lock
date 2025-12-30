@@ -4701,6 +4701,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "elasticsearch"
+version = "9.1.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12bb303aa6e1d28c0c86b6fbfe484fd0fd3f512629aeed1ac4f6b85f81d9834a"
+dependencies = [
+ "base64",
+ "bytes",
+ "dyn-clone",
+ "flate2",
+ "lazy_static",
+ "parking_lot",
+ "percent-encoding",
+ "reqwest",
+ "rustc_version 0.4.1",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "url",
+ "void",
+]
+
+[[package]]
 name = "elliptic-curve"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6842,6 +6865,7 @@ dependencies = [
  "futures",
  "internal-error",
  "jsonwebtoken",
+ "kamu-search",
  "merge",
  "messaging-outbox",
  "mockall",
@@ -6963,6 +6987,7 @@ dependencies = [
  "dill",
  "email-utils",
  "event-sourcing",
+ "futures",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
@@ -6972,14 +6997,19 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "messaging-outbox",
  "mockall",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "random-strings",
  "secrecy",
  "serde",
  "serde_json",
+ "test-group",
  "test-log",
  "thiserror 2.0.17",
  "time-source",
@@ -7018,6 +7048,7 @@ name = "kamu-adapter-auth-oso-rebac"
 version = "0.255.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "database-common",
  "dill",
  "futures",
@@ -7226,9 +7257,12 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-messaging-outbox-inmem",
  "kamu-molecule-domain",
  "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -7495,6 +7529,7 @@ name = "kamu-auth-rebac-services"
 version = "0.255.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "dill",
  "futures",
  "indoc 2.0.7",
@@ -7707,6 +7742,7 @@ dependencies = [
  "kamu-messaging-outbox-sqlite",
  "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-elasticsearch",
  "kamu-search-openai",
  "kamu-search-qdrant",
  "kamu-search-services",
@@ -7862,12 +7898,15 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "random-strings",
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "test-utils",
  "tokio",
+ "tokio-retry",
  "url",
 ]
 
@@ -7976,6 +8015,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-accounts",
+ "kamu-search",
  "merge",
  "messaging-outbox",
  "mockall",
@@ -8063,8 +8103,10 @@ dependencies = [
 name = "kamu-datasets-services"
 version = "0.255.0"
 dependencies = [
+ "arrow",
  "async-stream",
  "async-trait",
+ "bon",
  "bytes",
  "cheap-clone",
  "chrono",
@@ -8090,6 +8132,10 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-messaging-outbox-inmem",
+ "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "messaging-outbox",
  "mockall",
  "nutype",
@@ -8105,6 +8151,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "tempfile",
+ "test-group",
  "test-log",
  "test-utils",
  "thiserror 2.0.17",
@@ -8428,6 +8475,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-core",
  "kamu-datasets",
+ "kamu-search",
  "messaging-outbox",
  "nonempty",
  "num-bigint",
@@ -8451,6 +8499,7 @@ dependencies = [
  "datafusion",
  "dill",
  "file-utils",
+ "futures",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
@@ -8459,6 +8508,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-services",
  "kamu-molecule-domain",
+ "kamu-search",
  "messaging-outbox",
  "nonempty",
  "num-bigint",
@@ -8494,11 +8544,52 @@ name = "kamu-search"
 version = "0.255.0"
 dependencies = [
  "async-trait",
+ "database-common",
+ "dill",
  "futures",
  "internal-error",
  "opendatafabric",
+ "serde",
  "serde_json",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kamu-search-elasticsearch"
+version = "0.255.0"
+dependencies = [
+ "async-trait",
+ "canonical_json",
+ "chrono",
+ "common-macros",
+ "container-runtime",
+ "dill",
+ "elasticsearch",
+ "hex",
+ "init-on-startup",
+ "internal-error",
+ "kamu-search",
+ "kamu-search-elasticsearch-macros",
+ "kamu-search-services",
+ "messaging-outbox",
+ "random-strings",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+ "time-source",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "kamu-search-elasticsearch-macros"
+version = "0.255.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -8536,6 +8627,7 @@ name = "kamu-search-services"
 version = "0.255.0"
 dependencies = [
  "async-trait",
+ "common-macros",
  "dill",
  "futures",
  "init-on-startup",
@@ -14558,6 +14650,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "void"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vsimd"

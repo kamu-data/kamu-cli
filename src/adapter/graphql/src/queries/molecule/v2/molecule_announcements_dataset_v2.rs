@@ -14,6 +14,7 @@ use database_common::PaginationOpts;
 use kamu_molecule_domain::{
     MoleculeFindProjectAnnouncementError,
     MoleculeFindProjectAnnouncementUseCase,
+    MoleculeViewProjectAnnouncementsMode,
     MoleculeViewProjectAnnouncementsUseCase,
 };
 
@@ -62,6 +63,7 @@ impl MoleculeAnnouncements {
         let listing = view_project_announcements_uc
             .execute(
                 &self.project.entity,
+                MoleculeViewProjectAnnouncementsMode::LatestProjection, /* LatestSource */
                 filters.map(Into::into),
                 Some(PaginationOpts {
                     offset: page * per_page,

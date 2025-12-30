@@ -18,7 +18,7 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchServiceLocalConfig {
+pub struct NaturalLanguageSearchConfig {
     /// The multiplication factor that determines how many more points will be
     /// requested from vector store to compensate for filtering out results that
     /// may be inaccessible to user.
@@ -32,8 +32,8 @@ pub struct SearchServiceLocalConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchServiceLocalImpl {
-    config: Arc<SearchServiceLocalConfig>,
+pub struct NaturalLanguageSearchServiceImpl {
+    config: Arc<NaturalLanguageSearchConfig>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
     vector_repo: Option<Arc<dyn VectorRepository>>,
@@ -42,10 +42,10 @@ pub struct SearchServiceLocalImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn SearchServiceLocal)]
-impl SearchServiceLocalImpl {
+#[dill::interface(dyn NaturalLanguageSearchService)]
+impl NaturalLanguageSearchServiceImpl {
     pub fn new(
-        config: Arc<SearchServiceLocalConfig>,
+        config: Arc<NaturalLanguageSearchConfig>,
         rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
         vector_repo: Option<Arc<dyn VectorRepository>>,
@@ -62,13 +62,13 @@ impl SearchServiceLocalImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl SearchServiceLocal for SearchServiceLocalImpl {
+impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn search_natural_language(
         &self,
         prompt: &str,
         options: SearchNatLangOpts,
-    ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
+    ) -> Result<SearchNatLangResult, SearchNatLangError> {
         let (Some(embeddings_encoder), Some(vector_repo)) = (
             self.embeddings_encoder.as_deref(),
             self.vector_repo.as_deref(),
@@ -77,7 +77,7 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
         };
 
         if prompt.trim().is_empty() {
-            return Ok(SearchLocalNatLangResult {
+            return Ok(SearchNatLangResult {
                 datasets: Vec::new(),
             });
         }
@@ -193,7 +193,7 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             }
         }
 
-        Ok(SearchLocalNatLangResult { datasets })
+        Ok(SearchNatLangResult { datasets })
     }
 }
 

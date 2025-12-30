@@ -7,21 +7,38 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_graphql::value;
 use base64::Engine as _;
+use bon::bon;
 use chrono::Utc;
 use indoc::indoc;
-use kamu_accounts::LoggedAccount;
+use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
+    DatasetRegistry,
+    DatasetRegistryExt,
+};
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
+use messaging_outbox::{OutboxAgent, OutboxProvider};
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
-use pretty_assertions::assert_eq;
 use serde_json::json;
+use time_source::SystemTimeSourceProvider;
 
-use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
-use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts};
+use crate::utils::{
+    AuthenticationCatalogsResult,
+    BaseGQLDatasetHarness,
+    GraphQLQueryRequest,
+    PredefinedAccountOpts,
+    authentication_catalogs_ext,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -377,9 +394,11 @@ const SEARCH_QUERY: &str = indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_provision_project() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_provision_project(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -410,7 +429,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([]),
     );
@@ -434,8 +453,8 @@ async fn test_molecule_v2_provision_project() {
     let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
     let announcements_did = res["project"]["announcements"]["id"].as_str().unwrap();
     assert_ne!(project_account_id, harness.molecule_account_id.to_string());
-    assert_eq!(project_account_name, "molecule.vitafast");
-    assert_eq!(
+    pretty_assertions::assert_eq!(project_account_name, "molecule.vitafast");
+    pretty_assertions::assert_eq!(
         *res,
         json!({
             "isSuccess": true,
@@ -486,7 +505,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"],
         json!({
             "account": {
@@ -506,7 +525,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([{
             "ipnftSymbol": "vitafast",
@@ -527,7 +546,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
         json!({
             "isSuccess": false,
@@ -549,7 +568,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
         json!({
             "isSuccess": false,
@@ -572,7 +591,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
         json!(true),
     );
@@ -583,7 +602,7 @@ async fn test_molecule_v2_provision_project() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([
             {
@@ -600,11 +619,13 @@ async fn test_molecule_v2_provision_project() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_disable_enable_project() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_disable_enable_project(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -641,7 +662,7 @@ async fn test_molecule_v2_disable_enable_project() {
         .await;
 
     async fn query_project(
-        harness: &GraphQLMoleculeV1Harness,
+        harness: &GraphQLMoleculeV2Harness,
         uid: &str,
     ) -> async_graphql::Response {
         GraphQLQueryRequest::new(
@@ -673,7 +694,7 @@ async fn test_molecule_v2_disable_enable_project() {
         .await;
     assert!(res.is_ok(), "{res:#?}");
     let disable_res = res.data.into_json().unwrap();
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         disable_res["molecule"]["v2"]["disableProject"]["project"],
         json!({ "__typename": "MoleculeProjectMutV2" }),
     );
@@ -687,7 +708,7 @@ async fn test_molecule_v2_disable_enable_project() {
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
-    assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
+    pretty_assertions::assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
 
     // Project is no longer visible in the listing
     let res = GraphQLQueryRequest::new(
@@ -708,7 +729,7 @@ async fn test_molecule_v2_disable_enable_project() {
     )
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([]),
     );
@@ -716,7 +737,7 @@ async fn test_molecule_v2_disable_enable_project() {
     // Querying by UID returns None
     let res = query_project(&harness, ipnft_uid).await;
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"],
         json!(null),
     );
@@ -730,7 +751,7 @@ async fn test_molecule_v2_disable_enable_project() {
             .await;
         assert!(res.is_ok(), "{res:#?}");
         let enable_res = res.data.into_json().unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             enable_res["molecule"]["v2"]["enableProject"]["project"],
             json!({ "__typename": "MoleculeProjectMutV2" }),
         );
@@ -741,7 +762,7 @@ async fn test_molecule_v2_disable_enable_project() {
         .await;
     // it should be two blocks longer than initial (one disable and one enable
     // operations)
-    assert_eq!(post_enable_chain_len, initial_chain_len + 2);
+    pretty_assertions::assert_eq!(post_enable_chain_len, initial_chain_len + 2);
 
     let res = GraphQLQueryRequest::new(
         indoc!(
@@ -761,7 +782,7 @@ async fn test_molecule_v2_disable_enable_project() {
     )
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
         json!([{
             "ipnftUid": ipnft_uid,
@@ -770,7 +791,7 @@ async fn test_molecule_v2_disable_enable_project() {
 
     let res = query_project(&harness, ipnft_uid).await;
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"],
         json!({
             "ipnftUid": ipnft_uid,
@@ -781,9 +802,11 @@ async fn test_molecule_v2_disable_enable_project() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_disable_enable_project_errors() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_disable_enable_project_errors(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -802,7 +825,7 @@ async fn test_molecule_v2_disable_enable_project_errors() {
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
-    assert_eq!(disable_error, format!("Project {missing_uid} not found"));
+    pretty_assertions::assert_eq!(disable_error, format!("Project {missing_uid} not found"));
 
     let res = GraphQLQueryRequest::new(
         ENABLE_PROJECT,
@@ -814,7 +837,7 @@ async fn test_molecule_v2_disable_enable_project_errors() {
     let enable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         enable_error,
         format!("No historical entries for project {missing_uid}")
     );
@@ -822,9 +845,13 @@ async fn test_molecule_v2_disable_enable_project_errors() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
+    es_ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -845,7 +872,7 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
         json!(true),
     );
@@ -871,7 +898,7 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
         json!({
             "isSuccess": false,
@@ -883,11 +910,13 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_data_room_quota_exceeded() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_data_room_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -976,19 +1005,21 @@ async fn test_molecule_v2_data_room_quota_exceeded() {
     let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
         ["uploadFile"]
         .clone();
-    assert_eq!(payload["isSuccess"], json!(false));
+    pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
     let msg = payload["message"].as_str().unwrap();
     assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
-    assert_eq!(payload["__typename"], json!("MoleculeQuotaExceeded"));
+    pretty_assertions::assert_eq!(payload["__typename"], json!("MoleculeQuotaExceeded"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_data_room_operations() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -1006,7 +1037,7 @@ async fn test_molecule_v2_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
         json!(true),
     );
@@ -1149,7 +1180,7 @@ async fn test_molecule_v2_data_room_operations() {
     .await;
 
     let res_data = res.data.into_json().unwrap();
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
@@ -1158,7 +1189,7 @@ async fn test_molecule_v2_data_room_operations() {
         .as_str()
         .unwrap();
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
@@ -1200,7 +1231,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Attempt to upload a new file to the same path
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
             async_graphql::Variables::from_value(value!({
@@ -1281,6 +1312,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1296,7 +1329,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1312,7 +1345,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1424,7 +1457,7 @@ async fn test_molecule_v2_data_room_operations() {
 
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
@@ -1433,7 +1466,7 @@ async fn test_molecule_v2_data_room_operations() {
         .as_str()
         .unwrap();
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
@@ -1470,6 +1503,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1494,7 +1529,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1510,7 +1545,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1607,7 +1642,7 @@ async fn test_molecule_v2_data_room_operations() {
 
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
@@ -1616,7 +1651,7 @@ async fn test_molecule_v2_data_room_operations() {
         .as_str()
         .unwrap();
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
@@ -1642,6 +1677,8 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -1676,7 +1713,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1692,7 +1729,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -1758,7 +1795,7 @@ async fn test_molecule_v2_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
@@ -1876,7 +1913,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     let random_ref = odf::DatasetID::new_generated_ed25519().1;
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPDATE_FILE_BY_REF_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -1946,12 +1983,12 @@ async fn test_molecule_v2_data_room_operations() {
 
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
@@ -1987,6 +2024,8 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -2030,7 +2069,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2046,7 +2085,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2122,7 +2161,7 @@ async fn test_molecule_v2_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/foo.txt",
@@ -2212,7 +2251,7 @@ async fn test_molecule_v2_data_room_operations() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/baz.txt",
@@ -2240,7 +2279,7 @@ async fn test_molecule_v2_data_room_operations() {
     // moveEntry //
     ///////////////
     // Non-existent file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2270,7 +2309,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Attempt to move to an already occupied path
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2300,7 +2339,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Actual file move
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2328,6 +2367,8 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let all_entries_nodes = json!([
         {
@@ -2376,7 +2417,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         },
     ]);
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2446,7 +2487,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2462,7 +2503,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -2487,7 +2528,7 @@ async fn test_molecule_v2_data_room_operations() {
     /////////////
 
     // Filters without values
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2507,7 +2548,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by tags: [test-tag4]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2577,7 +2618,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by tags: [test-tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2647,7 +2688,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by tags: [test-tag2, test-tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2665,23 +2706,23 @@ async fn test_molecule_v2_data_room_operations() {
         .into_json()
         .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
-            "totalCount": 1,
+            "totalCount": 2,
             "nodes": [
-                // {
-                //     "path": "/2025/foo.txt",
-                //     "ref": file_1_did,
-                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                //     "asVersionedFile": {
-                //         "latest": {
-                //             "accessLevel": "public",
-                //             "contentType": "text/plain",
-                //             "version": 2,
-                //             "description": "Plain text file that was updated",
-                //             "categories": ["test-category-1", "test-category-3"],
-                //             "tags": ["test-tag1", "test-tag4"],
-                //         }
-                //     }
-                // },
+                {
+                     "path": "/2025/foo.txt",
+                     "ref": file_1_did,
+                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                     "asVersionedFile": {
+                         "latest": {
+                             "accessLevel": "public",
+                             "contentType": "text/plain",
+                             "version": 2,
+                             "description": "Plain text file that was updated",
+                             "categories": ["test-category-1", "test-category-3"],
+                             "tags": ["test-tag1", "test-tag4"],
+                         }
+                     }
+                },
                 {
                     "path": "/bar.txt",
                     "ref": file_2_did,
@@ -2717,7 +2758,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by categories: [test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2787,7 +2828,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by categories: [test-category-2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2857,7 +2898,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by categories: [test-category-3, test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2927,7 +2968,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by access levels: [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -2997,7 +3038,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by access levels: [holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -3067,7 +3108,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Filters by access levels: [holders, public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -3092,7 +3133,7 @@ async fn test_molecule_v2_data_room_operations() {
 
     // Filters combination: [test-tag4] AND [test-category-1] AND
     // [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
@@ -3166,7 +3207,7 @@ async fn test_molecule_v2_data_room_operations() {
     /////////////////
 
     // Non-existent file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3195,7 +3236,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Actual file removal
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3222,7 +3263,10 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3332,7 +3376,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3348,7 +3392,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3424,7 +3468,7 @@ async fn test_molecule_v2_data_room_operations() {
     // Non-existent file
     let random_dataset_id = odf::DatasetID::new_generated_ed25519().1;
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3460,7 +3504,7 @@ async fn test_molecule_v2_data_room_operations() {
     );
 
     // Actual update
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3528,15 +3572,15 @@ async fn test_molecule_v2_data_room_operations() {
 
     let cas_failure_payload =
         &cas_failure_res["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"];
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         cas_failure_payload["__typename"],
         "UpdateVersionErrorCasFailed"
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         cas_failure_payload["message"],
         "Expected head didn't match, dataset was likely updated concurrently"
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         cas_failure_payload["expectedHead"],
         cas_expected_head.to_string()
     );
@@ -3544,7 +3588,10 @@ async fn test_molecule_v2_data_room_operations() {
         cas_failure_payload["actualHead"].is_string()
             && cas_failure_payload["actualHead"] != cas_failure_payload["expectedHead"]
     );
-    assert_eq!(
+
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3593,7 +3640,7 @@ async fn test_molecule_v2_data_room_operations() {
             ],
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             indoc!(
                 r#"
@@ -3699,7 +3746,7 @@ async fn test_molecule_v2_data_room_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3715,7 +3762,7 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -3746,11 +3793,13 @@ async fn test_molecule_v2_data_room_operations() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_announcements_quota_exceeded() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_announcements_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -3811,16 +3860,18 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
     let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
         ["announcements"]["create"]
         .clone();
-    assert_eq!(payload["isSuccess"], json!(false));
+    pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
     let msg = payload["message"].as_str().unwrap();
     assert!(msg.contains("Quota exceeded"), "unexpected message: {msg}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_announcements_operations() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -3828,7 +3879,7 @@ async fn test_molecule_v2_announcements_operations() {
     // Create the first project
     const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
@@ -3879,7 +3930,7 @@ async fn test_molecule_v2_announcements_operations() {
         "#
     );
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -3949,7 +4000,7 @@ async fn test_molecule_v2_announcements_operations() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -4005,7 +4056,7 @@ async fn test_molecule_v2_announcements_operations() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -4049,7 +4100,7 @@ async fn test_molecule_v2_announcements_operations() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -4092,7 +4143,7 @@ async fn test_molecule_v2_announcements_operations() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -4138,7 +4189,7 @@ async fn test_molecule_v2_announcements_operations() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -4152,7 +4203,7 @@ async fn test_molecule_v2_announcements_operations() {
     };
 
     // Create an announcement with attachment DID that does not exist
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
@@ -4189,6 +4240,8 @@ async fn test_molecule_v2_announcements_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     // Announcements are listed as expected
     let all_announcements_tail_nodes = value!([
@@ -4228,7 +4281,7 @@ async fn test_molecule_v2_announcements_operations() {
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
         },
     ]);
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4323,7 +4376,7 @@ async fn test_molecule_v2_announcements_operations() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -4339,7 +4392,7 @@ async fn test_molecule_v2_announcements_operations() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -4364,7 +4417,7 @@ async fn test_molecule_v2_announcements_operations() {
     /////////////
 
     // Filters without values
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4396,7 +4449,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by tags: [test-tag2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4464,7 +4517,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by tags: [test-tag3]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4532,7 +4585,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by tags: [test-tag2, test-tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4553,21 +4606,21 @@ async fn test_molecule_v2_announcements_operations() {
                     "project": {
                         "announcements": {
                             "tail": {
-                                "totalCount": 2,
+                                "totalCount": 3,
                                 "nodes": [
-                                    // {
-                                    //     "id": project_1_announcement_3_id,
-                                    //     "headline": "Test announcement 3",
-                                    //     "body": "Blah blah 3",
-                                    //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
-                                    //     ],
-                                    //     "accessLevel": "holders",
-                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
-                                    //     "categories": [],
-                                    //     "tags": ["test-tag1"],
-                                    // },
+                                    {
+                                         "id": project_1_announcement_3_id,
+                                         "headline": "Test announcement 3",
+                                         "body": "Blah blah 3",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                             project_1_file_2_dataset_id,
+                                         ],
+                                         "accessLevel": "holders",
+                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                         "categories": [],
+                                         "tags": ["test-tag1"],
+                                    },
                                     {
                                         "id": project_1_announcement_2_id,
                                         "headline": "Test announcement 2",
@@ -4600,7 +4653,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by categories: [test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4668,7 +4721,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by categories: [test-category-2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4736,7 +4789,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by categories: [test-category-2, test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4757,7 +4810,7 @@ async fn test_molecule_v2_announcements_operations() {
                     "project": {
                         "announcements": {
                             "tail": {
-                                "totalCount": 1,
+                                "totalCount": 2,
                                 "nodes": [
                                     // {
                                     //     "id": project_1_announcement_3_id,
@@ -4772,18 +4825,18 @@ async fn test_molecule_v2_announcements_operations() {
                                     //     "categories": [],
                                     //     "tags": ["test-tag1"],
                                     // },
-                                    // {
-                                    //     "id": project_1_announcement_2_id,
-                                    //     "headline": "Test announcement 2",
-                                    //     "body": "Blah blah 2",
-                                    //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //     ],
-                                    //     "accessLevel": "holders",
-                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                                    //     "categories": ["test-category-1"],
-                                    //     "tags": ["test-tag1", "test-tag2"],
-                                    // },
+                                    {
+                                         "id": project_1_announcement_2_id,
+                                         "headline": "Test announcement 2",
+                                         "body": "Blah blah 2",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                         ],
+                                         "accessLevel": "holders",
+                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                         "categories": ["test-category-1"],
+                                         "tags": ["test-tag1", "test-tag2"],
+                                    },
                                     {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -4804,7 +4857,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by access levels: [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4872,7 +4925,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by access levels: [holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -4940,7 +4993,7 @@ async fn test_molecule_v2_announcements_operations() {
     );
 
     // Filters by access levels: [public, holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -5009,7 +5062,7 @@ async fn test_molecule_v2_announcements_operations() {
 
     // Filters combination: [test-tag1, test-tag2] AND [test-category-1] AND
     // [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
@@ -5079,9 +5132,11 @@ async fn test_molecule_v2_announcements_operations() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_activity() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -5091,7 +5146,7 @@ async fn test_molecule_v2_activity() {
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
@@ -5113,13 +5168,15 @@ async fn test_molecule_v2_activity() {
         Some(true),
     );
 
+    harness.synchronize_agents().await;
+
     // Activities are empty
     let expected_activity_node = value!({
         "activity": {
             "nodes": []
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5135,7 +5192,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5198,7 +5255,7 @@ async fn test_molecule_v2_activity() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -5253,7 +5310,7 @@ async fn test_molecule_v2_activity() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -5266,6 +5323,8 @@ async fn test_molecule_v2_activity() {
 
         file_dataset_id
     };
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5291,7 +5350,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5307,7 +5366,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5354,7 +5413,7 @@ async fn test_molecule_v2_activity() {
         "#
     );
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
@@ -5385,7 +5444,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
@@ -5416,6 +5475,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5459,7 +5520,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5475,7 +5536,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5496,7 +5557,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Move a file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5524,6 +5585,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5576,7 +5639,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5592,7 +5655,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5642,7 +5705,7 @@ async fn test_molecule_v2_activity() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -5654,6 +5717,8 @@ async fn test_molecule_v2_activity() {
 
         new_announcement_id
     };
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5722,7 +5787,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5738,7 +5803,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5759,7 +5824,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Upload a new file version
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
@@ -5791,6 +5856,8 @@ async fn test_molecule_v2_activity() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -5867,7 +5934,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5883,7 +5950,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5904,7 +5971,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Remove a file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -5931,6 +5998,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     // Check project activity events
 
@@ -6019,7 +6088,7 @@ async fn test_molecule_v2_activity() {
             ]
         }
     });
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6035,7 +6104,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6058,7 +6127,7 @@ async fn test_molecule_v2_activity() {
     ///////////////////////////////////////////////////////////////////////////////
 
     // Create another project
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
@@ -6110,7 +6179,7 @@ async fn test_molecule_v2_activity() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -6123,7 +6192,9 @@ async fn test_molecule_v2_activity() {
         new_announcement_id
     };
 
-    assert_eq!(
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6256,7 +6327,7 @@ async fn test_molecule_v2_activity() {
             }
         },
     ]);
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6376,7 +6447,7 @@ async fn test_molecule_v2_activity() {
     ]);
 
     // Filters: byKinds -> only FILE
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6400,7 +6471,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters: byKinds -> only ANNOUNCEMENT
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6594,7 +6665,7 @@ async fn test_molecule_v2_activity() {
         },
     ]);
     // Filters without values
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6621,7 +6692,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6650,7 +6721,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters: byKinds -> only FILE
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6677,7 +6748,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters: byKinds -> only ANNOUNCEMENT
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6704,7 +6775,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6826,7 +6897,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -6935,7 +7006,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag2, tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7044,7 +7115,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7146,7 +7217,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7255,7 +7326,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-2, test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7276,40 +7347,15 @@ async fn test_molecule_v2_activity() {
                     "project": {
                         "activity": {
                             "nodes": [
-                                // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
-                                //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
-                                //     }
-                                // },
-                                // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
-                                //     "entry": {
-                                //         "path": "/foo_renamed.txt",
-                                //         "ref": project_1_file_1_dataset_id,
-                                //         "accessLevel": "public",
-                                //         "changeBy": USER_1,
-                                //     }
-                                // },
-                                // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
-                                //     "announcement": {
-                                //         "id": project_1_announcement_1_id,
-                                //         "headline": "Test announcement 1",
-                                //         "body": "Blah blah 1",
-                                //         "attachments": [
-                                //             project_1_file_1_dataset_id,
-                                //             project_1_file_2_dataset_id,
-                                //         ],
-                                //         "accessLevel": "public",
-                                //         "changeBy": USER_1,
-                                //         "categories": ["test-category-1"],
-                                //         "tags": ["test-tag1", "test-tag2"],
-                                //     }
-                                // },
+                                {
+                                     "__typename": "MoleculeActivityFileRemovedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
@@ -7319,15 +7365,40 @@ async fn test_molecule_v2_activity() {
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
+                                {
+                                     "__typename": "MoleculeActivityAnnouncementV2",
+                                     "announcement": {
+                                         "id": project_1_announcement_1_id,
+                                         "headline": "Test announcement 1",
+                                         "body": "Blah blah 1",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                             project_1_file_2_dataset_id,
+                                         ],
+                                         "accessLevel": "public",
+                                         "changeBy": USER_1,
+                                         "categories": ["test-category-1"],
+                                         "tags": ["test-tag1", "test-tag2"],
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
+                                //         "path": "/foo_renamed.txt",
+                                //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
+                                //         "changeBy": USER_1,
                                 //     }
                                 // },
+                                {
+                                     "__typename": "MoleculeActivityFileUpdatedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
@@ -7337,15 +7408,15 @@ async fn test_molecule_v2_activity() {
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
-                                // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
-                                //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
-                                //     }
-                                // },
+                                {
+                                     "__typename": "MoleculeActivityFileAddedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileAddedV2",
                                 //     "entry": {
@@ -7364,7 +7435,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7473,7 +7544,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7582,7 +7653,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [public, holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7611,7 +7682,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters combination: [test-tag1] AND [test-category-1] AND [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7724,7 +7795,7 @@ async fn test_molecule_v2_activity() {
     ////////////////////
 
     // Filters without values
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7748,7 +7819,7 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7774,7 +7845,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -7893,7 +7964,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8012,7 +8083,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by tags: [tag2, tag1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8031,19 +8102,19 @@ async fn test_molecule_v2_activity() {
                 "v2": {
                     "activity": {
                         "nodes": [
-                            // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
-                            //     "announcement": {
-                            //         "id": project_2_announcement_1_id,
-                            //         "headline": "Test announcement 2",
-                            //         "body": "Blah blah 2",
-                            //         "attachments": [],
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //         "categories": ["test-category-1", "test-category-2"],
-                            //         "tags": ["test-tag2"],
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "announcement": {
+                                     "id": project_2_announcement_1_id,
+                                     "headline": "Test announcement 2",
+                                     "body": "Blah blah 2",
+                                     "attachments": [],
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                     "categories": ["test-category-1", "test-category-2"],
+                                     "tags": ["test-tag2"],
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileRemovedV2",
                             //     "entry": {
@@ -8131,7 +8202,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8250,7 +8321,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-2]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8369,7 +8440,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by categories: [test-category-2, test-category-1]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8401,40 +8472,15 @@ async fn test_molecule_v2_activity() {
                                     "tags": ["test-tag2"],
                                 }
                             },
-                            // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
-                            //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //     }
-                            // },
-                            // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
-                            //     "entry": {
-                            //         "path": "/foo_renamed.txt",
-                            //         "ref": project_1_file_1_dataset_id,
-                            //         "accessLevel": "public",
-                            //         "changeBy": USER_1,
-                            //     }
-                            // },
-                            // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
-                            //     "announcement": {
-                            //         "id": project_1_announcement_1_id,
-                            //         "headline": "Test announcement 1",
-                            //         "body": "Blah blah 1",
-                            //         "attachments": [
-                            //             project_1_file_1_dataset_id,
-                            //             project_1_file_2_dataset_id,
-                            //         ],
-                            //         "accessLevel": "public",
-                            //         "changeBy": USER_1,
-                            //         "categories": ["test-category-1"],
-                            //         "tags": ["test-tag1", "test-tag2"],
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityFileRemovedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
@@ -8444,15 +8490,40 @@ async fn test_molecule_v2_activity() {
                             //         "changeBy": USER_1,
                             //     }
                             // },
+                            {
+                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "announcement": {
+                                     "id": project_1_announcement_1_id,
+                                     "headline": "Test announcement 1",
+                                     "body": "Blah blah 1",
+                                     "attachments": [
+                                         project_1_file_1_dataset_id,
+                                         project_1_file_2_dataset_id,
+                                     ],
+                                     "accessLevel": "public",
+                                     "changeBy": USER_1,
+                                     "categories": ["test-category-1"],
+                                     "tags": ["test-tag1", "test-tag2"],
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
+                            //         "path": "/foo_renamed.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
+                            //         "changeBy": USER_1,
                             //     }
                             // },
+                            {
+                                 "__typename": "MoleculeActivityFileUpdatedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
@@ -8462,15 +8533,15 @@ async fn test_molecule_v2_activity() {
                             //         "changeBy": USER_1,
                             //     }
                             // },
-                            // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
-                            //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityFileAddedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileAddedV2",
                             //     "entry": {
@@ -8488,7 +8559,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [public]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8607,7 +8678,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8726,7 +8797,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters by access levels: [public, holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8752,7 +8823,7 @@ async fn test_molecule_v2_activity() {
     );
 
     // Filters combination: [test-tag2] AND [test-category-1] AND [holders]
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -8873,9 +8944,11 @@ async fn test_molecule_v2_activity() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_search() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -8885,7 +8958,7 @@ async fn test_molecule_v2_search() {
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
@@ -8950,7 +9023,7 @@ async fn test_molecule_v2_search() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -9005,7 +9078,7 @@ async fn test_molecule_v2_search() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -9047,7 +9120,7 @@ async fn test_molecule_v2_search() {
         "#
     );
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
@@ -9079,7 +9152,7 @@ async fn test_molecule_v2_search() {
             }
         })
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
@@ -9113,7 +9186,7 @@ async fn test_molecule_v2_search() {
     );
 
     // Move a file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -9172,7 +9245,7 @@ async fn test_molecule_v2_search() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -9186,7 +9259,7 @@ async fn test_molecule_v2_search() {
     };
 
     // Remove a file
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
@@ -9217,7 +9290,7 @@ async fn test_molecule_v2_search() {
     ///////////////////////////////////////////////////////////////////////////////
 
     // Create another project
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
@@ -9269,7 +9342,7 @@ async fn test_molecule_v2_search() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             announcement_create_node,
             json!({
                 "__typename": "CreateAnnouncementSuccess",
@@ -9315,7 +9388,7 @@ async fn test_molecule_v2_search() {
             .unwrap()
             .to_owned();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             upload_file_node,
             json!({
                 "entry": {
@@ -9328,6 +9401,9 @@ async fn test_molecule_v2_search() {
 
         file_dataset_id
     };
+
+    // Synchronize outbox and search agents
+    harness.synchronize_agents().await;
 
     ////////////
     // Search //
@@ -9425,18 +9501,8 @@ async fn test_molecule_v2_search() {
     });
 
     // Empty prompt
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9449,18 +9515,8 @@ async fn test_molecule_v2_search() {
     );
 
     // Prompt: "tEXt" (files + announcements (body))
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tEXt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("tEXt", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9473,18 +9529,8 @@ async fn test_molecule_v2_search() {
     );
 
     // Prompt: "tESt" (files + announcements (headline))
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tESt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("tESt", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9497,18 +9543,8 @@ async fn test_molecule_v2_search() {
     );
 
     // Prompt: "bLaH" (only announcements (body))
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "bLaH",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("bLaH", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9520,19 +9556,9 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Prompt: "lain" (only files)
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lain",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+    // Prompt: "plain" (only files)
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("plain", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9545,21 +9571,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byIpnftUids: [PROJECT_1_UID]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9572,21 +9592,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byIpnftUids: [PROJECT_2_UID]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9599,21 +9613,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byIpnftUids: [PROJECT_2_UID, PROJECT_1_UID]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9626,21 +9634,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byKind: [FILE]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9653,21 +9655,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byKind: ANNOUNCEMENT
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9680,21 +9676,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byKind: [ANNOUNCEMENT, FILE]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9707,21 +9697,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byTags: [test-tag1]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9734,21 +9718,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byTags: [test-tag2]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9761,48 +9739,36 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byTags: [test-tag2, test-tag1]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2", "test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
-                // project_2_file_1_dataset_search_hit_node,
-                // project_2_announcement_1_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
                 project_1_announcement_1_search_hit_node,
                 project_1_file_1_dataset_search_hit_node,
             ],
-            "totalCount": 2
+            "totalCount": 4
         })
     );
 
     // Filters: byCategories: [test-category-1]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9815,21 +9781,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byCategories: [test-category-2]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9842,48 +9802,36 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byCategories: [test-category-2, test-category-1]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2", "test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
-                // project_2_file_1_dataset_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
                 project_2_announcement_1_search_hit_node,
-                // project_1_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
                 // project_1_file_1_dataset_search_hit_node,
             ],
-            "totalCount": 1
+            "totalCount": 3
         })
     );
 
     // Filters: byAccessLevels: ["public"]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9896,21 +9844,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byAccessLevels: ["holders"]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9923,21 +9865,15 @@ async fn test_molecule_v2_search() {
     );
 
     // Filters: byAccessLevels: ["holders", "public"]
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders", "public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9949,26 +9885,20 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters combo: "lah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
+    // Filters combo: "blah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
     //                + "ONLY_ANNOUNCEMENTS"
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lah blah 1",
-                "filters": {
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "blah blah 1",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9984,15 +9914,17 @@ async fn test_molecule_v2_search() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(resourcegen)]
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_dump_dataset_snapshots() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_dump_dataset_snapshots(es_ctx: Arc<ElasticsearchTestContext>) {
     // NOTE: Instead of dumping the source snapshots of datasets here we create
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
     const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -10162,6 +10094,194 @@ async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
     path.push(format!("../../../resources/molecule/{name}.yaml"));
 
     std::fs::write(path, &yaml).unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+pub struct GraphQLMoleculeV2Harness {
+    base_gql_harness: BaseGQLDatasetHarness,
+    es_base_harness: ElasticsearchBaseHarness,
+    schema: kamu_adapter_graphql::Schema,
+    catalog_authorized: dill::Catalog,
+    outbox_agent: Arc<dyn OutboxAgent>,
+    molecule_account_id: odf::AccountID,
+}
+
+#[bon]
+impl GraphQLMoleculeV2Harness {
+    #[builder]
+    async fn new(
+        es_ctx: Arc<ElasticsearchTestContext>,
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        #[builder(default = PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })]
+        predefined_account_opts: PredefinedAccountOpts,
+    ) -> Self {
+        let es_base_harness =
+            ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default);
+
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .base_catalog(es_base_harness.catalog())
+            .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Dispatching)
+            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .system_time_source_provider(SystemTimeSourceProvider::Inherited)
+            .build();
+
+        let base_gql_catalog = base_gql_harness.catalog();
+
+        let cache_dir = base_gql_harness.temp_dir().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
+
+        let mut base_builder = dill::CatalogBuilder::new_chained(base_gql_catalog);
+        base_builder
+            .add::<kamu_datasets_services::FindVersionedFileVersionUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewVersionedFileHistoryUseCaseImpl>()
+            .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()
+            .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
+            .add::<kamu::QueryServiceImpl>()
+            .add::<kamu::QueryDatasetDataUseCaseImpl>()
+            .add::<kamu::SessionContextBuilder>()
+            .add::<kamu::ObjectStoreRegistryImpl>()
+            .add::<kamu::ObjectStoreBuilderLocalFs>()
+            .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())
+            .add::<kamu::EngineProvisionerNull>()
+            .add::<kamu::DataFormatRegistryImpl>()
+            .add::<kamu::PushIngestPlannerImpl>()
+            .add::<kamu::PushIngestExecutorImpl>()
+            .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
+            .add_value(kamu_core::ServerUrlConfig::new_test(None))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>()
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
+
+        kamu_molecule_services::register_dependencies(&mut base_builder);
+
+        let base_catalog = base_builder.build();
+
+        let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
+
+        let AuthenticationCatalogsResult {
+            catalog_no_subject,
+            catalog_authorized,
+            ..
+        } = authentication_catalogs_ext(
+            &base_catalog,
+            Some(CurrentAccountSubject::Logged(LoggedAccount {
+                account_id: molecule_account_id.clone(),
+                account_name: "molecule".parse().unwrap(),
+            })),
+            predefined_account_opts,
+        )
+        .await;
+
+        // Initialize outbox agent
+        let outbox_agent = catalog_authorized.get_one::<dyn OutboxAgent>().unwrap();
+        outbox_agent.run_initialization().await.unwrap();
+
+        // Ensure search indexes schemas are properly initialized
+        {
+            let indexing_catalog = dill::CatalogBuilder::new_chained(&catalog_no_subject)
+                .add_value(KamuBackgroundCatalog::new(catalog_no_subject))
+                .build();
+            ElasticsearchBaseHarness::run_initial_indexing(&indexing_catalog).await;
+        }
+
+        Self {
+            base_gql_harness,
+            es_base_harness,
+            schema: kamu_adapter_graphql::schema_quiet(),
+            catalog_authorized,
+            outbox_agent: base_catalog.get_one::<dyn OutboxAgent>().unwrap(),
+            molecule_account_id,
+        }
+    }
+
+    async fn create_projects_dataset(&self) -> CreateDatasetResult {
+        let snapshot =
+            kamu_molecule_domain::MoleculeDatasetSnapshots::projects("molecule".parse().unwrap());
+
+        let create_dataset = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset
+            .execute(snapshot, Default::default())
+            .await
+            .unwrap()
+    }
+
+    async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        let catalog = self.catalog_authorized.clone();
+        self.schema
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&catalog))
+                    .data(dataset_handle_data_loader(&catalog))
+                    .data(catalog),
+            )
+            .await
+    }
+
+    async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
+        let dataset_reg = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+        let projects_dataset = dataset_reg
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
+            .await
+            .unwrap();
+
+        let last_block = projects_dataset
+            .as_metadata_chain()
+            .get_block_by_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap();
+
+        usize::try_from(last_block.sequence_number).unwrap() + 1
+    }
+
+    async fn execute_search_query(
+        &self,
+        prompt: &str,
+        filters: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let gql_value = GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": prompt,
+                "filters": filters,
+            })),
+        )
+        .execute(&self.schema, &self.catalog_authorized)
+        .await
+        .data;
+
+        let json_value = gql_value.into_json().unwrap();
+        json_value["molecule"]["v2"]["search"].clone()
+    }
+
+    async fn synchronize_agents(&self) {
+        self.outbox_agent.run_while_has_tasks().await.unwrap();
+        self.es_base_harness.es_ctx().refresh_indices().await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

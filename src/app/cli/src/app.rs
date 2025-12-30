@@ -268,14 +268,19 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
+
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+
+        let wrapped_work_catalog = dill::CatalogBuilder::new_chained(work_catalog)
+            .add_value(KamuBackgroundCatalog::new(work_catalog.clone()))
+            .build();
 
         maybe_transactional(
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
                 let command_builder = cli_commands::get_command(
-                    work_catalog,
+                    &wrapped_work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
                     current_account,
@@ -1079,10 +1084,19 @@ pub fn register_config_in_catalog(
         vector_repo,
         overfetch_factor,
         overfetch_amount,
+        repo,
     } = config.search.clone().unwrap();
 
-    catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalConfig {
+    // Note: this is specific to CLI:
+    // - we are not registering NaturalLanguageSearchIndexer startup job here to
+    //   avoid heavyweight load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
+    catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
         overfetch_amount: overfetch_amount.unwrap(),
     });
@@ -1142,6 +1156,45 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    // Note: this is specific to CLI:
+    // - we are not registering SearchIndexer startup job here to avoid heavyweight
+    //   load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
+
+    match repo.unwrap_or_default() {
+        config::SearchRepositoryConfig::Dummy => {
+            // no lazy init needed for dummy impl
+            catalog_builder.add::<kamu_search_services::DummySearchService>();
+        }
+
+        config::SearchRepositoryConfig::Elasticsearch(mut cfg) => {
+            cfg.merge(config::SearchRepositoryConfigElasticsearch::default());
+
+            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchClientConfig {
+                url: url::Url::parse(&cfg.url).int_err()?,
+                password: cfg.password,
+                timeout_secs: cfg.timeout_secs.unwrap(),
+                enable_compression: cfg.enable_compression.unwrap(),
+            });
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
+                index_prefix: cfg.index_prefix.unwrap(),
+            });
+        }
+        config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
+            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchContainerRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
+                image: cfg.image.unwrap(),
+                start_timeout: cfg.start_timeout.unwrap().into(),
+            });
+        }
+    }
 
     catalog_builder.add_value(PasswordPolicyConfig::default());
 

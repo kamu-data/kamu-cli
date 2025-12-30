@@ -19,9 +19,18 @@ pub trait MoleculeViewProjectAnnouncementsUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
+        mode: MoleculeViewProjectAnnouncementsMode,
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum MoleculeViewProjectAnnouncementsMode {
+    LatestProjection,
+    LatestSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

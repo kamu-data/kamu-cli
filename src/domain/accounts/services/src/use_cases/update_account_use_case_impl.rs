@@ -21,6 +21,7 @@ use kamu_accounts::{
     UpdateAccountUseCase,
 };
 use messaging_outbox::Outbox;
+use time_source::SystemTimeSource;
 
 use crate::utils;
 
@@ -31,32 +32,34 @@ use crate::utils;
 pub struct UpdateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
     account_authorization_helper: dill::Lazy<Arc<dyn utils::AccountAuthorizationHelper>>,
 }
 
 impl UpdateAccountUseCaseImpl {
     async fn notify_account_updated(
         &self,
-        account: &Account,
+        updated_account: &Account,
         original_account: &Account,
     ) -> Result<(), InternalError> {
         use messaging_outbox::OutboxExt;
 
-        if original_account.account_name != account.account_name {
-            tracing::info!(
-                "Detected rename of predefined account from '{}' to '{}'",
-                original_account.account_name,
-                account.account_name
-            );
+        if original_account.account_name != updated_account.account_name
+            || original_account.display_name != updated_account.display_name
+            || original_account.email != updated_account.email
+        {
             self.outbox
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                    AccountLifecycleMessage::renamed(
-                        account.id.clone(),
-                        account.email.clone(),
+                    AccountLifecycleMessage::updated(
+                        self.time_source.now(),
+                        updated_account.id.clone(),
+                        original_account.email.clone(),
+                        updated_account.email.clone(),
                         original_account.account_name.clone(),
-                        account.account_name.clone(),
-                        account.display_name.clone(),
+                        updated_account.account_name.clone(),
+                        original_account.display_name.clone(),
+                        updated_account.display_name.clone(),
                     ),
                 )
                 .await?;
@@ -106,7 +109,7 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
             .update_account(&account_to_update)
             .await?;
 
-        self.notify_account_updated(original_account, &account_to_update)
+        self.notify_account_updated(&account_to_update, original_account)
             .await?;
 
         Ok(())

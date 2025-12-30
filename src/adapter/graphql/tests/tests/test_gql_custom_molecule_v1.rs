@@ -14,16 +14,16 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
-    DatasetRegistry,
-    DatasetRegistryExt,
-};
-use odf::dataset::MetadataChainExt;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
+use messaging_outbox::OutboxProvider;
 use serde_json::json;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
+use crate::utils::{
+    AuthenticationCatalogsResult,
+    BaseGQLDatasetHarness,
+    PredefinedAccountOpts,
+    authentication_catalogs_ext,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1462,6 +1462,9 @@ impl GraphQLMoleculeV1Harness {
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
@@ -1491,6 +1494,7 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add::<kamu_search_services::DummySearchService>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
@@ -1501,7 +1505,9 @@ impl GraphQLMoleculeV1Harness {
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
 
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs_ext(
+        let AuthenticationCatalogsResult {
+            catalog_authorized, ..
+        } = authentication_catalogs_ext(
             &base_catalog,
             Some(CurrentAccountSubject::Logged(LoggedAccount {
                 account_id: molecule_account_id.clone(),
@@ -1548,25 +1554,6 @@ impl GraphQLMoleculeV1Harness {
                     .data(catalog),
             )
             .await
-    }
-
-    pub async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
-        let dataset_reg = self
-            .catalog_authorized
-            .get_one::<dyn DatasetRegistry>()
-            .unwrap();
-        let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&dataset_alias.as_local_ref())
-            .await
-            .unwrap();
-
-        let last_block = projects_dataset
-            .as_metadata_chain()
-            .get_block_by_ref(&odf::BlockRef::Head)
-            .await
-            .unwrap();
-
-        usize::try_from(last_block.sequence_number).unwrap() + 1
     }
 }
 
