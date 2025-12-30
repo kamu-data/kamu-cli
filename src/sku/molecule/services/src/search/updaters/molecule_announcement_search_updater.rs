@@ -60,7 +60,10 @@ impl MoleculeAnnouncementSearchUpdater {
                 ctx,
                 announcement_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
-                    id: published_message.ipnft_uid.clone(),
+                    id: published_message
+                        .announcement_record
+                        .announcement_id
+                        .to_string(),
                     doc: announcement_document,
                 }],
             )

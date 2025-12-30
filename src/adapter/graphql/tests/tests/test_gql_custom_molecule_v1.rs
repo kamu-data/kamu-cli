@@ -15,6 +15,7 @@ use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
+use messaging_outbox::OutboxProvider;
 use serde_json::json;
 
 use crate::utils::{
@@ -1461,6 +1462,9 @@ impl GraphQLMoleculeV1Harness {
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 

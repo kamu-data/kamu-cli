@@ -284,6 +284,8 @@ impl MoleculeSearchUseCaseImpl {
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
+        let prompt = prompt.trim();
+
         let ctx = SearchContext {
             catalog: &self.catalog,
         };
@@ -327,12 +329,18 @@ impl MoleculeSearchUseCaseImpl {
             .search(
                 ctx,
                 SearchRequest {
-                    query: Some(prompt.to_string()),
+                    // TODO: consider eating empty prompt at engine level
+                    query: if prompt.is_empty() {
+                        None
+                    } else {
+                        Some(prompt.to_string())
+                    },
                     entity_schemas,
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: vec![
-                        SearchSortSpec::Relevance,
+                        // Consider enabling!
+                        // SearchSortSpec::Relevance,
                         SearchSortSpec::ByField {
                             field: molecule_schema::fields::EVENT_TIME,
                             direction: SearchSortDirection::Descending,

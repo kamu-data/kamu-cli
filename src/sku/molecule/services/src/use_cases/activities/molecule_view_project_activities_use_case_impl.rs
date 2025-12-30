@@ -306,6 +306,26 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             catalog: &self.catalog,
         };
 
+        let entity_schemas = {
+            if let Some(by_kinds) = filters.as_ref().and_then(|f| f.by_kinds.as_deref())
+                && !by_kinds.is_empty()
+            {
+                let mut schemas = vec![];
+                if by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
+                    schemas.push(activity_schema::SCHEMA_NAME);
+                }
+                if by_kinds.contains(&MoleculeActivityKind::Announcement) {
+                    schemas.push(announcement_schema::SCHEMA_NAME);
+                }
+                schemas
+            } else {
+                vec![
+                    activity_schema::SCHEMA_NAME,
+                    announcement_schema::SCHEMA_NAME,
+                ]
+            }
+        };
+
         let filter = {
             let mut and_clauses = vec![];
 
@@ -329,12 +349,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                 ctx,
                 SearchRequest {
                     query: None, // no textual query, just filtering
-                    entity_schemas: vec![
-                        // Query simultaneously both activities and announcements.
-                        // This should give mixed-type listing sorted by time desc
-                        announcement_schema::SCHEMA_NAME,
-                        activity_schema::SCHEMA_NAME,
-                    ],
+                    entity_schemas,
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),

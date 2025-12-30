@@ -57,6 +57,9 @@ impl BaseGQLFlowRunsHarness {
     pub async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
+            .outbox_provider(messaging_outbox::OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .build();
 
         let base_gql_flow_catalog =

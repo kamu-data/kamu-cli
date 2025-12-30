@@ -26,6 +26,7 @@ use kamu_datasets::{
 };
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
+use messaging_outbox::{OutboxAgent, OutboxProvider};
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
 use serde_json::json;
@@ -1311,6 +1312,8 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1500,6 +1503,8 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1672,6 +1677,8 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -2018,6 +2025,8 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -2359,6 +2368,8 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         })
     );
 
+    harness.synchronize_agents().await;
+
     let all_entries_nodes = json!([
         {
             "path": "/2025/foo.txt",
@@ -2695,23 +2706,23 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         .into_json()
         .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
-            "totalCount": 1,
+            "totalCount": 2,
             "nodes": [
-                // {
-                //     "path": "/2025/foo.txt",
-                //     "ref": file_1_did,
-                //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                //     "asVersionedFile": {
-                //         "latest": {
-                //             "accessLevel": "public",
-                //             "contentType": "text/plain",
-                //             "version": 2,
-                //             "description": "Plain text file that was updated",
-                //             "categories": ["test-category-1", "test-category-3"],
-                //             "tags": ["test-tag1", "test-tag4"],
-                //         }
-                //     }
-                // },
+                {
+                     "path": "/2025/foo.txt",
+                     "ref": file_1_did,
+                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                     "asVersionedFile": {
+                         "latest": {
+                             "accessLevel": "public",
+                             "contentType": "text/plain",
+                             "version": 2,
+                             "description": "Plain text file that was updated",
+                             "categories": ["test-category-1", "test-category-3"],
+                             "tags": ["test-tag1", "test-tag4"],
+                         }
+                     }
+                },
                 {
                     "path": "/bar.txt",
                     "ref": file_2_did,
@@ -3252,6 +3263,9 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
             }
         })
     );
+
+    harness.synchronize_agents().await;
+
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
@@ -3574,6 +3588,9 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
         cas_failure_payload["actualHead"].is_string()
             && cas_failure_payload["actualHead"] != cas_failure_payload["expectedHead"]
     );
+
+    harness.synchronize_agents().await;
+
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
@@ -4224,6 +4241,8 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
         })
     );
 
+    harness.synchronize_agents().await;
+
     // Announcements are listed as expected
     let all_announcements_tail_nodes = value!([
         {
@@ -4587,21 +4606,21 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                     "project": {
                         "announcements": {
                             "tail": {
-                                "totalCount": 2,
+                                "totalCount": 3,
                                 "nodes": [
-                                    // {
-                                    //     "id": project_1_announcement_3_id,
-                                    //     "headline": "Test announcement 3",
-                                    //     "body": "Blah blah 3",
-                                    //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
-                                    //     ],
-                                    //     "accessLevel": "holders",
-                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
-                                    //     "categories": [],
-                                    //     "tags": ["test-tag1"],
-                                    // },
+                                    {
+                                         "id": project_1_announcement_3_id,
+                                         "headline": "Test announcement 3",
+                                         "body": "Blah blah 3",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                             project_1_file_2_dataset_id,
+                                         ],
+                                         "accessLevel": "holders",
+                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                                         "categories": [],
+                                         "tags": ["test-tag1"],
+                                    },
                                     {
                                         "id": project_1_announcement_2_id,
                                         "headline": "Test announcement 2",
@@ -4791,7 +4810,7 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                     "project": {
                         "announcements": {
                             "tail": {
-                                "totalCount": 1,
+                                "totalCount": 2,
                                 "nodes": [
                                     // {
                                     //     "id": project_1_announcement_3_id,
@@ -4806,18 +4825,18 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "categories": [],
                                     //     "tags": ["test-tag1"],
                                     // },
-                                    // {
-                                    //     "id": project_1_announcement_2_id,
-                                    //     "headline": "Test announcement 2",
-                                    //     "body": "Blah blah 2",
-                                    //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //     ],
-                                    //     "accessLevel": "holders",
-                                    //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
-                                    //     "categories": ["test-category-1"],
-                                    //     "tags": ["test-tag1", "test-tag2"],
-                                    // },
+                                    {
+                                         "id": project_1_announcement_2_id,
+                                         "headline": "Test announcement 2",
+                                         "body": "Blah blah 2",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                         ],
+                                         "accessLevel": "holders",
+                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
+                                         "categories": ["test-category-1"],
+                                         "tags": ["test-tag1", "test-tag2"],
+                                    },
                                     {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -5149,6 +5168,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
         Some(true),
     );
 
+    harness.synchronize_agents().await;
+
     // Activities are empty
     let expected_activity_node = value!({
         "activity": {
@@ -5303,6 +5324,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
         file_dataset_id
     };
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -5453,6 +5476,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -5560,6 +5585,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5690,6 +5717,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
 
         new_announcement_id
     };
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5826,6 +5855,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -5967,6 +5998,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     // Check project activity events
 
@@ -6158,6 +6191,8 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
 
         new_announcement_id
     };
+
+    harness.synchronize_agents().await;
 
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
@@ -7312,40 +7347,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                     "project": {
                         "activity": {
                             "nodes": [
-                                // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
-                                //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
-                                //     }
-                                // },
-                                // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
-                                //     "entry": {
-                                //         "path": "/foo_renamed.txt",
-                                //         "ref": project_1_file_1_dataset_id,
-                                //         "accessLevel": "public",
-                                //         "changeBy": USER_1,
-                                //     }
-                                // },
-                                // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
-                                //     "announcement": {
-                                //         "id": project_1_announcement_1_id,
-                                //         "headline": "Test announcement 1",
-                                //         "body": "Blah blah 1",
-                                //         "attachments": [
-                                //             project_1_file_1_dataset_id,
-                                //             project_1_file_2_dataset_id,
-                                //         ],
-                                //         "accessLevel": "public",
-                                //         "changeBy": USER_1,
-                                //         "categories": ["test-category-1"],
-                                //         "tags": ["test-tag1", "test-tag2"],
-                                //     }
-                                // },
+                                {
+                                     "__typename": "MoleculeActivityFileRemovedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
@@ -7355,15 +7365,40 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
+                                {
+                                     "__typename": "MoleculeActivityAnnouncementV2",
+                                     "announcement": {
+                                         "id": project_1_announcement_1_id,
+                                         "headline": "Test announcement 1",
+                                         "body": "Blah blah 1",
+                                         "attachments": [
+                                             project_1_file_1_dataset_id,
+                                             project_1_file_2_dataset_id,
+                                         ],
+                                         "accessLevel": "public",
+                                         "changeBy": USER_1,
+                                         "categories": ["test-category-1"],
+                                         "tags": ["test-tag1", "test-tag2"],
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
+                                //         "path": "/foo_renamed.txt",
+                                //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
+                                //         "changeBy": USER_1,
                                 //     }
                                 // },
+                                {
+                                     "__typename": "MoleculeActivityFileUpdatedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
                                 //     "entry": {
@@ -7373,15 +7408,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //         "changeBy": USER_1,
                                 //     }
                                 // },
-                                // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
-                                //     "entry": {
-                                //         "path": "/bar.txt",
-                                //         "ref": project_1_file_2_dataset_id,
-                                //         "accessLevel": "holders",
-                                //         "changeBy": USER_2,
-                                //     }
-                                // },
+                                {
+                                     "__typename": "MoleculeActivityFileAddedV2",
+                                     "entry": {
+                                         "path": "/bar.txt",
+                                         "ref": project_1_file_2_dataset_id,
+                                         "accessLevel": "holders",
+                                         "changeBy": USER_2,
+                                     }
+                                },
                                 // {
                                 //     "__typename": "MoleculeActivityFileAddedV2",
                                 //     "entry": {
@@ -8067,19 +8102,19 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                 "v2": {
                     "activity": {
                         "nodes": [
-                            // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
-                            //     "announcement": {
-                            //         "id": project_2_announcement_1_id,
-                            //         "headline": "Test announcement 2",
-                            //         "body": "Blah blah 2",
-                            //         "attachments": [],
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //         "categories": ["test-category-1", "test-category-2"],
-                            //         "tags": ["test-tag2"],
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "announcement": {
+                                     "id": project_2_announcement_1_id,
+                                     "headline": "Test announcement 2",
+                                     "body": "Blah blah 2",
+                                     "attachments": [],
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                     "categories": ["test-category-1", "test-category-2"],
+                                     "tags": ["test-tag2"],
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileRemovedV2",
                             //     "entry": {
@@ -8437,40 +8472,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "tags": ["test-tag2"],
                                 }
                             },
-                            // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
-                            //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //     }
-                            // },
-                            // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
-                            //     "entry": {
-                            //         "path": "/foo_renamed.txt",
-                            //         "ref": project_1_file_1_dataset_id,
-                            //         "accessLevel": "public",
-                            //         "changeBy": USER_1,
-                            //     }
-                            // },
-                            // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
-                            //     "announcement": {
-                            //         "id": project_1_announcement_1_id,
-                            //         "headline": "Test announcement 1",
-                            //         "body": "Blah blah 1",
-                            //         "attachments": [
-                            //             project_1_file_1_dataset_id,
-                            //             project_1_file_2_dataset_id,
-                            //         ],
-                            //         "accessLevel": "public",
-                            //         "changeBy": USER_1,
-                            //         "categories": ["test-category-1"],
-                            //         "tags": ["test-tag1", "test-tag2"],
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityFileRemovedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
@@ -8480,15 +8490,40 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "changeBy": USER_1,
                             //     }
                             // },
+                            {
+                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "announcement": {
+                                     "id": project_1_announcement_1_id,
+                                     "headline": "Test announcement 1",
+                                     "body": "Blah blah 1",
+                                     "attachments": [
+                                         project_1_file_1_dataset_id,
+                                         project_1_file_2_dataset_id,
+                                     ],
+                                     "accessLevel": "public",
+                                     "changeBy": USER_1,
+                                     "categories": ["test-category-1"],
+                                     "tags": ["test-tag1", "test-tag2"],
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
+                            //         "path": "/foo_renamed.txt",
+                            //         "ref": project_1_file_1_dataset_id,
+                            //         "accessLevel": "public",
+                            //         "changeBy": USER_1,
                             //     }
                             // },
+                            {
+                                 "__typename": "MoleculeActivityFileUpdatedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
                             //     "entry": {
@@ -8498,15 +8533,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "changeBy": USER_1,
                             //     }
                             // },
-                            // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
-                            //     "entry": {
-                            //         "path": "/bar.txt",
-                            //         "ref": project_1_file_2_dataset_id,
-                            //         "accessLevel": "holders",
-                            //         "changeBy": USER_2,
-                            //     }
-                            // },
+                            {
+                                 "__typename": "MoleculeActivityFileAddedV2",
+                                 "entry": {
+                                     "path": "/bar.txt",
+                                     "ref": project_1_file_2_dataset_id,
+                                     "accessLevel": "holders",
+                                     "changeBy": USER_2,
+                                 }
+                            },
                             // {
                             //     "__typename": "MoleculeActivityFileAddedV2",
                             //     "entry": {
@@ -9367,6 +9402,9 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         file_dataset_id
     };
 
+    // Synchronize outbox and search agents
+    harness.synchronize_agents().await;
+
     ////////////
     // Search //
     ////////////
@@ -9464,17 +9502,7 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Empty prompt
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9488,17 +9516,7 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Prompt: "tEXt" (files + announcements (body))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tEXt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("tEXt", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9512,17 +9530,7 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Prompt: "tESt" (files + announcements (headline))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tESt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("tESt", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9536,17 +9544,7 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Prompt: "bLaH" (only announcements (body))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "bLaH",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("bLaH", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9558,19 +9556,9 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         })
     );
 
-    // Prompt: "lain" (only files)
+    // Prompt: "plain" (only files)
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lain",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("plain", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9584,20 +9572,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byIpnftUids: [PROJECT_1_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9611,20 +9593,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byIpnftUids: [PROJECT_2_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9638,20 +9614,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byIpnftUids: [PROJECT_2_UID, PROJECT_1_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9665,20 +9635,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byKind: [FILE]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9692,20 +9656,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byKind: ANNOUNCEMENT
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9719,20 +9677,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byKind: [ANNOUNCEMENT, FILE]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9746,20 +9698,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byTags: [test-tag1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9773,20 +9719,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byTags: [test-tag2]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9800,47 +9740,35 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byTags: [test-tag2, test-tag1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2", "test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
-                // project_2_file_1_dataset_search_hit_node,
-                // project_2_announcement_1_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
+                project_2_announcement_1_search_hit_node,
                 project_1_announcement_1_search_hit_node,
                 project_1_file_1_dataset_search_hit_node,
             ],
-            "totalCount": 2
+            "totalCount": 4
         })
     );
 
     // Filters: byCategories: [test-category-1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9854,20 +9782,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byCategories: [test-category-2]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9881,47 +9803,35 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byCategories: [test-category-2, test-category-1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2", "test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
-                // project_2_file_1_dataset_search_hit_node,
+                project_2_file_1_dataset_search_hit_node,
                 project_2_announcement_1_search_hit_node,
-                // project_1_announcement_1_search_hit_node,
+                project_1_announcement_1_search_hit_node,
                 // project_1_file_1_dataset_search_hit_node,
             ],
-            "totalCount": 1
+            "totalCount": 3
         })
     );
 
     // Filters: byAccessLevels: ["public"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -9935,20 +9845,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byAccessLevels: ["holders"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9962,20 +9866,14 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 
     // Filters: byAccessLevels: ["holders", "public"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders", "public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -9987,26 +9885,20 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         })
     );
 
-    // Filters combo: "lah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
+    // Filters combo: "blah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
     //                + "ONLY_ANNOUNCEMENTS"
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lah blah 1",
-                "filters": {
+        harness
+            .execute_search_query(
+                "blah blah 1",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10211,16 +10103,17 @@ async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 pub struct GraphQLMoleculeV2Harness {
     base_gql_harness: BaseGQLDatasetHarness,
-    _es_base_harness: ElasticsearchBaseHarness,
+    es_base_harness: ElasticsearchBaseHarness,
     schema: kamu_adapter_graphql::Schema,
     catalog_authorized: dill::Catalog,
+    outbox_agent: Arc<dyn OutboxAgent>,
     molecule_account_id: odf::AccountID,
 }
 
 #[bon]
 impl GraphQLMoleculeV2Harness {
     #[builder]
-    pub async fn new(
+    async fn new(
         es_ctx: Arc<ElasticsearchTestContext>,
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
@@ -10236,6 +10129,7 @@ impl GraphQLMoleculeV2Harness {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .base_catalog(es_base_harness.catalog())
             .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Dispatching)
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .system_time_source_provider(SystemTimeSourceProvider::Inherited)
             .build();
@@ -10268,7 +10162,9 @@ impl GraphQLMoleculeV2Harness {
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>()
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
 
         kamu_molecule_services::register_dependencies(&mut base_builder);
 
@@ -10290,6 +10186,10 @@ impl GraphQLMoleculeV2Harness {
         )
         .await;
 
+        // Initialize outbox agent
+        let outbox_agent = catalog_authorized.get_one::<dyn OutboxAgent>().unwrap();
+        outbox_agent.run_initialization().await.unwrap();
+
         // Ensure search indexes schemas are properly initialized
         {
             let indexing_catalog = dill::CatalogBuilder::new_chained(&catalog_no_subject)
@@ -10300,14 +10200,15 @@ impl GraphQLMoleculeV2Harness {
 
         Self {
             base_gql_harness,
-            _es_base_harness: es_base_harness,
+            es_base_harness,
             schema: kamu_adapter_graphql::schema_quiet(),
             catalog_authorized,
+            outbox_agent: base_catalog.get_one::<dyn OutboxAgent>().unwrap(),
             molecule_account_id,
         }
     }
 
-    pub async fn create_projects_dataset(&self) -> CreateDatasetResult {
+    async fn create_projects_dataset(&self) -> CreateDatasetResult {
         let snapshot =
             kamu_molecule_domain::MoleculeDatasetSnapshots::projects("molecule".parse().unwrap());
 
@@ -10322,7 +10223,7 @@ impl GraphQLMoleculeV2Harness {
             .unwrap()
     }
 
-    pub async fn execute_authorized_query(
+    async fn execute_authorized_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
@@ -10338,7 +10239,7 @@ impl GraphQLMoleculeV2Harness {
             .await
     }
 
-    pub async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
+    async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
         let dataset_reg = self
             .catalog_authorized
             .get_one::<dyn DatasetRegistry>()
@@ -10355,6 +10256,31 @@ impl GraphQLMoleculeV2Harness {
             .unwrap();
 
         usize::try_from(last_block.sequence_number).unwrap() + 1
+    }
+
+    async fn execute_search_query(
+        &self,
+        prompt: &str,
+        filters: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let gql_value = GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": prompt,
+                "filters": filters,
+            })),
+        )
+        .execute(&self.schema, &self.catalog_authorized)
+        .await
+        .data;
+
+        let json_value = gql_value.into_json().unwrap();
+        json_value["molecule"]["v2"]["search"].clone()
+    }
+
+    async fn synchronize_agents(&self) {
+        self.outbox_agent.run_while_has_tasks().await.unwrap();
+        self.es_base_harness.es_ctx().refresh_indices().await;
     }
 }
 

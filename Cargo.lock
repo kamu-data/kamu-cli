@@ -7257,6 +7257,7 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-messaging-outbox-inmem",
  "kamu-molecule-domain",
  "kamu-molecule-services",
  "kamu-search",
@@ -7897,12 +7898,15 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "random-strings",
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "test-utils",
  "tokio",
+ "tokio-retry",
  "url",
 ]
 

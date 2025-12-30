@@ -19,6 +19,7 @@ use kamu_molecule_domain::{
     MoleculeDataRoomMessageEntryRemoved,
     MoleculeDataRoomMessageEntryUpdated,
     molecule_data_room_entry_search_schema as data_room_entry_schema,
+    molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
@@ -132,6 +133,45 @@ impl MoleculeDataRoomSearchUpdater {
             &moved_message.ipnft_uid,
             &moved_message.path_to,
         );
+
+        // Replace modified properties
+        let mut existing_document = existing_document;
+        if let Some(obj) = existing_document.as_object_mut() {
+            obj.insert(
+                molecule_schema::fields::PATH.to_string(),
+                serde_json::Value::String(moved_message.path_to.as_str().to_string()),
+            );
+            obj.insert(
+                molecule_schema::fields::SYSTEM_TIME.to_string(),
+                serde_json::Value::String(
+                    moved_message
+                        .data_room_entry
+                        .system_time
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                ),
+            );
+            obj.insert(
+                molecule_schema::fields::EVENT_TIME.to_string(),
+                serde_json::Value::String(
+                    moved_message
+                        .data_room_entry
+                        .event_time
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                ),
+            );
+            obj.insert(
+                molecule_schema::fields::CHANGE_BY.to_string(),
+                serde_json::Value::String(
+                    moved_message
+                        .data_room_entry
+                        .denormalized_latest_file_info
+                        .change_by
+                        .clone(),
+                ),
+            );
+        } else {
+            unreachable!()
+        }
 
         self.search_service
             .bulk_update(
