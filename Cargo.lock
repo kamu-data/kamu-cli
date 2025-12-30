@@ -7260,6 +7260,7 @@ dependencies = [
  "kamu-molecule-domain",
  "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-elasticsearch",
  "kamu-search-services",
  "kamu-task-system",
  "kamu-task-system-inmem",

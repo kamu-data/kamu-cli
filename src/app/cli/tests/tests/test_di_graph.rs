@@ -149,7 +149,7 @@ fn test_di_server_graph_validates(
     let server_catalog = server_catalog_builder.build();
 
     let wrapped_catalog = dill::CatalogBuilder::new_chained(&server_catalog)
-        .add_value(KamuBackgroundCatalog::new(server_catalog.clone()))
+        .add_value(KamuBackgroundCatalog::new(server_catalog))
         .build();
 
     let mut cli_catalog_builder = dill::CatalogBuilder::new_chained(&wrapped_catalog);

@@ -107,6 +107,9 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-molecule-services = { workspace = true }
