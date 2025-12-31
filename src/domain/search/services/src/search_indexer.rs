@@ -20,7 +20,7 @@ use kamu_search::{SearchEntitySchemaProvider, SearchRepository};
 #[dill::meta(InitOnStartupMeta {
     job_name: "dev.kamu.search.SearchIndexer",
     depends_on: &[],
-    requires_transaction: true,
+    requires_transaction: false,
 })]
 pub struct SearchIndexer {
     search_repo: Arc<dyn SearchRepository>,

@@ -62,13 +62,14 @@ pub fn get_multitenant_molecule_config_with_elasticsearch() -> String {
     let search_config: serde_yaml::Value = serde_yaml::from_str(&elasticsearch_config).unwrap();
 
     // Merge search config into content section
-    if let Some(content) = base_config.get_mut("content") {
-        if let Some(content_map) = content.as_mapping_mut() {
-            if let Some(search_map) = search_config.as_mapping() {
-                for (key, value) in search_map {
-                    content_map.insert(key.clone(), value.clone());
-                }
-            }
+    if let (Some(content_map), Some(search_map)) = (
+        base_config
+            .get_mut("content")
+            .and_then(|c| c.as_mapping_mut()),
+        search_config.as_mapping(),
+    ) {
+        for (key, value) in search_map {
+            content_map.insert(key.clone(), value.clone());
         }
     }
 

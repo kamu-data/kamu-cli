@@ -6984,6 +6984,7 @@ dependencies = [
  "common-macros",
  "crypto-utils",
  "database-common",
+ "database-common-macros",
  "dill",
  "email-utils",
  "event-sourcing",

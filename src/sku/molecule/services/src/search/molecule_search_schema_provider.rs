@@ -34,7 +34,6 @@ use crate::search::indexers::{
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct MoleculeSearchSchemaProvider {
     background_catalog: Arc<KamuBackgroundCatalog>,
-    account_service: Arc<dyn AccountService>,
 }
 
 #[common_macros::method_names_consts]
@@ -54,10 +53,20 @@ impl MoleculeSearchSchemaProvider {
         let mut total_indexed = 0;
         for org_account_name in kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS {
             // Resolve organization account, if exists
-            let maybe_org_account = self
-                .account_service
-                .account_by_name(&odf::AccountName::try_from(org_account_name).unwrap())
-                .await?;
+            let maybe_org_account =
+                DatabaseTransactionRunner::new(self.background_catalog.catalog().clone())
+                    .transactional(|transaction_catalog| {
+                        let account_service =
+                            transaction_catalog.get_one::<dyn AccountService>().unwrap();
+                        async move {
+                            account_service
+                                .account_by_name(
+                                    &odf::AccountName::try_from(org_account_name).unwrap(),
+                                )
+                                .await
+                        }
+                    })
+                    .await?;
 
             // Skip if organization account not found
             let Some(org_account) = maybe_org_account else {

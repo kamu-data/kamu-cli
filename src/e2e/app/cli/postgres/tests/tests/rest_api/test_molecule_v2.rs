@@ -32,3 +32,15 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_activity_change_by_for_remove,
+    options = Options::default().with_multi_tenant().with_kamu_config(
+        kamu_cli_e2e_repo_tests::rest_api::get_multitenant_molecule_config_with_elasticsearch()
+            .as_str()
+    ),
+    extra_test_groups = "containerized, elasticsearch, molecule"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
