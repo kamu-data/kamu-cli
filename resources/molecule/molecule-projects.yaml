@@ -1,0 +1,86 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: molecule-projects
+  kind: Root
+  metadata:
+  - kind: SetDataSchema
+    schema:
+      fields:
+      - name: offset
+        type:
+          kind: Int64
+      - name: op
+        type:
+          kind: Int32
+      - name: system_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: event_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: account_id
+        type:
+          kind: String
+      - name: ipnft_symbol
+        type:
+          kind: String
+      - name: ipnft_uid
+        type:
+          kind: String
+      - name: ipnft_address
+        type:
+          kind: String
+      - name: ipnft_token_id
+        type:
+          kind: String
+      - name: data_room_dataset_id
+        type:
+          kind: String
+      - name: announcements_dataset_id
+        type:
+          kind: String
+  - kind: AddPushSource
+    sourceName: default
+    read:
+      kind: NdJson
+      schema:
+      - op INT NOT NULL
+      - account_id STRING NOT NULL
+      - ipnft_symbol STRING NOT NULL
+      - ipnft_uid STRING NOT NULL
+      - ipnft_address STRING NOT NULL
+      - ipnft_token_id STRING NOT NULL
+      - data_room_dataset_id STRING NOT NULL
+      - announcements_dataset_id STRING NOT NULL
+    merge:
+      kind: ChangelogStream
+      primaryKey:
+      - account_id
+  - kind: SetInfo
+    description: List of projects tracked by Molecule.xyz
+    keywords:
+    - DeSci
+    - BioTech
+    - Funding
+    - Crypto
+  - kind: SetAttachments
+    attachments:
+      kind: Embedded
+      items:
+      - path: README.md
+        content: |
+          # Projects tracked by Molecule.xyz
+
+          Molecule is a decentralized biotech protocol,
+          building a web3 marketplace for research-related IP.
+          Our platform and scalable framework for biotech DAOs
+          connects academics and biotech companies with quick and
+          easy funding, while enabling patient, researcher, and funder
+          communities to directly govern and own research-related IP.
+
+          Find out more at https://molecule.xyz/

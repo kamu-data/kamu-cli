@@ -11,6 +11,7 @@ mod test_accounts;
 mod test_auth;
 mod test_dataset;
 mod test_ingest;
+mod test_molecule_v2;
 mod test_odf_core;
 mod test_odf_query;
 mod test_search;

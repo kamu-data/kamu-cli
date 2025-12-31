@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    id,\n                    account_id,\n                    quota_type,\n                    event_type,\n                    event_payload as \"event_payload: Value\",\n                    event_time as \"event_time: DateTime<Utc>\"\n                FROM account_quota_events\n                WHERE ($1::bigint IS NULL OR id > $1)\n                  AND ($2::bigint IS NULL OR id <= $2)\n                ORDER BY id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "quota_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "event_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "event_payload: Value",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "event_time: DateTime<Utc>",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a552a860cce30f7ca843ea7b8eeb5b312a768fed6b53d836e48cec5c10041b1b"
+}
