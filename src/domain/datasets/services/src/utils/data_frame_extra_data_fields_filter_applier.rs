@@ -20,8 +20,8 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static ARRAY_HAS_ALL_UDF: LazyLock<Arc<datafusion::logical_expr::ScalarUDF>> =
-    LazyLock::new(datafusion::functions_nested::array_has::array_has_all_udf);
+static ARRAY_HAS_ANY_UDF: LazyLock<Arc<datafusion::logical_expr::ScalarUDF>> =
+    LazyLock::new(datafusion::functions_nested::array_has::array_has_any_udf);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,9 +89,9 @@ impl DataFrameExtraDataFieldsFilterApplier {
                             ScalarValue::List(list_array)
                         };
 
-                        // array_has_all(field1, [1, 2, 3]
+                        // array_has_any(field1, [1, 2, 3]
                         Expr::ScalarFunction(ScalarFunction::new_udf(
-                            (*ARRAY_HAS_ALL_UDF).clone(),
+                            (*ARRAY_HAS_ANY_UDF).clone(),
                             vec![col(field_name), lit(values_as_scalar)],
                         ))
                     } else {
@@ -101,7 +101,7 @@ impl DataFrameExtraDataFieldsFilterApplier {
                     }
                 },
             )
-            // ((array_has_all(field1, [1, 2, 3]) AND field2 in [4, 5, 6]) AND field3 in [7, 8, 9])
+            // ((array_has_any(field1, [1, 2, 3]) AND field2 in [4, 5, 6]) AND field3 in [7, 8, 9])
             .reduce(Expr::and)
             // Safety: we use the NonEmpty<T>, so we will always have elements.
             .unwrap();
