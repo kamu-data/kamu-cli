@@ -9,6 +9,8 @@
 
 use std::collections::HashSet;
 
+use crate::MoleculeAccessLevelRule;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -30,6 +32,7 @@ pub struct MoleculeActivitiesFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
     pub by_kinds: Option<Vec<MoleculeActivityKind>>,
 }
 

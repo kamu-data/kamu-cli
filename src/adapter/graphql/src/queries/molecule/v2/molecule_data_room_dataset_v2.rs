@@ -26,6 +26,7 @@ use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
     MoleculeAccessLevel,
+    MoleculeAccessLevelRuleInput,
     MoleculeCategory,
     MoleculeChangeBy,
     MoleculeProjectV2,
@@ -172,6 +173,7 @@ pub struct MoleculeDataRoomEntriesFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
+    by_access_level_rules: Option<Vec<MoleculeAccessLevelRuleInput>>,
 }
 
 impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeDataRoomEntriesFilters {
@@ -180,6 +182,9 @@ impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeData
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
+            by_access_level_rules: value
+                .by_access_level_rules
+                .map(|rules| rules.into_iter().map(Into::into).collect()),
         }
     }
 }

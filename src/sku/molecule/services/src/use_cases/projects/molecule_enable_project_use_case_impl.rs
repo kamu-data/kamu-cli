@@ -78,7 +78,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
             .limit(0, Some(1))
             .int_err()?;
 
-        let records: Vec<serde_json::Value> = df.collect_json_aos().await.int_err()?;
+        let records = df.collect_json_aos().await.int_err()?;
         assert!(records.len() <= 1);
 
         // No record found?

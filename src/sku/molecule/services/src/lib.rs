@@ -12,6 +12,7 @@
 mod dependencies;
 mod services;
 mod use_cases;
+pub mod utils;
 
 pub use dependencies::*;
 pub use services::*;

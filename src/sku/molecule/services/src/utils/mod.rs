@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod extra_data_fields_filter;
+mod molecule_filters;
 
 pub use extra_data_fields_filter::*;
+pub use molecule_filters::*;
