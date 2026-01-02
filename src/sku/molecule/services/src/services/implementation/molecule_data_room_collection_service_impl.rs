@@ -15,6 +15,7 @@ use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
+use nonempty::NonEmpty;
 
 use crate::{
     MoleculeDataRoomCollectionEntryNotFoundByRefError,
@@ -155,12 +156,34 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 path_prefix,
                 max_depth,
                 filters.and_then(|f| {
-                    utils::molecule_fields_filter(
-                        None,
-                        f.by_tags,
-                        f.by_categories,
+                    let base_filters =
+                        utils::molecule_fields_filter(None, f.by_tags, f.by_categories);
+                    let access_levels = utils::normalize_access_level_rules(
                         f.by_access_levels,
+                        f.by_access_level_rules,
+                    );
+                    let access_filter = NonEmpty::from_vec(
+                        access_levels
+                            .into_iter()
+                            .flat_map(|rule| rule.access_levels)
+                            .collect::<Vec<_>>(),
                     )
+                    .map(|values| ExtraDataFieldFilter {
+                        field_name: "molecule_access_level".to_string(),
+                        values,
+                        is_array: false,
+                    });
+
+                    match (base_filters, access_filter) {
+                        (Some(existing), Some(access_filter)) => {
+                            let mut filters = existing.into_iter().collect::<Vec<_>>();
+                            filters.push(access_filter);
+                            NonEmpty::from_vec(filters)
+                        }
+                        (Some(existing), None) => Some(existing),
+                        (None, Some(access_filter)) => NonEmpty::from_vec(vec![access_filter]),
+                        (None, None) => None,
+                    }
                 }),
                 pagination,
             )

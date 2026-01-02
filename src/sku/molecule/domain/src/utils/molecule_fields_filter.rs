@@ -9,13 +9,14 @@
 
 use nonempty::NonEmpty;
 
+use crate::MoleculeAccessLevelRule;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn molecule_fields_filter(
     by_ipnft_uids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
-    by_access_levels: Option<Vec<String>>,
 ) -> Option<kamu_datasets::ExtraDataFieldsFilter> {
     use kamu_datasets::ExtraDataFieldFilter as Filter;
 
@@ -40,22 +41,37 @@ pub fn molecule_fields_filter(
             is_array: true,
         })
     });
-    let maybe_access_levels_filter = by_access_levels.and_then(|values| {
-        NonEmpty::from_vec(values).map(|values| Filter {
-            field_name: "molecule_access_level".to_string(),
-            values,
-            is_array: false,
-        })
-    });
 
     let filters = maybe_ipnft_uids_filter
         .into_iter()
         .chain(maybe_tags_filter)
         .chain(maybe_categories_filter)
-        .chain(maybe_access_levels_filter)
         .collect::<Vec<_>>();
 
     NonEmpty::from_vec(filters)
+}
+
+pub fn normalize_access_level_rules(
+    by_access_levels: Option<Vec<String>>,
+    by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
+) -> Vec<MoleculeAccessLevelRule> {
+    let mut rules = Vec::new();
+
+    if let Some(access_levels) = by_access_levels
+        && let Some(access_levels) = NonEmpty::from_vec(access_levels)
+    {
+        rules.push(MoleculeAccessLevelRule {
+            ipnft_uid: None,
+            access_levels: access_levels.into(),
+        });
+    }
+
+    if let Some(mut access_rules) = by_access_level_rules {
+        access_rules.retain(|rule| !rule.access_levels.is_empty());
+        rules.extend(access_rules);
+    }
+
+    rules
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

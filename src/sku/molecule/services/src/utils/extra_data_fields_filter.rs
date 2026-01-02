@@ -22,18 +22,21 @@ pub fn molecule_extra_data_fields_filter(
         NonEmpty::from_vec(values).map(|values| Filter {
             field_name: "tags".to_string(),
             values,
+            is_array: true,
         })
     });
     let maybe_categories_filter = by_categories.and_then(|values| {
         NonEmpty::from_vec(values).map(|values| Filter {
             field_name: "categories".to_string(),
             values,
+            is_array: true,
         })
     });
     let maybe_access_levels_filter = by_access_levels.and_then(|values| {
         NonEmpty::from_vec(values).map(|values| Filter {
             field_name: "access_levels".to_string(),
             values,
+            is_array: true,
         })
     });
 

@@ -10,6 +10,8 @@
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::MoleculeAccessLevelRule;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
@@ -163,11 +165,12 @@ pub struct MoleculeAnnouncementPayloadRecord {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MoleculeAnnouncementsFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

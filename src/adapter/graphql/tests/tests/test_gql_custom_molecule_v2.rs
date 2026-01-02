@@ -9163,6 +9163,192 @@ async fn test_molecule_v2_activity() {
     );
 }
 
+#[tokio::test]
+async fn test_molecule_v2_activity_access_level_rules_filters() {
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
+    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
+
+    for (uid, addr, token_id) in [
+        (
+            PROJECT_1_UID,
+            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
+            201,
+        ),
+        (
+            PROJECT_2_UID,
+            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
+            202,
+        ),
+    ] {
+        let token_id_str = token_id.to_string();
+        assert_eq!(
+            {
+                let res_json = GraphQLQueryRequest::new(
+                    CREATE_PROJECT,
+                    async_graphql::Variables::from_value(value!({
+                        "ipnftSymbol": format!("sym{token_id}"),
+                        "ipnftUid": uid,
+                        "ipnftAddress": addr,
+                        "ipnftTokenId": token_id_str,
+                    })),
+                )
+                .execute(&harness.schema, &harness.catalog_authorized)
+                .await
+                .data
+                .into_json()
+                .unwrap();
+
+                res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            },
+            Some(true),
+        );
+    }
+
+    async fn create_file(
+        harness: &GraphQLMoleculeV1Harness,
+        ipnft_uid: &str,
+        path: &str,
+        access_level: &str,
+    ) -> String {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "path": path,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"payload"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": access_level,
+                "description": null,
+                "categories": null,
+                "tags": null,
+                "contentText": null,
+                "encryptionMetadata": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+
+        upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    let project_1_public = create_file(&harness, PROJECT_1_UID, "/p1-public.txt", "public").await;
+    let project_1_holders =
+        create_file(&harness, PROJECT_1_UID, "/p1-holders.txt", "holders").await;
+    let project_2_private =
+        create_file(&harness, PROJECT_2_UID, "/p2-private.txt", "private").await;
+
+    // Global activity filtered by scoped access rules should only include matching
+    // entries
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byAccessLevelRules": [
+                        { "ipnftUid": PROJECT_1_UID, "accessLevels": ["holders", "public"] },
+                        { "ipnftUid": PROJECT_2_UID, "accessLevels": ["private"] }
+                    ]
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p2-private.txt",
+                                    "ref": project_2_private,
+                                    "accessLevel": "private",
+                                    "changeBy": USER_1,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p1-holders.txt",
+                                    "ref": project_1_holders,
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_1,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p1-public.txt",
+                                    "ref": project_1_public,
+                                    "accessLevel": "public",
+                                    "changeBy": USER_1,
+                                }
+                            },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+
+    // Project-scoped filter should apply the access rule subset
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": PROJECT_1_UID,
+                "filters": {
+                    "byAccessLevelRules": [
+                        { "accessLevels": ["holders"] }
+                    ]
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "activity": {
+                            "nodes": [
+                                {
+                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "entry": {
+                                        "path": "/p1-holders.txt",
+                                        "ref": project_1_holders,
+                                        "accessLevel": "holders",
+                                        "changeBy": USER_1,
+                                    }
+                                },
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]

@@ -11,7 +11,12 @@ use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 
-use crate::{MoleculeDataRoomActivity, MoleculeGlobalAnnouncement, MoleculeSearchEntityKind};
+use crate::{
+    MoleculeAccessLevelRule,
+    MoleculeDataRoomActivity,
+    MoleculeGlobalAnnouncement,
+    MoleculeSearchEntityKind,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,6 +39,7 @@ pub struct MoleculeSearchFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
     pub by_kinds: Option<Vec<MoleculeSearchEntityKind>>,
 }
 
