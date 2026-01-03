@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder, Component};
+use dill::{Catalog, CatalogBuilder};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -52,10 +52,7 @@ impl DatasetBaseUseCaseHarness {
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
                 .add_value(CurrentAccountSubject::new_test())
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(ConsumerFilter::AllConsumers),
-                )
+                .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,

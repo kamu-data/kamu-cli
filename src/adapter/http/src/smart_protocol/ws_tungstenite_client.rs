@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use database_common_macros::{transactional_method1, transactional_method2};
-use dill::*;
 use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -46,26 +45,16 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct WsSmartTransferProtocolClient {
-    catalog: Catalog,
+    catalog: dill::Catalog,
     dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
-    pub fn new(
-        catalog: Catalog,
-        dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
-    ) -> Self {
-        Self {
-            catalog,
-            dataset_credential_resolver,
-        }
-    }
-
     async fn pull_send_request(
         &self,
         socket: &mut TungsteniteStream,

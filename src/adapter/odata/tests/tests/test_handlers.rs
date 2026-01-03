@@ -382,10 +382,9 @@ impl TestHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(RunInfoDir::new(run_info_dir))
-                .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
