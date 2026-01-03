@@ -24,12 +24,12 @@ use kamu_flow_system::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn BackgroundAgent)]
 #[dill::interface(dyn FlowSystemEventAgent)]
 #[dill::scope(dill::Singleton)]
 pub struct FlowSystemEventAgentImpl {
-    catalog: dill::Catalog,
+    catalog: dill::CatalogWeakRef,
     flow_system_event_bridge: Arc<dyn FlowSystemEventBridge>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
 }
@@ -40,16 +40,17 @@ impl FlowSystemEventAgentImpl {
     /// Runs catch-up phase for all projectors
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_catch_up_phase(&self) {
+        let catalog = self.catalog.upgrade();
+
         // For each projector, apply all existing unprocessed events
-        let projector_builders = self
-            .catalog
+        let projector_builders = catalog
             .builders_for::<dyn FlowSystemEventProjector>()
             .collect::<Vec<_>>();
 
         // Loop until each projector is totally caught up
         for builder in projector_builders {
             tracing::debug!(
-                instance_type = builder.instance_type_name(),
+                instance_type = builder.instance_type().name,
                 "Catching up projector"
             );
 
@@ -61,13 +62,13 @@ impl FlowSystemEventAgentImpl {
                     // Success
                     Ok(num_processed) => {
                         tracing::debug!(
-                            instance_type = builder.instance_type_name(),
+                            instance_type = builder.instance_type().name,
                             num_processed,
                             "Projector batch processed",
                         );
                         if num_processed == 0 {
                             tracing::debug!(
-                                instance_type = builder.instance_type_name(),
+                                instance_type = builder.instance_type().name,
                                 num_total_processed,
                                 "Projector caught up",
                             );
@@ -81,7 +82,7 @@ impl FlowSystemEventAgentImpl {
                         tracing::error!(
                             error = ?e,
                             error_msg = %e,
-                            instance_type = builder.instance_type_name(),
+                            instance_type = builder.instance_type().name,
                             "Projector batch processing failed",
                         );
                         break;
@@ -97,10 +98,11 @@ impl FlowSystemEventAgentImpl {
     async fn run_single_iteration(&self, hint: FlowSystemEventStoreWakeHint) {
         tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
+        let catalog = self.catalog.upgrade();
+
         // For each projector, apply a batch of new events, just 1 batch per iteration.
         // Each projector will run in a separate transaction.
-        let projector_builders = self
-            .catalog
+        let projector_builders = catalog
             .builders_for::<dyn FlowSystemEventProjector>()
             .collect::<Vec<_>>();
 
@@ -109,7 +111,7 @@ impl FlowSystemEventAgentImpl {
                 // Success
                 Ok(num_processed) => {
                     tracing::debug!(
-                        instance_type = builder.instance_type_name(),
+                        instance_type = builder.instance_type().name,
                         num_processed,
                         "Projector batch processed",
                     );
@@ -120,7 +122,7 @@ impl FlowSystemEventAgentImpl {
                     tracing::error!(
                         error = ?e,
                         error_msg = %e,
-                        instance_type = builder.instance_type_name(),
+                        instance_type = builder.instance_type().name,
                         "Projector batch processing failed",
                     );
                 }
@@ -129,7 +131,7 @@ impl FlowSystemEventAgentImpl {
     }
 
     #[transactional_method]
-    #[tracing::instrument(level = "debug", skip_all, fields(projector = builder.instance_type_name()))]
+    #[tracing::instrument(level = "debug", skip_all, fields(projector = builder.instance_type().name))]
     async fn apply_batch_to_projector(
         &self,
         projector_builder: &dill::TypecastBuilder<'_, dyn FlowSystemEventProjector>,

@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -232,7 +231,7 @@ impl DatasetEntryServiceHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = {
-            let mut b = CatalogBuilder::new();
+            let mut b = dill::Catalog::builder();
 
             use odf::dataset::DatasetStorageUnitLocalFs;
             b.add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir));
@@ -255,10 +254,9 @@ impl DatasetEntryServiceHarness {
 
             b.add_value(DidSecretEncryptionConfig::sample());
 
-            b.add_builder(
-                OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            );
+            b.add_builder(OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ));
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
             b.add_value(CurrentAccountSubject::new_test());

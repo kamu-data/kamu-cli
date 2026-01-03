@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
-use dill::Component;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -93,10 +92,9 @@ impl ClientSideHarness {
         b.add_value(CacheDir::new(cache_dir));
         b.add_value(RemoteReposDir::new(repos_dir));
 
-        b.add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
+        b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ))
         .bind::<dyn Outbox, OutboxImmediateImpl>();
 
         b.add::<DependencyGraphServiceImpl>();

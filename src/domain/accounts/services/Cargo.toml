@@ -44,7 +44,7 @@ time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 jsonwebtoken = { version = "10", default-features = false, features = [ "rust_crypto" ] }
 secrecy = "0.10"
 serde = "1"

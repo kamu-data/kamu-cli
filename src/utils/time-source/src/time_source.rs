@@ -32,6 +32,7 @@ pub trait SystemTimeSource: Send + Sync {
 
 #[dill::component]
 #[dill::interface(dyn SystemTimeSource)]
+#[dill::scope(dill::scopes::Agnostic)]
 pub struct SystemTimeSourceDefault;
 
 #[async_trait::async_trait]

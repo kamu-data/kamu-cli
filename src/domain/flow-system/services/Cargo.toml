@@ -40,7 +40,7 @@ time-source = { workspace = true }
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 mockall = "0.14"
 futures = "0.3"
 serde_json = { version = "1", default-features = false }

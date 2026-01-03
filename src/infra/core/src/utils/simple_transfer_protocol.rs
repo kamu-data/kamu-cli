@@ -11,7 +11,6 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use database_common_macros::{transactional_method1, transactional_method2};
-use dill::{Catalog, component};
 use futures::{Future, StreamExt, TryStreamExt, stream};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
@@ -65,18 +64,14 @@ impl Default for SimpleProtocolTransferOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Implements "Simple Transfer Protocol" as described in ODF spec
+#[dill::component]
 pub struct SimpleTransferProtocol {
-    catalog: Catalog,
+    catalog: dill::Catalog,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 impl SimpleTransferProtocol {
-    pub fn new(catalog: Catalog) -> Self {
-        Self { catalog }
-    }
-
     pub async fn sync(
         &self,
         src_ref: &odf::DatasetRefAny,

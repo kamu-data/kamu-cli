@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
 use url::Url;
@@ -18,8 +17,9 @@ use super::object_store_with_tracing::ObjectStoreWithTracing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn ObjectStoreBuilder)]
+#[dill::component]
+#[dill::scope(dill::scopes::Agnostic)]
+#[dill::interface(dyn ObjectStoreBuilder)]
 pub struct ObjectStoreBuilderLocalFs {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

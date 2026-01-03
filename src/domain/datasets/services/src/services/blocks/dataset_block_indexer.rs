@@ -125,8 +125,11 @@ impl InitOnStartup for DatasetBlockIndexer {
         // Convert handles into jobs wrapped into tokio tasks
         let mut job_results = tokio::task::JoinSet::new();
         for (dataset_handle, block_ref) in datasets_to_index {
-            let indexing_job =
-                DatasetBlockIndexingJob::new(&self.catalog, dataset_handle.clone(), block_ref);
+            let indexing_job = DatasetBlockIndexingJob::new(
+                self.catalog.clone(),
+                dataset_handle.clone(),
+                block_ref,
+            );
             let indexing_span = tracing::info_span!("DatasetBlockIndexingJob", %dataset_handle);
 
             use tracing::Instrument;

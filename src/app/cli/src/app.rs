@@ -545,10 +545,9 @@ pub fn configure_base_catalog(
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
-    b.add_builder(
-        messaging_outbox::OutboxImmediateImpl::builder()
-            .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
-    );
+    b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+        messaging_outbox::ConsumerFilter::ImmediateConsumers,
+    ));
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();

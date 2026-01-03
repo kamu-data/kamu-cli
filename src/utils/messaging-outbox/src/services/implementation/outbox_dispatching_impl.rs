@@ -10,7 +10,6 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::InternalError;
 
 use super::{OutboxImmediateImpl, OutboxTransactionalImpl};
@@ -25,16 +24,17 @@ pub struct OutboxDispatchingImpl {
     immediate_producers: HashSet<String>,
 }
 
-#[component(pub)]
+#[dill::component(pub)]
 impl OutboxDispatchingImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        catalog: Catalog,
+        catalog: &dill::Catalog,
         immediate_outbox: Arc<OutboxImmediateImpl>,
         transactional_outbox: Arc<OutboxTransactionalImpl>,
     ) -> Self {
-        let (transactional_producers, immediate_producers) =
-            Self::classify_message_routes(&catalog);
+        // TODO: PERF: This component is transient and will scan builder metadata on
+        // every injection
+        let (transactional_producers, immediate_producers) = Self::classify_message_routes(catalog);
 
         Self {
             immediate_outbox,
@@ -44,7 +44,9 @@ impl OutboxDispatchingImpl {
         }
     }
 
-    fn classify_message_routes(catalog: &Catalog) -> (HashSet<String>, HashSet<String>) {
+    fn classify_message_routes(catalog: &dill::Catalog) -> (HashSet<String>, HashSet<String>) {
+        use dill::{Builder, BuilderExt};
+
         let mut transactional_producers = HashSet::new();
         let mut immediate_producers = HashSet::new();
 
@@ -54,7 +56,7 @@ impl OutboxDispatchingImpl {
             assert!(
                 all_metadata.len() <= 1,
                 "Multiple consumer metadata records unexpected for {}",
-                consumer_builder.instance_type_name()
+                consumer_builder.instance_type().name
             );
             for metadata in all_metadata {
                 for producer_name in metadata.feeding_producers {

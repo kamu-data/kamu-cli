@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, component};
 use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::TransactionRef;
@@ -33,16 +32,12 @@ pub trait DatabaseTransactionManager: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
 pub struct DatabaseTransactionRunner {
-    catalog: Catalog,
+    catalog: dill::Catalog,
 }
 
-#[component(pub)]
 impl DatabaseTransactionRunner {
-    pub fn new(catalog: Catalog) -> Self {
-        Self { catalog }
-    }
-
     #[tracing::instrument(
         name = "DatabaseTransactionRunner::transactional",
         level = "debug",
@@ -53,7 +48,7 @@ impl DatabaseTransactionRunner {
         callback: H,
     ) -> Result<HFutResultT, HFutResultE>
     where
-        H: FnOnce(Catalog) -> HFut,
+        H: FnOnce(dill::Catalog) -> HFut,
         HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
         HFutResultE: From<InternalError>,
     {
@@ -168,6 +163,18 @@ impl DatabaseTransactionRunner {
             callback(catalog_item1, catalog_item2, catalog_item3).await
         })
         .await
+    }
+}
+
+impl From<dill::Catalog> for DatabaseTransactionRunner {
+    fn from(value: dill::Catalog) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<dill::CatalogWeakRef> for DatabaseTransactionRunner {
+    fn from(value: dill::CatalogWeakRef) -> Self {
+        Self::new(value.upgrade())
     }
 }
 

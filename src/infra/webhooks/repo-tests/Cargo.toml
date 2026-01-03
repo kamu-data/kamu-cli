@@ -27,7 +27,7 @@ kamu-webhooks = { workspace = true }
 odf = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = "0.3"
 http = { version = "1", default-features = false }
 secrecy = "0.10"

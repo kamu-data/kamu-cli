@@ -101,7 +101,7 @@ bytes = "1"
 cfg-if = "1" # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "6", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
 indoc = { version = "2" }

@@ -37,7 +37,7 @@ odf = { workspace = true, default-features = false }
 time-source = { workspace = true, default-features = false }
 
 async-trait = { version = "0.1", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 hex = { version = "0.4", default-features = false }
 nutype = { version = "0.6", default-features = false }
 serde = { version = "1", default-features = false }
