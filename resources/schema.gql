@@ -3220,7 +3220,7 @@ type MoleculeAnnouncementEntry {
 	id: String!
 	headline: String!
 	body: String!
-	attachments: [DatasetID!]!
+	attachments: [MoleculeVersionedFile!]!
 	accessLevel: String!
 	changeBy: String!
 	categories: [String!]!
