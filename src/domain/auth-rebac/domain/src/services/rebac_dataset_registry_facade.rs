@@ -51,6 +51,7 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//
 #[derive(Debug)]
 pub struct ClassifyDatasetRefsByAllowanceResponse {
     pub accessible_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,

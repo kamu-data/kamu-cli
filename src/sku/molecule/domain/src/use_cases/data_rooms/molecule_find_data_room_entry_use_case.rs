@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::BatchLookup;
 use internal_error::InternalError;
 use kamu_datasets::CollectionPath;
 
@@ -29,8 +30,20 @@ pub trait MoleculeFindDataRoomEntryUseCase: Send + Sync {
         as_of: Option<odf::Multihash>,
         r#ref: &odf::DatasetID,
     ) -> Result<Option<MoleculeDataRoomEntry>, MoleculeFindDataRoomEntryError>;
+
+    async fn execute_find_by_refs(
+        &self,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeFindDataRoomEntryError>,
+        InternalError,
+    >;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]

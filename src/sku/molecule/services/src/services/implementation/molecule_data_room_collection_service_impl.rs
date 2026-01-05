@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
-use internal_error::ErrorIntoInternal;
+use database_common::{BatchLookup, PaginationOpts};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
@@ -231,6 +231,25 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             })?;
 
         Ok(maybe_entry)
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_find_data_room_collection_entries_by_refs,
+        skip_all,
+        fields(%data_room_dataset_id, ?as_of, refs = %format_utils::format_collection(refs))
+    )]
+    async fn find_data_room_collection_entries_by_refs(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<CollectionEntry, odf::DatasetID, MoleculeDataRoomCollectionReadError>,
+        InternalError,
+    > {
+        let _ = (data_room_dataset_id, as_of, refs);
+        todo!()
     }
 
     #[tracing::instrument(

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
+use database_common::{BatchLookup, PaginationOpts};
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
 use kamu_molecule_domain::{MoleculeDataRoomEntriesFilters, MoleculeUpdateDataRoomEntryResult};
@@ -41,6 +41,16 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionReadError>;
+
+    async fn find_data_room_collection_entries_by_refs(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<CollectionEntry, odf::DatasetID, MoleculeDataRoomCollectionReadError>,
+        InternalError,
+    >;
 
     async fn upsert_data_room_collection_entry(
         &self,
