@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use nonempty::NonEmpty;
 
 use crate::MoleculeAccessLevelRule;
@@ -71,7 +73,82 @@ pub fn normalize_access_level_rules(
         rules.extend(access_rules);
     }
 
-    rules
+    let mut deduplicated_rules: Vec<MoleculeAccessLevelRule> = Vec::new();
+
+    for rule in rules {
+        let mut unique_access_levels = Vec::new();
+        let mut seen_levels = HashSet::new();
+
+        for access_level in rule.access_levels {
+            if seen_levels.insert(access_level.clone()) {
+                unique_access_levels.push(access_level);
+            }
+        }
+
+        if let Some(existing_rule) = deduplicated_rules
+            .iter_mut()
+            .find(|existing_rule| existing_rule.ipnft_uid == rule.ipnft_uid)
+        {
+            let mut existing_levels = existing_rule
+                .access_levels
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>();
+
+            for access_level in unique_access_levels {
+                if existing_levels.insert(access_level.clone()) {
+                    existing_rule.access_levels.push(access_level);
+                }
+            }
+        } else {
+            deduplicated_rules.push(MoleculeAccessLevelRule {
+                ipnft_uid: rule.ipnft_uid,
+                access_levels: unique_access_levels,
+            });
+        }
+    }
+
+    deduplicated_rules
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_access_level_rules_dedups_and_merges_by_ipnft() {
+        let rules = normalize_access_level_rules(
+            Some(vec!["public".to_string(), "public".to_string()]),
+            Some(vec![
+                MoleculeAccessLevelRule {
+                    ipnft_uid: None,
+                    access_levels: vec!["private".to_string(), "public".to_string()],
+                },
+                MoleculeAccessLevelRule {
+                    ipnft_uid: Some("ipnft-1".to_string()),
+                    access_levels: vec!["project".to_string()],
+                },
+                MoleculeAccessLevelRule {
+                    ipnft_uid: Some("ipnft-1".to_string()),
+                    access_levels: vec!["team".to_string(), "project".to_string()],
+                },
+            ]),
+        );
+
+        assert_eq!(
+            rules,
+            vec![
+                MoleculeAccessLevelRule {
+                    ipnft_uid: None,
+                    access_levels: vec!["public".to_string(), "private".to_string()],
+                },
+                MoleculeAccessLevelRule {
+                    ipnft_uid: Some("ipnft-1".to_string()),
+                    access_levels: vec!["project".to_string(), "team".to_string()],
+                }
+            ]
+        );
+    }
+}
