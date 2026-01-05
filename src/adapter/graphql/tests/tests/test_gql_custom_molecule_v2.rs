@@ -9308,45 +9308,6 @@ async fn test_molecule_v2_activity_access_level_rules_filters() {
             }
         })
     );
-
-    // Project-scoped filter should apply the access rule subset
-    assert_eq!(
-        GraphQLQueryRequest::new(
-            LIST_PROJECT_ACTIVITY_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
-                "filters": {
-                    "byAccessLevelRules": [
-                        { "accessLevels": ["holders"] }
-                    ]
-                },
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data,
-        value!({
-            "molecule": {
-                "v2": {
-                    "project": {
-                        "activity": {
-                            "nodes": [
-                                {
-                                    "__typename": "MoleculeActivityFileAddedV2",
-                                    "entry": {
-                                        "path": "/p1-holders.txt",
-                                        "ref": project_1_holders,
-                                        "accessLevel": "holders",
-                                        "changeBy": USER_1,
-                                    }
-                                },
-                            ]
-                        }
-                    }
-                }
-            }
-        })
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

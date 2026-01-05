@@ -3175,7 +3175,7 @@ type Molecule {
 }
 
 input MoleculeAccessLevelRuleInput {
-	ipnftUid: String
+	ipnftUid: String!
 	accessLevels: [String!]!
 }
 
