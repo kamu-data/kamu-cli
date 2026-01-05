@@ -10,9 +10,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{PushIngestResult, auth};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::PushIngestResult;
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -23,7 +22,7 @@ use crate::MoleculeAnnouncementsService;
 #[dill::component]
 #[dill::interface(dyn MoleculeCreateAnnouncementUseCase)]
 pub struct MoleculeCreateAnnouncementUseCaseImpl {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    find_data_room_entry_uc: Arc<dyn MoleculeFindDataRoomEntryUseCase>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
     outbox: Arc<dyn Outbox>,
 }
@@ -31,6 +30,7 @@ pub struct MoleculeCreateAnnouncementUseCaseImpl {
 impl MoleculeCreateAnnouncementUseCaseImpl {
     async fn validate_attachments(
         &self,
+        molecule_project: &MoleculeProject,
         announcement: &MoleculeAnnouncementPayloadRecord,
     ) -> Result<(), MoleculeCreateAnnouncementError> {
         if announcement.attachments.is_empty() {
@@ -38,24 +38,29 @@ impl MoleculeCreateAnnouncementUseCaseImpl {
             return Ok(());
         }
 
-        let dataset_refs = announcement
-            .attachments
-            .iter()
-            .map(odf::DatasetID::as_local_ref)
-            .collect::<Vec<_>>();
-        let dataset_refs_as_refs = dataset_refs.iter().collect::<Vec<_>>();
+        let attachment_refs = announcement.attachments.iter().collect::<Vec<_>>();
 
-        let resolution = self
-            .rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&dataset_refs_as_refs, auth::DatasetAction::Read)
-            .await?;
+        let lookup = self
+            .find_data_room_entry_uc
+            .execute_find_by_refs(
+                molecule_project,
+                None, /* check latest version */
+                &attachment_refs,
+            )
+            .await
+            .map_err(|e| -> MoleculeCreateAnnouncementError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
 
-        if !resolution.inaccessible_refs.is_empty() {
-            let not_found_dataset_ids = resolution
-                .inaccessible_refs
+        if !lookup.not_found.is_empty() {
+            let not_found_dataset_ids = lookup
+                .not_found
                 .into_iter()
-                // Safety: having ID as input guarantees ID as output
-                .map(|(dataset_ref, _e)| dataset_ref.into_id().unwrap())
+                .map(|(dataset_id, _e)| dataset_id)
                 .collect();
 
             return Err(MoleculeCreateAnnouncementNotFoundAttachmentsError {
@@ -89,7 +94,8 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         // 1. Validate input data
 
-        self.validate_attachments(&announcement).await?;
+        self.validate_attachments(molecule_project, &announcement)
+            .await?;
 
         // 2. Store global announcement
 
