@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -27,9 +26,9 @@ use crate::queries::molecule::v2::{
     MoleculeAnnouncementId,
     MoleculeCategory,
     MoleculeChangeBy,
+    MoleculeDataRoomEntry,
     MoleculeProjectV2,
     MoleculeTag,
-    MoleculeVersionedFile,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,13 +180,13 @@ impl MoleculeAnnouncementEntry {
         self.entity.body.as_str()
     }
 
-    async fn attachments(&self, ctx: &Context<'_>) -> Result<Vec<MoleculeVersionedFile<'_>>> {
+    async fn attachments(&self, ctx: &Context<'_>) -> Result<Vec<MoleculeDataRoomEntry>> {
         let find_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeFindDataRoomEntryUseCase);
 
         let refs = self.entity.attachments.iter().collect::<Vec<_>>();
 
         let lookup = find_data_room_entry_uc
-            .execute_find_by_refs(&self.project.entity, None, &refs)
+            .execute_find_by_refs(&self.project.entity, None /* latest */, &refs)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeFindDataRoomEntryError as E;
@@ -205,7 +204,11 @@ impl MoleculeAnnouncementEntry {
             .into_iter()
             .map(|data_room_entry| {
                 let latest = true;
-                MoleculeVersionedFile::new(Cow::Owned(data_room_entry), latest)
+                MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    data_room_entry,
+                    latest,
+                )
             })
             .collect::<Vec<_>>();
 
