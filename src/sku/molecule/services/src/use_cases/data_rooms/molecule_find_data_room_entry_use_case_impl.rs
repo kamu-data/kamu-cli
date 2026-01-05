@@ -48,13 +48,11 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 path,
             )
             .await
-            .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindDataRoomEntryError::Access(e)
-                }
-                MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindDataRoomEntryError::Internal(e)
+            .map_err(|e| -> MoleculeFindDataRoomEntryError {
+                use MoleculeDataRoomCollectionReadError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::DataRoomNotFound(_) | E::Internal(_) => e.int_err().into(),
                 }
             })?;
 
@@ -82,13 +80,11 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 r#ref,
             )
             .await
-            .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindDataRoomEntryError::Access(e)
-                }
-                MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindDataRoomEntryError::Internal(e)
+            .map_err(|e| -> MoleculeFindDataRoomEntryError {
+                use MoleculeDataRoomCollectionReadError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::DataRoomNotFound(_) | E::Internal(_) => e.int_err().into(),
                 }
             })?;
 
