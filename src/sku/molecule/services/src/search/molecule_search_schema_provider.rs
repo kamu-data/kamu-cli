@@ -10,8 +10,13 @@
 use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
-use internal_error::InternalError;
-use kamu_accounts::{AccountService, CurrentAccountSubject, LoggedAccount};
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::{
+    AccountRepository,
+    CurrentAccountSubject,
+    GetAccountByNameError,
+    LoggedAccount,
+};
 use kamu_core::KamuBackgroundCatalog;
 use kamu_molecule_domain::{
     molecule_activity_search_schema as activity_schema,
@@ -33,7 +38,7 @@ use crate::search::indexers::{
 #[dill::component]
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct MoleculeSearchSchemaProvider {
-    background_catalog: Arc<KamuBackgroundCatalog>,
+    catalog: dill::Catalog,
 }
 
 #[common_macros::method_names_consts]
@@ -50,23 +55,31 @@ impl MoleculeSearchSchemaProvider {
         F: Fn(LoggedAccount, dill::Catalog, Arc<dyn SearchRepository>) -> Fut,
         Fut: std::future::Future<Output = Result<usize, InternalError>>,
     {
+        let background_catalog = self.catalog.get_one::<KamuBackgroundCatalog>().unwrap();
+
         let mut total_indexed = 0;
         for org_account_name in kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS {
             // Resolve organization account, if exists
             let maybe_org_account =
-                DatabaseTransactionRunner::new(self.background_catalog.catalog().clone())
+                match DatabaseTransactionRunner::new(background_catalog.base_catalog().clone())
                     .transactional(|transaction_catalog| {
-                        let account_service =
-                            transaction_catalog.get_one::<dyn AccountService>().unwrap();
+                        let account_repo = transaction_catalog
+                            .get_one::<dyn AccountRepository>()
+                            .unwrap();
                         async move {
-                            account_service
-                                .account_by_name(
+                            account_repo
+                                .get_account_by_name(
                                     &odf::AccountName::try_from(org_account_name).unwrap(),
                                 )
                                 .await
                         }
                     })
-                    .await?;
+                    .await
+                {
+                    Ok(account) => Some(account),
+                    Err(GetAccountByNameError::NotFound(_)) => None,
+                    Err(e @ GetAccountByNameError::Internal(_)) => return Err(e.int_err()),
+                };
 
             // Skip if organization account not found
             let Some(org_account) = maybe_org_account else {
@@ -84,7 +97,7 @@ impl MoleculeSearchSchemaProvider {
 
             // Create catalog scoped to organization account
             let org_account_catalog =
-                dill::CatalogBuilder::new_chained(self.background_catalog.catalog())
+                dill::CatalogBuilder::new_chained(background_catalog.base_catalog())
                     .add_value(CurrentAccountSubject::logged(
                         org_account.id,
                         org_account.account_name,

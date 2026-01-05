@@ -10193,7 +10193,10 @@ impl GraphQLMoleculeV2Harness {
         // Ensure search indexes schemas are properly initialized
         {
             let indexing_catalog = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-                .add_value(KamuBackgroundCatalog::new(catalog_no_subject))
+                .add_value(KamuBackgroundCatalog::new(
+                    catalog_no_subject,
+                    CurrentAccountSubject::new_test(),
+                ))
                 .build();
             ElasticsearchBaseHarness::run_initial_indexing(&indexing_catalog).await;
         }

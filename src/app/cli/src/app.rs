@@ -38,7 +38,7 @@ use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatche
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
-use crate::accounts::{AccountService, CurrentAccountIndication};
+use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
 use crate::output::*;
@@ -206,8 +206,27 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         ))
         .await?;
 
+        let current_account_indication = current_account.clone();
+        let cli_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
+            .transactional_with(
+                |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
+                    current_account_indication
+                        .to_current_account_subject(
+                            tenancy_config,
+                            workspace_status,
+                            account_service,
+                        )
+                        .await
+                        .int_err()
+                },
+            )
+            .await?;
+
         let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(KamuBackgroundCatalog::new(base_catalog.clone()))
+            .add_value(KamuBackgroundCatalog::new(
+                base_catalog.clone(),
+                cli_account_subject.clone(),
+            ))
             .build();
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
@@ -221,11 +240,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = build_cli_catalog(
             &wrapped_base_catalog,
             maybe_server_catalog.as_ref(),
-            current_account.clone(),
-            workspace_status,
+            cli_account_subject,
             tenancy_config,
-        )
-        .await?;
+        );
 
         // Register metrics
         maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
@@ -621,28 +638,17 @@ pub fn configure_cli_catalog(
     b
 }
 
-async fn build_cli_catalog(
+fn build_cli_catalog(
     base_catalog: &Catalog,
     maybe_server_catalog: Option<&Catalog>,
-    current_account_indication: CurrentAccountIndication,
-    workspace_status: WorkspaceStatus,
+    cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> Result<Catalog, InternalError> {
-    let current_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
-        .transactional_with(
-            |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
-                current_account_indication
-                    .to_current_account_subject(tenancy_config, workspace_status, account_service)
-                    .await
-                    .int_err()
-            },
-        )
-        .await?;
+) -> Catalog {
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
-    Ok(configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(current_account_subject)
-        .build())
+    configure_cli_catalog(cli_base_catalog, tenancy_config)
+        .add_value(cli_account_subject)
+        .build()
 }
 
 // Public only for tests
