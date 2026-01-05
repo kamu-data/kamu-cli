@@ -31,7 +31,7 @@ use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, Elasticsearch
 use kamu_search_services::SearchIndexer;
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
-use time_source::{SystemTimeSource, SystemTimeSourceProvider};
+use time_source::{SystemTimeSource, SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use crate::tests::use_cases::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -45,6 +45,7 @@ pub struct ElasticsearchDatasetBaseHarness {
     es_base_harness: ElasticsearchBaseHarness,
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     outbox_agent: Arc<dyn OutboxAgent>,
+    fixed_time: DateTime<Utc>,
 }
 
 #[bon]
@@ -56,7 +57,12 @@ impl ElasticsearchDatasetBaseHarness {
         predefined_accounts_config: Option<PredefinedAccountsConfig>,
         predefined_datasets_config: Option<PredefinedDatasetsConfig>,
     ) -> Self {
-        let es_base_harness = ElasticsearchBaseHarness::new(ctx);
+        let fixed_time = Utc::now();
+
+        let es_base_harness = ElasticsearchBaseHarness::new(
+            ctx,
+            SystemTimeSourceProvider::Stub(SystemTimeSourceStub::new_set(fixed_time)),
+        );
 
         let indexing_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
@@ -154,12 +160,13 @@ impl ElasticsearchDatasetBaseHarness {
             es_base_harness,
             dataset_base_use_case_harness,
             outbox_agent,
+            fixed_time,
         }
     }
 
     #[inline]
     pub fn fixed_time(&self) -> DateTime<Utc> {
-        self.es_base_harness.fixed_time()
+        self.fixed_time
     }
 
     #[inline]

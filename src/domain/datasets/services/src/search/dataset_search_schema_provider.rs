@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method2;
 use internal_error::InternalError;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, dataset_search_schema};
 use kamu_search::*;
@@ -20,8 +21,27 @@ use crate::search::dataset_search_indexer::*;
 #[dill::component]
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct DatasetSearchSchemaProvider {
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    catalog: dill::Catalog,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetSearchSchemaProvider {
+    #[transactional_method2(
+        dataset_entry_service: Arc<dyn DatasetEntryService>,
+        dataset_registry: Arc<dyn DatasetRegistry>
+    )]
+    async fn index_datasets(
+        &self,
+        search_repo: Arc<dyn SearchRepository>,
+    ) -> Result<usize, InternalError> {
+        index_datasets(
+            dataset_entry_service.as_ref(),
+            dataset_registry.as_ref(),
+            search_repo.as_ref(),
+        )
+        .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,12 +62,7 @@ impl kamu_search::SearchEntitySchemaProvider for DatasetSearchSchemaProvider {
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
         assert!(schema.schema_name == dataset_search_schema::SCHEMA_NAME);
-        index_datasets(
-            self.dataset_entry_service.as_ref(),
-            self.dataset_registry.as_ref(),
-            search_repo.as_ref(),
-        )
-        .await
+        self.index_datasets(search_repo).await
     }
 }
 

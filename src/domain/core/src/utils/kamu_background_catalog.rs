@@ -7,20 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::CurrentAccountSubject;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct KamuBackgroundCatalog {
-    background_catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
+    system_user_subject: CurrentAccountSubject,
 }
 
 impl KamuBackgroundCatalog {
-    pub fn new(background_catalog: dill::Catalog) -> Self {
-        Self { background_catalog }
+    pub fn new(base_catalog: dill::Catalog, system_user_subject: CurrentAccountSubject) -> Self {
+        Self {
+            base_catalog,
+            system_user_subject,
+        }
     }
 
     #[inline]
-    pub fn catalog(&self) -> &dill::Catalog {
-        &self.background_catalog
+    pub fn base_catalog(&self) -> &dill::Catalog {
+        &self.base_catalog
+    }
+
+    pub fn system_user_catalog(&self) -> dill::Catalog {
+        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
+        b.add_value(self.system_user_subject.clone());
+        b.add_value(self.clone());
+        b.build()
     }
 }
 

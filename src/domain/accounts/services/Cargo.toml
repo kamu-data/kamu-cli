@@ -30,6 +30,7 @@ testing = ["dep:mockall"]
 common-macros = { workspace = true }
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }

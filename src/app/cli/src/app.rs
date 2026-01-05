@@ -37,7 +37,7 @@ use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatche
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
-use crate::accounts::{AccountService, CurrentAccountIndication};
+use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
 use crate::output::*;
@@ -205,21 +205,43 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         ))
         .await?;
 
+        let current_account_indication = current_account.clone();
+        let cli_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
+            .transactional_with(
+                |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
+                    current_account_indication
+                        .to_current_account_subject(
+                            tenancy_config,
+                            workspace_status,
+                            account_service,
+                        )
+                        .await
+                        .int_err()
+                },
+            )
+            .await?;
+
+        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
+            .add_value(KamuBackgroundCatalog::new(
+                base_catalog.clone(),
+                cli_account_subject.clone(),
+            ))
+            .build();
+
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog = configure_server_catalog(&base_catalog, tenancy_config).build();
+            let server_catalog =
+                configure_server_catalog(&wrapped_base_catalog, tenancy_config).build();
             Some(server_catalog)
         } else {
             None
         };
 
         let cli_catalog = build_cli_catalog(
-            &base_catalog,
+            &wrapped_base_catalog,
             maybe_server_catalog.as_ref(),
-            current_account.clone(),
-            workspace_status,
+            cli_account_subject,
             tenancy_config,
-        )
-        .await?;
+        );
 
         // Register metrics
         maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
@@ -267,19 +289,16 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
-
-        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
-
-        let wrapped_work_catalog = dill::CatalogBuilder::new_chained(work_catalog)
-            .add_value(KamuBackgroundCatalog::new(work_catalog.clone()))
-            .build();
+        let work_catalog = maybe_server_catalog
+            .as_ref()
+            .unwrap_or(&wrapped_base_catalog);
 
         maybe_transactional(
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
                 let command_builder = cli_commands::get_command(
-                    &wrapped_work_catalog,
+                    work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
                     current_account,
@@ -614,28 +633,17 @@ pub fn configure_cli_catalog(
     b
 }
 
-async fn build_cli_catalog(
+fn build_cli_catalog(
     base_catalog: &Catalog,
     maybe_server_catalog: Option<&Catalog>,
-    current_account_indication: CurrentAccountIndication,
-    workspace_status: WorkspaceStatus,
+    cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> Result<Catalog, InternalError> {
-    let current_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
-        .transactional_with(
-            |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
-                current_account_indication
-                    .to_current_account_subject(tenancy_config, workspace_status, account_service)
-                    .await
-                    .int_err()
-            },
-        )
-        .await?;
+) -> Catalog {
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
-    Ok(configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(current_account_subject)
-        .build())
+    configure_cli_catalog(cli_base_catalog, tenancy_config)
+        .add_value(cli_account_subject)
+        .build()
 }
 
 // Public only for tests
@@ -1159,7 +1167,13 @@ pub fn register_config_in_catalog(
         config::SearchRepositoryConfig::Elasticsearch(mut cfg) => {
             cfg.merge(config::SearchRepositoryConfigElasticsearch::default());
 
-            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            if is_e2e_testing {
+                // TODO: kind of a hack, make lazy init work in e2e tests
+                catalog_builder.add::<kamu_search_services::SearchIndexer>();
+                catalog_builder.add::<kamu_search_services::SearchServiceImpl>();
+            } else {
+                catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            }
             catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchRepository>();
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchClientConfig {
                 url: url::Url::parse(&cfg.url).int_err()?,

@@ -20,6 +20,7 @@ use kamu_search_elasticsearch::testing::{
     SearchTestResponse,
 };
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
+use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
 
@@ -114,21 +115,21 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alice",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alice",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "bob",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "bob",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
         ]
     );
@@ -173,21 +174,21 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alicia",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alicia",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "robert",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "robert",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
         ]
     );
@@ -223,15 +224,15 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
         [
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "alice",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "alice",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
             serde_json::json!({
                 account_search_schema::fields::ACCOUNT_NAME: "charlie",
-                account_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::CREATED_AT: harness.fixed_time.to_rfc3339(),
                 account_search_schema::fields::DISPLAY_NAME: "charlie",
-                account_search_schema::fields::UPDATED_AT: harness.fixed_time().to_rfc3339(),
+                account_search_schema::fields::UPDATED_AT: harness.fixed_time.to_rfc3339(),
             }),
         ]
     );
@@ -244,6 +245,7 @@ struct AccountIndexingHarness {
     es_base_harness: ElasticsearchBaseHarness,
     account_base_harness: AccountBaseUseCaseHarness,
     catalog: dill::Catalog,
+    fixed_time: DateTime<Utc>,
 }
 
 impl AccountIndexingHarness {
@@ -251,7 +253,12 @@ impl AccountIndexingHarness {
         ctx: Arc<ElasticsearchTestContext>,
         maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
     ) -> Self {
-        let es_base_harness = ElasticsearchBaseHarness::new(ctx);
+        let fixed_time = Utc::now();
+
+        let es_base_harness = ElasticsearchBaseHarness::new(
+            ctx,
+            SystemTimeSourceProvider::Stub(SystemTimeSourceStub::new_set(fixed_time)),
+        );
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             maybe_base_catalog: Some(es_base_harness.catalog()),
@@ -286,12 +293,8 @@ impl AccountIndexingHarness {
             es_base_harness,
             account_base_harness,
             catalog,
+            fixed_time,
         }
-    }
-
-    #[inline]
-    pub fn fixed_time(&self) -> DateTime<Utc> {
-        self.es_base_harness.fixed_time()
     }
 
     pub async fn view_accounts_index(&self) -> SearchTestResponse {

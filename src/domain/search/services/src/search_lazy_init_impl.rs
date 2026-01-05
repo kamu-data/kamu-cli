@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{Component, TypedBuilder};
 use internal_error::*;
+use kamu_core::KamuBackgroundCatalog;
 use kamu_search::*;
 
 use crate::*;
@@ -20,6 +21,7 @@ use crate::*;
 /// This is a temporary solution that initializes the search index upon the
 /// first call.
 pub struct SearchImplLazyInit {
+    background_catalog: Arc<KamuBackgroundCatalog>,
     is_initialized: tokio::sync::OnceCell<()>,
 }
 
@@ -29,33 +31,37 @@ pub struct SearchImplLazyInit {
 #[dill::interface(dyn SearchService)]
 #[dill::scope(dill::Singleton)]
 impl SearchImplLazyInit {
-    pub fn new() -> Self {
+    pub fn new(background_catalog: Arc<KamuBackgroundCatalog>) -> Self {
         Self {
+            background_catalog,
             is_initialized: tokio::sync::OnceCell::new(),
         }
     }
 
-    async fn maybe_init(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
+    async fn maybe_init(&self) -> Result<(), InternalError> {
         self.is_initialized
-            .get_or_try_init(async || self.init(catalog).await)
+            .get_or_try_init(async || self.init().await)
             .await?;
         Ok(())
     }
 
-    async fn init(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
-        let indexer = SearchIndexer::builder().get(catalog).int_err()?;
+    async fn init(&self) -> Result<(), InternalError> {
+        let system_user_catalog = self.background_catalog.system_user_catalog();
+
+        let indexer = SearchIndexer::builder()
+            .get(&system_user_catalog)
+            .int_err()?;
 
         use init_on_startup::InitOnStartup;
         indexer.run_initialization().await
     }
 
-    async fn inner(
-        &self,
-        catalog: &dill::Catalog,
-    ) -> Result<Arc<dyn SearchService>, InternalError> {
-        self.maybe_init(catalog).await?;
+    async fn inner(&self) -> Result<Arc<dyn SearchService>, InternalError> {
+        self.maybe_init().await?;
 
-        let inner = SearchServiceImpl::builder().get(catalog).int_err()?;
+        let inner = SearchServiceImpl::builder()
+            .get(self.background_catalog.base_catalog())
+            .int_err()?;
 
         Ok(inner)
     }
@@ -66,7 +72,7 @@ impl SearchImplLazyInit {
 #[async_trait::async_trait]
 impl SearchService for SearchImplLazyInit {
     async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
+        let inner = self.inner().await?;
         inner.health(ctx).await
     }
 
@@ -75,7 +81,7 @@ impl SearchService for SearchImplLazyInit {
         ctx: SearchContext<'_>,
         req: SearchRequest,
     ) -> Result<SearchResponse, InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
+        let inner = self.inner().await?;
         inner.search(ctx, req).await
     }
 
@@ -85,7 +91,7 @@ impl SearchService for SearchImplLazyInit {
         schema_name: SearchEntitySchemaName,
         id: &SearchEntityId,
     ) -> Result<Option<serde_json::Value>, InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
+        let inner = self.inner().await?;
         inner.find_document_by_id(ctx, schema_name, id).await
     }
 
@@ -95,7 +101,7 @@ impl SearchService for SearchImplLazyInit {
         schema_name: SearchEntitySchemaName,
         operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError> {
-        let inner = self.inner(ctx.catalog).await?;
+        let inner = self.inner().await?;
         inner.bulk_update(ctx, schema_name, operations).await
     }
 }

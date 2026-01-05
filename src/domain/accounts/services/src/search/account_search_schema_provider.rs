@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use kamu_accounts::account_search_schema;
 use kamu_search::*;
@@ -20,7 +21,19 @@ use crate::search::account_search_indexer::*;
 #[dill::component]
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct AccountSearchSchemaProvider {
-    expensive_account_repo: Arc<dyn kamu_accounts::ExpensiveAccountRepository>,
+    catalog: dill::Catalog,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl AccountSearchSchemaProvider {
+    #[transactional_method1(expensive_account_repo: Arc<dyn kamu_accounts::ExpensiveAccountRepository>)]
+    async fn index_accounts(
+        &self,
+        search_repo: Arc<dyn SearchRepository>,
+    ) -> Result<usize, InternalError> {
+        index_accounts(expensive_account_repo.as_ref(), search_repo.as_ref()).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +54,7 @@ impl kamu_search::SearchEntitySchemaProvider for AccountSearchSchemaProvider {
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
         assert!(schema.schema_name == account_search_schema::SCHEMA_NAME);
-        index_accounts(self.expensive_account_repo.as_ref(), search_repo.as_ref()).await
+        self.index_accounts(search_repo).await
     }
 }
 

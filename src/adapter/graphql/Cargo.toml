@@ -104,6 +104,7 @@ kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-webhooks = { workspace = true, features = ["testing"] }

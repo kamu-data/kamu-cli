@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use indoc::indoc;
@@ -45,6 +47,8 @@ impl BaseGQLFlowRunsHarness {
     pub async fn new(base_gql_harness: BaseGQLDatasetHarness, runs_catalog: dill::Catalog) -> Self {
         let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
 
+        Self::run_related_startup_jobs(&base_gql_flow_harness.catalog_authorized).await;
+
         Self {
             base_gql_flow_harness,
         }
@@ -53,6 +57,9 @@ impl BaseGQLFlowRunsHarness {
     pub async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
+            .outbox_provider(messaging_outbox::OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .build();
 
         let base_gql_flow_catalog =
@@ -115,6 +122,20 @@ impl BaseGQLFlowRunsHarness {
         );
 
         b.build()
+    }
+
+    async fn run_related_startup_jobs(catalog: &dill::Catalog) {
+        init_on_startup::run_startup_jobs_ex(
+            catalog,
+            init_on_startup::RunStartupJobsOptions {
+                job_selector: Some(init_on_startup::JobSelector::AllOf(HashSet::from([
+                    JOB_KAMU_TASKS_AGENT_RECOVERY,
+                    JOB_KAMU_FLOW_AGENT_RECOVERY,
+                ]))),
+            },
+        )
+        .await
+        .unwrap();
     }
 
     pub fn trigger_ingest_flow_mutation(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
