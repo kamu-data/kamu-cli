@@ -223,7 +223,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             .execute_find_by_ref(
                 ReadCheckedDataset::from_ref(&readable_data_room),
                 as_of,
-                &[r#ref],
+                r#ref,
             )
             .await
             .map_err(|e| match e {
