@@ -32,6 +32,7 @@ pub struct SqliteFlowSystemEventBridge {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
+#[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl SqliteFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {

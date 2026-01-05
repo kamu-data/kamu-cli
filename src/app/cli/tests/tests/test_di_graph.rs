@@ -169,6 +169,54 @@ fn test_di_server_graph_validates(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(resourcegen)]
+#[test_log::test(tokio::test)]
+async fn update_di_graph() {
+    let tenancy_config = TenancyConfig::MultiTenant;
+    let repositories_config = RepositoriesConfig::Sqlite;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_layout = WorkspaceLayout::new(temp_dir.path());
+    let mut base_catalog_builder = kamu_cli::configure_base_catalog(
+        &workspace_layout,
+        WorkspaceStatus::Created(tenancy_config),
+        tenancy_config,
+        None,
+        false,
+    );
+
+    register_repositories(&mut base_catalog_builder, repositories_config);
+
+    base_catalog_builder.add_value(OutputConfig::default());
+
+    kamu_cli::register_config_in_catalog(
+        &kamu_cli::config::CLIConfig::default(),
+        &mut base_catalog_builder,
+        WorkspaceStatus::Created(tenancy_config),
+        None,
+        false,
+    )
+    .unwrap();
+    base_catalog_builder.add_value(Interact::new(false, false));
+    let base_catalog = base_catalog_builder.build();
+
+    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
+
+    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
+    cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
+    cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
+    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
+
+    let puml = dill::utils::plantuml::render(&cli_catalog_builder.build());
+
+    let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("../../../resources/di.puml");
+
+    std::fs::write(&path, puml.as_bytes()).unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

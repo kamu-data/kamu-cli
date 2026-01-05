@@ -43,6 +43,7 @@ content:
           - TAX_LEVY STRING
           - NEIGHBOURHOOD_CODE STRING
           - REPORT_YEAR STRING
+          - NOTE STRING
       preprocess:
         kind: Sql
         engine: datafusion
@@ -76,7 +77,8 @@ content:
             BIG_IMPROVEMENT_YEAR,
             TAX_LEVY,
             NEIGHBOURHOOD_CODE,
-            cast(concat(REPORT_YEAR, '-01-01') as date) as REPORT_YEAR
+            cast(concat(REPORT_YEAR, '-01-01') as date) as REPORT_YEAR,
+            NOTE
           from input
       merge:
         kind: Ledger

@@ -52,7 +52,7 @@ bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "50", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
 nutype = { version = "0.6", default-features = false }

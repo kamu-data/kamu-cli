@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.255.1] - 2026-01-05
+### Changed
+- Upgraded `prost`, `tonic`, `flat`, `opentelemetry` to latest versions
+- Switched to `dill v0.15.0`, weak catalog references instead of direct catalog loops.
+
 ## [0.255.0] - 2025-12-22
 ### Added
 - Support for re-defining the `AddPushSource`

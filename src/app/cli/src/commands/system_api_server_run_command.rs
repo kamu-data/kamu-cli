@@ -64,7 +64,7 @@ pub struct APIServerRunCommand {
 impl APIServerRunCommand {
     async fn get_access_token(
         &self,
-        api_server_catalog: dill::Catalog,
+        api_server_catalog: &dill::Catalog,
     ) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
@@ -88,7 +88,7 @@ impl APIServerRunCommand {
             password: account_config.password.into_inner(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(api_server_catalog)
+        let login_response = DatabaseTransactionRunner::new(api_server_catalog.clone())
             .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
@@ -144,7 +144,7 @@ impl Command for APIServerRunCommand {
         .await?;
 
         let access_token = self
-            .get_access_token(api_server.api_server_catalog().clone())
+            .get_access_token(api_server.api_server_catalog())
             .await?;
 
         tracing::info!(

@@ -35,12 +35,12 @@ pub(crate) struct DatasetBlockIndexingJob {
 
 impl DatasetBlockIndexingJob {
     pub(crate) fn new(
-        catalog: &Catalog,
+        catalog: Catalog,
         hdl_to_index: odf::DatasetHandle,
         block_ref: odf::BlockRef,
     ) -> Self {
         Self {
-            catalog: catalog.clone(),
+            catalog,
             hdl_to_index,
             block_ref,
         }

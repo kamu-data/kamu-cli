@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use dill::Component;
 use kamu_accounts::*;
 use kamu_accounts_services::*;
 use kamu_search::*;
@@ -268,10 +267,9 @@ impl AccountIndexingHarness {
         });
 
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
-        b.add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
+        b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<AccountSearchSchemaProvider>()
         .add::<AccountSearchUpdater>();

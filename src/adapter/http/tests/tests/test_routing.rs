@@ -13,7 +13,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
 use kamu::domain::*;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -66,10 +65,9 @@ async fn setup_repo() -> RepoFixture {
     let mut b = dill::CatalogBuilder::new();
     b.add::<SystemTimeSourceDefault>()
         .add::<DidGeneratorDefault>()
-        .add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
+        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<DatabaseTransactionRunner>()
         .add::<DependencyGraphServiceImpl>()

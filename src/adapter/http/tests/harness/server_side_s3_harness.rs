@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
@@ -115,10 +114,9 @@ impl ServerSideS3Harness {
                 .add::<DidGeneratorDefault>()
                 .add_value(RunInfoDir::new(run_info_dir))
                 .add_value(AuthConfig::sample())
-                .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()

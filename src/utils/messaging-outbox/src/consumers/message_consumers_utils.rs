@@ -118,7 +118,7 @@ pub(crate) fn particular_consumer_metadata_for(
             assert!(
                 all_metadata.len() <= 1,
                 "Multiple consumer metadata records unexpected for {}",
-                consumer_builder.instance_type_name()
+                consumer_builder.instance_type().name
             );
             all_metadata.first().map(|meta| (**meta).clone())
         })
@@ -171,7 +171,7 @@ pub(crate) fn enumerate_messaging_routes(
         assert!(
             all_metadata.len() <= 1,
             "Multiple consumer metadata records unexpected for {}",
-            consumer_builder.instance_type_name()
+            consumer_builder.instance_type().name
         );
         for metadata in all_metadata {
             if metadata.delivery == durability {

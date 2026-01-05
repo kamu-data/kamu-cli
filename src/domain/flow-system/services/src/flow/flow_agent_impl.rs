@@ -31,7 +31,7 @@ use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowAgentImpl {
-    catalog: Catalog,
+    catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
     state: Arc<Mutex<State>>,
@@ -74,7 +74,7 @@ struct State {
 #[scope(Singleton)]
 impl FlowAgentImpl {
     pub fn new(
-        catalog: Catalog,
+        catalog: CatalogWeakRef,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<FlowAgentConfig>,
     ) -> Self {

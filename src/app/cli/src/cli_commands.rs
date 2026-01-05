@@ -387,6 +387,7 @@ pub fn get_command(
             cli::SystemSubCommand::DebugToken(sc) => {
                 Box::new(DebugTokenCommand::builder(sc.token).cast())
             }
+            cli::SystemSubCommand::Depgraph(_) => Box::new(SystemDepgraphCommand::builder().cast()),
             cli::SystemSubCommand::Decode(sc) => {
                 Box::new(SystemDecodeCommand::builder(sc.manifest, sc.stdin).cast())
             }
@@ -518,6 +519,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
             },
             cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Depgraph(_)
             | cli::SystemSubCommand::Diagnose(_)
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Info(_)

@@ -30,7 +30,7 @@ odf = { workspace = true, default-features = false, features = ["testing"] }
 
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = "0.3"
 itertools = "0.14"
 pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }

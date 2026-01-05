@@ -1921,7 +1921,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
+pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     let dataset_id_foo = odf::DatasetID::new_seeded_ed25519(b"foo");

@@ -119,10 +119,9 @@ impl TestWebhookDatasetRemovalHandlerHarness {
         b.add::<WebhookDatasetRemovalHandler>()
             .add::<WebhookSecretGeneratorImpl>()
             .add_value(WebhooksConfig::default())
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<InMemoryWebhookSubscriptionEventStore>();
 
