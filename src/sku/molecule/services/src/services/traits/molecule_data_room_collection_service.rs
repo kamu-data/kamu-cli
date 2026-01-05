@@ -48,8 +48,12 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
     ) -> Result<
-        BatchLookup<CollectionEntry, odf::DatasetID, MoleculeDataRoomCollectionReadError>,
-        InternalError,
+        BatchLookup<
+            CollectionEntry,
+            odf::DatasetID,
+            MoleculeDataRoomCollectionEntryNotFoundByRefError,
+        >,
+        MoleculeDataRoomCollectionReadError,
     >;
 
     async fn upsert_data_room_collection_entry(
@@ -80,6 +84,8 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
@@ -112,6 +118,14 @@ pub enum MoleculeDataRoomCollectionWriteError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Data room collection entry not found by ref: '{ref}'")]
+pub struct MoleculeDataRoomCollectionEntryNotFoundByRefError {
+    pub r#ref: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

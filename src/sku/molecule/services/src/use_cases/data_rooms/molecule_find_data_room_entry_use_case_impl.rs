@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use database_common::BatchLookup;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::*;
 
@@ -25,7 +25,7 @@ pub struct MoleculeFindDataRoomEntryUseCaseImpl {
 }
 
 impl MoleculeFindDataRoomEntryUseCaseImpl {
-    fn map_collection_error(
+    fn map_read_collection_error(
         e: MoleculeDataRoomCollectionReadError,
     ) -> MoleculeFindDataRoomEntryError {
         use MoleculeDataRoomCollectionReadError as E;
@@ -61,7 +61,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 path,
             )
             .await
-            .map_err(Self::map_collection_error)?;
+            .map_err(Self::map_read_collection_error)?;
 
         let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
@@ -87,7 +87,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 r#ref,
             )
             .await
-            .map_err(Self::map_collection_error)?;
+            .map_err(Self::map_read_collection_error)?;
 
         let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
@@ -105,8 +105,8 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
     ) -> Result<
-        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeFindDataRoomEntryError>,
-        InternalError,
+        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeDataRoomEntryNotFoundByRefError>,
+        MoleculeFindDataRoomEntryError,
     > {
         let lookup = self
             .data_room_collection_service
@@ -115,7 +115,8 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 as_of,
                 refs,
             )
-            .await?;
+            .await
+            .map_err(Self::map_read_collection_error)?;
 
         Ok(BatchLookup {
             found: lookup
@@ -126,7 +127,12 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
             not_found: lookup
                 .not_found
                 .into_iter()
-                .map(|(r#ref, e)| (r#ref, Self::map_collection_error(e)))
+                .map(|(r#ref, e)| {
+                    (
+                        r#ref,
+                        MoleculeDataRoomEntryNotFoundByRefError { r#ref: e.r#ref },
+                    )
+                })
                 .collect(),
         })
     }

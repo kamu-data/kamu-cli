@@ -37,8 +37,8 @@ pub trait MoleculeFindDataRoomEntryUseCase: Send + Sync {
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
     ) -> Result<
-        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeFindDataRoomEntryError>,
-        InternalError,
+        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeDataRoomEntryNotFoundByRefError>,
+        MoleculeFindDataRoomEntryError,
     >;
 }
 
@@ -53,6 +53,14 @@ pub enum MoleculeFindDataRoomEntryError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Data room entry not found by ref: '{ref}'")]
+pub struct MoleculeDataRoomEntryNotFoundByRefError {
+    pub r#ref: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

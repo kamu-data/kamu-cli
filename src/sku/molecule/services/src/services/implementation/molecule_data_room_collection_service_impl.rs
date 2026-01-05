@@ -10,13 +10,14 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::{BatchLookup, PaginationOpts};
-use internal_error::{ErrorIntoInternal, InternalError};
+use database_common::{BatchLookup, BatchLookupCreateOptions, PaginationOpts};
+use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
 
 use crate::{
+    MoleculeDataRoomCollectionEntryNotFoundByRefError,
     MoleculeDataRoomCollectionReadError,
     MoleculeDataRoomCollectionService,
     MoleculeDataRoomCollectionWriteError,
@@ -245,11 +246,44 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
     ) -> Result<
-        BatchLookup<CollectionEntry, odf::DatasetID, MoleculeDataRoomCollectionReadError>,
-        InternalError,
+        BatchLookup<
+            CollectionEntry,
+            odf::DatasetID,
+            MoleculeDataRoomCollectionEntryNotFoundByRefError,
+        >,
+        MoleculeDataRoomCollectionReadError,
     > {
-        let _ = (data_room_dataset_id, as_of, refs);
-        todo!()
+        let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
+
+        let found_collection_entries = self
+            .find_collection_entries
+            .execute_find_multi_by_refs(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                refs,
+            )
+            .await
+            .map_err(|e| match e {
+                FindCollectionEntriesError::Internal(_) => e.int_err(),
+            })?;
+
+        Ok(BatchLookup::from_found_items(
+            found_collection_entries,
+            refs,
+            BatchLookupCreateOptions {
+                found_ids_fn: |collection_entries| {
+                    collection_entries
+                        .iter()
+                        .map(|collection_entry| collection_entry.reference.clone())
+                        .collect()
+                },
+                not_found_err_fn: |r#ref| MoleculeDataRoomCollectionEntryNotFoundByRefError {
+                    r#ref: r#ref.clone(),
+                },
+                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
+                _phantom: Default::default(),
+            },
+        ))
     }
 
     #[tracing::instrument(
