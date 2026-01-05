@@ -40,8 +40,6 @@ impl BaseGQLDatasetHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     ) -> Self {
-        use dill::Component;
-
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -54,10 +52,9 @@ impl BaseGQLDatasetHarness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(kamu_adapter_graphql::Config::default())
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(ConsumerFilter::AllConsumers),
-                )
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(tenancy_config)

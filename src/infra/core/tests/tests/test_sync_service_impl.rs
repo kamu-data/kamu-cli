@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 use std::path::Path;
 use std::str::FromStr;
 
-use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
@@ -96,10 +95,9 @@ async fn do_test_sync(
         .add::<SimpleTransferProtocol>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()
-        .add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
+        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(MockDatasetEntryWriter::new())
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
@@ -155,10 +153,9 @@ async fn do_test_sync(
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
+        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(mock_dataset_entry_writer_bar)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()

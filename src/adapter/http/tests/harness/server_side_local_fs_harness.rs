@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use dill::Component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{CacheDir, RunInfoDir, ServerUrlConfig};
 use kamu::*;
@@ -126,10 +125,9 @@ impl ServerSideLocalFsHarness {
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
-                .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(time_source.clone())
                 .add_value(AuthConfig::sample())
