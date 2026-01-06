@@ -84,6 +84,7 @@ impl Molecule {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: to hide from GQL introspection
 fn v1_enabled(ctx: &Context<'_>) -> bool {
     FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)
         .is_enabled(ctx)
