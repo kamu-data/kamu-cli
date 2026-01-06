@@ -91,6 +91,7 @@ impl ElasticsearchContainerRepository {
             Arc::new(ElasticsearchClientConfig {
                 url,
                 password: Some(DUMMY_PASSWORD.to_string()),
+                ca_cert_pem_path: None,
                 timeout_secs: 5,
                 enable_compression: false,
             }),
