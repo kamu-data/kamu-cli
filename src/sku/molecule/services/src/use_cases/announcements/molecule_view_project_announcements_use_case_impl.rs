@@ -13,7 +13,7 @@ use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeAnnouncementsService;
+use crate::{MoleculeAnnouncementsService, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,7 +72,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
         };
 
         let df = if let Some(filters) = filters {
-            crate::utils::apply_molecule_filters_to_df(
+            utils::apply_molecule_filters_to_df(
                 df,
                 None,
                 filters.by_tags,

@@ -15,7 +15,7 @@ use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeGlobalDataRoomActivitiesService;
+use crate::{MoleculeGlobalDataRoomActivitiesService, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +63,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
         // Apply filters, if present
         let df = if let Some(filters) = filters {
-            crate::utils::apply_molecule_filters_to_df(
+            utils::apply_molecule_filters_to_df(
                 df,
                 None,
                 filters.by_tags,

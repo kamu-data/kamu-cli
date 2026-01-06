@@ -14,7 +14,7 @@ use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeAnnouncementsService;
+use crate::{MoleculeAnnouncementsService, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,7 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
         };
 
         let df = if let Some(filters) = filters {
-            crate::utils::apply_molecule_filters_to_df(
+            utils::apply_molecule_filters_to_df(
                 df,
                 None,
                 filters.by_tags,

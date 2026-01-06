@@ -80,9 +80,12 @@ pub fn normalize_access_level_rules(
         let mut seen_levels = HashSet::new();
 
         for access_level in rule.access_levels {
-            if seen_levels.insert(access_level.clone()) {
-                unique_access_levels.push(access_level);
+            if seen_levels.contains(access_level.as_str()) {
+                continue;
             }
+
+            seen_levels.insert(access_level.clone());
+            unique_access_levels.push(access_level);
         }
 
         if let Some(existing_rule) = deduplicated_rules
@@ -96,9 +99,12 @@ pub fn normalize_access_level_rules(
                 .collect::<HashSet<_>>();
 
             for access_level in unique_access_levels {
-                if existing_levels.insert(access_level.clone()) {
-                    existing_rule.access_levels.push(access_level);
+                if existing_levels.contains(access_level.as_str()) {
+                    continue;
                 }
+
+                existing_levels.insert(access_level.clone());
+                existing_rule.access_levels.push(access_level);
             }
         } else {
             deduplicated_rules.push(MoleculeAccessLevelRule {
