@@ -3174,6 +3174,11 @@ type Molecule {
 	v2: MoleculeV2!
 }
 
+input MoleculeAccessLevelRuleInput {
+	ipnftUid: String!
+	accessLevels: [String!]!
+}
+
 type MoleculeActivityAnnouncementV2 {
 	announcement: MoleculeAnnouncementEntry!
 }
@@ -3272,6 +3277,7 @@ input MoleculeAnnouncementsFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 }
 
 type MoleculeDataRoom {
@@ -3287,6 +3293,7 @@ input MoleculeDataRoomEntriesFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 }
 
 type MoleculeDataRoomEntry {
@@ -3569,6 +3576,7 @@ input MoleculeProjectActivityFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 	byKinds: [MoleculeActivityKindInput!]
 }
 
@@ -3786,6 +3794,7 @@ input MoleculeSemanticSearchFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 	byKinds: [MoleculeSearchEntityKindInput!]
 }
 

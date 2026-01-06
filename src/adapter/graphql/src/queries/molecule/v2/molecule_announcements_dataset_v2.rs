@@ -23,6 +23,7 @@ use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
     MoleculeAccessLevel,
+    MoleculeAccessLevelRuleInput,
     MoleculeAnnouncementId,
     MoleculeCategory,
     MoleculeChangeBy,
@@ -248,6 +249,7 @@ pub struct MoleculeAnnouncementsFilters {
     by_tags: Option<Vec<MoleculeTag>>,
     by_categories: Option<Vec<MoleculeCategory>>,
     by_access_levels: Option<Vec<MoleculeAccessLevel>>,
+    by_access_level_rules: Option<Vec<MoleculeAccessLevelRuleInput>>,
 }
 
 impl From<MoleculeAnnouncementsFilters> for kamu_molecule_domain::MoleculeAnnouncementsFilters {
@@ -256,6 +258,9 @@ impl From<MoleculeAnnouncementsFilters> for kamu_molecule_domain::MoleculeAnnoun
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
+            by_access_level_rules: value
+                .by_access_level_rules
+                .map(|rules| rules.into_iter().map(Into::into).collect()),
         }
     }
 }

@@ -13,7 +13,7 @@ use database_common::PaginationOpts;
 use internal_error::ResultIntoInternal;
 use kamu_molecule_domain::*;
 
-use crate::MoleculeAnnouncementsService;
+use crate::{MoleculeAnnouncementsService, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,12 +71,15 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
             df
         };
 
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
-        });
-        let df = if let Some(filters) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters)
-                .int_err()?
+        let df = if let Some(filters) = filters {
+            utils::apply_molecule_filters_to_df(
+                df,
+                None,
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_access_level_rules,
+            )?
         } else {
             df
         };
