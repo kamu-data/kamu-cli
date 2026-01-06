@@ -266,6 +266,11 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             .map_err(|e| match e {
                 FindCollectionEntriesError::Internal(_) => e.int_err(),
             })?;
+        let ref_positions = refs
+            .iter()
+            .enumerate()
+            .map(|(idx, r)| ((*r).clone(), idx))
+            .collect::<std::collections::HashMap<_, _>>();
 
         Ok(BatchLookup::from_found_items(
             found_collection_entries,
@@ -280,7 +285,12 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 not_found_err_fn: |r#ref| MoleculeDataRoomCollectionEntryNotFoundByRefError {
                     r#ref: r#ref.clone(),
                 },
-                maybe_found_items_comparator: None::<fn(&_, &_) -> _>,
+                maybe_found_items_comparator: Some(|a: &CollectionEntry, b: &CollectionEntry| {
+                    // NOTE: restore order based on input refs
+                    let ref_a_pos = ref_positions.get(&a.reference).unwrap();
+                    let ref_b_pos = ref_positions.get(&b.reference).unwrap();
+                    ref_a_pos.cmp(ref_b_pos)
+                }),
                 _phantom: Default::default(),
             },
         ))
