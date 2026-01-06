@@ -199,7 +199,7 @@ impl MoleculeAnnouncementEntry {
         // NOTE: If data room entries are not found, they were removed and should not be
         //       displayed.
 
-        let actual_attachment_versioned_files = lookup
+        let actual_attachment_data_room_entries = lookup
             .found
             .into_iter()
             .map(|data_room_entry| {
@@ -212,7 +212,7 @@ impl MoleculeAnnouncementEntry {
             })
             .collect::<Vec<_>>();
 
-        Ok(actual_attachment_versioned_files)
+        Ok(actual_attachment_data_room_entries)
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {
