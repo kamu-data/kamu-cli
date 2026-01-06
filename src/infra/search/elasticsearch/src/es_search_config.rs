@@ -13,6 +13,7 @@
 pub struct ElasticsearchClientConfig {
     pub url: url::Url,
     pub password: Option<String>,
+    pub ca_cert_pem_path: Option<std::path::PathBuf>,
     pub timeout_secs: u64,
     pub enable_compression: bool,
 }

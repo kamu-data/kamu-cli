@@ -47,6 +47,21 @@ impl ElasticsearchClient {
             ));
         }
 
+        // Configure TLS certificate if provided
+        if let Some(ca_cert_path) = &config.ca_cert_pem_path {
+            tracing::info!(ca_cert_path = ?ca_cert_path, "Loading CA certificate for Elasticsearch client");
+            let cert_pem = std::fs::read(ca_cert_path).map_err(|e| {
+                ElasticsearchClientBuildError::CertificateRead {
+                    path: ca_cert_path.clone(),
+                    source: e,
+                }
+            })?;
+
+            let cert = elasticsearch::cert::Certificate::from_pem(&cert_pem)?;
+            builder =
+                builder.cert_validation(elasticsearch::cert::CertificateValidation::Full(cert));
+        }
+
         let transport = builder.build()?;
         let client = elasticsearch::Elasticsearch::new(transport);
         Ok(Self { client })
@@ -692,6 +707,15 @@ pub enum ElasticsearchReindexError {
 pub enum ElasticsearchClientBuildError {
     #[error("transport error building Elasticsearch client: {0}")]
     Build(#[from] elasticsearch::http::transport::BuildError),
+
+    #[error("failed to read CA certificate from {path}: {source}")]
+    CertificateRead {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("invalid certificate format: {0}")]
+    InvalidCertificate(#[from] elasticsearch::Error),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

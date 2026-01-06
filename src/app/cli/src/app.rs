@@ -1195,6 +1195,7 @@ pub fn register_config_in_catalog(
                 password: cfg.password,
                 timeout_secs: cfg.timeout_secs.unwrap(),
                 enable_compression: cfg.enable_compression.unwrap(),
+                ca_cert_pem_path: cfg.ca_cert_pem_path.map(std::path::PathBuf::from),
             });
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
                 index_prefix: cfg.index_prefix.unwrap(),

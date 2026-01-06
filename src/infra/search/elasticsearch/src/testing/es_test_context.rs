@@ -23,9 +23,12 @@ static ELASTICSEARCH_CLIENT: OnceCell<Arc<ElasticsearchClient>> = OnceCell::cons
 
 const ENV_ELASTICSEARCH_URL: &str = "ELASTICSEARCH_URL";
 const ENV_ELASTICSEARCH_PASSWORD: &str = "ELASTICSEARCH_PASSWORD";
+const ENV_ELASTICSEARCH_CA_CERT_PEM_PATH: &str = "ELASTICSEARCH_CA_CERT_PEM_PATH";
 
-const DEFAULT_ELASTICSEARCH_URL: &str = "http://localhost:9200";
-const DEFAULT_ELASTICSEARCH_PASSWORD: Option<&str> = None;
+const DEFAULT_ELASTICSEARCH_URL: &str = "http://localhost:9200" /* "https://localhost:9200" */;
+const DEFAULT_ELASTICSEARCH_PASSWORD: Option<&str> = Some("root");
+
+const ELASTICSEARCH_HTTPS_CA_CERT_PEM_PATH: &str = ".local/elasticsearch/certs/ca/ca.crt";
 
 const INDEX_PREFIX_TEMPLATE: &str = "kamu-test-";
 
@@ -47,14 +50,45 @@ impl ElasticsearchTestContext {
         // Read configuration from environment variables
         let es_url = std::env::var(ENV_ELASTICSEARCH_URL)
             .unwrap_or_else(|_| DEFAULT_ELASTICSEARCH_URL.to_string());
+        let es_url = Url::parse(&es_url).unwrap();
+
         let es_password = std::env::var(ENV_ELASTICSEARCH_PASSWORD)
             .ok()
             .or_else(|| DEFAULT_ELASTICSEARCH_PASSWORD.map(ToString::to_string));
 
+        // Certificates are only used for HTTPS connections
+        let es_ca_cert_pem_path = std::env::var(ENV_ELASTICSEARCH_CA_CERT_PEM_PATH)
+            .ok()
+            .or_else(|| {
+                // Only use default certificate path for HTTPS connections
+                if es_url.scheme() == "https" {
+                    Some(ELASTICSEARCH_HTTPS_CA_CERT_PEM_PATH.to_string())
+                } else {
+                    None
+                }
+            })
+            .map(|path| {
+                let path_buf = std::path::PathBuf::from(&path);
+                if path_buf.is_absolute() {
+                    path_buf
+                } else {
+                    // Walk up from current directory until we find the file
+                    let mut current = std::env::current_dir().unwrap();
+                    loop {
+                        let candidate = current.join(&path_buf);
+                        if candidate.exists() {
+                            return candidate;
+                        }
+                        assert!(current.pop(), "Could not find certificate file: {path}");
+                    }
+                }
+            });
+
         // Client config
         let client_config = ElasticsearchClientConfig {
-            url: Url::parse(&es_url).unwrap(),
+            url: es_url,
             password: es_password.clone(),
+            ca_cert_pem_path: es_ca_cert_pem_path,
             timeout_secs: ELASTICSEARCH_TIMEOUT_SECS,
             enable_compression: false,
         };

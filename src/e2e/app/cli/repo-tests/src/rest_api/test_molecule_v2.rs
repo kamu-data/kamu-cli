@@ -44,9 +44,13 @@ pub const ELASTICSEARCH_CONFIG_EXTENSION: &str = indoc::indoc!(
       search:
         repo:
           kind: elasticsearch
+          # url: https://localhost:9200
           url: http://localhost:9200
           password: root
           indexPrefix: <random_prefix>
+
+          # Bind absolute path for HTTPS with self-signed certs
+          # caCertPemPath: .local/elasticsearch/certs/ca/ca.crt
     "#
 );
 
