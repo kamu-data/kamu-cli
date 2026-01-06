@@ -9,9 +9,10 @@
 
 mod admin_guard;
 mod can_provision_accounts_guard;
+mod feature_enabled_guard;
 mod logged_in_guard;
 
 pub use admin_guard::*;
 pub use can_provision_accounts_guard::*;
+pub use feature_enabled_guard::*;
 pub use logged_in_guard::*;
-

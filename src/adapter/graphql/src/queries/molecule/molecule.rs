@@ -65,7 +65,11 @@ impl Molecule {
     }
 
     /// 1-st Molecule API version (query).
-    #[graphql(deprecation = "Use `v2` instead")]
+    #[graphql(
+        deprecation = "Use `v2` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     async fn v1(&self) -> v1::MoleculeV1 {
         v1::MoleculeV1
     }
@@ -74,6 +78,16 @@ impl Molecule {
     async fn v2(&self) -> v2::MoleculeV2 {
         v2::MoleculeV2
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn v1_enabled(ctx: &Context<'_>) -> bool {
+    FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)
+        .is_enabled(ctx)
+        .is_ok()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
