@@ -26,7 +26,7 @@ pub trait FindCollectionEntriesUseCase: Send + Sync {
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        r#ref: &[&odf::DatasetID],
+        r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError>;
 
     async fn execute_find_multi_by_refs(

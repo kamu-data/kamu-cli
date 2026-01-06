@@ -502,7 +502,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments
+                  attachments {
+                    path
+                    ref
+                  }
                   accessLevel
                   changeBy
                   categories
@@ -558,7 +561,10 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     id
                     headline
                     body
-                    attachments
+                    attachments {
+                      path
+                      ref
+                    }
                     accessLevel
                     changeBy
                     categories

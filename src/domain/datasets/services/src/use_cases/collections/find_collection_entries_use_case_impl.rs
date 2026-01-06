@@ -95,10 +95,10 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
-        r#ref: &[&odf::DatasetID],
+        r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
         let mut results = self
-            .execute_find_multi_by_refs(collection_dataset, as_of, r#ref)
+            .execute_find_multi_by_refs(collection_dataset, as_of, &[r#ref])
             .await?;
         Ok(results.pop())
     }

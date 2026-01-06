@@ -12,6 +12,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
+    MoleculeFindDataRoomEntryError,
+    MoleculeFindDataRoomEntryUseCase,
     MoleculeFindProjectAnnouncementError,
     MoleculeFindProjectAnnouncementUseCase,
     MoleculeViewProjectAnnouncementsUseCase,
@@ -24,6 +26,7 @@ use crate::queries::molecule::v2::{
     MoleculeAnnouncementId,
     MoleculeCategory,
     MoleculeChangeBy,
+    MoleculeDataRoomEntry,
     MoleculeProjectV2,
     MoleculeTag,
 };
@@ -177,8 +180,39 @@ impl MoleculeAnnouncementEntry {
         self.entity.body.as_str()
     }
 
-    async fn attachments<'a>(&'a self) -> Vec<DatasetID<'a>> {
-        self.entity.attachments.iter().map(Into::into).collect()
+    async fn attachments(&self, ctx: &Context<'_>) -> Result<Vec<MoleculeDataRoomEntry>> {
+        let find_data_room_entry_uc = from_catalog_n!(ctx, dyn MoleculeFindDataRoomEntryUseCase);
+
+        let refs = self.entity.attachments.iter().collect::<Vec<_>>();
+
+        let lookup = find_data_room_entry_uc
+            .execute_find_by_refs(&self.project.entity, None /* latest */, &refs)
+            .await
+            .map_err(|e| -> GqlError {
+                use MoleculeFindDataRoomEntryError as E;
+                match e {
+                    E::Access(e) => e.into(),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        // NOTE: If data room entries are not found, they were removed and should not be
+        //       displayed.
+
+        let actual_attachment_data_room_entries = lookup
+            .found
+            .into_iter()
+            .map(|data_room_entry| {
+                let latest = true;
+                MoleculeDataRoomEntry::new_from_data_room_entry(
+                    &self.project,
+                    data_room_entry,
+                    latest,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        Ok(actual_attachment_data_room_entries)
     }
 
     async fn access_level(&self) -> &MoleculeAccessLevel {

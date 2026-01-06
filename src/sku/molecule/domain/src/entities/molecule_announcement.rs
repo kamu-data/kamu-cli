@@ -152,11 +152,11 @@ pub struct MoleculeAnnouncementPayloadRecord {
     #[serde(rename = "molecule_change_by")]
     pub change_by: String,
 
-    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
+    // NOTE: Needs `Option` because it did not exist in V1 and will be `null` on read
     #[serde(default)]
     pub categories: Option<Vec<String>>,
 
-    // NOTE: Needs `Option` becase it did not exist in V1 and will be `null` on read
+    // NOTE: Needs `Option` because it did not exist in V1 and will be `null` on read
     #[serde(default)]
     pub tags: Option<Vec<String>>,
 }

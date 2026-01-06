@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
+use database_common::{BatchLookup, PaginationOpts};
 use internal_error::InternalError;
 use kamu_datasets::{CollectionEntry, CollectionEntryListing, CollectionPath};
 use kamu_molecule_domain::{MoleculeDataRoomEntriesFilters, MoleculeUpdateDataRoomEntryResult};
@@ -42,6 +42,20 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, MoleculeDataRoomCollectionReadError>;
 
+    async fn find_data_room_collection_entries_by_refs(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<
+            CollectionEntry,
+            odf::DatasetID,
+            MoleculeDataRoomCollectionEntryNotFoundByRefError,
+        >,
+        MoleculeDataRoomCollectionReadError,
+    >;
+
     async fn upsert_data_room_collection_entry(
         &self,
         data_room_dataset_id: &odf::DatasetID,
@@ -70,6 +84,8 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
@@ -102,6 +118,14 @@ pub enum MoleculeDataRoomCollectionWriteError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Data room collection entry not found by ref: '{ref}'")]
+pub struct MoleculeDataRoomCollectionEntryNotFoundByRefError {
+    pub r#ref: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

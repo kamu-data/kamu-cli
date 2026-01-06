@@ -8451,6 +8451,7 @@ dependencies = [
  "datafusion",
  "dill",
  "file-utils",
+ "format-utils",
  "indoc 2.0.7",
  "internal-error",
  "kamu-accounts",
