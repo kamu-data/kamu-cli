@@ -365,7 +365,10 @@ const SEARCH_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments
+                  attachments {
+                    path
+                    ref
+                  }
                   accessLevel
                   changeBy
                   categories
@@ -9655,7 +9658,17 @@ async fn test_molecule_v2_search() {
         "__typename": "MoleculeSemanticSearchFoundAnnouncement",
         "announcement": {
             "accessLevel": "public",
-            "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+            "attachments": [
+                {
+                    "path": "/foo_renamed.txt",
+                    "ref": project_1_file_1_dataset_id
+                },
+                // NOTE: We removed this file from the data room
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": project_1_file_2_dataset_id
+                // },
+            ],
             "body": "Blah blah 1 text",
             "categories": ["test-category-1"],
             "changeBy": USER_1,
