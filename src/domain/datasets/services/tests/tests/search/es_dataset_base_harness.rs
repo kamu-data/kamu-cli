@@ -28,7 +28,7 @@ use kamu_messaging_outbox_inmem::{
 };
 use kamu_search::*;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
-use kamu_search_services::SearchIndexer;
+use kamu_search_services::SearchIndexerImpl;
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -103,7 +103,7 @@ impl ElasticsearchDatasetBaseHarness {
 
         // Ensure search indexes exist: this is not a normal startup path,
         //  but tests need it for "predefined" content
-        let search_indexer = system_user_catalog.get_one::<SearchIndexer>().unwrap();
+        let search_indexer = system_user_catalog.get_one::<SearchIndexerImpl>().unwrap();
         search_indexer.ensure_indexes_exist().await.unwrap();
 
         // Run predefined accounts registration, if specified

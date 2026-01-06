@@ -110,9 +110,10 @@ impl Search {
         ))
     }
 
-    /// Searches for datasets and other objects managed by the
-    /// current node using a full text prompt in natural language
+    // TODO: restrict to admin only for now, until it's fully ready for public use
+    // (final API, ReBAC)
     #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
+    #[graphql(guard = "AdminGuard::new()")]
     async fn query_full_text(
         &self,
         ctx: &Context<'_>,

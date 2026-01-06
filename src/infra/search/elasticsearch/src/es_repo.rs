@@ -360,6 +360,31 @@ impl SearchRepository for ElasticsearchRepository {
         let index_name = self.resolve_writable_index_name(client, schema_name)?;
         client.bulk_update(&index_name, operations).await.int_err()
     }
+
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_drop_all_schemas, skip_all)]
+    async fn drop_all_schemas(&self) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+
+        // List all indices with the configured prefix
+        let index_names = client
+            .list_indices_by_prefix(&self.repo_config.index_prefix)
+            .await
+            .int_err()?;
+
+        // Convert to refs
+        let refs: Vec<&str> = index_names.iter().map(String::as_str).collect();
+
+        // Delete them
+        client.delete_indices_bulk(&refs).await.int_err()?;
+
+        // Clean registered schemas
+        {
+            let mut state = self.state.write().unwrap();
+            state.registered_schemas.clear();
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

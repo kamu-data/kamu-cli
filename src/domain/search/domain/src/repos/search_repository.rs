@@ -42,6 +42,8 @@ pub trait SearchRepository: Send + Sync {
         schema_name: SearchEntitySchemaName,
         operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError>;
+
+    async fn drop_all_schemas(&self) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

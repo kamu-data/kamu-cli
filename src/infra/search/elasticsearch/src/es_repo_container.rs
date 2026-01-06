@@ -155,6 +155,10 @@ impl SearchRepository for ElasticsearchContainerRepository {
             .bulk_update(schema_name, operations)
             .await
     }
+
+    async fn drop_all_schemas(&self) -> Result<(), InternalError> {
+        self.inner().await?.drop_all_schemas().await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

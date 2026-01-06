@@ -29,6 +29,7 @@ pub struct SearchImplLazyInit {
 
 #[dill::component(pub)]
 #[dill::interface(dyn SearchService)]
+#[dill::interface(dyn SearchIndexer)]
 #[dill::scope(dill::Singleton)]
 impl SearchImplLazyInit {
     pub fn new(background_catalog: Arc<KamuBackgroundCatalog>) -> Self {
@@ -48,7 +49,7 @@ impl SearchImplLazyInit {
     async fn init(&self) -> Result<(), InternalError> {
         let system_user_catalog = self.background_catalog.system_user_catalog();
 
-        let indexer = SearchIndexer::builder()
+        let indexer = SearchIndexerImpl::builder()
             .get(&system_user_catalog)
             .int_err()?;
 
@@ -103,6 +104,21 @@ impl SearchService for SearchImplLazyInit {
     ) -> Result<(), InternalError> {
         let inner = self.inner().await?;
         inner.bulk_update(ctx, schema_name, operations).await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl SearchIndexer for SearchImplLazyInit {
+    async fn reset_search_indices(&self) -> Result<(), InternalError> {
+        let system_user_catalog = self.background_catalog.system_user_catalog();
+
+        let indexer = SearchIndexerImpl::builder()
+            .get(&system_user_catalog)
+            .int_err()?;
+
+        indexer.reset_search_indices().await
     }
 }
 

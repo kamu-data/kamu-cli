@@ -1168,7 +1168,7 @@ pub fn register_config_in_catalog(
 
             if is_e2e_testing {
                 // TODO: kind of a hack, make lazy init work in e2e tests
-                catalog_builder.add::<kamu_search_services::SearchIndexer>();
+                catalog_builder.add::<kamu_search_services::SearchIndexerImpl>();
                 catalog_builder.add::<kamu_search_services::SearchServiceImpl>();
             } else {
                 catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();

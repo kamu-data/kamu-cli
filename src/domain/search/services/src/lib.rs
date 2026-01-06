@@ -14,7 +14,7 @@ mod embeddings_chunker_simple;
 mod natural_language_search_indexer;
 mod natural_language_search_lazy_init;
 mod natural_language_search_service_impl;
-mod search_indexer;
+mod search_indexer_impl;
 mod search_lazy_init_impl;
 mod search_service_impl;
 
@@ -23,6 +23,6 @@ pub use embeddings_chunker_simple::*;
 pub use natural_language_search_indexer::*;
 pub use natural_language_search_lazy_init::*;
 pub use natural_language_search_service_impl::*;
-pub use search_indexer::*;
+pub use search_indexer_impl::*;
 pub use search_lazy_init_impl::*;
 pub use search_service_impl::*;
