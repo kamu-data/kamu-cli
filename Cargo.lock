@@ -7284,7 +7284,6 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
- "kamu-messaging-outbox-inmem",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
