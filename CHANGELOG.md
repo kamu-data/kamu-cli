@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.256.0] - 2026-01-08
 ### Added
 - Prototyped full-text search capabilities via `Elasticsearch`:
   - can be connected to external instance or launch an embedded container
