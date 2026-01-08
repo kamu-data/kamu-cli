@@ -19,7 +19,7 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchServiceLocalIndexerConfig {
+pub struct NaturalLanguageSearchIndexerConfig {
     // Whether to clear and re-index on start or work with existing vectors is any exist
     pub clear_on_start: bool,
 
@@ -45,7 +45,7 @@ pub struct SearchServiceLocalIndexerConfig {
     requires_transaction: true,
 })]
 pub struct NaturalLanguageSearchIndexer {
-    config: Arc<SearchServiceLocalIndexerConfig>,
+    config: Arc<NaturalLanguageSearchIndexerConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,

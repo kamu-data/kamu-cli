@@ -1094,7 +1094,7 @@ pub fn register_config_in_catalog(
     });
 
     let indexer = indexer.unwrap_or_default();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
         skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
         skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,
