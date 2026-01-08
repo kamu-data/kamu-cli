@@ -7,13 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::prelude::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Config {
-    #[serde(default)]
-    pub molecule_api_v1_enabled: bool,
+#[derive(InputObject, Clone)]
+pub struct MoleculeAccessLevelRuleInput {
+    pub ipnft_uid: String,
+    pub access_levels: Vec<String>,
+}
+
+impl From<MoleculeAccessLevelRuleInput> for kamu_molecule_domain::MoleculeAccessLevelRule {
+    fn from(value: MoleculeAccessLevelRuleInput) -> Self {
+        Self {
+            ipnft_uid: Some(value.ipnft_uid),
+            access_levels: value.access_levels,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

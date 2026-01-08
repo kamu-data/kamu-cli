@@ -21,6 +21,7 @@ use kamu_molecule_domain::{
 
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
+    MoleculeAccessLevelRuleInput,
     MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntry,
@@ -215,6 +216,7 @@ pub struct MoleculeProjectActivityFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRuleInput>>,
     pub by_kinds: Option<Vec<MoleculeActivityKindInput>>,
 }
 
@@ -224,6 +226,9 @@ impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActi
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
+            by_access_level_rules: value
+                .by_access_level_rules
+                .map(|rules| rules.into_iter().map(Into::into).collect()),
             by_kinds: value
                 .by_kinds
                 .map(|kinds| kinds.into_iter().map(Into::into).collect()),

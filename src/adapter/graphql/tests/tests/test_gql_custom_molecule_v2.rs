@@ -150,7 +150,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments
+                  attachments {
+                    path
+                    ref
+                  }
                   accessLevel
                   changeBy
                   categories
@@ -206,7 +209,10 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     id
                     headline
                     body
-                    attachments
+                    attachments {
+                      path
+                      ref
+                    }
                     accessLevel
                     changeBy
                     categories
@@ -377,7 +383,10 @@ const SEARCH_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments
+                  attachments {
+                    path
+                    ref
+                  }
                   accessLevel
                   changeBy
                   categories
@@ -3915,7 +3924,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                       id
                       headline
                       body
-                      attachments
+                      attachments {
+                        path
+                        ref
+                      }
                       accessLevel
                       changeBy
                       categories
@@ -4250,8 +4262,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
             "headline": "Test announcement 3",
             "body": "Blah blah 3",
             "attachments": [
-                project_1_file_1_dataset_id,
-                project_1_file_2_dataset_id,
+                {
+                    "path": "/foo.txt",
+                    "ref": project_1_file_1_dataset_id
+                },
+                {
+                    "path": "/bar.txt",
+                    "ref": project_1_file_2_dataset_id
+                },
             ],
             "accessLevel": "holders",
             "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4263,7 +4281,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
             "headline": "Test announcement 2",
             "body": "Blah blah 2",
             "attachments": [
-                project_1_file_1_dataset_id,
+                {
+                    "path": "/foo.txt",
+                    "ref": project_1_file_1_dataset_id
+                },
             ],
             "accessLevel": "holders",
             "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4318,8 +4339,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                         "headline": "Test announcement 3",
                         "body": "Blah blah 3",
                         "attachments": [
-                            project_1_file_1_dataset_id,
-                            project_1_file_2_dataset_id,
+                            {
+                                "path": "/foo.txt",
+                                "ref": project_1_file_1_dataset_id
+                            },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id
+                            },
                         ],
                         "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4334,7 +4361,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                         "headline": "Test announcement 2",
                         "body": "Blah blah 2",
                         "attachments": [
-                            project_1_file_1_dataset_id,
+                            {
+                                "path": "/foo.txt",
+                                "ref": project_1_file_1_dataset_id
+                            },
                         ],
                         "accessLevel": "holders",
                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4477,8 +4507,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4490,7 +4526,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 2",
                                         "body": "Blah blah 2",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4545,8 +4584,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4558,7 +4603,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 2",
                                     //     "body": "Blah blah 2",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4613,8 +4661,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                          "headline": "Test announcement 3",
                                          "body": "Blah blah 3",
                                          "attachments": [
-                                             project_1_file_1_dataset_id,
-                                             project_1_file_2_dataset_id,
+                                             {
+                                                 "path": "/foo.txt",
+                                                 "ref": project_1_file_1_dataset_id
+                                             },
+                                             {
+                                                 "path": "/bar.txt",
+                                                 "ref": project_1_file_2_dataset_id
+                                             },
                                          ],
                                          "accessLevel": "holders",
                                          "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4626,7 +4680,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 2",
                                         "body": "Blah blah 2",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4681,8 +4738,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4694,7 +4757,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 2",
                                         "body": "Blah blah 2",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4749,8 +4815,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4762,7 +4834,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 2",
                                     //     "body": "Blah blah 2",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4817,8 +4892,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4830,7 +4911,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                          "headline": "Test announcement 2",
                                          "body": "Blah blah 2",
                                          "attachments": [
-                                             project_1_file_1_dataset_id,
+                                             {
+                                                 "path": "/foo.txt",
+                                                 "ref": project_1_file_1_dataset_id
+                                             },
                                          ],
                                          "accessLevel": "holders",
                                          "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4885,8 +4969,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4898,7 +4988,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 2",
                                     //     "body": "Blah blah 2",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -4953,8 +5046,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 3",
                                         "body": "Blah blah 3",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -4966,7 +5065,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 2",
                                         "body": "Blah blah 2",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -5021,8 +5123,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 3",
                                         "body": "Blah blah 3",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -5034,7 +5142,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                         "headline": "Test announcement 2",
                                         "body": "Blah blah 2",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
+                                            {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id
+                                            },
                                         ],
                                         "accessLevel": "holders",
                                         "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -5090,8 +5201,14 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 3",
                                     //     "body": "Blah blah 3",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
-                                    //         project_1_file_2_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
+                                    //         {
+                                    //             "path": "/bar.txt",
+                                    //             "ref": project_1_file_2_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
@@ -5103,7 +5220,10 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
                                     //     "headline": "Test announcement 2",
                                     //     "body": "Blah blah 2",
                                     //     "attachments": [
-                                    //         project_1_file_1_dataset_id,
+                                    //         {
+                                    //             "path": "/foo.txt",
+                                    //             "ref": project_1_file_1_dataset_id
+                                    //         },
                                     //     ],
                                     //     "accessLevel": "holders",
                                     //     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD",
@@ -5730,8 +5850,14 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
                         "attachments": [
-                            project_1_file_1_dataset_id,
-                            project_1_file_2_dataset_id,
+                            {
+                                "path": "/foo_renamed.txt",
+                                "ref": project_1_file_1_dataset_id,
+                            },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                            },
                         ],
                         "accessLevel": "public",
                         "changeBy": USER_1,
@@ -5877,8 +6003,14 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
                         "attachments": [
-                            project_1_file_1_dataset_id,
-                            project_1_file_2_dataset_id,
+                            {
+                                "path": "/foo_renamed.txt",
+                                "ref": project_1_file_1_dataset_id,
+                            },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                            },
                         ],
                         "accessLevel": "public",
                         "changeBy": USER_1,
@@ -6031,8 +6163,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
                         "attachments": [
-                            project_1_file_1_dataset_id,
-                            project_1_file_2_dataset_id,
+                            {
+                                "path": "/foo_renamed.txt",
+                                "ref": project_1_file_1_dataset_id,
+                            },
+                            // NOTE: We removed this file from the data room
+                            // {
+                            //     "path": "/bar.txt",
+                            //     "ref": project_1_file_2_dataset_id,
+                            // },
                         ],
                         "accessLevel": "public",
                         "changeBy": USER_1,
@@ -6272,8 +6411,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [
-                    project_1_file_1_dataset_id,
-                    project_1_file_2_dataset_id,
+                    {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                    },
+                    // NOTE: We removed this file from the data room
+                    // {
+                    //     "path": "/bar.txt",
+                    //     "ref": project_1_file_2_dataset_id,
+                    // },
                 ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -6435,8 +6581,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [
-                    project_1_file_1_dataset_id,
-                    project_1_file_2_dataset_id,
+                    {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                    },
+                    // NOTE: We removed this file from the data room
+                    // {
+                    //     "path": "/bar.txt",
+                    //     "ref": project_1_file_2_dataset_id,
+                    // },
                 ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -6524,8 +6677,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [
-                    project_1_file_1_dataset_id,
-                    project_1_file_2_dataset_id,
+                    {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                    },
+                    // NOTE: We removed this file from the data room
+                    // {
+                    //     "path": "/bar.txt",
+                    //     "ref": project_1_file_2_dataset_id,
+                    // },
                 ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -6654,8 +6814,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [
-                    project_1_file_1_dataset_id,
-                    project_1_file_2_dataset_id,
+                    {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                    },
+                    // NOTE: We removed this file from the data room
+                    // {
+                    //     "path": "/bar.txt",
+                    //     "ref": project_1_file_2_dataset_id,
+                    // },
                 ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -6834,8 +7001,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -6943,8 +7117,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -7052,8 +7233,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -7159,8 +7347,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -7263,8 +7458,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //         "headline": "Test announcement 1",
                                 //         "body": "Blah blah 1",
                                 //         "attachments": [
-                                //             project_1_file_1_dataset_id,
-                                //             project_1_file_2_dataset_id,
+                                //             {
+                                //                 "path": "/foo_renamed.txt",
+                                //                 "ref": project_1_file_1_dataset_id,
+                                //             },
+                                //             // NOTE: We removed this file from the data room
+                                //             // {
+                                //             //     "path": "/bar.txt",
+                                //             //     "ref": project_1_file_2_dataset_id,
+                                //             // },
                                 //         ],
                                 //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
@@ -7348,12 +7550,44 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                         "activity": {
                             "nodes": [
                                 {
-                                     "__typename": "MoleculeActivityFileRemovedV2",
-                                     "entry": {
-                                         "path": "/bar.txt",
-                                         "ref": project_1_file_2_dataset_id,
-                                         "accessLevel": "holders",
-                                         "changeBy": USER_2,
+                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "entry": {
+                                        "path": "/bar.txt",
+                                        "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
+                                        "changeBy": USER_2,
+                                    }
+                                },
+                                // {
+                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "entry": {
+                                //         "path": "/foo_renamed.txt",
+                                //         "ref": project_1_file_1_dataset_id,
+                                //         "accessLevel": "public",
+                                //         "changeBy": USER_1,
+                                //     }
+                                // },
+                                {
+                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "announcement": {
+                                        "id": project_1_announcement_1_id,
+                                        "headline": "Test announcement 1",
+                                        "body": "Blah blah 1",
+                                        "attachments": [
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
+                                        ],
+                                        "accessLevel": "public",
+                                        "changeBy": USER_1,
+                                        "categories": ["test-category-1"],
+                                        "tags": ["test-tag1", "test-tag2"],
                                      }
                                 },
                                 // {
@@ -7366,38 +7600,13 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //     }
                                 // },
                                 {
-                                     "__typename": "MoleculeActivityAnnouncementV2",
-                                     "announcement": {
-                                         "id": project_1_announcement_1_id,
-                                         "headline": "Test announcement 1",
-                                         "body": "Blah blah 1",
-                                         "attachments": [
-                                             project_1_file_1_dataset_id,
-                                             project_1_file_2_dataset_id,
-                                         ],
-                                         "accessLevel": "public",
-                                         "changeBy": USER_1,
-                                         "categories": ["test-category-1"],
-                                         "tags": ["test-tag1", "test-tag2"],
-                                     }
-                                },
-                                // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
-                                //     "entry": {
-                                //         "path": "/foo_renamed.txt",
-                                //         "ref": project_1_file_1_dataset_id,
-                                //         "accessLevel": "public",
-                                //         "changeBy": USER_1,
-                                //     }
-                                // },
-                                {
-                                     "__typename": "MoleculeActivityFileUpdatedV2",
-                                     "entry": {
-                                         "path": "/bar.txt",
-                                         "ref": project_1_file_2_dataset_id,
-                                         "accessLevel": "holders",
-                                         "changeBy": USER_2,
-                                     }
+                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "entry": {
+                                        "path": "/bar.txt",
+                                        "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
+                                        "changeBy": USER_2,
+                                    }
                                 },
                                 // {
                                 //     "__typename": "MoleculeActivityFileUpdatedV2",
@@ -7409,13 +7618,13 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //     }
                                 // },
                                 {
-                                     "__typename": "MoleculeActivityFileAddedV2",
-                                     "entry": {
-                                         "path": "/bar.txt",
-                                         "ref": project_1_file_2_dataset_id,
-                                         "accessLevel": "holders",
-                                         "changeBy": USER_2,
-                                     }
+                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "entry": {
+                                        "path": "/bar.txt",
+                                        "ref": project_1_file_2_dataset_id,
+                                        "accessLevel": "holders",
+                                        "changeBy": USER_2,
+                                    }
                                 },
                                 // {
                                 //     "__typename": "MoleculeActivityFileAddedV2",
@@ -7481,8 +7690,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -7590,8 +7806,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                 //         "headline": "Test announcement 1",
                                 //         "body": "Blah blah 1",
                                 //         "attachments": [
-                                //             project_1_file_1_dataset_id,
-                                //             project_1_file_2_dataset_id,
+                                //             {
+                                //                 "path": "/foo_renamed.txt",
+                                //                 "ref": project_1_file_1_dataset_id,
+                                //             },
+                                //             // NOTE: We removed this file from the data room
+                                //             // {
+                                //             //     "path": "/bar.txt",
+                                //             //     "ref": project_1_file_2_dataset_id,
+                                //             // },
                                 //         ],
                                 //         "accessLevel": "public",
                                 //         "changeBy": USER_1,
@@ -7728,8 +7951,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                         "headline": "Test announcement 1",
                                         "body": "Blah blah 1",
                                         "attachments": [
-                                            project_1_file_1_dataset_id,
-                                            project_1_file_2_dataset_id,
+                                            {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                            },
+                                            // NOTE: We removed this file from the data room
+                                            // {
+                                            //     "path": "/bar.txt",
+                                            //     "ref": project_1_file_2_dataset_id,
+                                            // },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -7902,8 +8132,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "headline": "Test announcement 1",
                                     "body": "Blah blah 1",
                                     "attachments": [
-                                        project_1_file_1_dataset_id,
-                                        project_1_file_2_dataset_id,
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -8021,8 +8258,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "headline": "Test announcement 1",
                                     "body": "Blah blah 1",
                                     "attachments": [
-                                        project_1_file_1_dataset_id,
-                                        project_1_file_2_dataset_id,
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -8140,8 +8384,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "headline": "Test announcement 1",
                                     "body": "Blah blah 1",
                                     "attachments": [
-                                        project_1_file_1_dataset_id,
-                                        project_1_file_2_dataset_id,
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -8259,8 +8510,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "headline": "Test announcement 1",
                                     "body": "Blah blah 1",
                                     "attachments": [
-                                        project_1_file_1_dataset_id,
-                                        project_1_file_2_dataset_id,
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -8378,8 +8636,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "headline": "Test announcement 1",
                             //         "body": "Blah blah 1",
                             //         "attachments": [
-                            //             project_1_file_1_dataset_id,
-                            //             project_1_file_2_dataset_id,
+                            //             {
+                            //                 "path": "/foo_renamed.txt",
+                            //                 "ref": project_1_file_1_dataset_id,
+                            //             },
+                            //             // NOTE: We removed this file from the data room
+                            //             // {
+                            //             //     "path": "/bar.txt",
+                            //             //     "ref": project_1_file_2_dataset_id,
+                            //             // },
                             //         ],
                             //         "accessLevel": "public",
                             //         "changeBy": USER_1,
@@ -8491,20 +8756,27 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //     }
                             // },
                             {
-                                 "__typename": "MoleculeActivityAnnouncementV2",
-                                 "announcement": {
-                                     "id": project_1_announcement_1_id,
-                                     "headline": "Test announcement 1",
-                                     "body": "Blah blah 1",
-                                     "attachments": [
-                                         project_1_file_1_dataset_id,
-                                         project_1_file_2_dataset_id,
-                                     ],
-                                     "accessLevel": "public",
-                                     "changeBy": USER_1,
-                                     "categories": ["test-category-1"],
-                                     "tags": ["test-tag1", "test-tag2"],
-                                 }
+                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "announcement": {
+                                    "id": project_1_announcement_1_id,
+                                    "headline": "Test announcement 1",
+                                    "body": "Blah blah 1",
+                                    "attachments": [
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
+                                    ],
+                                    "accessLevel": "public",
+                                    "changeBy": USER_1,
+                                    "categories": ["test-category-1"],
+                                    "tags": ["test-tag1", "test-tag2"],
+                                }
                             },
                             // {
                             //     "__typename": "MoleculeActivityFileUpdatedV2",
@@ -8616,8 +8888,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                                     "headline": "Test announcement 1",
                                     "body": "Blah blah 1",
                                     "attachments": [
-                                        project_1_file_1_dataset_id,
-                                        project_1_file_2_dataset_id,
+                                        {
+                                            "path": "/foo_renamed.txt",
+                                            "ref": project_1_file_1_dataset_id,
+                                        },
+                                        // NOTE: We removed this file from the data room
+                                        // {
+                                        //     "path": "/bar.txt",
+                                        //     "ref": project_1_file_2_dataset_id,
+                                        // },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -8735,8 +9014,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "headline": "Test announcement 1",
                             //         "body": "Blah blah 1",
                             //         "attachments": [
-                            //             project_1_file_1_dataset_id,
-                            //             project_1_file_2_dataset_id,
+                            //             {
+                            //                 "path": "/foo_renamed.txt",
+                            //                 "ref": project_1_file_1_dataset_id,
+                            //             },
+                            //             // NOTE: We removed this file from the data room
+                            //             // {
+                            //             //     "path": "/bar.txt",
+                            //             //     "ref": project_1_file_2_dataset_id,
+                            //             // },
                             //         ],
                             //         "accessLevel": "public",
                             //         "changeBy": USER_1,
@@ -8880,8 +9166,15 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "headline": "Test announcement 1",
                             //         "body": "Blah blah 1",
                             //         "attachments": [
-                            //             project_1_file_1_dataset_id,
-                            //             project_1_file_2_dataset_id,
+                            //             {
+                            //                 "path": "/foo_renamed.txt",
+                            //                 "ref": project_1_file_1_dataset_id,
+                            //             },
+                            //             // NOTE: We removed this file from the data room
+                            //             // {
+                            //             //     "path": "/bar.txt",
+                            //             //     "ref": project_1_file_2_dataset_id,
+                            //             // },
                             //         ],
                             //         "accessLevel": "public",
                             //         "changeBy": USER_1,
@@ -8934,6 +9227,161 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
                             //         "changeBy": USER_1,
                             //     }
                             // },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_activity_access_level_rules_filters(
+    es_ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
+    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
+
+    for (uid, addr, token_id) in [
+        (
+            PROJECT_1_UID,
+            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
+            201,
+        ),
+        (
+            PROJECT_2_UID,
+            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
+            202,
+        ),
+    ] {
+        let token_id_str = token_id.to_string();
+        assert_eq!(
+            {
+                let res_json = GraphQLQueryRequest::new(
+                    CREATE_PROJECT,
+                    async_graphql::Variables::from_value(value!({
+                        "ipnftSymbol": format!("sym{token_id}"),
+                        "ipnftUid": uid,
+                        "ipnftAddress": addr,
+                        "ipnftTokenId": token_id_str,
+                    })),
+                )
+                .execute(&harness.schema, &harness.catalog_authorized)
+                .await
+                .data
+                .into_json()
+                .unwrap();
+
+                res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            },
+            Some(true),
+        );
+    }
+
+    async fn create_file(
+        harness: &GraphQLMoleculeV2Harness,
+        ipnft_uid: &str,
+        path: &str,
+        access_level: &str,
+    ) -> String {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": ipnft_uid,
+                "path": path,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"payload"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": access_level,
+                "description": null,
+                "categories": null,
+                "tags": null,
+                "contentText": null,
+                "encryptionMetadata": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+
+        upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    let project_1_public = create_file(&harness, PROJECT_1_UID, "/p1-public.txt", "public").await;
+    let project_1_holders =
+        create_file(&harness, PROJECT_1_UID, "/p1-holders.txt", "holders").await;
+    let project_2_private =
+        create_file(&harness, PROJECT_2_UID, "/p2-private.txt", "private").await;
+
+    harness.synchronize_agents().await;
+
+    // Global activity filtered by scoped access rules should only include matching
+    // entries
+    assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byAccessLevelRules": [
+                        { "ipnftUid": PROJECT_1_UID, "accessLevels": ["holders", "public"] },
+                        { "ipnftUid": PROJECT_2_UID, "accessLevels": ["private"] }
+                    ]
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "activity": {
+                        "nodes": [
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p2-private.txt",
+                                    "ref": project_2_private,
+                                    "accessLevel": "private",
+                                    "changeBy": USER_1,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p1-holders.txt",
+                                    "ref": project_1_holders,
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_1,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAddedV2",
+                                "entry": {
+                                    "path": "/p1-public.txt",
+                                    "ref": project_1_public,
+                                    "accessLevel": "public",
+                                    "changeBy": USER_1,
+                                }
+                            },
                         ]
                     }
                 }
@@ -9442,7 +9890,17 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         "__typename": "MoleculeSemanticSearchFoundAnnouncement",
         "announcement": {
             "accessLevel": "public",
-            "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+            "attachments": [
+                {
+                    "path": "/foo_renamed.txt",
+                    "ref": project_1_file_1_dataset_id
+                },
+                // NOTE: We removed this file from the data room
+                // {
+                //     "path": "/bar.txt",
+                //     "ref": project_1_file_2_dataset_id
+                // },
+            ],
             "body": "Blah blah 1 text",
             "categories": ["test-category-1"],
             "changeBy": USER_1,

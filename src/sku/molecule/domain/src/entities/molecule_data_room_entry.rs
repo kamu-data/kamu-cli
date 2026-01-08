@@ -12,6 +12,8 @@ use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{CollectionEntry, CollectionPathV2, FileVersion};
 
+use crate::MoleculeAccessLevelRule;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -154,11 +156,12 @@ impl MoleculeDenormalizeFileToDataRoom {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MoleculeDataRoomEntriesFilters {
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

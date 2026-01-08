@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common::BatchLookup;
 use internal_error::ErrorIntoInternal;
 use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::*;
@@ -21,6 +22,18 @@ use crate::{MoleculeDataRoomCollectionReadError, MoleculeDataRoomCollectionServi
 #[dill::interface(dyn MoleculeFindDataRoomEntryUseCase)]
 pub struct MoleculeFindDataRoomEntryUseCaseImpl {
     data_room_collection_service: Arc<dyn MoleculeDataRoomCollectionService>,
+}
+
+impl MoleculeFindDataRoomEntryUseCaseImpl {
+    fn map_read_collection_error(
+        e: MoleculeDataRoomCollectionReadError,
+    ) -> MoleculeFindDataRoomEntryError {
+        use MoleculeDataRoomCollectionReadError as E;
+        match e {
+            E::Access(e) => e.into(),
+            E::DataRoomNotFound(_) | E::Internal(_) => e.int_err().into(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,15 +61,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 path,
             )
             .await
-            .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindDataRoomEntryError::Access(e)
-                }
-                MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindDataRoomEntryError::Internal(e)
-                }
-            })?;
+            .map_err(Self::map_read_collection_error)?;
 
         let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
@@ -82,18 +87,54 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 r#ref,
             )
             .await
-            .map_err(|e| match e {
-                MoleculeDataRoomCollectionReadError::DataRoomNotFound(e) => e.int_err().into(),
-                MoleculeDataRoomCollectionReadError::Access(e) => {
-                    MoleculeFindDataRoomEntryError::Access(e)
-                }
-                MoleculeDataRoomCollectionReadError::Internal(e) => {
-                    MoleculeFindDataRoomEntryError::Internal(e)
-                }
-            })?;
+            .map_err(Self::map_read_collection_error)?;
 
         let maybe_molecule_entry = maybe_entry.map(MoleculeDataRoomEntry::from_collection_entry);
         Ok(maybe_molecule_entry)
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_refs,
+        skip_all,
+        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, refs = %format_utils::format_collection(refs))
+    )]
+    async fn execute_find_by_refs(
+        &self,
+        molecule_project: &MoleculeProject,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeDataRoomEntryNotFoundByRefError>,
+        MoleculeFindDataRoomEntryError,
+    > {
+        let lookup = self
+            .data_room_collection_service
+            .find_data_room_collection_entries_by_refs(
+                &molecule_project.data_room_dataset_id,
+                as_of,
+                refs,
+            )
+            .await
+            .map_err(Self::map_read_collection_error)?;
+
+        Ok(BatchLookup {
+            found: lookup
+                .found
+                .into_iter()
+                .map(MoleculeDataRoomEntry::from_collection_entry)
+                .collect(),
+            not_found: lookup
+                .not_found
+                .into_iter()
+                .map(|(r#ref, e)| {
+                    (
+                        r#ref,
+                        MoleculeDataRoomEntryNotFoundByRefError { r#ref: e.r#ref },
+                    )
+                })
+                .collect(),
+        })
     }
 }
 

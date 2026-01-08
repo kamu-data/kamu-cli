@@ -163,17 +163,15 @@ impl MoleculeSearchUseCaseImpl {
         };
 
         // Filtering
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(
-                f.by_ipnft_uids,
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
-        });
-        let df = if let Some(filter) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
-                .int_err()?
+        let df = if let Some(filters) = filters {
+            crate::utils::apply_molecule_filters_to_df(
+                df,
+                filters.by_ipnft_uids,
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_access_level_rules,
+            )?
         } else {
             df
         };
@@ -238,17 +236,15 @@ impl MoleculeSearchUseCaseImpl {
         };
 
         // Filtering
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(
-                f.by_ipnft_uids,
-                f.by_tags,
-                f.by_categories,
-                f.by_access_levels,
-            )
-        });
-        let df = if let Some(filter) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
-                .int_err()?
+        let df = if let Some(filters) = filters {
+            crate::utils::apply_molecule_filters_to_df(
+                df,
+                filters.by_ipnft_uids,
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_access_level_rules,
+            )?
         } else {
             df
         };

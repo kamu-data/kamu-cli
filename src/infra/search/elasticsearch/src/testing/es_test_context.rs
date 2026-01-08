@@ -25,7 +25,7 @@ const ENV_ELASTICSEARCH_URL: &str = "ELASTICSEARCH_URL";
 const ENV_ELASTICSEARCH_PASSWORD: &str = "ELASTICSEARCH_PASSWORD";
 const ENV_ELASTICSEARCH_CA_CERT_PEM_PATH: &str = "ELASTICSEARCH_CA_CERT_PEM_PATH";
 
-const DEFAULT_ELASTICSEARCH_URL: &str = "http://localhost:9200" /* "https://localhost:9200" */;
+const DEFAULT_ELASTICSEARCH_URL: &str = "http://localhost:9200";
 const DEFAULT_ELASTICSEARCH_PASSWORD: Option<&str> = Some("root");
 
 const ELASTICSEARCH_HTTPS_CA_CERT_PEM_PATH: &str = ".local/elasticsearch/certs/ca/ca.crt";

@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
 };
 use kamu_search::*;
 
-use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_search};
+use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_search, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,13 +85,15 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
             df
         };
 
-        let maybe_filter = filters.and_then(|f| {
-            utils::molecule_fields_filter(None, f.by_tags, f.by_categories, f.by_access_levels)
-        });
-
-        let df = if let Some(filters) = maybe_filter {
-            kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filters)
-                .int_err()?
+        let df = if let Some(filters) = filters {
+            utils::apply_molecule_filters_to_df(
+                df,
+                None,
+                filters.by_tags,
+                filters.by_categories,
+                filters.by_access_levels,
+                filters.by_access_level_rules,
+            )?
         } else {
             df
         };

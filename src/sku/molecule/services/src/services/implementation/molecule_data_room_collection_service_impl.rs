@@ -10,13 +10,15 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
+use database_common::{BatchLookup, BatchLookupCreateOptions, PaginationOpts};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::*;
 use kamu_molecule_domain::*;
+use nonempty::NonEmpty;
 
 use crate::{
+    MoleculeDataRoomCollectionEntryNotFoundByRefError,
     MoleculeDataRoomCollectionReadError,
     MoleculeDataRoomCollectionService,
     MoleculeDataRoomCollectionWriteError,
@@ -154,12 +156,34 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 path_prefix,
                 max_depth,
                 filters.and_then(|f| {
-                    utils::molecule_fields_filter(
-                        None,
-                        f.by_tags,
-                        f.by_categories,
+                    let base_filters =
+                        utils::molecule_fields_filter(None, f.by_tags, f.by_categories);
+                    let access_levels = utils::normalize_access_level_rules(
                         f.by_access_levels,
+                        f.by_access_level_rules,
+                    );
+                    let access_filter = NonEmpty::from_vec(
+                        access_levels
+                            .into_iter()
+                            .flat_map(|rule| rule.access_levels)
+                            .collect::<Vec<_>>(),
                     )
+                    .map(|values| ExtraDataFieldFilter {
+                        field_name: "molecule_access_level".to_string(),
+                        values,
+                        is_array: false,
+                    });
+
+                    match (base_filters, access_filter) {
+                        (Some(existing), Some(access_filter)) => {
+                            let mut filters = existing.into_iter().collect::<Vec<_>>();
+                            filters.push(access_filter);
+                            NonEmpty::from_vec(filters)
+                        }
+                        (Some(existing), None) => Some(existing),
+                        (None, Some(access_filter)) => NonEmpty::from_vec(vec![access_filter]),
+                        (None, None) => None,
+                    }
                 }),
                 pagination,
             )
@@ -223,7 +247,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             .execute_find_by_ref(
                 ReadCheckedDataset::from_ref(&readable_data_room),
                 as_of,
-                &[r#ref],
+                r#ref,
             )
             .await
             .map_err(|e| match e {
@@ -231,6 +255,68 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
             })?;
 
         Ok(maybe_entry)
+    }
+
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeDataRoomCollectionServiceImpl_find_data_room_collection_entries_by_refs,
+        skip_all,
+        fields(%data_room_dataset_id, ?as_of, refs = %format_utils::format_collection(refs))
+    )]
+    async fn find_data_room_collection_entries_by_refs(
+        &self,
+        data_room_dataset_id: &odf::DatasetID,
+        as_of: Option<odf::Multihash>,
+        refs: &[&odf::DatasetID],
+    ) -> Result<
+        BatchLookup<
+            CollectionEntry,
+            odf::DatasetID,
+            MoleculeDataRoomCollectionEntryNotFoundByRefError,
+        >,
+        MoleculeDataRoomCollectionReadError,
+    > {
+        let readable_data_room = self.readable_data_room(data_room_dataset_id).await?;
+
+        let found_collection_entries = self
+            .find_collection_entries
+            .execute_find_multi_by_refs(
+                ReadCheckedDataset::from_ref(&readable_data_room),
+                as_of,
+                refs,
+            )
+            .await
+            .map_err(|e| match e {
+                FindCollectionEntriesError::Internal(_) => e.int_err(),
+            })?;
+        let ref_positions = refs
+            .iter()
+            .enumerate()
+            .map(|(idx, r)| ((*r).clone(), idx))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        Ok(BatchLookup::from_found_items(
+            found_collection_entries,
+            refs,
+            BatchLookupCreateOptions {
+                found_ids_fn: |collection_entries| {
+                    collection_entries
+                        .iter()
+                        .map(|collection_entry| collection_entry.reference.clone())
+                        .collect()
+                },
+                not_found_err_fn: |r#ref| MoleculeDataRoomCollectionEntryNotFoundByRefError {
+                    r#ref: r#ref.clone(),
+                },
+                maybe_found_items_comparator: Some(|a: &CollectionEntry, b: &CollectionEntry| {
+                    // NOTE: restore order based on input refs
+                    let ref_a_pos = ref_positions.get(&a.reference).unwrap();
+                    let ref_b_pos = ref_positions.get(&b.reference).unwrap();
+                    ref_a_pos.cmp(ref_b_pos)
+                }),
+                _phantom: Default::default(),
+            },
+        ))
     }
 
     #[tracing::instrument(

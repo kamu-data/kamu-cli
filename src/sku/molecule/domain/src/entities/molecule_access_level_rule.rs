@@ -9,11 +9,10 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Config {
-    #[serde(default)]
-    pub molecule_api_v1_enabled: bool,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MoleculeAccessLevelRule {
+    pub ipnft_uid: Option<String>,
+    pub access_levels: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

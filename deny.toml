@@ -37,14 +37,14 @@ deny = [
     # { name = "hyper", deny-multiple-versions = true },
     { name = "object_store", deny-multiple-versions = true },
     { name = "parquet", deny-multiple-versions = true },
-    # TODO: waiting for qdrant-client and opentelemetry to update
+    # TODO: waiting for qdrant-client to update
     # { name = "prost", deny-multiple-versions = true },
     { name = "reqwest", deny-multiple-versions = true },
     # TODO: Too many versions between alloy, aws-sdk, reqwest etc.
     # { name = "rustls", deny-multiple-versions = true },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
-    # TODO: waiting for qdrant-client and opentelemetry to update
+    # TODO: waiting for qdrant-client to update
     # { name = "tonic", deny-multiple-versions = true },
 ]
 
@@ -117,7 +117,7 @@ ignore = [
     # Unmaintained (rustls-pemfile)
     # https://rustsec.org/advisories/RUSTSEC-2025-0134
     "RUSTSEC-2025-0134",
-    # Security violation (ruint)
-    # https://rustsec.org/advisories/RUSTSEC-2025-0137
-    "RUSTSEC-2025-0137",    
+    # Unsound (lru)
+    # https://rustsec.org/advisories/RUSTSEC-2026-0002
+    "RUSTSEC-2026-0002",
 ]

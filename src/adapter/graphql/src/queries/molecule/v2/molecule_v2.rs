@@ -31,6 +31,7 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
+    MoleculeAccessLevelRuleInput,
     MoleculeActivityEventV2,
     MoleculeActivityEventV2Connection,
     MoleculeAnnouncementEntry,
@@ -346,6 +347,7 @@ pub struct MoleculeSemanticSearchFilters {
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
+    by_access_level_rules: Option<Vec<MoleculeAccessLevelRuleInput>>,
     by_kinds: Option<Vec<MoleculeSearchEntityKindInput>>,
 }
 
@@ -356,6 +358,9 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
+            by_access_level_rules: value
+                .by_access_level_rules
+                .map(|rules| rules.into_iter().map(Into::into).collect::<Vec<_>>()),
             by_kinds: value
                 .by_kinds
                 .map(|kinds| kinds.into_iter().map(Into::into).collect()),
