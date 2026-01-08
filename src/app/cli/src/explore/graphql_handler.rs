@@ -64,6 +64,9 @@ pub async fn graphql_handler(
         .data(account_entity_data_loader(&catalog))
         .data(dataset_handle_data_loader(&catalog))
         .data(catalog);
+
+    tracing::debug!(?graphql_request, "Incoming GraphQL request");
+
     let graphql_response: async_graphql_axum::GraphQLResponse =
         schema.execute(graphql_request).await.into();
 
