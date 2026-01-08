@@ -12,3 +12,6 @@ pub mod paths;
 
 mod tenancy_config;
 pub use tenancy_config::*;
+
+mod kamu_background_catalog;
+pub use kamu_background_catalog::*;

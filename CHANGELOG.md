@@ -11,6 +11,44 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.256.0] - 2026-01-08
+### Added
+- Prototyped full-text search capabilities via `Elasticsearch`:
+  - can be connected to external instance or launch an embedded container
+  - prototyped schema descriptors, supporting multiple field types with different search capabilities, such as :
+     - prose
+     - identifiers
+     - keywords
+     - dates
+     - numbers, 
+     - booleans
+     - ...
+  - designed search schemas for accounts and datasets
+  - automatic index creations and alias rotations for search schemas, with detection of mappings drift
+  - accounts and datasets are indexed automatically on first launch or after explicit reset,
+     as well as react to lifecycle changes incrementally (via handling outbox events)
+  - prototyped query language, allowing:
+     - textual prompts (simplistic, using `simple_query_string` algorithm for now)
+     - filter expressions: ==, !=, <, >, <=, >=, in {}, prefix
+     - filter combinations: AND, OR, NOT
+     - sorting criterias: by field or by relevance, any combination
+     - pagination controls
+  - supporting fields sourcing (returning original document)
+  - supporting highlights (explains which field matched)
+  - supporting debug explanations of scoring
+  - predefined capatilities regardless of schema:
+     - title-based sorting (each schema specifies a field that should act like a title)
+     - banning field (when set, the document is auto-excluded from read aliases matching search schemas)
+  - testing mechanisms with Elasticsearch:
+     - integration tests: creating temporary indices with a random prefix, cleaned at shutdown
+     - e2e tests
+     - CI support (separate `elasticsearch` test group, starting container on Github)
+     - written solid coverage for accounts & datasets indexing and searching logic
+  - temporary GQL endpoint for testing (gated with admin guard)
+  - GQL endpoint to force reindexing at run-time
+### Fixed
+- Qdrant initialization works similarly to Elasticsearch solution, and avoids excessive reindexing  
+
 ## [0.255.1] - 2026-01-05
 ### Changed
 - Upgraded `prost`, `tonic`, `flat`, `opentelemetry` to latest versions

@@ -9,14 +9,11 @@
 
 use std::sync::Arc;
 
-use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
     Account,
     AccountLifecycleMessage,
-    AccountService,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
-    DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
@@ -25,15 +22,14 @@ use kamu_accounts::{
     TEST_PASSWORD,
     VerifyPasswordError,
 };
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::utils::{AccountAuthorizationHelper, MockAccountAuthorizationHelper};
-use kamu_accounts_services::{
-    AccountServiceImpl,
-    CreateAccountUseCaseImpl,
-    ModifyAccountPasswordUseCaseImpl,
+use kamu_accounts_services::ModifyAccountPasswordUseCaseImpl;
+use kamu_accounts_services::utils::{
+    AccountAuthorizationHelperTestProvider,
+    MockAccountAuthorizationHelper,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use time_source::SystemTimeSourceDefault;
+
+use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,15 +41,16 @@ async fn test_modify_account_password_success() {
     let harness = ModifyAccountPasswordUseCaseImplHarness::new(
         MockAccountAuthorizationHelper::allowing(),
         outbox,
-    )
-    .await;
+    );
 
     let initial_password = TEST_PASSWORD.clone();
-    let account = harness.create_account(initial_password.clone()).await;
+    let account = harness
+        .create_account_with_password(initial_password.clone())
+        .await;
 
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &initial_password)
             .await,
         Ok(_),
@@ -63,7 +60,7 @@ async fn test_modify_account_password_success() {
 
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
+            .modify_account_password_use_case
             .execute(&account, new_password.clone())
             .await,
         Ok(_),
@@ -71,14 +68,14 @@ async fn test_modify_account_password_success() {
 
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &new_password)
             .await,
         Ok(_),
@@ -95,15 +92,16 @@ async fn test_modify_account_password_not_admin() {
     let harness = ModifyAccountPasswordUseCaseImplHarness::new(
         MockAccountAuthorizationHelper::disallowing(),
         outbox,
-    )
-    .await;
+    );
 
-    let account = harness.create_account(TEST_PASSWORD.clone()).await;
+    let account = harness
+        .create_account_with_password(TEST_PASSWORD.clone())
+        .await;
     let new_password = Password::try_new("new_password_1").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
+            .modify_account_password_use_case
             .execute(&account, new_password.clone())
             .await,
         Err(ModifyAccountPasswordError::Access(odf::AccessError::Unauthenticated(e)))
@@ -111,7 +109,7 @@ async fn test_modify_account_password_not_admin() {
     );
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &new_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
@@ -128,16 +126,17 @@ async fn test_modify_account_password_with_confirmation_success() {
     let harness = ModifyAccountPasswordUseCaseImplHarness::new(
         MockAccountAuthorizationHelper::allowing(),
         outbox,
-    )
-    .await;
+    );
 
     let initial_password = TEST_PASSWORD.clone();
-    let account = harness.create_account(initial_password.clone()).await;
+    let account = harness
+        .create_account_with_password(initial_password.clone())
+        .await;
     let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
+            .modify_account_password_use_case
             .execute_with_confirmation(&account, initial_password.clone(), new_password.clone())
             .await,
         Ok(_),
@@ -145,14 +144,14 @@ async fn test_modify_account_password_with_confirmation_success() {
 
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
     pretty_assertions::assert_matches!(
         harness
-            .account_service
+            .account_service()
             .verify_account_password(&account.account_name, &new_password)
             .await,
         Ok(_),
@@ -169,18 +168,17 @@ async fn test_modify_account_password_with_confirmation_incorrect_old_password()
     let harness = ModifyAccountPasswordUseCaseImplHarness::new(
         MockAccountAuthorizationHelper::allowing(),
         outbox,
-    )
-    .await;
+    );
 
     let initial_password = TEST_PASSWORD.clone();
-    let account = harness.create_account(initial_password).await;
+    let account = harness.create_account_with_password(initial_password).await;
 
     let wrong_old_password = Password::try_new("wrong-old-password").unwrap();
     let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
+            .modify_account_password_use_case
             .execute_with_confirmation(&account, wrong_old_password, new_password)
             .await,
         Err(ModifyAccountPasswordWithConfirmationError::WrongOldPassword(_)),
@@ -197,16 +195,17 @@ async fn test_modify_account_password_with_confirmation_incorrect_not_enough_per
     let harness = ModifyAccountPasswordUseCaseImplHarness::new(
         MockAccountAuthorizationHelper::disallowing(),
         outbox,
-    )
-    .await;
+    );
 
     let initial_password = TEST_PASSWORD.clone();
-    let account = harness.create_account(initial_password.clone()).await;
+    let account = harness
+        .create_account_with_password(initial_password.clone())
+        .await;
     let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
+            .modify_account_password_use_case
             .execute_with_confirmation(&account, initial_password, new_password)
             .await,
         Err(ModifyAccountPasswordWithConfirmationError::Access(odf::AccessError::Unauthenticated(e)))
@@ -216,49 +215,43 @@ async fn test_modify_account_password_with_confirmation_incorrect_not_enough_per
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct ModifyAccountPasswordUseCaseImplHarness {
-    create_use_case: Arc<dyn CreateAccountUseCase>,
-    modify_use_case: Arc<dyn ModifyAccountPasswordUseCase>,
-    account_service: Arc<dyn AccountService>,
+    account_base_harness: AccountBaseUseCaseHarness,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
+    modify_account_password_use_case: Arc<dyn ModifyAccountPasswordUseCase>,
 }
 
 impl ModifyAccountPasswordUseCaseImplHarness {
-    async fn new(
+    fn new(
         mock_account_authorization_helper: MockAccountAuthorizationHelper,
         mock_outbox: MockOutbox,
     ) -> Self {
-        let mut b = dill::CatalogBuilder::new();
+        let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
+            account_authorization_helper_provider: AccountAuthorizationHelperTestProvider::Mock(
+                mock_account_authorization_helper,
+            ),
+            ..Default::default()
+        });
 
-        b.add::<CreateAccountUseCaseImpl>();
-        b.add::<AccountServiceImpl>();
+        let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-        b.add::<InMemoryAccountRepository>();
-        b.add_value(DidSecretEncryptionConfig::sample());
-        b.add::<InMemoryDidSecretKeyRepository>();
-        b.add::<SystemTimeSourceDefault>();
-
         b.add::<ModifyAccountPasswordUseCaseImpl>();
-        b.add_value(mock_account_authorization_helper)
-            .bind::<dyn AccountAuthorizationHelper, MockAccountAuthorizationHelper>();
-
-        NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
         Self {
-            create_use_case: catalog.get_one().unwrap(),
-            modify_use_case: catalog.get_one().unwrap(),
-            account_service: catalog.get_one().unwrap(),
+            account_base_harness,
+            create_account_use_case: catalog.get_one().unwrap(),
+            modify_account_password_use_case: catalog.get_one().unwrap(),
         }
     }
 
-    async fn create_account(&self, password: Password) -> Account {
+    async fn create_account_with_password(&self, password: Password) -> Account {
         let creator_account = Account::dummy();
         let account_name = odf::AccountName::new_unchecked("new-account");
 
-        self.create_use_case
+        self.create_account_use_case
             .execute_derived(
                 &creator_account,
                 &account_name,
@@ -286,11 +279,11 @@ impl ModifyAccountPasswordUseCaseImplHarness {
                             m.display_name == "new-account"
                                 && m.email == "kamu+new-account@example.com".parse().unwrap()
                         }
-                        AccountLifecycleMessage::Renamed(_)
+                        AccountLifecycleMessage::Updated(_)
                         | AccountLifecycleMessage::Deleted(_) => false,
                     }
                 }),
-                eq(1),
+                eq(2),
             )
             .returning(|_, _, _| Ok(()));
     }

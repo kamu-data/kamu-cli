@@ -80,6 +80,7 @@ interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
 interface "MetricsProvider" <<i>>
 interface "ModifyAccountPasswordUseCase" <<i>>
+interface "NaturalLanguageSearchService" <<i>>
 interface "OAuthDeviceCodeGenerator" <<i>>
 interface "OAuthDeviceCodeRepository" <<i>>
 interface "OAuthDeviceCodeService" <<i>>
@@ -114,7 +115,8 @@ interface "ResetExecutor" <<i>>
 interface "ResetPlanner" <<i>>
 interface "ResourceLoader" <<i>>
 interface "SchemaService" <<i>>
-interface "SearchServiceLocal" <<i>>
+interface "SearchEntitySchemaProvider" <<i>>
+interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
@@ -142,6 +144,8 @@ class "AccessTokenRegistryService"
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
 class "AccountProperties" <<singleton>>
+class "AccountSearchSchemaProvider"
+class "AccountSearchUpdater"
 class "AccountServiceImpl"
 class "AppendDatasetMetadataBatchUseCaseImpl"
 class "ApplyAccountDatasetRelationsUseCaseImpl"
@@ -183,6 +187,8 @@ class "DatasetLfsBuilderDatabaseBackedImpl"
 class "DatasetProperties" <<singleton>>
 class "DatasetReferenceIndexer"
 class "DatasetReferenceServiceImpl"
+class "DatasetSearchSchemaProvider"
+class "DatasetSearchUpdater"
 class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
@@ -195,6 +201,7 @@ class "DependencyGraphServiceImpl" <<singleton>>
 class "DidGeneratorDefault"
 class "DidSecretEncryptionConfig" <<singleton>>
 class "DidSecretService"
+class "DummySearchService"
 class "EmbeddingsChunkerConfigSimple" <<singleton>>
 class "EmbeddingsChunkerSimple"
 class "EmbeddingsEncoderConfigOpenAI" <<singleton>>
@@ -236,6 +243,9 @@ class "MetadataChainDbBackedConfig" <<singleton>>
 class "MetadataQueryServiceImpl"
 class "ModifyAccountPasswordUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
+class "NaturalLanguageSearchConfig" <<singleton>>
+class "NaturalLanguageSearchImplLazyInit" <<singleton>>
+class "NaturalLanguageSearchIndexerConfig" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
 class "OAuthDeviceCodeServiceImpl"
@@ -284,9 +294,6 @@ class "ResetPlannerImpl"
 class "ResourceLoaderImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
-class "SearchServiceLocalConfig" <<singleton>>
-class "SearchServiceLocalImplLazyInit"
-class "SearchServiceLocalIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
@@ -498,6 +505,11 @@ class "WsSmartTransferProtocolClient"
 "VerifyDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "VerifyDatasetUseCaseImpl"  --> "VerificationService"
 "SimpleTransferProtocol"  --> "Catalog"
+"SearchEntitySchemaProvider" <|-- "AccountSearchSchemaProvider"
+"AccountSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "AccountSearchUpdater"
+"MessageConsumerT" <|-- "AccountSearchUpdater"
+"AccountSearchUpdater"  --> "SearchService"
 "AccessTokenService" <|-- "AccessTokenServiceImpl"
 "AccessTokenServiceImpl"  --> "AccessTokenRepository"
 "AccessTokenServiceImpl"  --> "Outbox"
@@ -545,14 +557,17 @@ class "WsSmartTransferProtocolClient"
 "DeleteAccountUseCaseImpl"  --> "AccountService"
 "DeleteAccountUseCaseImpl"  --> "AccountAuthorizationHelper"
 "DeleteAccountUseCaseImpl"  --> "Outbox"
+"DeleteAccountUseCaseImpl"  --> "SystemTimeSource"
 "ModifyAccountPasswordUseCase" <|-- "ModifyAccountPasswordUseCaseImpl"
 "ModifyAccountPasswordUseCaseImpl"  --> "AccountService"
 "ModifyAccountPasswordUseCaseImpl"  --> "AccountAuthorizationHelper"
 "ModifyAccountPasswordUseCaseImpl"  --> "Outbox"
+"ModifyAccountPasswordUseCaseImpl"  --> "SystemTimeSource"
 "UpdateAccountUseCase" <|-- "UpdateAccountUseCaseImpl"
 "UpdateAccountUseCaseImpl"  --> "AccountService"
 "UpdateAccountUseCaseImpl" "lazy" --> "AccountAuthorizationHelper"
 "UpdateAccountUseCaseImpl"  --> "Outbox"
+"UpdateAccountUseCaseImpl"  --> "SystemTimeSource"
 "AccountAuthorizationHelper" <|-- "AccountAuthorizationHelperImpl"
 "AccountAuthorizationHelperImpl"  --> "RebacService"
 "AccountAuthorizationHelperImpl"  --> "CurrentAccountSubject"
@@ -635,6 +650,15 @@ class "WsSmartTransferProtocolClient"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
 "DidGenerator" <|-- "DidGeneratorDefault"
+"SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
+"DatasetSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"DatasetSearchUpdater"  --> "DatasetEntryService"
+"DatasetSearchUpdater"  --> "DatasetRegistry"
+"DatasetSearchUpdater"  --> "SearchService"
 "InitOnStartup" <|-- "DatasetBlockIndexer"
 "DatasetBlockIndexer"  --> "Catalog"
 "MessageConsumer" <|-- "DatasetBlockUpdateHandler"
@@ -697,6 +721,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetReferenceServiceImpl"  --> "DatasetReferenceRepository"
 "DatasetReferenceServiceImpl"  --> "Outbox"
 "DatasetReferenceServiceImpl"  --> "DatasetStorageUnitWriter"
+"DatasetReferenceServiceImpl"  --> "SystemTimeSource"
 "InitOnStartup" <|-- "DatasetStatisticsIndexer"
 "DatasetStatisticsIndexer"  --> "Catalog"
 "DatasetStatisticsService" <|-- "DatasetStatisticsServiceImpl"
@@ -727,6 +752,7 @@ class "WsSmartTransferProtocolClient"
 "DeleteDatasetUseCaseImpl"  --> "DatasetEntryWriter"
 "DeleteDatasetUseCaseImpl"  --> "Outbox"
 "DeleteDatasetUseCaseImpl"  --> "DatasetStorageUnitWriter"
+"DeleteDatasetUseCaseImpl"  --> "SystemTimeSource"
 "GetDatasetDownstreamDependenciesUseCase" <|-- "GetDatasetDownstreamDependenciesUseCaseImpl"
 "GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetActionAuthorizer"
 "GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetEntryService"
@@ -741,6 +767,7 @@ class "WsSmartTransferProtocolClient"
 "RenameDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "RenameDatasetUseCaseImpl"  --> "DatasetEntryWriter"
 "RenameDatasetUseCaseImpl"  --> "Outbox"
+"RenameDatasetUseCaseImpl"  --> "SystemTimeSource"
 "UpdateCollectionEntriesUseCase" <|-- "UpdateCollectionEntriesUseCaseImpl"
 "UpdateCollectionEntriesUseCaseImpl"  --> "QueryService"
 "UpdateCollectionEntriesUseCaseImpl"  --> "PushIngestDataUseCase"
@@ -750,6 +777,7 @@ class "WsSmartTransferProtocolClient"
 "CreateDatasetUseCaseHelper"  --> "DatasetEntryWriter"
 "CreateDatasetUseCaseHelper"  --> "Outbox"
 "CreateDatasetUseCaseHelper"  --> "DatasetStorageUnitWriter"
+"CreateDatasetUseCaseHelper"  --> "SystemTimeSource"
 "CreateDatasetUseCaseHelper"  --> "TenancyConfig"
 "DatasetDataBlockRepository" <|-- "SqliteDatasetDataBlockRepository"
 "SqliteDatasetDataBlockRepository"  --> "TransactionRefT"
@@ -789,10 +817,11 @@ class "WsSmartTransferProtocolClient"
 "VectorRepository" <|-- "VectorRepositoryQdrantContainer"
 "VectorRepositoryQdrantContainer"  --> "ContainerRuntime"
 "VectorRepositoryQdrantContainer"  --> "VectorRepositoryConfigQdrantContainer"
+"SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
-"SearchServiceLocal" <|-- "SearchServiceLocalImplLazyInit"
-"SearchServiceLocalImplLazyInit"  --> "Catalog"
+"NaturalLanguageSearchService" <|-- "NaturalLanguageSearchImplLazyInit"
+"NaturalLanguageSearchImplLazyInit"  --> "KamuBackgroundCatalog"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

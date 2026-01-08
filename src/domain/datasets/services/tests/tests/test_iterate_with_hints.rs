@@ -1152,7 +1152,8 @@ impl IterateWithHintsHarness {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts::default()).await;
 
-        let mut b = CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog());
+        let mut b =
+            CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog());
 
         let catalog = b
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()

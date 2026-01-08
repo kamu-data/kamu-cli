@@ -212,6 +212,7 @@ impl FlowHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.now(),
                     dataset_id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,
@@ -252,6 +253,7 @@ impl FlowHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.now(),
                     dataset_id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,
@@ -276,7 +278,7 @@ impl FlowHarness {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+                DatasetLifecycleMessage::deleted(self.now(), dataset_id.clone()),
             )
             .await
             .unwrap();

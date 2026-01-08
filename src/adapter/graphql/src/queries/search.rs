@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
-use kamu_search::SearchLocalNatLangError;
+use kamu_search::SearchNatLangError;
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -110,9 +110,93 @@ impl Search {
         ))
     }
 
+    // TODO: restrict to admin only for now, until it's fully ready for public use
+    // (final API, ReBAC)
+    #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
+    #[graphql(guard = "AdminGuard::new()")]
+    async fn query_full_text(
+        &self,
+        ctx: &Context<'_>,
+        prompt: String,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<FullTextSearchResponse> {
+        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchService);
+
+        use kamu_accounts::account_search_schema as account_schema;
+        use kamu_datasets::dataset_search_schema as dataset_schema;
+
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+        let context = kamu_search::SearchContext { catalog };
+
+        // Run actual search request
+        let search_results = {
+            use kamu_search::*;
+
+            search_service
+                .search(
+                    context,
+                    SearchRequest {
+                        query: if prompt.is_empty() {
+                            None
+                        } else {
+                            Some(prompt)
+                        },
+                        source: SearchRequestSourceSpec::All,
+                        entity_schemas: vec![
+                            account_schema::SCHEMA_NAME,
+                            dataset_schema::SCHEMA_NAME,
+                        ],
+                        filter: None,
+                        // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
+                        sort: vec![],
+                        page: SearchPaginationSpec {
+                            limit: per_page,
+                            offset: page * per_page,
+                        },
+                        options: SearchOptions {
+                            enable_explain: false,
+                            enable_highlighting: true,
+                        },
+                    },
+                )
+                .await
+        }?;
+
+        // Convert into GQL response
+        Ok(FullTextSearchResponse {
+            took_ms: search_results.took_ms,
+            timeout: search_results.timeout,
+            total_hits: search_results.total_hits,
+            hits: search_results
+                .hits
+                .into_iter()
+                .map(|hit| FullTextSearchHit {
+                    id: hit.id,
+                    schema_name: hit.schema_name.to_string(),
+                    score: hit.score,
+                    source: hit.source,
+                    highlights: hit.highlights.map(|highlights| {
+                        highlights
+                            .into_iter()
+                            .map(|h| FullTextSearchHighlight {
+                                field: h.field,
+                                best_fragment: h.best_fragment,
+                            })
+                            .collect()
+                    }),
+                })
+                .collect(),
+        })
+    }
+
     /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
-    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?per_page))]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,
@@ -120,7 +204,11 @@ impl Search {
         // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
+        let natural_language_search_service =
+            from_catalog_n!(ctx, dyn kamu_search::NaturalLanguageSearchService);
+
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+        let context = kamu_search::SearchContext { catalog };
 
         // TODO: Support "next page token" style pagination
         let page = 0;
@@ -128,12 +216,12 @@ impl Search {
 
         let limit = per_page;
 
-        let res = search_service
-            .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
+        let res = natural_language_search_service
+            .search_natural_language(context, &prompt, kamu_search::SearchNatLangOpts { limit })
             .await
             .map_err(|e| match e {
-                SearchLocalNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
-                SearchLocalNatLangError::Internal(e) => GqlError::Internal(e),
+                SearchNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
+                SearchNatLangError::Internal(e) => GqlError::Internal(e),
             })?;
 
         let total_count = res.datasets.len();
@@ -220,6 +308,31 @@ impl Search {
             page_nodes, page, per_page, total,
         ))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchResponse {
+    pub took_ms: u64,
+    pub timeout: bool,
+    pub total_hits: u64,
+    pub hits: Vec<FullTextSearchHit>,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchHit {
+    pub id: String,
+    pub schema_name: String,
+    pub score: Option<f64>,
+    pub source: serde_json::Value,
+    pub highlights: Option<Vec<FullTextSearchHighlight>>,
+}
+
+#[derive(SimpleObject, Debug)]
+pub struct FullTextSearchHighlight {
+    pub field: String,
+    pub best_fragment: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

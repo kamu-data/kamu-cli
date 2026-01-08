@@ -221,3 +221,31 @@ impl SystemTimeSource for FakeSystemTimeSource {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub enum SystemTimeSourceProvider {
+    #[default]
+    Default,
+    Stub(SystemTimeSourceStub),
+    Inherited,
+}
+
+impl SystemTimeSourceProvider {
+    pub fn embed_into_catalog(self, target_catalog_builder: &mut dill::CatalogBuilder) {
+        match self {
+            SystemTimeSourceProvider::Default => {
+                target_catalog_builder.add::<SystemTimeSourceDefault>();
+            }
+            SystemTimeSourceProvider::Stub(stub) => {
+                target_catalog_builder
+                    .add_value(stub)
+                    .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+            }
+            SystemTimeSourceProvider::Inherited => {
+                // No-op
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

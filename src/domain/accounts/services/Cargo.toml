@@ -30,6 +30,7 @@ testing = ["dep:mockall"]
 common-macros = { workspace = true }
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
@@ -37,6 +38,7 @@ kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
@@ -45,6 +47,7 @@ time-source = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
+futures = "0.3"
 jsonwebtoken = { version = "10", default-features = false, features = [ "rust_crypto" ] }
 secrecy = "0.10"
 serde = "1"
@@ -69,9 +72,15 @@ kamu-accounts-services = { workspace = true, default-features = false, features 
 ] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
+    "testing",
+] }
+kamu-search-services = { workspace = true }
 
 mockall = { version = "0.14", default-features = false }
+oop = "0.0.2"
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
 test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

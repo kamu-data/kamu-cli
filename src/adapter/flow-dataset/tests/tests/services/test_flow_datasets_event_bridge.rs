@@ -303,7 +303,7 @@ impl FlowDatasetsEventBridgeHarness {
     }
 
     async fn mimic_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
-        let message = DatasetLifecycleMessage::deleted(dataset_id.clone());
+        let message = DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone());
         self.outbox
             .post_message(MESSAGE_PRODUCER_KAMU_DATASET_SERVICE, message)
             .await
