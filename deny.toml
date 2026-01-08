@@ -118,7 +118,7 @@ ignore = [
     # Unmaintained (rustls-pemfile)
     # https://rustsec.org/advisories/RUSTSEC-2025-0134
     "RUSTSEC-2025-0134",
-    # Security violation (ruint)
-    # https://rustsec.org/advisories/RUSTSEC-2025-0137
-    "RUSTSEC-2025-0137",
+    # Unsound (lru)
+    # https://rustsec.org/advisories/RUSTSEC-2026-0002
+    "RUSTSEC-2026-0002",
 ]
