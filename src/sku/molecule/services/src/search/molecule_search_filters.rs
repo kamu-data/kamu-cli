@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_molecule_domain::{
+    MoleculeAccessLevelRule,
     MoleculeActivitiesFilters,
     MoleculeAnnouncementsFilters,
     MoleculeDataRoomEntriesFilters,
@@ -29,6 +30,14 @@ pub(crate) fn map_molecule_data_room_entries_filters_to_search(
         search_filters.push(field_in_str(
             molecule_schema::fields::ACCESS_LEVEL,
             &by_access_levels,
+        ));
+    }
+
+    if let Some(by_access_level_rules) = filters.by_access_level_rules
+        && !by_access_level_rules.is_empty()
+    {
+        search_filters.push(map_molecule_access_level_rules_to_search(
+            &by_access_level_rules,
         ));
     }
 
@@ -66,6 +75,14 @@ pub(crate) fn map_molecule_announcements_filters_to_search(
         ));
     }
 
+    if let Some(by_access_level_rules) = filters.by_access_level_rules
+        && !by_access_level_rules.is_empty()
+    {
+        search_filters.push(map_molecule_access_level_rules_to_search(
+            &by_access_level_rules,
+        ));
+    }
+
     if let Some(by_categories) = filters.by_categories
         && !by_categories.is_empty()
     {
@@ -97,6 +114,14 @@ pub(crate) fn map_molecule_activities_filters_to_search(
         search_filters.push(field_in_str(
             molecule_schema::fields::ACCESS_LEVEL,
             &by_access_levels,
+        ));
+    }
+
+    if let Some(by_access_level_rules) = filters.by_access_level_rules
+        && !by_access_level_rules.is_empty()
+    {
+        search_filters.push(map_molecule_access_level_rules_to_search(
+            &by_access_level_rules,
         ));
     }
 
@@ -143,6 +168,14 @@ pub(crate) fn map_molecule_search_filters(filters: MoleculeSearchFilters) -> Vec
         ));
     }
 
+    if let Some(by_access_level_rules) = filters.by_access_level_rules
+        && !by_access_level_rules.is_empty()
+    {
+        search_filters.push(map_molecule_access_level_rules_to_search(
+            &by_access_level_rules,
+        ));
+    }
+
     if let Some(by_categories) = filters.by_categories
         && !by_categories.is_empty()
     {
@@ -159,6 +192,28 @@ pub(crate) fn map_molecule_search_filters(filters: MoleculeSearchFilters) -> Vec
     }
 
     search_filters
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_molecule_access_level_rules_to_search(
+    access_level_rules: &[MoleculeAccessLevelRule],
+) -> SearchFilterExpr {
+    let mut or_clauses = Vec::with_capacity(access_level_rules.len());
+
+    for rule in access_level_rules {
+        or_clauses.push(filter_and!(
+            // Match access levels
+            field_in_str(molecule_schema::fields::ACCESS_LEVEL, &rule.access_levels,),
+            // Match ipnft_id
+            match &rule.ipnft_uid {
+                Some(ipnft_uid) => field_eq_str(molecule_schema::fields::IPNFT_UID, ipnft_uid,),
+                None => unreachable!(),
+            }
+        ));
+    }
+
+    SearchFilterExpr::or_clauses(or_clauses)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
