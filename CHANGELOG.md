@@ -20,8 +20,11 @@ Recommendation: for ease of reading, use the following order:
      - identifiers
      - keywords
      - dates
-     - numbers, ...
+     - numbers, 
+     - booleans
+     - ...
   - designed search schemas for accounts and datasets
+  - automatic index creations and alias rotations for search schemas, with detection of mappings drift
   - accounts and datasets are indexed automatically on first launch or after explicit reset,
      as well as react to lifecycle changes incrementally (via handling outbox events)
   - prototyped query language, allowing:
@@ -33,6 +36,9 @@ Recommendation: for ease of reading, use the following order:
   - supporting fields sourcing (returning original document)
   - supporting highlights (explains which field matched)
   - supporting debug explanations of scoring
+  - predefined capatilities regardless of schema:
+     - title-based sorting (each schema specifies a field that should act like a title)
+     - banning field (when set, the document is auto-excluded from read aliases matching search schemas)
   - testing mechanisms with Elasticsearch:
      - integration tests: creating temporary indices with a random prefix, cleaned at shutdown
      - e2e tests
