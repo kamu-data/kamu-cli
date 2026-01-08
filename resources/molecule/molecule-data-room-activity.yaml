@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: molecule-data-room-activity
+  name: data-room-activity
   kind: Root
   metadata:
   - kind: SetDataSchema
