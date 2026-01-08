@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: molecule-projects
+  name: projects
   kind: Root
   metadata:
   - kind: SetDataSchema

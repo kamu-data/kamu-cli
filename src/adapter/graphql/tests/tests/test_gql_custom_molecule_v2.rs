@@ -10557,27 +10557,48 @@ async fn test_molecule_v2_dump_dataset_snapshots() {
         .await
         .unwrap();
 
-    dump_snapshot(molecule_projects_dataset.as_ref(), "molecule-projects").await;
+    // NOTE: Dataset names in snapshots must match dataset names
+    //       -- we use them for data migration
+    //       -->
+    dump_snapshot(
+        molecule_projects_dataset.as_ref(),
+        "molecule-projects",
+        Some("projects"),
+    )
+    .await;
     dump_snapshot(
         molecule_announcements_dataset.as_ref(),
         "molecule-announcements",
+        Some("announcements"),
     )
     .await;
     dump_snapshot(
         molecule_data_room_activity_dataset.as_ref(),
         "molecule-data-room-activity",
+        Some("data-room-activity"),
     )
     .await;
-    dump_snapshot(project_data_room_dataset.as_ref(), "project-data-room").await;
+    // <--
+    dump_snapshot(
+        project_data_room_dataset.as_ref(),
+        "project-data-room",
+        None,
+    )
+    .await;
     dump_snapshot(
         project_announcements_dataset.as_ref(),
         "project-announcements",
+        None,
     )
     .await;
-    dump_snapshot(project_file_dataset.as_ref(), "project-file").await;
+    dump_snapshot(project_file_dataset.as_ref(), "project-file", None).await;
 }
 
-async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
+async fn dump_snapshot(
+    dataset: &dyn odf::dataset::Dataset,
+    file_name: &str,
+    dataset_name_override: Option<&str>,
+) {
     use futures::TryStreamExt;
 
     let blocks: Vec<_> = dataset
@@ -10588,7 +10609,7 @@ async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
         .unwrap();
 
     let snapshot = odf::DatasetSnapshot {
-        name: name.parse().unwrap(),
+        name: dataset_name_override.unwrap_or(file_name).parse().unwrap(),
         kind: odf::DatasetKind::Root,
         metadata: blocks
             .into_iter()
@@ -10608,7 +10629,7 @@ async fn dump_snapshot(dataset: &dyn odf::dataset::Dataset, name: &str) {
         .unwrap();
 
     let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../../resources/molecule/{name}.yaml"));
+    path.push(format!("../../../resources/molecule/{file_name}.yaml"));
 
     std::fs::write(path, &yaml).unwrap();
 }
