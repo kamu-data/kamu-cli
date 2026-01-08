@@ -1086,7 +1086,6 @@ pub fn register_config_in_catalog(
     //   (could be quite a long startup time, indexing itself + container start, if
     //   containers are used)
     // - lazy init wrapper is unnecessary in server mode
-    catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
 
     catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
@@ -1126,7 +1125,13 @@ pub fn register_config_in_catalog(
     }
 
     match vector_repo.unwrap_or_default() {
+        config::VectorRepoConfig::Dummy => {
+            catalog_builder.add::<kamu_search_services::DummyNaturalLanguageSearchService>();
+        }
+
         config::VectorRepoConfig::Qdrant(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrant::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
@@ -1137,6 +1142,8 @@ pub fn register_config_in_catalog(
             });
         }
         config::VectorRepoConfig::QdrantContainer(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrantContainer::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();

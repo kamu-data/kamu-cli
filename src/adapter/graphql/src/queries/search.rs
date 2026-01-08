@@ -207,6 +207,9 @@ impl Search {
         let natural_language_search_service =
             from_catalog_n!(ctx, dyn kamu_search::NaturalLanguageSearchService);
 
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+        let context = kamu_search::SearchContext { catalog };
+
         // TODO: Support "next page token" style pagination
         let page = 0;
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
@@ -214,7 +217,7 @@ impl Search {
         let limit = per_page;
 
         let res = natural_language_search_service
-            .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
+            .search_natural_language(context, &prompt, kamu_search::SearchNatLangOpts { limit })
             .await
             .map_err(|e| match e {
                 SearchNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),

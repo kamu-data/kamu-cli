@@ -1246,6 +1246,7 @@ impl Default for EmbeddingsEncoderConfigOpenAi {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum VectorRepoConfig {
+    Dummy,
     Qdrant(VectorRepoConfigQdrant),
     QdrantContainer(VectorRepoConfigQdrantContainer),
 }

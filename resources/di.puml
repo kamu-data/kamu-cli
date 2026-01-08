@@ -244,7 +244,7 @@ class "MetadataQueryServiceImpl"
 class "ModifyAccountPasswordUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
 class "NaturalLanguageSearchConfig" <<singleton>>
-class "NaturalLanguageSearchImplLazyInit"
+class "NaturalLanguageSearchImplLazyInit" <<singleton>>
 class "NaturalLanguageSearchIndexerConfig" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
@@ -821,7 +821,7 @@ class "WsSmartTransferProtocolClient"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
 "NaturalLanguageSearchService" <|-- "NaturalLanguageSearchImplLazyInit"
-"NaturalLanguageSearchImplLazyInit"  --> "Catalog"
+"NaturalLanguageSearchImplLazyInit"  --> "KamuBackgroundCatalog"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

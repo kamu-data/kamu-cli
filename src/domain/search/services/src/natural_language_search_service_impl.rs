@@ -66,6 +66,7 @@ impl NaturalLanguageSearchService for NaturalLanguageSearchServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn search_natural_language(
         &self,
+        _ctx: SearchContext<'_>,
         prompt: &str,
         options: SearchNatLangOpts,
     ) -> Result<SearchNatLangResult, SearchNatLangError> {

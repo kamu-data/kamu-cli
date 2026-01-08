@@ -8571,6 +8571,8 @@ version = "0.255.1"
 dependencies = [
  "async-trait",
  "common-macros",
+ "database-common",
+ "database-common-macros",
  "dill",
  "futures",
  "init-on-startup",

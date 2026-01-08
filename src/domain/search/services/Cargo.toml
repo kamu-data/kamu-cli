@@ -27,6 +27,8 @@ default = []
 
 [dependencies]
 common-macros = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-auth-rebac = { workspace = true }

@@ -9,6 +9,8 @@
 
 use internal_error::InternalError;
 
+use crate::SearchContext;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Provides search functionality for datasets and other objects managed by the
@@ -21,6 +23,7 @@ pub trait NaturalLanguageSearchService: Send + Sync {
     /// re-ranking, so multiple search hits can refer to the same dataset.
     async fn search_natural_language(
         &self,
+        ctx: SearchContext<'_>,
         prompt: &str,
         options: SearchNatLangOpts,
     ) -> Result<SearchNatLangResult, SearchNatLangError>;
