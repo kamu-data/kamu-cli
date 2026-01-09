@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
 use crate::utils::CreateDatasetUseCaseHelper;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
+pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool) {
     if needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();
@@ -31,8 +29,14 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+
+    b.add::<FindCollectionEntriesUseCaseImpl>();
     b.add::<UpdateCollectionEntriesUseCaseImpl>();
-    b.add::<UpdateVersionFileUseCaseImpl>();
+    b.add::<ViewCollectionEntriesUseCaseImpl>();
+
+    b.add::<FindVersionedFileVersionUseCaseImpl>();
+    b.add::<ViewVersionedFileHistoryUseCaseImpl>();
+    b.add::<UpdateVersionedFileUseCaseImpl>();
 
     b.add::<CreateDatasetUseCaseHelper>();
 
@@ -41,6 +45,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();
+    b.add::<AccountQuotaCheckerStorageImpl>();
 
     b.add::<DatasetAliasUpdateHandler>();
     b.add::<DatasetBlockUpdateHandler>();

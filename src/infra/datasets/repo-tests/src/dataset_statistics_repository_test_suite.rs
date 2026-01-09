@@ -65,7 +65,6 @@ pub async fn test_set_and_get_statistics(catalog: &Catalog) {
     let get_result = stats_repo
         .get_dataset_statistics(&dataset_id, &odf::BlockRef::Head)
         .await;
-    println!("{statistics:?}");
     assert_matches!(get_result, Ok(s) if s == statistics);
 }
 

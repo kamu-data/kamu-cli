@@ -25,6 +25,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_datasets_services::QuotaDefaultsConfig;
 use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
@@ -516,6 +517,8 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
+    b.add::<DidSecretService>();
+
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
@@ -656,7 +659,14 @@ pub fn configure_server_catalog(
         kamu_adapter_auth_web3::register_dependencies(&mut b);
     }
 
+    kamu_molecule_services::register_dependencies(&mut b);
+
     b.add::<UploadServiceLocal>();
+
+    b.add_value(
+        kamu_adapter_graphql::GqlFeatureFlags::new()
+            .with_feature(kamu_adapter_graphql::GqlFeature::MoleculeApiV1),
+    );
 
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
@@ -932,6 +942,16 @@ pub fn register_config_in_catalog(
     } else {
         warn!("Did secret keys will not be stored");
     }
+    //
+
+    // Quotas limits configuration
+    catalog_builder.add_value(QuotaDefaultsConfig {
+        storage: config
+            .quota_defaults
+            .as_ref()
+            .and_then(|q| q.storage)
+            .unwrap_or_default(),
+    });
     //
 
     // Authentication configuration

@@ -1,0 +1,31 @@
+[package]
+name = "format-utils"
+description = "Utility for formatting data"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+
+
+[dev-dependencies]
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }

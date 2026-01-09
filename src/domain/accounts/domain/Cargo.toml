@@ -35,6 +35,7 @@ internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
+event-sourcing = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
@@ -50,10 +51,11 @@ rand = "0.9"
 reusable = "0.1"
 secrecy = "0.10"
 serde = "1"
+serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 strum = { version = "0.27", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
-uuid = { version = "1", default-features = false, features = ["v4"] }
+uuid = { version = "1", default-features = false, features = ["v4", "serde"] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

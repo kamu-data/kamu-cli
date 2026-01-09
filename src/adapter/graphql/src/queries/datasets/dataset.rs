@@ -31,14 +31,8 @@ impl Dataset {
     pub async fn try_from_ref(
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<TransformInputDataset> {
-        let maybe_dataset = Datasets::by_dataset_ref(ctx, dataset_ref).await?;
-
-        if let Some(dataset) = maybe_dataset {
-            Ok(TransformInputDataset::accessible(dataset))
-        } else {
-            Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
-        }
+    ) -> Result<Option<Dataset>> {
+        Datasets::by_dataset_ref(ctx, dataset_ref).await
     }
 
     pub fn from_resolved_authorized_dataset(
@@ -49,6 +43,42 @@ impl Dataset {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
                 .with_owner(owner),
         }
+    }
+
+    pub(crate) async fn as_versioned_file_impl(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<VersionedFile<'_>>> {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
+            return Ok(None);
+        }
+
+        Ok(Some(self.as_versioned_file_unchecked()))
+    }
+
+    #[inline]
+    pub(crate) fn as_versioned_file_unchecked(&self) -> VersionedFile<'_> {
+        VersionedFile::new(&self.dataset_request_state)
+    }
+
+    pub(crate) async fn as_collection_impl(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<Collection<'_>>> {
+        let archetype = self.dataset_request_state.archetype(ctx).await?;
+
+        if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
+            return Ok(None);
+        }
+
+        Ok(Some(self.as_collection_unchecked()))
+    }
+
+    #[inline]
+    pub(crate) fn as_collection_unchecked(&self) -> Collection<'_> {
+        Collection::new(&self.dataset_request_state)
     }
 }
 
@@ -250,25 +280,13 @@ impl Dataset {
     /// Downcast a dataset to a versioned file interface
     #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile<'_>>> {
-        let archetype = self.dataset_request_state.archetype(ctx).await?;
-
-        if archetype != Some(odf::schema::ext::DatasetArchetype::VersionedFile) {
-            return Ok(None);
-        }
-
-        Ok(Some(VersionedFile::new(&self.dataset_request_state)))
+        self.as_versioned_file_impl(ctx).await
     }
 
     /// Downcast a dataset to a collection interface
     #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection<'_>>> {
-        let archetype = self.dataset_request_state.archetype(ctx).await?;
-
-        if archetype != Some(odf::schema::ext::DatasetArchetype::Collection) {
-            return Ok(None);
-        }
-
-        Ok(Some(Collection::new(&self.dataset_request_state)))
+        self.as_collection_impl(ctx).await
     }
 }
 
