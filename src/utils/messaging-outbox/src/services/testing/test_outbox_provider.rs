@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::Component;
-
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,23 +35,20 @@ impl OutboxProvider {
             }
             OutboxProvider::Immediate { force_immediate } => {
                 target_catalog_builder
-                    .add_builder(OutboxImmediateImpl::builder().with_consumer_filter(
-                        if force_immediate {
-                            ConsumerFilter::AllConsumers
-                        } else {
-                            ConsumerFilter::ImmediateConsumers
-                        },
-                    ))
+                    .add_builder(OutboxImmediateImpl::builder(if force_immediate {
+                        ConsumerFilter::AllConsumers
+                    } else {
+                        ConsumerFilter::ImmediateConsumers
+                    }))
                     .bind::<dyn crate::Outbox, OutboxImmediateImpl>();
             }
             OutboxProvider::Dispatching => {
                 // The most complete setup, but it still needs bindings for repositories.
                 // Not adding those here to avoid cyclic build dependencies.
                 target_catalog_builder
-                    .add_builder(
-                        OutboxImmediateImpl::builder()
-                            .with_consumer_filter(ConsumerFilter::ImmediateConsumers),
-                    )
+                    .add_builder(OutboxImmediateImpl::builder(
+                        ConsumerFilter::ImmediateConsumers,
+                    ))
                     .add::<OutboxTransactionalImpl>()
                     .add::<OutboxDispatchingImpl>()
                     .bind::<dyn crate::Outbox, OutboxDispatchingImpl>()

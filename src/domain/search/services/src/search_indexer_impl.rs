@@ -11,18 +11,19 @@ use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_search::{SearchEntitySchemaProvider, SearchRepository};
+use kamu_search::{SearchEntitySchemaProvider, SearchIndexer, SearchRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
+#[dill::interface(dyn SearchIndexer)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: "dev.kamu.search.SearchIndexer",
     depends_on: &[],
     requires_transaction: false,
 })]
-pub struct SearchIndexer {
+pub struct SearchIndexerImpl {
     search_repo: Arc<dyn SearchRepository>,
     entity_schema_providers: Vec<Arc<dyn SearchEntitySchemaProvider>>,
 }
@@ -30,8 +31,8 @@ pub struct SearchIndexer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
-impl SearchIndexer {
-    #[tracing::instrument(level = "info", name = SearchIndexer_ensure_indexes_exist, skip_all)]
+impl SearchIndexerImpl {
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_ensure_indexes_exist, skip_all)]
     // Public for tests only
     pub async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
         // Request schemas from all providers and ensure indexes exist
@@ -70,7 +71,12 @@ impl SearchIndexer {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", name = SearchIndexer_run_indexing, skip_all)]
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_drop_all_schemas, skip_all)]
+    async fn drop_all_schemas(&self) -> Result<(), InternalError> {
+        self.search_repo.drop_all_schemas().await
+    }
+
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_run_indexing, skip_all)]
     async fn run_indexing(&self) -> Result<(), InternalError> {
         for provider in &self.entity_schema_providers {
             let schemas = provider.provide_schemas();
@@ -123,8 +129,26 @@ impl SearchIndexer {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl InitOnStartup for SearchIndexer {
-    #[tracing::instrument(level = "info", name = SearchIndexer_run_initialization, skip_all)]
+impl SearchIndexer for SearchIndexerImpl {
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_reset_search_indices, skip_all)]
+    async fn reset_search_indices(&self) -> Result<(), InternalError> {
+        // Drop all existing indexes
+        self.drop_all_schemas().await?;
+
+        // Recreate indexes and run full indexing
+        self.ensure_indexes_exist().await?;
+        self.run_indexing().await?;
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl InitOnStartup for SearchIndexerImpl {
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.ensure_indexes_exist().await?;
         self.run_indexing().await?;

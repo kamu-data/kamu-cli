@@ -99,14 +99,16 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
         message: &AccountLifecycleMessage,
     ) -> Result<(), InternalError> {
         match message {
-            AccountLifecycleMessage::Deleted(message) => self
-                .handle_account_lifecycle_deleted_message(message)
-                .await
-                .map_err(ErrorIntoInternal::int_err)?,
+            AccountLifecycleMessage::Deleted(message) => {
+                self.handle_account_lifecycle_deleted_message(message)
+                    .await?;
+            }
 
-            AccountLifecycleMessage::Updated(_)
-            | AccountLifecycleMessage::Created(_)
-            | AccountLifecycleMessage::PasswordChanged(_) => {}
+            AccountLifecycleMessage::Created(_)
+            | AccountLifecycleMessage::Updated(_)
+            | AccountLifecycleMessage::PasswordChanged(_) => {
+                // No action required
+            }
         }
 
         Ok(())

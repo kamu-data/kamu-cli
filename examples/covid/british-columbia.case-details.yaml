@@ -10,7 +10,7 @@ content:
       # Where to fetch the data from.
       fetch:
         kind: Url
-        url: http://www.bccdc.ca/Health-Info-Site/Documents/BCCDC_COVID19_Dashboard_Case_Details.csv
+        url: https://www.bccdc.ca/Health-Info-Site/Documents/BCCDC_COVID19_Dashboard_Case_Details.csv
       # How to interpret the data.
       read:
         kind: Csv

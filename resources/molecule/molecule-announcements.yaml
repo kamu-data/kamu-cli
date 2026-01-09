@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: molecule-announcements
+  name: announcements
   kind: Root
   metadata:
   - kind: SetDataSchema

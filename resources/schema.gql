@@ -471,6 +471,14 @@ type Admin {
 	selfTest: String!
 }
 
+type AdminMut {
+	search: AdminSearchMut!
+}
+
+type AdminSearchMut {
+	resetFullTextIndices: String!
+}
+
 type ApplyRolesMatrixResult {
 	message: String!
 }
@@ -3988,6 +3996,10 @@ type Mutation {
 	Allows setting permissions for multiple datasets in batch mode
 	"""
 	collaboration: CollaborationMut!
+	"""
+	Admin-related functionality group
+	"""
+	admin: AdminMut!
 }
 
 union NameLookupResult = Account
@@ -4536,10 +4548,6 @@ type Search {
 	versatile interface to the user consisting of just one input field.
 	"""
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
-	"""
-	Searches for datasets and other objects managed by the
-	current node using a full text prompt in natural language
-	"""
 	queryFullText(prompt: String!, page: Int, perPage: Int): FullTextSearchResponse!
 	"""
 	Searches for datasets and other objects managed by the
@@ -4650,14 +4658,8 @@ type SetAttachments {
 	attachments: Attachments!
 }
 
-"""
-Specifies the complete schema of Data Slices added to the Dataset following
-this event.
-
-See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
-"""
 type SetDataSchema {
-	schema: DataSchema!
+	schema(format: DataSchemaFormat): DataSchema!
 }
 
 interface SetDatasetVisibilityResult {

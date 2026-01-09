@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method1;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
@@ -19,7 +20,7 @@ use kamu_search::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchServiceLocalIndexerConfig {
+pub struct NaturalLanguageSearchIndexerConfig {
     // Whether to clear and re-index on start or work with existing vectors is any exist
     pub clear_on_start: bool,
 
@@ -42,17 +43,66 @@ pub struct SearchServiceLocalIndexerConfig {
 #[dill::meta(InitOnStartupMeta {
     job_name: "dev.kamu.search.NaturalLanguageSearchIndexer",
     depends_on: &[JOB_KAMU_DATASETS_DATASET_BLOCK_INDEXER],
-    requires_transaction: true,
+    requires_transaction: false,
 })]
 pub struct NaturalLanguageSearchIndexer {
-    config: Arc<SearchServiceLocalIndexerConfig>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    catalog: dill::Catalog,
+    config: Arc<NaturalLanguageSearchIndexerConfig>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
     vector_repo: Arc<dyn VectorRepository>,
 }
 
 impl NaturalLanguageSearchIndexer {
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn index_datasets(&self) -> Result<(), InternalError> {
+        tracing::info!("Fetching metadata of all datasets. This make take a while!");
+
+        let mut chunks = Vec::new();
+        let mut payloads = Vec::new();
+        let mut datasets = dataset_registry.all_dataset_handles();
+
+        while let Some(hdl) = datasets.try_next().await? {
+            let dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
+            let Some(document) = self.dataset_metadata_as_document(dataset).await? else {
+                continue;
+            };
+
+            for chunk in self.embeddings_chunker.chunk(document).await? {
+                let payload = if !self.config.payload_include_content {
+                    serde_json::json!({
+                        "dataset_id": hdl.id.to_string(),
+                    })
+                } else {
+                    serde_json::json!({
+                        "dataset_id": hdl.id.to_string(),
+                        "dataset_alias": hdl.alias.to_string(),
+                        "content": chunk,
+                    })
+                };
+
+                payloads.push(payload);
+                chunks.push(chunk);
+            }
+        }
+
+        tracing::info!(?chunks, "Encoding chunks to embeddings");
+
+        // TODO: Split into batches?
+        let vectors = self.embeddings_encoder.encode(chunks).await?;
+
+        let points = vectors
+            .into_iter()
+            .zip_eq(payloads)
+            .map(|(vector, payload)| NewPoint { vector, payload })
+            .collect();
+
+        self.vector_repo.insert(points).await.int_err()?;
+
+        Ok(())
+    }
+
     async fn dataset_metadata_as_document(
         &self,
         dataset: ResolvedDataset,
@@ -142,51 +192,7 @@ impl InitOnStartup for NaturalLanguageSearchIndexer {
             return Ok(());
         }
 
-        tracing::info!("Fetching metadata of all datasets. This make take a while!");
-
-        let mut chunks = Vec::new();
-        let mut payloads = Vec::new();
-        let mut datasets = self.dataset_registry.all_dataset_handles();
-
-        while let Some(hdl) = datasets.try_next().await? {
-            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
-
-            let Some(document) = self.dataset_metadata_as_document(dataset).await? else {
-                continue;
-            };
-
-            for chunk in self.embeddings_chunker.chunk(document).await? {
-                let payload = if !self.config.payload_include_content {
-                    serde_json::json!({
-                        "dataset_id": hdl.id.to_string(),
-                    })
-                } else {
-                    serde_json::json!({
-                        "dataset_id": hdl.id.to_string(),
-                        "dataset_alias": hdl.alias.to_string(),
-                        "content": chunk,
-                    })
-                };
-
-                payloads.push(payload);
-                chunks.push(chunk);
-            }
-        }
-
-        tracing::info!(?chunks, "Encoding chunks to embeddings");
-
-        // TODO: Split into batches?
-        let vectors = self.embeddings_encoder.encode(chunks).await?;
-
-        let points = vectors
-            .into_iter()
-            .zip_eq(payloads)
-            .map(|(vector, payload)| NewPoint { vector, payload })
-            .collect();
-
-        self.vector_repo.insert(points).await.int_err()?;
-
-        Ok(())
+        self.index_datasets().await
     }
 }
 

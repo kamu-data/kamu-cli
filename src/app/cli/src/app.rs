@@ -572,10 +572,9 @@ pub fn configure_base_catalog(
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
-    b.add_builder(
-        messaging_outbox::OutboxImmediateImpl::builder()
-            .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
-    );
+    b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+        messaging_outbox::ConsumerFilter::ImmediateConsumers,
+    ));
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
@@ -1107,7 +1106,6 @@ pub fn register_config_in_catalog(
     //   (could be quite a long startup time, indexing itself + container start, if
     //   containers are used)
     // - lazy init wrapper is unnecessary in server mode
-    catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
 
     catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
@@ -1115,7 +1113,7 @@ pub fn register_config_in_catalog(
     });
 
     let indexer = indexer.unwrap_or_default();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
         skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
         skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,
@@ -1147,7 +1145,13 @@ pub fn register_config_in_catalog(
     }
 
     match vector_repo.unwrap_or_default() {
+        config::VectorRepoConfig::Dummy => {
+            catalog_builder.add::<kamu_search_services::DummyNaturalLanguageSearchService>();
+        }
+
         config::VectorRepoConfig::Qdrant(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrant::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
@@ -1158,6 +1162,8 @@ pub fn register_config_in_catalog(
             });
         }
         config::VectorRepoConfig::QdrantContainer(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrantContainer::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();
@@ -1189,7 +1195,7 @@ pub fn register_config_in_catalog(
 
             if is_e2e_testing {
                 // TODO: kind of a hack, make lazy init work in e2e tests
-                catalog_builder.add::<kamu_search_services::SearchIndexer>();
+                catalog_builder.add::<kamu_search_services::SearchIndexerImpl>();
                 catalog_builder.add::<kamu_search_services::SearchServiceImpl>();
             } else {
                 catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();

@@ -1,0 +1,1070 @@
+@startuml
+
+hide circle
+hide empty members
+hide <<i>> stereotype
+
+<style>
+class {
+    .i {
+        FontColor blue
+    }
+}
+</style>
+
+interface "AccessTokenRepository" <<i>>
+interface "AccessTokenService" <<i>>
+interface "AccessTokenStore" <<i>>
+interface "AccountAuthorizationHelper" <<i>>
+interface "AccountQuotaEventStore" <<i>>
+interface "AccountQuotaService" <<i>>
+interface "AccountQuotaStorageChecker" <<i>>
+interface "AccountRepository" <<i>>
+interface "AccountService" <<i>>
+interface "AppendDatasetMetadataBatchUseCase" <<i>>
+interface "ApplyAccountDatasetRelationsUseCase" <<i>>
+interface "AuthenticationProvider" <<i>>
+interface "AuthenticationService" <<i>>
+interface "BackgroundAgent" <<i>>
+interface "CommitDatasetEventUseCase" <<i>>
+interface "CompactDatasetUseCase" <<i>>
+interface "CompactionExecutor" <<i>>
+interface "CompactionPlanner" <<i>>
+interface "CreateAccountUseCase" <<i>>
+interface "CreateDatasetFromSnapshotUseCase" <<i>>
+interface "CreateDatasetUseCase" <<i>>
+interface "DataFormatRegistry" <<i>>
+interface "DatabasePasswordProvider" <<i>>
+interface "DatabaseTransactionManager" <<i>>
+interface "DatasetActionAuthorizer" <<i>>
+interface "DatasetDataBlockRepository" <<i>>
+interface "DatasetDependencyRepository" <<i>>
+interface "DatasetEntryRemovalListener" <<i>>
+interface "DatasetEntryRepository" <<i>>
+interface "DatasetEntryService" <<i>>
+interface "DatasetEntryWriter" <<i>>
+interface "DatasetEnvVarRepository" <<i>>
+interface "DatasetEnvVarService" <<i>>
+interface "DatasetFactory" <<i>>
+interface "DatasetIncrementQueryService" <<i>>
+interface "DatasetKeyBlockRepository" <<i>>
+interface "DatasetKeyValueService" <<i>>
+interface "DatasetLfsBuilder" <<i>>
+interface "DatasetReferenceRepository" <<i>>
+interface "DatasetReferenceService" <<i>>
+interface "DatasetRegistry" <<i>>
+interface "DatasetStatisticsRepository" <<i>>
+interface "DatasetStatisticsService" <<i>>
+interface "DatasetStorageUnit" <<i>>
+interface "DatasetStorageUnitWriter" <<i>>
+interface "DeleteAccountUseCase" <<i>>
+interface "DeleteDatasetUseCase" <<i>>
+interface "DependencyGraphService" <<i>>
+interface "DidGenerator" <<i>>
+interface "DidSecretKeyRepository" <<i>>
+interface "EmbeddingsChunker" <<i>>
+interface "EmbeddingsEncoder" <<i>>
+interface "EngineProvisioner" <<i>>
+interface "ExpensiveAccountRepository" <<i>>
+interface "ExportService" <<i>>
+interface "FindCollectionEntriesUseCase" <<i>>
+interface "FindVersionedFileVersionUseCase" <<i>>
+interface "FlowConfigurationEventStore" <<i>>
+interface "FlowEventStore" <<i>>
+interface "FlowProcessStateQuery" <<i>>
+interface "FlowProcessStateRepository" <<i>>
+interface "FlowSystemEventBridge" <<i>>
+interface "FlowTriggerEventStore" <<i>>
+interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
+interface "GetDatasetSchemaUseCase" <<i>>
+interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
+interface "InitOnStartup" <<i>>
+interface "JwtTokenIssuer" <<i>>
+interface "MessageConsumer" <<i>>
+interface "MessageConsumerT" <<i>>
+interface "MetadataQueryService" <<i>>
+interface "MetricsProvider" <<i>>
+interface "ModifyAccountPasswordUseCase" <<i>>
+interface "MoleculeAnnouncementsService" <<i>>
+interface "MoleculeAppendGlobalDataRoomActivityUseCase" <<i>>
+interface "MoleculeCreateAnnouncementUseCase" <<i>>
+interface "MoleculeCreateDataRoomEntryUseCase" <<i>>
+interface "MoleculeCreateProjectUseCase" <<i>>
+interface "MoleculeCreateVersionedFileDatasetUseCase" <<i>>
+interface "MoleculeDataRoomCollectionService" <<i>>
+interface "MoleculeDisableProjectUseCase" <<i>>
+interface "MoleculeEnableProjectUseCase" <<i>>
+interface "MoleculeFindDataRoomEntryUseCase" <<i>>
+interface "MoleculeFindProjectAnnouncementUseCase" <<i>>
+interface "MoleculeFindProjectUseCase" <<i>>
+interface "MoleculeGlobalDataRoomActivitiesService" <<i>>
+interface "MoleculeMoveDataRoomEntryUseCase" <<i>>
+interface "MoleculeProjectsService" <<i>>
+interface "MoleculeReadVersionedFileEntryUseCase" <<i>>
+interface "MoleculeRemoveDataRoomEntryUseCase" <<i>>
+interface "MoleculeSearchUseCase" <<i>>
+interface "MoleculeUpdateDataRoomEntryUseCase" <<i>>
+interface "MoleculeUpdateVersionedFileMetadataUseCase" <<i>>
+interface "MoleculeUploadVersionedFileVersionUseCase" <<i>>
+interface "MoleculeVersionedFileContentProvider" <<i>>
+interface "MoleculeViewDataRoomEntriesUseCase" <<i>>
+interface "MoleculeViewGlobalActivitiesUseCase" <<i>>
+interface "MoleculeViewGlobalAnnouncementsUseCase" <<i>>
+interface "MoleculeViewProjectActivitiesUseCase" <<i>>
+interface "MoleculeViewProjectAnnouncementsUseCase" <<i>>
+interface "MoleculeViewProjectsUseCase" <<i>>
+interface "NaturalLanguageSearchService" <<i>>
+interface "OAuthDeviceCodeGenerator" <<i>>
+interface "OAuthDeviceCodeRepository" <<i>>
+interface "OAuthDeviceCodeService" <<i>>
+interface "ObjectStoreBuilder" <<i>>
+interface "ObjectStoreRegistry" <<i>>
+interface "OdfServerAccessTokenResolver" <<i>>
+interface "OutboxAgent" <<i>>
+interface "OutboxMessageConsumptionRepository" <<i>>
+interface "OutboxMessageRepository" <<i>>
+interface "PasswordHashRepository" <<i>>
+interface "PollingIngestService" <<i>>
+interface "ProvenanceService" <<i>>
+interface "PullDatasetUseCase" <<i>>
+interface "PullRequestPlanner" <<i>>
+interface "PushDatasetUseCase" <<i>>
+interface "PushIngestDataUseCase" <<i>>
+interface "PushIngestExecutor" <<i>>
+interface "PushIngestPlanner" <<i>>
+interface "PushRequestPlanner" <<i>>
+interface "QueryDatasetDataUseCase" <<i>>
+interface "QueryService" <<i>>
+interface "RebacDatasetRegistryFacade" <<i>>
+interface "RebacRepository" <<i>>
+interface "RebacService" <<i>>
+interface "RemoteAliasResolver" <<i>>
+interface "RemoteAliasesRegistry" <<i>>
+interface "RemoteRepositoryRegistry" <<i>>
+interface "RemoteStatusService" <<i>>
+interface "RenameDatasetUseCase" <<i>>
+interface "ResetDatasetUseCase" <<i>>
+interface "ResetExecutor" <<i>>
+interface "ResetPlanner" <<i>>
+interface "ResourceLoader" <<i>>
+interface "SchemaService" <<i>>
+interface "SearchEntitySchemaProvider" <<i>>
+interface "SearchService" <<i>>
+interface "SearchServiceRemote" <<i>>
+interface "SessionAuth" <<i>>
+interface "SessionManager" <<i>>
+interface "SetWatermarkExecutor" <<i>>
+interface "SetWatermarkPlanner" <<i>>
+interface "SetWatermarkUseCase" <<i>>
+interface "SmartTransferProtocolClient" <<i>>
+interface "SyncService" <<i>>
+interface "SystemTimeSource" <<i>>
+interface "TaskEventStore" <<i>>
+interface "TransformElaborationService" <<i>>
+interface "TransformExecutor" <<i>>
+interface "TransformRequestPlanner" <<i>>
+interface "UpdateAccountUseCase" <<i>>
+interface "UpdateCollectionEntriesUseCase" <<i>>
+interface "UpdateVersionedFileUseCase" <<i>>
+interface "VectorRepository" <<i>>
+interface "VerificationService" <<i>>
+interface "VerifyDatasetUseCase" <<i>>
+interface "ViewCollectionEntriesUseCase" <<i>>
+interface "ViewVersionedFileHistoryUseCase" <<i>>
+interface "Web3AuthEip4361NonceRepository" <<i>>
+interface "Web3AuthEip4361NonceService" <<i>>
+interface "WebhookDeliveryRepository" <<i>>
+interface "WebhookSubscriptionEventStore" <<i>>
+class "AccessTokenRegistryService"
+class "AccessTokenServiceImpl"
+class "AccountAuthorizationHelperImpl"
+class "AccountProperties" <<singleton>>
+class "AccountQuotaCheckerStorageImpl"
+class "AccountQuotaServiceImpl"
+class "AccountSearchSchemaProvider"
+class "AccountSearchUpdater"
+class "AccountServiceImpl"
+class "AppendDatasetMetadataBatchUseCaseImpl"
+class "ApplyAccountDatasetRelationsUseCaseImpl"
+class "AuthConfig" <<singleton>>
+class "AuthenticationServiceImpl"
+class "BuildInfo" <<singleton>>
+class "CLIAccessTokenStore"
+class "CacheDir" <<singleton>>
+class "CommitDatasetEventUseCaseImpl"
+class "CompactDatasetUseCaseImpl"
+class "CompactionExecutorImpl"
+class "CompactionPlannerImpl"
+class "Config" <<singleton>>
+class "ConfigService"
+class "ConfirmDeleteService"
+class "ContainerRuntime"
+class "ContainerRuntimeConfig" <<singleton>>
+class "CreateAccountUseCaseImpl"
+class "CreateDatasetFromSnapshotUseCaseImpl"
+class "CreateDatasetUseCaseHelper"
+class "CreateDatasetUseCaseImpl"
+class "CurrentAccountSubject" <<singleton>>
+class "DataFormatRegistryImpl"
+class "DatabaseConnectionSettings" <<singleton>>
+class "DatabaseNoPasswordProvider"
+class "DatabaseTransactionRunner"
+class "DatasetAccountLifecycleHandler"
+class "DatasetAliasUpdateHandler"
+class "DatasetBlockIndexer"
+class "DatasetBlockUpdateHandler"
+class "DatasetEntryIndexer"
+class "DatasetEntryServiceImpl"
+class "DatasetEnvVarServiceNull"
+class "DatasetEnvVarsConfig" <<singleton>>
+class "DatasetFactoryImpl"
+class "DatasetIncrementQueryServiceImpl"
+class "DatasetKeyValueServiceSysEnv"
+class "DatasetLfsBuilderDatabaseBackedImpl"
+class "DatasetProperties" <<singleton>>
+class "DatasetReferenceIndexer"
+class "DatasetReferenceServiceImpl"
+class "DatasetSearchSchemaProvider"
+class "DatasetSearchUpdater"
+class "DatasetStatisticsIndexer"
+class "DatasetStatisticsServiceImpl"
+class "DatasetStatisticsUpdateHandler"
+class "DatasetStorageUnitLocalFs"
+class "DeleteAccountUseCaseImpl"
+class "DeleteDatasetUseCaseImpl"
+class "DependencyGraphImmediateListener"
+class "DependencyGraphIndexer"
+class "DependencyGraphServiceImpl" <<singleton>>
+class "DidGeneratorDefault"
+class "DidSecretEncryptionConfig" <<singleton>>
+class "DidSecretService"
+class "DummySearchService"
+class "EmbeddingsChunkerConfigSimple" <<singleton>>
+class "EmbeddingsChunkerSimple"
+class "EmbeddingsEncoderConfigOpenAI" <<singleton>>
+class "EmbeddingsEncoderOpenAi" <<singleton>>
+class "EngineConfigDatafusionEmbeddedBatchQuery" <<singleton>>
+class "EngineConfigDatafusionEmbeddedCompaction" <<singleton>>
+class "EngineConfigDatafusionEmbeddedIngest" <<singleton>>
+class "EngineProvisionerLocal"
+class "EngineProvisionerLocalConfig" <<singleton>>
+class "EthereumSourceConfig" <<singleton>>
+class "ExportServiceImpl"
+class "FetchService"
+class "FileUploadLimitConfig" <<singleton>>
+class "FindCollectionEntriesUseCaseImpl"
+class "FindVersionedFileVersionUseCaseImpl"
+class "FlightSqlServiceFactory"
+class "FlowAgentConfig" <<singleton>>
+class "FlowSystemEventAgentConfig" <<singleton>>
+class "GcService"
+class "GetDatasetDownstreamDependenciesUseCaseImpl"
+class "GetDatasetSchemaUseCaseImpl"
+class "GetDatasetUpstreamDependenciesUseCaseImpl"
+class "GithubAuthenticationConfig" <<singleton>>
+class "HttpSourceConfig" <<singleton>>
+class "Interact" <<singleton>>
+class "IpfsClient" <<singleton>>
+class "IpfsGateway" <<singleton>>
+class "JupyterConfig" <<singleton>>
+class "JwtAuthenticationConfig" <<singleton>>
+class "KamuAuthOso"
+class "KamuFlightSqlService"
+class "LoginPasswordAuthProvider"
+class "LoginService"
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MetadataChainDbBackedConfig" <<singleton>>
+class "MetadataQueryServiceImpl"
+class "ModifyAccountPasswordUseCaseImpl"
+class "MoleculeActivitySearchUpdater"
+class "MoleculeAnnouncementSearchUpdater"
+class "MoleculeAnnouncementsServiceImpl"
+class "MoleculeAppendGlobalDataRoomActivityUseCaseImpl"
+class "MoleculeCreateAnnouncementUseCaseImpl"
+class "MoleculeCreateDataRoomEntryUseCaseImpl"
+class "MoleculeCreateProjectUseCaseImpl"
+class "MoleculeCreateVersionedFileDatasetUseCaseImpl"
+class "MoleculeDataRoomCollectionServiceImpl"
+class "MoleculeDataRoomSearchUpdater"
+class "MoleculeDatasetAccessorFactory"
+class "MoleculeDisableProjectUseCaseImpl"
+class "MoleculeEnableProjectUseCaseImpl"
+class "MoleculeFindDataRoomEntryUseCaseImpl"
+class "MoleculeFindProjectAnnouncementUseCaseImpl"
+class "MoleculeFindProjectUseCaseImpl"
+class "MoleculeGlobalDataRoomActivitiesServiceImpl"
+class "MoleculeMoveDataRoomEntryUseCaseImpl"
+class "MoleculeProjectSearchUpdater"
+class "MoleculeProjectsServiceImpl"
+class "MoleculeReadVersionedFileEntryUseCaseImpl"
+class "MoleculeRemoveDataRoomEntryUseCaseImpl"
+class "MoleculeSearchSchemaProvider"
+class "MoleculeSearchUseCaseImpl"
+class "MoleculeUpdateDataRoomEntryUseCaseImpl"
+class "MoleculeUpdateVersionedFileMetadataUseCaseImpl"
+class "MoleculeUploadVersionedFileVersionUseCaseImpl"
+class "MoleculeVersionedFileContentProviderImpl"
+class "MoleculeViewDataRoomEntriesUseCaseImpl"
+class "MoleculeViewGlobalActivitiesUseCaseImpl"
+class "MoleculeViewGlobalAnnouncementsUseCaseImpl"
+class "MoleculeViewProjectActivitiesUseCaseImpl"
+class "MoleculeViewProjectAnnouncementsUseCaseImpl"
+class "MoleculeViewProjectsUseCaseImpl"
+class "MqttSourceConfig" <<singleton>>
+class "NaturalLanguageSearchConfig" <<singleton>>
+class "NaturalLanguageSearchImplLazyInit" <<singleton>>
+class "NaturalLanguageSearchIndexerConfig" <<singleton>>
+class "NotebookServerFactory"
+class "OAuthDeviceCodeGeneratorDefault"
+class "OAuthDeviceCodeServiceImpl"
+class "OAuthGithub" <<singleton>>
+class "ObjectStoreBuilderLocalFs" <<agnostic>>
+class "ObjectStoreRegistryImpl" <<singleton>>
+class "OsoDatasetAuthorizer"
+class "OsoResourceServiceImpl"
+class "OutboxAgentImpl" <<singleton>>
+class "OutboxAgentMetrics" <<singleton>>
+class "OutboxConfig" <<singleton>>
+class "OutboxDispatchingImpl"
+class "OutboxImmediateImpl"
+class "OutboxTransactionalImpl"
+class "OutputConfig" <<singleton>>
+class "PasswordHashingMode" <<singleton>>
+class "PasswordPolicyConfig" <<singleton>>
+class "PollingIngestServiceImpl"
+class "Pool" <<singleton>>
+class "PredefinedAccountsConfig" <<singleton>>
+class "PredefinedAccountsRegistrator"
+class "ProvenanceServiceImpl"
+class "PullDatasetUseCaseImpl"
+class "PullRequestPlannerImpl"
+class "PushDatasetUseCaseImpl"
+class "PushIngestDataUseCaseImpl"
+class "PushIngestExecutorImpl"
+class "PushIngestPlannerImpl"
+class "PushRequestPlannerImpl"
+class "QueryDatasetDataUseCaseImpl"
+class "QueryServiceImpl"
+class "QuotaDefaultsConfig" <<singleton>>
+class "RebacDatasetLifecycleMessageConsumer"
+class "RebacDatasetRegistryFacadeImpl"
+class "RebacIndexer"
+class "RebacServiceImpl"
+class "Registry" <<singleton>>
+class "RemoteAliasResolverImpl"
+class "RemoteAliasesRegistryImpl"
+class "RemoteReposDir" <<singleton>>
+class "RemoteRepositoryRegistryImpl"
+class "RemoteStatusServiceImpl"
+class "RenameDatasetUseCaseImpl"
+class "ResetDatasetUseCaseImpl"
+class "ResetExecutorImpl"
+class "ResetPlannerImpl"
+class "ResourceLoaderImpl"
+class "RunInfoDir" <<singleton>>
+class "SchemaServiceImpl"
+class "SearchServiceRemoteImpl"
+class "SessionAuthAnonymous"
+class "SessionAuthConfig" <<singleton>>
+class "SessionCachingConfig" <<singleton>>
+class "SessionContextBuilder"
+class "SessionId" <<singleton>>
+class "SessionManagerCaching"
+class "SessionManagerCachingState" <<singleton>>
+class "SetWatermarkExecutorImpl"
+class "SetWatermarkPlannerImpl"
+class "SetWatermarkUseCaseImpl"
+class "SimpleTransferProtocol"
+class "SourceConfig" <<singleton>>
+class "SparkLivyServerFactory"
+class "SqlInfoData" <<singleton>>
+class "SqliteAccessTokenRepository"
+class "SqliteAccountQuotaEventStore"
+class "SqliteAccountRepository"
+class "SqliteDatasetDataBlockRepository"
+class "SqliteDatasetDependencyRepository"
+class "SqliteDatasetEntryRepository"
+class "SqliteDatasetEnvVarRepository"
+class "SqliteDatasetKeyBlockRepository"
+class "SqliteDatasetReferenceRepository"
+class "SqliteDatasetStatisticsRepository"
+class "SqliteDidSecretKeyRepository"
+class "SqliteFlowConfigurationEventStore"
+class "SqliteFlowEventStore"
+class "SqliteFlowProcessStateQuery"
+class "SqliteFlowProcessStateRepository"
+class "SqliteFlowSystemEventBridge" <<agnostic>>
+class "SqliteFlowTriggerEventStore"
+class "SqliteOAuthDeviceCodeRepository"
+class "SqliteOutboxMessageConsumptionRepository"
+class "SqliteOutboxMessageRepository"
+class "SqlitePlugin"
+class "SqliteRebacRepository"
+class "SqliteTaskEventStore"
+class "SqliteTransactionManager"
+class "SqliteWeb3AuthEip4361NonceRepository"
+class "SqliteWebhookDeliveryRepository"
+class "SqliteWebhookSubscriptionEventStore"
+class "SyncRequestBuilder"
+class "SyncServiceImpl"
+class "SystemTimeSourceDefault" <<agnostic>>
+class "TaskAgentConfig" <<singleton>>
+class "TenancyConfig" <<singleton>>
+class "TransactionRef" <<singleton>>
+class "TransactionRefT" <<singleton>>
+class "TransformElaborationServiceImpl"
+class "TransformExecutorImpl"
+class "TransformRequestPlannerImpl"
+class "UpdateAccountUseCaseImpl"
+class "UpdateCollectionEntriesUseCaseImpl"
+class "UpdateVersionedFileUseCaseImpl"
+class "VectorRepositoryConfigQdrantContainer" <<singleton>>
+class "VectorRepositoryQdrantContainer" <<singleton>>
+class "VerificationServiceImpl"
+class "VerifyDatasetUseCaseImpl"
+class "ViewCollectionEntriesUseCaseImpl"
+class "ViewVersionedFileHistoryUseCaseImpl"
+class "Web3AuthEip4361NonceServiceImpl"
+class "WebhooksConfig" <<singleton>>
+class "WorkspaceLayout" <<singleton>>
+class "WorkspaceService"
+class "WsSmartTransferProtocolClient"
+"ContainerRuntime"  --> "ContainerRuntimeConfig"
+"DatabasePasswordProvider" <|-- "DatabaseNoPasswordProvider"
+"DatabaseTransactionRunner"  --> "Catalog"
+"DatabaseTransactionManager" <|-- "SqliteTransactionManager"
+"SqliteTransactionManager"  --> "Pool"
+"EngineProvisioner" <|-- "EngineProvisionerLocal"
+"EngineProvisionerLocal"  --> "ContainerRuntime"
+"EngineProvisionerLocal"  --> "EngineProvisionerLocalConfig"
+"EngineProvisionerLocal"  --> "RunInfoDir"
+"CompactionExecutor" <|-- "CompactionExecutorImpl"
+"CompactionExecutorImpl"  --> "ObjectStoreRegistry"
+"CompactionExecutorImpl"  --> "SystemTimeSource"
+"CompactionExecutorImpl"  --> "EngineConfigDatafusionEmbeddedCompaction"
+"CompactionExecutorImpl"  --> "RunInfoDir"
+"CompactionPlanner" <|-- "CompactionPlannerImpl"
+"ExportService" <|-- "ExportServiceImpl"
+"DataFormatRegistry" <|-- "DataFormatRegistryImpl"
+"FetchService"  --> "ContainerRuntime"
+"FetchService"  --> "DatasetKeyValueService"
+"FetchService" "?" --> "EthereumSourceConfig"
+"FetchService" "?" --> "HttpSourceConfig"
+"FetchService" "?" --> "MqttSourceConfig"
+"FetchService" "?" --> "SourceConfig"
+"FetchService"  --> "RunInfoDir"
+"PollingIngestService" <|-- "PollingIngestServiceImpl"
+"PollingIngestServiceImpl"  --> "EngineProvisioner"
+"PollingIngestServiceImpl"  --> "DataFormatRegistry"
+"PollingIngestServiceImpl"  --> "ObjectStoreRegistry"
+"PollingIngestServiceImpl"  --> "SystemTimeSource"
+"PollingIngestServiceImpl"  --> "EngineConfigDatafusionEmbeddedIngest"
+"PollingIngestServiceImpl"  --> "FetchService"
+"PollingIngestServiceImpl"  --> "CacheDir"
+"PollingIngestServiceImpl"  --> "RunInfoDir"
+"PushIngestExecutor" <|-- "PushIngestExecutorImpl"
+"PushIngestExecutorImpl"  --> "AccountQuotaStorageChecker"
+"PushIngestExecutorImpl"  --> "AccountService"
+"PushIngestExecutorImpl"  --> "EngineProvisioner"
+"PushIngestExecutorImpl"  --> "DataFormatRegistry"
+"PushIngestExecutorImpl"  --> "ObjectStoreRegistry"
+"PushIngestExecutorImpl"  --> "EngineConfigDatafusionEmbeddedIngest"
+"PushIngestExecutorImpl"  --> "TenancyConfig"
+"PushIngestPlanner" <|-- "PushIngestPlannerImpl"
+"PushIngestPlannerImpl"  --> "DataFormatRegistry"
+"PushIngestPlannerImpl"  --> "SystemTimeSource"
+"PushIngestPlannerImpl"  --> "RunInfoDir"
+"MetadataQueryService" <|-- "MetadataQueryServiceImpl"
+"ObjectStoreBuilder" <|-- "ObjectStoreBuilderLocalFs"
+"ObjectStoreRegistry" <|-- "ObjectStoreRegistryImpl"
+"ObjectStoreRegistryImpl" "*" --> "ObjectStoreBuilder"
+"ProvenanceService" <|-- "ProvenanceServiceImpl"
+"ProvenanceServiceImpl"  --> "RebacDatasetRegistryFacade"
+"ProvenanceServiceImpl"  --> "DatasetRegistry"
+"ProvenanceServiceImpl"  --> "DependencyGraphService"
+"PullRequestPlanner" <|-- "PullRequestPlannerImpl"
+"PullRequestPlannerImpl"  --> "RemoteAliasesRegistry"
+"PullRequestPlannerImpl"  --> "TransformRequestPlanner"
+"PullRequestPlannerImpl"  --> "DatasetRegistry"
+"PullRequestPlannerImpl"  --> "DependencyGraphService"
+"PullRequestPlannerImpl"  --> "SyncRequestBuilder"
+"PullRequestPlannerImpl"  --> "CurrentAccountSubject"
+"PushRequestPlanner" <|-- "PushRequestPlannerImpl"
+"PushRequestPlannerImpl"  --> "RemoteAliasResolver"
+"QueryService" <|-- "QueryServiceImpl"
+"QueryServiceImpl"  --> "DatasetActionAuthorizer"
+"QueryServiceImpl"  --> "DatasetRegistry"
+"QueryServiceImpl"  --> "SessionContextBuilder"
+"RemoteAliasResolver" <|-- "RemoteAliasResolverImpl"
+"RemoteAliasResolverImpl"  --> "RemoteAliasesRegistry"
+"RemoteAliasResolverImpl"  --> "RemoteRepositoryRegistry"
+"RemoteAliasResolverImpl"  --> "OdfServerAccessTokenResolver"
+"RemoteAliasesRegistry" <|-- "RemoteAliasesRegistryImpl"
+"RemoteAliasesRegistryImpl"  --> "DatasetRegistry"
+"RemoteRepositoryRegistry" <|-- "RemoteRepositoryRegistryImpl"
+"RemoteRepositoryRegistryImpl"  --> "RemoteReposDir"
+"RemoteStatusService" <|-- "RemoteStatusServiceImpl"
+"RemoteStatusServiceImpl"  --> "RemoteAliasesRegistry"
+"RemoteStatusServiceImpl"  --> "DatasetRegistry"
+"RemoteStatusServiceImpl"  --> "DatasetFactory"
+"ResourceLoader" <|-- "ResourceLoaderImpl"
+"ResetExecutor" <|-- "ResetExecutorImpl"
+"ResetPlanner" <|-- "ResetPlannerImpl"
+"SchemaService" <|-- "SchemaServiceImpl"
+"SchemaServiceImpl"  --> "SessionContextBuilder"
+"SearchServiceRemote" <|-- "SearchServiceRemoteImpl"
+"SearchServiceRemoteImpl"  --> "RemoteRepositoryRegistry"
+"SearchServiceRemoteImpl"  --> "OdfServerAccessTokenResolver"
+"SessionContextBuilder"  --> "ObjectStoreRegistry"
+"SessionContextBuilder"  --> "DatasetRegistry"
+"SessionContextBuilder"  --> "EngineConfigDatafusionEmbeddedBatchQuery"
+"SyncRequestBuilder"  --> "RemoteAliasResolver"
+"SyncRequestBuilder"  --> "RemoteRepositoryRegistry"
+"SyncRequestBuilder"  --> "DatasetRegistry"
+"SyncRequestBuilder"  --> "DatasetFactory"
+"SyncService" <|-- "SyncServiceImpl"
+"SyncServiceImpl"  --> "SmartTransferProtocolClient"
+"SyncServiceImpl"  --> "RemoteRepositoryRegistry"
+"SyncServiceImpl"  --> "DatasetFactory"
+"SyncServiceImpl"  --> "IpfsClient"
+"SyncServiceImpl"  --> "SimpleTransferProtocol"
+"TransformElaborationService" <|-- "TransformElaborationServiceImpl"
+"TransformElaborationServiceImpl"  --> "CompactionExecutor"
+"TransformElaborationServiceImpl"  --> "CompactionPlanner"
+"TransformElaborationServiceImpl"  --> "SystemTimeSource"
+"TransformExecutor" <|-- "TransformExecutorImpl"
+"TransformExecutorImpl"  --> "EngineProvisioner"
+"TransformRequestPlanner" <|-- "TransformRequestPlannerImpl"
+"TransformRequestPlannerImpl"  --> "DatasetRegistry"
+"VerificationService" <|-- "VerificationServiceImpl"
+"VerificationServiceImpl"  --> "TransformExecutor"
+"VerificationServiceImpl"  --> "TransformRequestPlanner"
+"SetWatermarkExecutor" <|-- "SetWatermarkExecutorImpl"
+"SetWatermarkPlanner" <|-- "SetWatermarkPlannerImpl"
+"SetWatermarkPlannerImpl"  --> "RemoteAliasesRegistry"
+"SetWatermarkPlannerImpl"  --> "SystemTimeSource"
+"CompactDatasetUseCase" <|-- "CompactDatasetUseCaseImpl"
+"CompactDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"CompactDatasetUseCaseImpl"  --> "CompactionExecutor"
+"CompactDatasetUseCaseImpl"  --> "CompactionPlanner"
+"PullDatasetUseCase" <|-- "PullDatasetUseCaseImpl"
+"PullDatasetUseCaseImpl"  --> "Catalog"
+"PullDatasetUseCaseImpl"  --> "PollingIngestService"
+"PullDatasetUseCaseImpl"  --> "SyncService"
+"PullDatasetUseCaseImpl"  --> "TransformElaborationService"
+"PullDatasetUseCaseImpl"  --> "TransformExecutor"
+"PullDatasetUseCaseImpl"  --> "TenancyConfig"
+"PushDatasetUseCase" <|-- "PushDatasetUseCaseImpl"
+"PushDatasetUseCaseImpl"  --> "Catalog"
+"PushDatasetUseCaseImpl"  --> "SyncService"
+"PushIngestDataUseCase" <|-- "PushIngestDataUseCaseImpl"
+"PushIngestDataUseCaseImpl"  --> "PushIngestExecutor"
+"PushIngestDataUseCaseImpl"  --> "PushIngestPlanner"
+"PushIngestDataUseCaseImpl"  --> "Outbox"
+"GetDatasetSchemaUseCase" <|-- "GetDatasetSchemaUseCaseImpl"
+"GetDatasetSchemaUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"GetDatasetSchemaUseCaseImpl"  --> "SchemaService"
+"QueryDatasetDataUseCase" <|-- "QueryDatasetDataUseCaseImpl"
+"QueryDatasetDataUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"QueryDatasetDataUseCaseImpl"  --> "QueryService"
+"QueryDatasetDataUseCaseImpl"  --> "DatasetRegistry"
+"ResetDatasetUseCase" <|-- "ResetDatasetUseCaseImpl"
+"ResetDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"ResetDatasetUseCaseImpl"  --> "ResetExecutor"
+"ResetDatasetUseCaseImpl"  --> "ResetPlanner"
+"SetWatermarkUseCase" <|-- "SetWatermarkUseCaseImpl"
+"SetWatermarkUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"SetWatermarkUseCaseImpl"  --> "SetWatermarkExecutor"
+"SetWatermarkUseCaseImpl"  --> "SetWatermarkPlanner"
+"VerifyDatasetUseCase" <|-- "VerifyDatasetUseCaseImpl"
+"VerifyDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"VerifyDatasetUseCaseImpl"  --> "VerificationService"
+"SimpleTransferProtocol"  --> "Catalog"
+"SearchEntitySchemaProvider" <|-- "AccountSearchSchemaProvider"
+"AccountSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "AccountSearchUpdater"
+"MessageConsumerT" <|-- "AccountSearchUpdater"
+"AccountSearchUpdater"  --> "SearchService"
+"AccessTokenService" <|-- "AccessTokenServiceImpl"
+"AccessTokenServiceImpl"  --> "AccessTokenRepository"
+"AccessTokenServiceImpl"  --> "Outbox"
+"AccessTokenServiceImpl"  --> "SystemTimeSource"
+"AccountQuotaService" <|-- "AccountQuotaServiceImpl"
+"AccountQuotaServiceImpl"  --> "AccountQuotaEventStore"
+"AccountQuotaServiceImpl"  --> "SystemTimeSource"
+"AccountService" <|-- "AccountServiceImpl"
+"AccountServiceImpl" "?" --> "PasswordHashingMode"
+"AccountServiceImpl"  --> "AccountRepository"
+"AccountServiceImpl"  --> "PasswordHashRepository"
+"AuthenticationService" <|-- "AuthenticationServiceImpl"
+"JwtTokenIssuer" <|-- "AuthenticationServiceImpl"
+"AuthenticationServiceImpl"  --> "AccessTokenService"
+"AuthenticationServiceImpl"  --> "AccountService"
+"AuthenticationServiceImpl" "*" --> "AuthenticationProvider"
+"AuthenticationServiceImpl"  --> "OAuthDeviceCodeService"
+"AuthenticationServiceImpl"  --> "Outbox"
+"AuthenticationServiceImpl"  --> "SystemTimeSource"
+"AuthenticationServiceImpl"  --> "AuthConfig"
+"AuthenticationServiceImpl"  --> "JwtAuthenticationConfig"
+"AuthenticationProvider" <|-- "LoginPasswordAuthProvider"
+"LoginPasswordAuthProvider"  --> "AccountService"
+"OAuthDeviceCodeGenerator" <|-- "OAuthDeviceCodeGeneratorDefault"
+"InitOnStartup" <|-- "OAuthDeviceCodeServiceImpl"
+"OAuthDeviceCodeService" <|-- "OAuthDeviceCodeServiceImpl"
+"OAuthDeviceCodeServiceImpl"  --> "OAuthDeviceCodeRepository"
+"OAuthDeviceCodeServiceImpl"  --> "OAuthDeviceCodeGenerator"
+"OAuthDeviceCodeServiceImpl"  --> "SystemTimeSource"
+"InitOnStartup" <|-- "PredefinedAccountsRegistrator"
+"PredefinedAccountsRegistrator"  --> "AccountService"
+"PredefinedAccountsRegistrator"  --> "CreateAccountUseCase"
+"PredefinedAccountsRegistrator"  --> "UpdateAccountUseCase"
+"PredefinedAccountsRegistrator"  --> "RebacService"
+"PredefinedAccountsRegistrator"  --> "PredefinedAccountsConfig"
+"PredefinedAccountsRegistrator"  --> "AccountProperties"
+"CreateAccountUseCase" <|-- "CreateAccountUseCaseImpl"
+"CreateAccountUseCaseImpl"  --> "DidSecretKeyRepository"
+"CreateAccountUseCaseImpl"  --> "AccountService"
+"CreateAccountUseCaseImpl"  --> "Outbox"
+"CreateAccountUseCaseImpl"  --> "SystemTimeSource"
+"CreateAccountUseCaseImpl"  --> "DidSecretEncryptionConfig"
+"DeleteAccountUseCase" <|-- "DeleteAccountUseCaseImpl"
+"DeleteAccountUseCaseImpl"  --> "AccountService"
+"DeleteAccountUseCaseImpl"  --> "AccountAuthorizationHelper"
+"DeleteAccountUseCaseImpl"  --> "Outbox"
+"DeleteAccountUseCaseImpl"  --> "SystemTimeSource"
+"ModifyAccountPasswordUseCase" <|-- "ModifyAccountPasswordUseCaseImpl"
+"ModifyAccountPasswordUseCaseImpl"  --> "AccountService"
+"ModifyAccountPasswordUseCaseImpl"  --> "AccountAuthorizationHelper"
+"ModifyAccountPasswordUseCaseImpl"  --> "Outbox"
+"ModifyAccountPasswordUseCaseImpl"  --> "SystemTimeSource"
+"UpdateAccountUseCase" <|-- "UpdateAccountUseCaseImpl"
+"UpdateAccountUseCaseImpl"  --> "AccountService"
+"UpdateAccountUseCaseImpl" "lazy" --> "AccountAuthorizationHelper"
+"UpdateAccountUseCaseImpl"  --> "Outbox"
+"UpdateAccountUseCaseImpl"  --> "SystemTimeSource"
+"AccountAuthorizationHelper" <|-- "AccountAuthorizationHelperImpl"
+"AccountAuthorizationHelperImpl"  --> "RebacService"
+"AccountAuthorizationHelperImpl"  --> "CurrentAccountSubject"
+"AccessTokenRepository" <|-- "SqliteAccessTokenRepository"
+"SqliteAccessTokenRepository"  --> "TransactionRefT"
+"AccountQuotaEventStore" <|-- "SqliteAccountQuotaEventStore"
+"SqliteAccountQuotaEventStore"  --> "TransactionRefT"
+"AccountRepository" <|-- "SqliteAccountRepository"
+"ExpensiveAccountRepository" <|-- "SqliteAccountRepository"
+"PasswordHashRepository" <|-- "SqliteAccountRepository"
+"SqliteAccountRepository"  --> "TransactionRefT"
+"DidSecretKeyRepository" <|-- "SqliteDidSecretKeyRepository"
+"SqliteDidSecretKeyRepository"  --> "TransactionRefT"
+"OAuthDeviceCodeRepository" <|-- "SqliteOAuthDeviceCodeRepository"
+"SqliteOAuthDeviceCodeRepository"  --> "TransactionRefT"
+"DatasetActionAuthorizer" <|-- "OsoDatasetAuthorizer"
+"OsoDatasetAuthorizer"  --> "CurrentAccountSubject"
+"OsoDatasetAuthorizer"  --> "KamuAuthOso"
+"OsoDatasetAuthorizer"  --> "OsoResourceServiceImpl"
+"OsoResourceServiceImpl"  --> "RebacService"
+"OsoResourceServiceImpl"  --> "DatasetEntryService"
+"KamuFlightSqlService"  --> "SqlInfoData"
+"KamuFlightSqlService" "lazy" --> "SessionAuth"
+"KamuFlightSqlService" "lazy" --> "SessionManager"
+"SessionAuth" <|-- "SessionAuthAnonymous"
+"SessionManager" <|-- "SessionManagerCaching"
+"SessionManagerCaching" "lazy" --> "QueryService"
+"SessionManagerCaching"  --> "SystemTimeSource"
+"SessionManagerCaching"  --> "CurrentAccountSubject"
+"SessionManagerCaching"  --> "SessionCachingConfig"
+"SessionManagerCaching"  --> "SessionManagerCachingState"
+"SessionManagerCaching"  --> "SessionId"
+"SmartTransferProtocolClient" <|-- "WsSmartTransferProtocolClient"
+"WsSmartTransferProtocolClient"  --> "Catalog"
+"WsSmartTransferProtocolClient"  --> "OdfServerAccessTokenResolver"
+"AuthenticationProvider" <|-- "OAuthGithub"
+"OAuthGithub"  --> "GithubAuthenticationConfig"
+"MessageConsumer" <|-- "RebacDatasetLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "RebacDatasetLifecycleMessageConsumer"
+"RebacDatasetLifecycleMessageConsumer"  --> "RebacService"
+"RebacDatasetLifecycleMessageConsumer"  --> "DatasetProperties"
+"RebacDatasetRegistryFacade" <|-- "RebacDatasetRegistryFacadeImpl"
+"RebacDatasetRegistryFacadeImpl"  --> "DatasetActionAuthorizer"
+"RebacDatasetRegistryFacadeImpl"  --> "DatasetRegistry"
+"InitOnStartup" <|-- "RebacIndexer"
+"RebacIndexer"  --> "ExpensiveAccountRepository"
+"RebacIndexer"  --> "RebacService"
+"RebacIndexer"  --> "DatasetEntryService"
+"RebacIndexer"  --> "PredefinedAccountsConfig"
+"RebacService" <|-- "RebacServiceImpl"
+"RebacServiceImpl"  --> "RebacRepository"
+"RebacServiceImpl"  --> "AccountProperties"
+"RebacServiceImpl"  --> "DatasetProperties"
+"ApplyAccountDatasetRelationsUseCase" <|-- "ApplyAccountDatasetRelationsUseCaseImpl"
+"ApplyAccountDatasetRelationsUseCaseImpl"  --> "RebacService"
+"ApplyAccountDatasetRelationsUseCaseImpl"  --> "DatasetActionAuthorizer"
+"RebacRepository" <|-- "SqliteRebacRepository"
+"SqliteRebacRepository"  --> "TransactionRefT"
+"InitOnStartup" <|-- "Web3AuthEip4361NonceServiceImpl"
+"Web3AuthEip4361NonceService" <|-- "Web3AuthEip4361NonceServiceImpl"
+"Web3AuthEip4361NonceServiceImpl"  --> "Web3AuthEip4361NonceRepository"
+"Web3AuthEip4361NonceServiceImpl"  --> "SystemTimeSource"
+"Web3AuthEip4361NonceRepository" <|-- "SqliteWeb3AuthEip4361NonceRepository"
+"SqliteWeb3AuthEip4361NonceRepository"  --> "TransactionRefT"
+"FlightSqlServiceFactory"  --> "Catalog"
+"NotebookServerFactory"  --> "ContainerRuntime"
+"NotebookServerFactory"  --> "JupyterConfig"
+"NotebookServerFactory"  --> "WorkspaceLayout"
+"SparkLivyServerFactory"  --> "ContainerRuntime"
+"SparkLivyServerFactory"  --> "JupyterConfig"
+"SparkLivyServerFactory"  --> "WorkspaceLayout"
+"ConfigService"  --> "WorkspaceLayout"
+"ConfirmDeleteService"  --> "RemoteStatusService"
+"ConfirmDeleteService"  --> "Interact"
+"GcService"  --> "WorkspaceLayout"
+"OdfServerAccessTokenResolver" <|-- "AccessTokenRegistryService"
+"AccessTokenRegistryService"  --> "AccessTokenStore"
+"AccessTokenRegistryService"  --> "CurrentAccountSubject"
+"AccessTokenStore" <|-- "CLIAccessTokenStore"
+"CLIAccessTokenStore"  --> "WorkspaceLayout"
+"LoginService"  --> "SystemTimeSource"
+"WorkspaceService"  --> "bool"
+"WorkspaceService"  --> "WorkspaceLayout"
+"DidGenerator" <|-- "DidGeneratorDefault"
+"MessageConsumer" <|-- "DidSecretService"
+"MessageConsumerT" <|-- "DidSecretService"
+"MessageConsumerT" <|-- "DidSecretService"
+"DidSecretService"  --> "DidSecretKeyRepository"
+"SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
+"DatasetSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"DatasetSearchUpdater"  --> "DatasetEntryService"
+"DatasetSearchUpdater"  --> "DatasetRegistry"
+"DatasetSearchUpdater"  --> "SearchService"
+"AccountQuotaStorageChecker" <|-- "AccountQuotaCheckerStorageImpl"
+"AccountQuotaCheckerStorageImpl"  --> "AccountQuotaEventStore"
+"AccountQuotaCheckerStorageImpl"  --> "DatasetStatisticsService"
+"AccountQuotaCheckerStorageImpl"  --> "QuotaDefaultsConfig"
+"InitOnStartup" <|-- "DatasetBlockIndexer"
+"DatasetBlockIndexer"  --> "Catalog"
+"MessageConsumer" <|-- "DatasetBlockUpdateHandler"
+"MessageConsumerT" <|-- "DatasetBlockUpdateHandler"
+"DatasetBlockUpdateHandler"  --> "DatasetDataBlockRepository"
+"DatasetBlockUpdateHandler"  --> "DatasetKeyBlockRepository"
+"DatasetBlockUpdateHandler"  --> "DatasetRegistry"
+"DatasetBlockUpdateHandler"  --> "Outbox"
+"MessageConsumer" <|-- "DatasetAccountLifecycleHandler"
+"MessageConsumerT" <|-- "DatasetAccountLifecycleHandler"
+"DatasetAccountLifecycleHandler"  --> "DatasetRegistry"
+"DatasetAccountLifecycleHandler"  --> "DeleteDatasetUseCase"
+"DatasetAccountLifecycleHandler"  --> "DatasetEntryWriter"
+"MessageConsumer" <|-- "DatasetAliasUpdateHandler"
+"MessageConsumerT" <|-- "DatasetAliasUpdateHandler"
+"MessageConsumerT" <|-- "DatasetAliasUpdateHandler"
+"DatasetAliasUpdateHandler"  --> "DatasetRegistry"
+"DatasetIncrementQueryService" <|-- "DatasetIncrementQueryServiceImpl"
+"DatasetIncrementQueryServiceImpl"  --> "DatasetRegistry"
+"InitOnStartup" <|-- "DatasetEntryIndexer"
+"DatasetEntryIndexer"  --> "AccountService"
+"DatasetEntryIndexer" "lazy" --> "DatasetEntryRepository"
+"DatasetEntryIndexer"  --> "DatasetStorageUnit"
+"DatasetEntryIndexer"  --> "SystemTimeSource"
+"DatasetEntryService" <|-- "DatasetEntryServiceImpl"
+"DatasetRegistry" <|-- "DatasetEntryServiceImpl"
+"DatasetEntryWriter" <|-- "DatasetEntryServiceImpl"
+"DatasetEntryServiceImpl"  --> "AccountService"
+"DatasetEntryServiceImpl"  --> "DatasetEntryRepository"
+"DatasetEntryServiceImpl"  --> "DatasetStorageUnit"
+"DatasetEntryServiceImpl"  --> "SystemTimeSource"
+"DatasetEntryServiceImpl"  --> "CurrentAccountSubject"
+"DatasetEntryServiceImpl"  --> "TenancyConfig"
+"DatasetEnvVarService" <|-- "DatasetEnvVarServiceNull"
+"DatasetKeyValueService" <|-- "DatasetKeyValueServiceSysEnv"
+"MessageConsumer" <|-- "DependencyGraphImmediateListener"
+"MessageConsumerT" <|-- "DependencyGraphImmediateListener"
+"DependencyGraphImmediateListener"  --> "DatasetDependencyRepository"
+"DependencyGraphImmediateListener"  --> "DatasetRegistry"
+"DependencyGraphImmediateListener"  --> "DependencyGraphService"
+"DependencyGraphImmediateListener"  --> "Outbox"
+"InitOnStartup" <|-- "DependencyGraphIndexer"
+"DependencyGraphIndexer"  --> "DatasetDependencyRepository"
+"DependencyGraphIndexer"  --> "DatasetRegistry"
+"DependencyGraphIndexer"  --> "DependencyGraphServiceImpl"
+"DependencyGraphService" <|-- "DependencyGraphServiceImpl"
+"MessageConsumer" <|-- "DependencyGraphServiceImpl"
+"MessageConsumerT" <|-- "DependencyGraphServiceImpl"
+"MessageConsumerT" <|-- "DependencyGraphServiceImpl"
+"DatasetLfsBuilder" <|-- "DatasetLfsBuilderDatabaseBackedImpl"
+"DatasetLfsBuilderDatabaseBackedImpl"  --> "Catalog"
+"DatasetLfsBuilderDatabaseBackedImpl"  --> "MetadataChainDbBackedConfig"
+"InitOnStartup" <|-- "DatasetReferenceIndexer"
+"DatasetReferenceIndexer"  --> "DatasetEntryRepository"
+"DatasetReferenceIndexer"  --> "DatasetReferenceRepository"
+"DatasetReferenceIndexer"  --> "DatasetStorageUnit"
+"DatasetReferenceService" <|-- "DatasetReferenceServiceImpl"
+"MessageConsumer" <|-- "DatasetReferenceServiceImpl"
+"MessageConsumerT" <|-- "DatasetReferenceServiceImpl"
+"DatasetReferenceServiceImpl"  --> "DatasetReferenceRepository"
+"DatasetReferenceServiceImpl"  --> "Outbox"
+"DatasetReferenceServiceImpl"  --> "DatasetStorageUnitWriter"
+"DatasetReferenceServiceImpl"  --> "SystemTimeSource"
+"InitOnStartup" <|-- "DatasetStatisticsIndexer"
+"DatasetStatisticsIndexer"  --> "Catalog"
+"DatasetStatisticsService" <|-- "DatasetStatisticsServiceImpl"
+"DatasetStatisticsServiceImpl"  --> "DatasetStatisticsRepository"
+"MessageConsumer" <|-- "DatasetStatisticsUpdateHandler"
+"MessageConsumerT" <|-- "DatasetStatisticsUpdateHandler"
+"DatasetStatisticsUpdateHandler"  --> "DatasetStatisticsRepository"
+"DatasetStatisticsUpdateHandler"  --> "DatasetRegistry"
+"FindCollectionEntriesUseCase" <|-- "FindCollectionEntriesUseCaseImpl"
+"FindCollectionEntriesUseCaseImpl"  --> "QueryService"
+"UpdateCollectionEntriesUseCase" <|-- "UpdateCollectionEntriesUseCaseImpl"
+"UpdateCollectionEntriesUseCaseImpl"  --> "QueryService"
+"UpdateCollectionEntriesUseCaseImpl"  --> "PushIngestDataUseCase"
+"ViewCollectionEntriesUseCase" <|-- "ViewCollectionEntriesUseCaseImpl"
+"ViewCollectionEntriesUseCaseImpl"  --> "QueryService"
+"AppendDatasetMetadataBatchUseCase" <|-- "AppendDatasetMetadataBatchUseCaseImpl"
+"CommitDatasetEventUseCase" <|-- "CommitDatasetEventUseCaseImpl"
+"CommitDatasetEventUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"CommitDatasetEventUseCaseImpl"  --> "SystemTimeSource"
+"CreateDatasetFromSnapshotUseCase" <|-- "CreateDatasetFromSnapshotUseCaseImpl"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "DidSecretKeyRepository"
+"CreateDatasetFromSnapshotUseCaseImpl" "lazy" --> "RebacService"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "DidGenerator"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "DatasetRegistry"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "SystemTimeSource"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "CurrentAccountSubject"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "DidSecretEncryptionConfig"
+"CreateDatasetFromSnapshotUseCaseImpl"  --> "CreateDatasetUseCaseHelper"
+"CreateDatasetUseCase" <|-- "CreateDatasetUseCaseImpl"
+"CreateDatasetUseCaseImpl" "lazy" --> "RebacService"
+"CreateDatasetUseCaseImpl"  --> "CurrentAccountSubject"
+"CreateDatasetUseCaseImpl"  --> "CreateDatasetUseCaseHelper"
+"DeleteDatasetUseCase" <|-- "DeleteDatasetUseCaseImpl"
+"DeleteDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"DeleteDatasetUseCaseImpl"  --> "DatasetRegistry"
+"DeleteDatasetUseCaseImpl"  --> "DependencyGraphService"
+"DeleteDatasetUseCaseImpl"  --> "DatasetEntryWriter"
+"DeleteDatasetUseCaseImpl"  --> "Outbox"
+"DeleteDatasetUseCaseImpl"  --> "DatasetStorageUnitWriter"
+"DeleteDatasetUseCaseImpl"  --> "SystemTimeSource"
+"GetDatasetDownstreamDependenciesUseCase" <|-- "GetDatasetDownstreamDependenciesUseCaseImpl"
+"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetActionAuthorizer"
+"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetEntryService"
+"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DependencyGraphService"
+"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "TenancyConfig"
+"GetDatasetUpstreamDependenciesUseCase" <|-- "GetDatasetUpstreamDependenciesUseCaseImpl"
+"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DatasetActionAuthorizer"
+"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DatasetEntryService"
+"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DependencyGraphService"
+"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "TenancyConfig"
+"RenameDatasetUseCase" <|-- "RenameDatasetUseCaseImpl"
+"RenameDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"RenameDatasetUseCaseImpl"  --> "DatasetEntryWriter"
+"RenameDatasetUseCaseImpl"  --> "Outbox"
+"RenameDatasetUseCaseImpl"  --> "SystemTimeSource"
+"FindVersionedFileVersionUseCase" <|-- "FindVersionedFileVersionUseCaseImpl"
+"FindVersionedFileVersionUseCaseImpl"  --> "QueryService"
+"UpdateVersionedFileUseCase" <|-- "UpdateVersionedFileUseCaseImpl"
+"UpdateVersionedFileUseCaseImpl"  --> "QueryService"
+"UpdateVersionedFileUseCaseImpl"  --> "PushIngestDataUseCase"
+"UpdateVersionedFileUseCaseImpl"  --> "SystemTimeSource"
+"ViewVersionedFileHistoryUseCase" <|-- "ViewVersionedFileHistoryUseCaseImpl"
+"ViewVersionedFileHistoryUseCaseImpl"  --> "QueryService"
+"CreateDatasetUseCaseHelper" "lazy" --> "AccountService"
+"CreateDatasetUseCaseHelper"  --> "DatasetEntryWriter"
+"CreateDatasetUseCaseHelper"  --> "Outbox"
+"CreateDatasetUseCaseHelper"  --> "DatasetStorageUnitWriter"
+"CreateDatasetUseCaseHelper"  --> "SystemTimeSource"
+"CreateDatasetUseCaseHelper"  --> "TenancyConfig"
+"DatasetDataBlockRepository" <|-- "SqliteDatasetDataBlockRepository"
+"SqliteDatasetDataBlockRepository"  --> "TransactionRefT"
+"DatasetDependencyRepository" <|-- "SqliteDatasetDependencyRepository"
+"DatasetEntryRemovalListener" <|-- "SqliteDatasetDependencyRepository"
+"SqliteDatasetDependencyRepository"  --> "TransactionRefT"
+"DatasetEntryRepository" <|-- "SqliteDatasetEntryRepository"
+"SqliteDatasetEntryRepository"  --> "TransactionRefT"
+"SqliteDatasetEntryRepository" "*" --> "DatasetEntryRemovalListener"
+"DatasetEnvVarRepository" <|-- "SqliteDatasetEnvVarRepository"
+"SqliteDatasetEnvVarRepository"  --> "TransactionRefT"
+"DatasetKeyBlockRepository" <|-- "SqliteDatasetKeyBlockRepository"
+"SqliteDatasetKeyBlockRepository"  --> "TransactionRefT"
+"DatasetReferenceRepository" <|-- "SqliteDatasetReferenceRepository"
+"SqliteDatasetReferenceRepository"  --> "TransactionRefT"
+"DatasetStatisticsRepository" <|-- "SqliteDatasetStatisticsRepository"
+"SqliteDatasetStatisticsRepository"  --> "TransactionRefT"
+"FlowProcessStateQuery" <|-- "SqliteFlowProcessStateQuery"
+"SqliteFlowProcessStateQuery"  --> "TransactionRefT"
+"FlowProcessStateRepository" <|-- "SqliteFlowProcessStateRepository"
+"SqliteFlowProcessStateRepository"  --> "TransactionRefT"
+"SqliteFlowProcessStateRepository"  --> "SystemTimeSource"
+"FlowConfigurationEventStore" <|-- "SqliteFlowConfigurationEventStore"
+"SqliteFlowConfigurationEventStore"  --> "TransactionRefT"
+"FlowEventStore" <|-- "SqliteFlowEventStore"
+"SqliteFlowEventStore"  --> "TransactionRefT"
+"FlowSystemEventBridge" <|-- "SqliteFlowSystemEventBridge"
+"SqliteFlowSystemEventBridge"  --> "Pool"
+"FlowTriggerEventStore" <|-- "SqliteFlowTriggerEventStore"
+"SqliteFlowTriggerEventStore"  --> "TransactionRefT"
+"OutboxMessageConsumptionRepository" <|-- "SqliteOutboxMessageConsumptionRepository"
+"SqliteOutboxMessageConsumptionRepository"  --> "TransactionRefT"
+"OutboxMessageRepository" <|-- "SqliteOutboxMessageRepository"
+"SqliteOutboxMessageRepository"  --> "TransactionRefT"
+"SearchEntitySchemaProvider" <|-- "MoleculeSearchSchemaProvider"
+"MoleculeSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "MoleculeActivitySearchUpdater"
+"MessageConsumerT" <|-- "MoleculeActivitySearchUpdater"
+"MoleculeActivitySearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeAnnouncementSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeAnnouncementSearchUpdater"
+"MoleculeAnnouncementSearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeDataRoomSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeDataRoomSearchUpdater"
+"MoleculeDataRoomSearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeProjectSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeProjectSearchUpdater"
+"MoleculeProjectSearchUpdater"  --> "SearchService"
+"MoleculeAnnouncementsService" <|-- "MoleculeAnnouncementsServiceImpl"
+"MoleculeAnnouncementsServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeDataRoomCollectionService" <|-- "MoleculeDataRoomCollectionServiceImpl"
+"MoleculeDataRoomCollectionServiceImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeDataRoomCollectionServiceImpl"  --> "FindCollectionEntriesUseCase"
+"MoleculeDataRoomCollectionServiceImpl"  --> "UpdateCollectionEntriesUseCase"
+"MoleculeDataRoomCollectionServiceImpl"  --> "ViewCollectionEntriesUseCase"
+"MoleculeDatasetAccessorFactory"  --> "RebacDatasetRegistryFacade"
+"MoleculeDatasetAccessorFactory"  --> "QueryService"
+"MoleculeDatasetAccessorFactory"  --> "PushIngestDataUseCase"
+"MoleculeDatasetAccessorFactory"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeGlobalDataRoomActivitiesService" <|-- "MoleculeGlobalDataRoomActivitiesServiceImpl"
+"MoleculeGlobalDataRoomActivitiesServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeProjectsService" <|-- "MoleculeProjectsServiceImpl"
+"MoleculeProjectsServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeVersionedFileContentProvider" <|-- "MoleculeVersionedFileContentProviderImpl"
+"MoleculeVersionedFileContentProviderImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeAppendGlobalDataRoomActivityUseCase" <|-- "MoleculeAppendGlobalDataRoomActivityUseCaseImpl"
+"MoleculeAppendGlobalDataRoomActivityUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeAppendGlobalDataRoomActivityUseCaseImpl"  --> "Outbox"
+"MoleculeViewGlobalActivitiesUseCase" <|-- "MoleculeViewGlobalActivitiesUseCaseImpl"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "Catalog"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "MoleculeViewGlobalAnnouncementsUseCase"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectActivitiesUseCase" <|-- "MoleculeViewProjectActivitiesUseCaseImpl"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "Catalog"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "MoleculeViewProjectAnnouncementsUseCase"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeCreateAnnouncementUseCase" <|-- "MoleculeCreateAnnouncementUseCaseImpl"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "MoleculeFindDataRoomEntryUseCase"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "Outbox"
+"MoleculeFindProjectAnnouncementUseCase" <|-- "MoleculeFindProjectAnnouncementUseCaseImpl"
+"MoleculeFindProjectAnnouncementUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewGlobalAnnouncementsUseCase" <|-- "MoleculeViewGlobalAnnouncementsUseCaseImpl"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "Catalog"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectAnnouncementsUseCase" <|-- "MoleculeViewProjectAnnouncementsUseCaseImpl"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "Catalog"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "SearchService"
+"MoleculeCreateDataRoomEntryUseCase" <|-- "MoleculeCreateDataRoomEntryUseCaseImpl"
+"MoleculeCreateDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeCreateDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeFindDataRoomEntryUseCase" <|-- "MoleculeFindDataRoomEntryUseCaseImpl"
+"MoleculeFindDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeMoveDataRoomEntryUseCase" <|-- "MoleculeMoveDataRoomEntryUseCaseImpl"
+"MoleculeMoveDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeMoveDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeRemoveDataRoomEntryUseCase" <|-- "MoleculeRemoveDataRoomEntryUseCaseImpl"
+"MoleculeRemoveDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeRemoveDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeUpdateDataRoomEntryUseCase" <|-- "MoleculeUpdateDataRoomEntryUseCaseImpl"
+"MoleculeUpdateDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeUpdateDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeViewDataRoomEntriesUseCase" <|-- "MoleculeViewDataRoomEntriesUseCaseImpl"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "Catalog"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "SearchService"
+"MoleculeCreateProjectUseCase" <|-- "MoleculeCreateProjectUseCaseImpl"
+"MoleculeCreateProjectUseCaseImpl"  --> "AccountService"
+"MoleculeCreateProjectUseCaseImpl"  --> "CreateAccountUseCase"
+"MoleculeCreateProjectUseCaseImpl"  --> "RebacService"
+"MoleculeCreateProjectUseCaseImpl"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeCreateProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeCreateProjectUseCaseImpl"  --> "Outbox"
+"MoleculeDisableProjectUseCase" <|-- "MoleculeDisableProjectUseCaseImpl"
+"MoleculeDisableProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeDisableProjectUseCaseImpl"  --> "Outbox"
+"MoleculeEnableProjectUseCase" <|-- "MoleculeEnableProjectUseCaseImpl"
+"MoleculeEnableProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeEnableProjectUseCaseImpl"  --> "Outbox"
+"MoleculeFindProjectUseCase" <|-- "MoleculeFindProjectUseCaseImpl"
+"MoleculeFindProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeViewProjectsUseCase" <|-- "MoleculeViewProjectsUseCaseImpl"
+"MoleculeViewProjectsUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeSearchUseCase" <|-- "MoleculeSearchUseCaseImpl"
+"MoleculeSearchUseCaseImpl"  --> "Catalog"
+"MoleculeSearchUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeSearchUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeSearchUseCaseImpl"  --> "SearchService"
+"MoleculeCreateVersionedFileDatasetUseCase" <|-- "MoleculeCreateVersionedFileDatasetUseCaseImpl"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "AccountService"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "RebacService"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeReadVersionedFileEntryUseCase" <|-- "MoleculeReadVersionedFileEntryUseCaseImpl"
+"MoleculeReadVersionedFileEntryUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeReadVersionedFileEntryUseCaseImpl"  --> "FindVersionedFileVersionUseCase"
+"MoleculeUpdateVersionedFileMetadataUseCase" <|-- "MoleculeUpdateVersionedFileMetadataUseCaseImpl"
+"MoleculeUpdateVersionedFileMetadataUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeUpdateVersionedFileMetadataUseCaseImpl"  --> "UpdateVersionedFileUseCase"
+"MoleculeUploadVersionedFileVersionUseCase" <|-- "MoleculeUploadVersionedFileVersionUseCaseImpl"
+"MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
+"EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
+"EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
+"VectorRepository" <|-- "VectorRepositoryQdrantContainer"
+"VectorRepositoryQdrantContainer"  --> "ContainerRuntime"
+"VectorRepositoryQdrantContainer"  --> "VectorRepositoryConfigQdrantContainer"
+"SearchService" <|-- "DummySearchService"
+"EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
+"EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
+"NaturalLanguageSearchService" <|-- "NaturalLanguageSearchImplLazyInit"
+"NaturalLanguageSearchImplLazyInit"  --> "KamuBackgroundCatalog"
+"TaskEventStore" <|-- "SqliteTaskEventStore"
+"SqliteTaskEventStore"  --> "TransactionRefT"
+"WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
+"SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
+"WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"
+"SqliteWebhookSubscriptionEventStore"  --> "TransactionRefT"
+"BackgroundAgent" <|-- "OutboxAgentImpl"
+"InitOnStartup" <|-- "OutboxAgentImpl"
+"OutboxAgent" <|-- "OutboxAgentImpl"
+"OutboxAgentImpl"  --> "CatalogWeakRef"
+"OutboxAgentImpl" "*" --> "MessageDispatcher"
+"OutboxAgentImpl"  --> "OutboxAgentMetrics"
+"OutboxAgentImpl"  --> "OutboxConfig"
+"MetricsProvider" <|-- "OutboxAgentMetrics"
+"OutboxDispatchingImpl"  --> "Catalog"
+"OutboxDispatchingImpl"  --> "OutboxImmediateImpl"
+"OutboxDispatchingImpl"  --> "OutboxTransactionalImpl"
+"OutboxImmediateImpl"  --> "Catalog"
+"OutboxImmediateImpl" "*" --> "MessageDispatcher"
+"OutboxTransactionalImpl"  --> "OutboxMessageRepository"
+"OutboxTransactionalImpl"  --> "SystemTimeSource"
+"DatasetStorageUnit" <|-- "DatasetStorageUnitLocalFs"
+"DatasetStorageUnitWriter" <|-- "DatasetStorageUnitLocalFs"
+"DatasetStorageUnitLocalFs"  --> "DatasetLfsBuilder"
+"DatasetFactory" <|-- "DatasetFactoryImpl"
+"DatasetFactoryImpl"  --> "OdfServerAccessTokenResolver"
+"DatasetFactoryImpl"  --> "IpfsGateway"
+"DatasetFactoryImpl" "?" --> "S3Metrics"
+"SystemTimeSource" <|-- "SystemTimeSourceDefault"
+@enduml

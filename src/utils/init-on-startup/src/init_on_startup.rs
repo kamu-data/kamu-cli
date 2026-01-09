@@ -184,7 +184,7 @@ fn get_startup_job_metadata<'a>(
     assert!(
         all_metadata.len() == 1,
         "Must define exatly one `InitOnStartupMeta` record for a startup job{}",
-        startup_job_builder.instance_type_name()
+        startup_job_builder.instance_type().name
     );
     (*all_metadata.first().unwrap()).clone()
 }

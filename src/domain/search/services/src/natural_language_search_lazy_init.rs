@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::{Component, TypedBuilder};
 use init_on_startup::InitOnStartup;
 use internal_error::*;
+use kamu_core::KamuBackgroundCatalog;
 use kamu_search::*;
 
 use crate::*;
@@ -19,7 +22,7 @@ use crate::*;
 /// This is a temporary solution that initializes the search index upon the
 /// first call.
 pub struct NaturalLanguageSearchImplLazyInit {
-    catalog: dill::Catalog,
+    background_catalog: Arc<KamuBackgroundCatalog>,
     is_initialized: tokio::sync::OnceCell<()>,
 }
 
@@ -27,10 +30,11 @@ pub struct NaturalLanguageSearchImplLazyInit {
 
 #[dill::component(pub)]
 #[dill::interface(dyn NaturalLanguageSearchService)]
+#[dill::scope(dill::Singleton)]
 impl NaturalLanguageSearchImplLazyInit {
-    pub fn new(catalog: dill::Catalog) -> Self {
+    pub fn new(background_catalog: Arc<KamuBackgroundCatalog>) -> Self {
         Self {
-            catalog,
+            background_catalog,
             is_initialized: tokio::sync::OnceCell::new(),
         }
     }
@@ -43,11 +47,26 @@ impl NaturalLanguageSearchImplLazyInit {
     }
 
     async fn init(&self) -> Result<(), InternalError> {
+        let system_user_catalog = self.background_catalog.system_user_catalog();
+
         let indexer = NaturalLanguageSearchIndexer::builder()
-            .get(&self.catalog)
+            .get(&system_user_catalog)
             .int_err()?;
 
         indexer.run_initialization().await
+    }
+
+    async fn inner(
+        &self,
+        ctx: SearchContext<'_>,
+    ) -> Result<Arc<dyn NaturalLanguageSearchService>, InternalError> {
+        self.maybe_init().await?;
+
+        let inner = NaturalLanguageSearchServiceImpl::builder()
+            .get(ctx.catalog)
+            .int_err()?;
+
+        Ok(inner)
     }
 }
 
@@ -57,16 +76,12 @@ impl NaturalLanguageSearchImplLazyInit {
 impl NaturalLanguageSearchService for NaturalLanguageSearchImplLazyInit {
     async fn search_natural_language(
         &self,
+        ctx: SearchContext<'_>,
         prompt: &str,
         options: SearchNatLangOpts,
     ) -> Result<SearchNatLangResult, SearchNatLangError> {
-        self.maybe_init().await?;
-
-        let inner = NaturalLanguageSearchServiceImpl::builder()
-            .get(&self.catalog)
-            .int_err()?;
-
-        inner.search_natural_language(prompt, options).await
+        let inner = self.inner(ctx).await?;
+        inner.search_natural_language(ctx, prompt, options).await
     }
 }
 

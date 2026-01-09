@@ -1371,6 +1371,7 @@ pub enum SystemSubCommand {
     ApiServer(SystemApiServer),
     Compact(SystemCompact),
     DebugToken(SystemDebugToken),
+    Depgraph(SystemDepgraph),
     Decode(SystemDecode),
     Diagnose(SystemDiagnose),
     E2e(SystemE2e),
@@ -1498,6 +1499,12 @@ pub struct SystemDebugToken {
     #[arg()]
     pub token: String,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Validate a Kamu token
+#[derive(Debug, clap::Args)]
+pub struct SystemDepgraph {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

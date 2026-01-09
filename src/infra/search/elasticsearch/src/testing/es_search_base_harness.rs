@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_search_services::{SearchIndexer, SearchServiceImpl};
+use kamu_search_services::{SearchIndexerImpl, SearchServiceImpl};
 use time_source::SystemTimeSourceProvider;
 
 use crate::testing::ElasticsearchTestContext;
@@ -29,7 +29,7 @@ impl ElasticsearchBaseHarness {
         system_time_source_provider: SystemTimeSourceProvider,
     ) -> Self {
         let mut b = dill::CatalogBuilder::new_chained(es_ctx.catalog());
-        b.add::<SearchIndexer>().add::<SearchServiceImpl>();
+        b.add::<SearchIndexerImpl>().add::<SearchServiceImpl>();
 
         system_time_source_provider.embed_into_catalog(&mut b);
 
@@ -39,7 +39,7 @@ impl ElasticsearchBaseHarness {
 
     pub async fn run_initial_indexing(catalog: &dill::Catalog) {
         use init_on_startup::InitOnStartup;
-        let indexer = catalog.get_one::<SearchIndexer>().unwrap();
+        let indexer = catalog.get_one::<SearchIndexerImpl>().unwrap();
         indexer.run_initialization().await.unwrap();
     }
 
