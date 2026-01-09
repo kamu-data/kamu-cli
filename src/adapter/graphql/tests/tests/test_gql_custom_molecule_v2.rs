@@ -3755,6 +3755,298 @@ async fn test_molecule_v2_data_room_operations() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_molecule_v2_data_room_as_of_block_hash() {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+
+    let harness = GraphQLMoleculeV1Harness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let create_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": ipnft_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "901",
+            })),
+        ))
+        .await;
+    assert!(create_res.is_ok(), "{create_res:#?}");
+
+    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]
+        ["project"]["dataRoom"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let dataset_registry = harness
+        .catalog_authorized
+        .get_one::<dyn DatasetRegistry>()
+        .unwrap();
+    let data_room_dataset = dataset_registry
+        .get_dataset_by_id(&odf::DatasetID::from_did_str(&data_room_did).unwrap())
+        .await
+        .unwrap();
+
+    let upload_1_res = GraphQLQueryRequest::new(
+        CREATE_VERSIONED_FILE,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": ipnft_uid,
+            "path": "/foo.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            "contentType": "text/plain",
+            "changeBy": USER_1,
+            "accessLevel": "public",
+            "description": "Plain text file",
+            "categories": ["test-category-1"],
+            "tags": ["tag-old"],
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    let upload_1_data = upload_1_res.data.into_json().unwrap();
+    pretty_assertions::assert_eq!(
+        upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        json!(true),
+    );
+    let file_1_did = upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+        ["ref"]
+        .as_str()
+        .unwrap();
+
+    let data_room_head_v1 = data_room_dataset
+        .as_metadata_chain()
+        .try_get_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .unwrap();
+    let file_1_dataset = dataset_registry
+        .get_dataset_by_id(&odf::DatasetID::from_did_str(file_1_did).unwrap())
+        .await
+        .unwrap();
+    let file_1_head_v1 = file_1_dataset
+        .as_metadata_chain()
+        .try_get_ref(&odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .unwrap();
+
+    const UPDATE_METADATA_QUERY: &str = indoc!(
+        r#"
+        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  updateFileMetadata(
+                    ref: $ref
+                    accessLevel: $accessLevel
+                    changeBy: $changeBy
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                  ) {
+                    isSuccess
+                    message
+                    __typename
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_METADATA_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+                "ref": file_1_did,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+                "description": "Plain text file updated",
+                "categories": ["test-category-1"],
+                "tags": ["tag-new"],
+                "contentText": "hello",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "updateFileMetadata": {
+                                "isSuccess": true,
+                                "message": "",
+                                "__typename": "MoleculeDataRoomUpdateFileMetadataResultSuccess",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    const PROJECT_DATA_ROOM_LATEST_QUERY: &str = indoc!(
+        r#"
+        query ($ipnftUid: String!) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  latest {
+                    entries {
+                      nodes {
+                        path
+                        asVersionedFile {
+                          latest {
+                            tags
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            PROJECT_DATA_ROOM_LATEST_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": ipnft_uid,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entries": {
+                                    "nodes": [{
+                                        "path": "/foo.txt",
+                                        "asVersionedFile": {
+                                            "latest": {
+                                                "tags": ["tag-new"],
+                                            }
+                                        }
+                                    }]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let upload_2_res = GraphQLQueryRequest::new(
+        CREATE_VERSIONED_FILE,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": ipnft_uid,
+            "path": "/bar.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
+            "contentType": "text/plain",
+            "changeBy": USER_1,
+            "accessLevel": "public",
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+    let upload_2_data = upload_2_res.data.into_json().unwrap();
+    pretty_assertions::assert_eq!(
+        upload_2_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        json!(true),
+    );
+
+    const PROJECTS_DATA_ROOM_AS_OF_QUERY: &str = indoc!(
+        r#"
+        query ($dataRoomBlockHash: Multihash!, $fileBlockHash: Multihash!) {
+          molecule {
+            v2 {
+              projects(page: 0, perPage: 100) {
+                nodes {
+                  dataRoom {
+                    asOf(blockHash: $dataRoomBlockHash) {
+                      entries {
+                        totalCount
+                        nodes {
+                          path
+                          asVersionedFile {
+                            asOf(blockHash: $fileBlockHash) {
+                              tags
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            PROJECTS_DATA_ROOM_AS_OF_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "dataRoomBlockHash": data_room_head_v1.to_string(),
+                "fileBlockHash": file_1_head_v1.to_string(),
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": {
+                    "projects": {
+                        "nodes": [{
+                            "dataRoom": {
+                                "asOf": {
+                                    "entries": {
+                                        "totalCount": 1,
+                                        "nodes": [{
+                                            "path": "/foo.txt",
+                                            "asVersionedFile": {
+                                                "asOf": {
+                                                    "tags": ["tag-old"],
+                                                }
+                                            }
+                                        }]
+                                    }
+                                }
+                            }
+                        }]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_molecule_v2_announcements_quota_exceeded() {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
