@@ -14,6 +14,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
+use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -26,6 +27,9 @@ use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_
 async fn test_collection_operations() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -283,6 +287,9 @@ async fn test_collection_operations() {
 async fn test_collection_extra_data() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -423,6 +430,9 @@ async fn test_collection_extra_data() {
 async fn test_collection_path_prefix_and_max_depth() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -536,6 +546,9 @@ async fn test_collection_path_prefix_and_max_depth() {
 async fn test_collection_entry_search() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -618,6 +631,9 @@ async fn test_collection_entry_search() {
 async fn test_collection_resolve_ref_to_dataset() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -706,6 +722,9 @@ async fn test_collection_resolve_ref_to_dataset() {
 async fn test_add_entry_errors() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -744,6 +763,9 @@ async fn test_add_entry_errors() {
 async fn test_multiple_parallel_add_entry_collection() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -817,10 +839,12 @@ impl GraphQLDatasetsHarness {
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
+        outbox_provider: Option<OutboxProvider>,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .maybe_outbox_provider(outbox_provider)
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 

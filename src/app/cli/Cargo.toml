@@ -119,6 +119,7 @@ kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
+kamu-search-elasticsearch = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }
@@ -212,7 +213,7 @@ datafusion = { version = "50", default-features = false, features = [
     "unicode_expressions",
     "compression",
 ] }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 dirs = "6"
 fs_extra = "1.3"
 futures = "0.3"

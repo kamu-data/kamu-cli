@@ -179,7 +179,7 @@ impl KamuCliApiServerHarness {
     }
 
     pub fn sqlite(options: KamuCliApiServerHarnessOptions) -> Self {
-        // We don't need to provide a config and specify sqlite database in it,
+        // We don't need to specify sqlite database in config,
         // because kamu-cli will create the database on its own
         Self::new(options, None)
     }

@@ -36,6 +36,7 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
 event-sourcing = { workspace = true }
+kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }

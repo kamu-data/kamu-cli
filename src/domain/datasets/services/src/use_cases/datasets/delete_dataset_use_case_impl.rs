@@ -23,6 +23,7 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 use crate::DatasetEntryWriter;
 
@@ -36,10 +37,36 @@ pub struct DeleteDatasetUseCaseImpl {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl DeleteDatasetUseCaseImpl {
+    async fn do_delete(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
+        // Remove entry
+        self.dataset_entry_writer
+            .remove_entry(dataset_handle)
+            .await?;
+
+        // Do actual delete
+        self.dataset_storage_unit_writer
+            .delete_dataset(&dataset_handle.id)
+            .await?;
+
+        // Notify interested parties
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::deleted(self.time_source.now(), dataset_handle.id.clone()),
+            )
+            .await?;
+
+        Ok(())
+    }
+
     async fn ensure_no_dangling_references(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -121,23 +148,8 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Validate against dangling ref
         self.ensure_no_dangling_references(&dataset_handle).await?;
 
-        // Remove entry
-        self.dataset_entry_writer
-            .remove_entry(&dataset_handle)
-            .await?;
-
-        // Do actual delete
-        self.dataset_storage_unit_writer
-            .delete_dataset(&dataset_handle.id)
-            .await?;
-
-        // Notify interested parties
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_handle.id),
-            )
-            .await?;
+        // Perform actual delete
+        Self::do_delete(&self, &dataset_handle).await?;
 
         Ok(())
     }
@@ -152,7 +164,22 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), DeleteDatasetError> {
+        // To enforce access control / dangling refs, resolve via ref
         self.execute_via_ref(&dataset_handle.as_local_ref()).await
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = DeleteDatasetUseCaseImpl_execute_via_handle_preauthorized,
+        skip_all,
+        fields(dataset_handle)
+    )]
+    async fn execute_via_handle_preauthorized(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
+        // Directly delete without access control / dangling refs check
+        Self::do_delete(&self, dataset_handle).await
     }
 }
 

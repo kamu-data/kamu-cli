@@ -9,21 +9,24 @@
 
 use internal_error::InternalError;
 
+use crate::SearchContext;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Provides search functionality for datasets and other objects managed by the
 /// current node
 #[async_trait::async_trait]
-pub trait SearchServiceLocal: Send + Sync {
+pub trait NaturalLanguageSearchService: Send + Sync {
     /// Search for datasets using a natural language prompt.
     ///
     /// Note that currently this API does NOT perform deduplication and
     /// re-ranking, so multiple search hits can refer to the same dataset.
     async fn search_natural_language(
         &self,
+        ctx: SearchContext<'_>,
         prompt: &str,
         options: SearchNatLangOpts,
-    ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError>;
+    ) -> Result<SearchNatLangResult, SearchNatLangError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +44,7 @@ impl Default for SearchNatLangOpts {
 
 // TODO: Support next page token for paginating through results
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct SearchLocalNatLangResult {
+pub struct SearchNatLangResult {
     pub datasets: Vec<SearchLocalResultDataset>,
 }
 
@@ -56,7 +59,7 @@ pub struct SearchLocalResultDataset {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum SearchLocalNatLangError {
+pub enum SearchNatLangError {
     #[error(transparent)]
     NotEnabled(#[from] NatLangSearchNotEnabled),
     #[error(transparent)]
@@ -66,3 +69,5 @@ pub enum SearchLocalNatLangError {
 #[derive(Debug, thiserror::Error)]
 #[error("Natural language search is not enabled")]
 pub struct NatLangSearchNotEnabled;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

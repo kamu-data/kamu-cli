@@ -300,10 +300,9 @@ impl FlowTriggerHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowTriggerTestListener>()
             .add::<FlowTriggerServiceImpl>()
@@ -459,7 +458,7 @@ impl FlowTriggerHarness {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+                DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone()),
             )
             .await
             .unwrap();

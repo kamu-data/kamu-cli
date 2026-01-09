@@ -32,6 +32,7 @@ pub trait SystemTimeSource: Send + Sync {
 
 #[dill::component]
 #[dill::interface(dyn SystemTimeSource)]
+#[dill::scope(dill::scopes::Agnostic)]
 pub struct SystemTimeSourceDefault;
 
 #[async_trait::async_trait]
@@ -216,6 +217,34 @@ impl SystemTimeSource for FakeSystemTimeSource {
 
         // Handle the case where receiver might be dropped during test cleanup
         let _ = rx.await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub enum SystemTimeSourceProvider {
+    #[default]
+    Default,
+    Stub(SystemTimeSourceStub),
+    Inherited,
+}
+
+impl SystemTimeSourceProvider {
+    pub fn embed_into_catalog(self, target_catalog_builder: &mut dill::CatalogBuilder) {
+        match self {
+            SystemTimeSourceProvider::Default => {
+                target_catalog_builder.add::<SystemTimeSourceDefault>();
+            }
+            SystemTimeSourceProvider::Stub(stub) => {
+                target_catalog_builder
+                    .add_value(stub)
+                    .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+            }
+            SystemTimeSourceProvider::Inherited => {
+                // No-op
+            }
+        }
     }
 }
 

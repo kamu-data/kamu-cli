@@ -204,10 +204,9 @@ struct ImmediateOutboxHarness {
 impl ImmediateOutboxHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
-        b.add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        );
+        b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::ImmediateConsumers,
+        ));
         b.bind::<dyn Outbox, OutboxImmediateImpl>();
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerB>();

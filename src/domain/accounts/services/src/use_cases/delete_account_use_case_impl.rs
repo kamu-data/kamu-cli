@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use kamu_accounts::*;
+use time_source::SystemTimeSource;
 
 use crate::utils;
 
@@ -21,6 +22,7 @@ pub struct DeleteAccountUseCaseImpl {
     account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[async_trait::async_trait]
@@ -40,6 +42,7 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
                 AccountLifecycleMessage::deleted(
+                    self.time_source.now(),
                     account.id.clone(),
                     account.email.clone(),
                     account.display_name.clone(),

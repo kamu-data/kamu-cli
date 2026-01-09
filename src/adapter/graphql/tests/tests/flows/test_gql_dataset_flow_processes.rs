@@ -17,6 +17,7 @@ use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::*;
+use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainIncrementInterval;
 use pretty_assertions::assert_eq;
 use uuid::Uuid;
@@ -758,6 +759,9 @@ impl DatasetFlowProcessesHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .build();
 
         let base_gql_flow_catalog =

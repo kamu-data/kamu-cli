@@ -122,6 +122,11 @@ impl Mutation {
     async fn collaboration(&self) -> CollaborationMut {
         CollaborationMut
     }
+
+    /// Admin-related functionality group
+    async fn admin(&self) -> AdminMut {
+        AdminMut
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

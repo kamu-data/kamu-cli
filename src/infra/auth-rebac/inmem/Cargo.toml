@@ -25,7 +25,7 @@ doctest = false
 kamu-auth-rebac = { workspace = true }
 
 async-trait = "0.1"
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 tokio = { version = "1", default-features = false, features = [] }
 
 

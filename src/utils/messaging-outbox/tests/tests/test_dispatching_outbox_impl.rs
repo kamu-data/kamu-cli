@@ -212,10 +212,9 @@ struct DispatchingOutboxHarness {
 impl DispatchingOutboxHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
-        b.add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
-        );
+        b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::ImmediateConsumers,
+        ));
         b.add::<OutboxTransactionalImpl>();
         b.add::<OutboxDispatchingImpl>();
         b.bind::<dyn Outbox, OutboxDispatchingImpl>();

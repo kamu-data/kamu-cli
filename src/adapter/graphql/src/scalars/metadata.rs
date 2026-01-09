@@ -19,7 +19,7 @@ use crate::queries::Account;
 // MetadataBlockExtended
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, SimpleObject, PartialEq, Eq)]
+#[derive(Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct MetadataBlockExtended {
     #[graphql(skip)]
@@ -69,7 +69,7 @@ impl MetadataBlockExtended {
 // EncodedBlock
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, SimpleObject, PartialEq, Eq)]
+#[derive(Debug, SimpleObject)]
 pub struct EncodedBlock {
     pub encoding: MetadataManifestFormat,
     pub content: String,

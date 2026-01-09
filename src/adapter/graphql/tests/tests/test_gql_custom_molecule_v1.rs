@@ -20,10 +20,16 @@ use kamu_datasets::{
     DatasetRegistry,
     DatasetRegistryExt,
 };
+use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainExt;
 use serde_json::json;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
+use crate::utils::{
+    AuthenticationCatalogsResult,
+    BaseGQLDatasetHarness,
+    PredefinedAccountOpts,
+    authentication_catalogs_ext,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1462,6 +1468,9 @@ impl GraphQLMoleculeV1Harness {
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
@@ -1501,7 +1510,9 @@ impl GraphQLMoleculeV1Harness {
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
 
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs_ext(
+        let AuthenticationCatalogsResult {
+            catalog_authorized, ..
+        } = authentication_catalogs_ext(
             &base_catalog,
             Some(CurrentAccountSubject::Logged(LoggedAccount {
                 account_id: molecule_account_id.clone(),

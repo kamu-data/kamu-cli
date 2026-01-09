@@ -59,7 +59,7 @@ tracing-subscriber = { version = "0.3", features = [
 ] }
 tower-http = { version = "0.6", default-features = false, features = ["trace"] }
 
-dill = { optional = true, version = "0.14", default-features = false }
+dill = { optional = true, version = "0.15", default-features = false }
 opentelemetry = { optional = true, version = "0.31", default-features = false, features = [
     "trace",
     "internal-logs",
