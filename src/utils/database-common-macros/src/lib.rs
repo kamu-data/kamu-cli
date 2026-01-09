@@ -53,7 +53,7 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
     let updated_function = quote! {
         #function_visibility #function_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(catalog)
+            ::database_common::DatabaseTransactionRunner::from(catalog)
                 .transactional(|catalog: ::dill::Catalog| async move {
                     #function_body
                 })
@@ -297,7 +297,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
                 .transactional(|transaction_catalog: ::dill::Catalog| async move {
                     #method_body
                 })
@@ -336,7 +336,7 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
                 .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
                     #method_body
                 })
@@ -377,7 +377,7 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
                 .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
                     #method_body
                 })
@@ -420,7 +420,7 @@ pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStrea
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
                 .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
                     #method_body
                 })
@@ -454,7 +454,7 @@ pub fn transactional_static_method(_attr: TokenStream, item: TokenStream) -> Tok
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(catalog.clone())
+            ::database_common::DatabaseTransactionRunner::from(catalog.clone())
                 .transactional(|transaction_catalog: Catalog| async move {
                     #method_body
                 })
@@ -495,7 +495,7 @@ pub fn transactional_static_method1(attr: TokenStream, item: TokenStream) -> Tok
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
+            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
                 .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
                     #method_body
                 })
@@ -538,7 +538,7 @@ pub fn transactional_static_method2(attr: TokenStream, item: TokenStream) -> Tok
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
+            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
                 .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
                     #method_body
                 })
@@ -583,7 +583,7 @@ pub fn transactional_static_method3(attr: TokenStream, item: TokenStream) -> Tok
     let updated_method = quote! {
         #method_visibility #method_signature {
             use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::new(#catalog_ident.clone())
+            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
                 .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
                     #method_body
                 })
@@ -649,7 +649,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 
                 let harness = #harness ::new(pg_pool);
 
-                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                database_common::DatabaseTransactionRunner::from(harness.catalog)
                     .transactional(|catalog| async move {
                         #fixture (&catalog).await;
 
@@ -665,7 +665,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             async fn #test_function_name (mysql_pool: sqlx::MySqlPool) {
                 let harness = #harness ::new(mysql_pool);
 
-                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                database_common::DatabaseTransactionRunner::from(harness.catalog)
                     .transactional(|catalog| async move {
                         #fixture (&catalog).await;
 
@@ -688,7 +688,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 
                 let harness = #harness ::new(sqlite_pool);
 
-                database_common::DatabaseTransactionRunner::new(harness.catalog)
+                database_common::DatabaseTransactionRunner::from(harness.catalog)
                     .transactional(|catalog| async move {
                         #fixture (&catalog).await;
 

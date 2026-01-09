@@ -37,7 +37,7 @@ use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatche
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
-use crate::accounts::{AccountService, CurrentAccountIndication};
+use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
 use crate::output::*;
@@ -205,21 +205,43 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         ))
         .await?;
 
+        let current_account_indication = current_account.clone();
+        let cli_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
+            .transactional_with(
+                |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
+                    current_account_indication
+                        .to_current_account_subject(
+                            tenancy_config,
+                            workspace_status,
+                            account_service,
+                        )
+                        .await
+                        .int_err()
+                },
+            )
+            .await?;
+
+        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
+            .add_value(KamuBackgroundCatalog::new(
+                base_catalog.clone(),
+                cli_account_subject.clone(),
+            ))
+            .build();
+
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog = configure_server_catalog(&base_catalog, tenancy_config).build();
+            let server_catalog =
+                configure_server_catalog(&wrapped_base_catalog, tenancy_config).build();
             Some(server_catalog)
         } else {
             None
         };
 
         let cli_catalog = build_cli_catalog(
-            &base_catalog,
+            &wrapped_base_catalog,
             maybe_server_catalog.as_ref(),
-            current_account.clone(),
-            workspace_status,
+            cli_account_subject,
             tenancy_config,
-        )
-        .await?;
+        );
 
         // Register metrics
         maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
@@ -267,7 +289,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
-        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+        let work_catalog = maybe_server_catalog
+            .as_ref()
+            .unwrap_or(&wrapped_base_catalog);
 
         maybe_transactional(
             is_transactional,
@@ -545,10 +569,9 @@ pub fn configure_base_catalog(
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
-    b.add_builder(
-        messaging_outbox::OutboxImmediateImpl::builder()
-            .with_consumer_filter(messaging_outbox::ConsumerFilter::ImmediateConsumers),
-    );
+    b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+        messaging_outbox::ConsumerFilter::ImmediateConsumers,
+    ));
     b.add::<messaging_outbox::OutboxTransactionalImpl>();
     b.add::<messaging_outbox::OutboxDispatchingImpl>();
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
@@ -609,28 +632,17 @@ pub fn configure_cli_catalog(
     b
 }
 
-async fn build_cli_catalog(
+fn build_cli_catalog(
     base_catalog: &Catalog,
     maybe_server_catalog: Option<&Catalog>,
-    current_account_indication: CurrentAccountIndication,
-    workspace_status: WorkspaceStatus,
+    cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> Result<Catalog, InternalError> {
-    let current_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
-        .transactional_with(
-            |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
-                current_account_indication
-                    .to_current_account_subject(tenancy_config, workspace_status, account_service)
-                    .await
-                    .int_err()
-            },
-        )
-        .await?;
+) -> Catalog {
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
-    Ok(configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(current_account_subject)
-        .build())
+    configure_cli_catalog(cli_base_catalog, tenancy_config)
+        .add_value(cli_account_subject)
+        .build()
 }
 
 // Public only for tests
@@ -1064,16 +1076,24 @@ pub fn register_config_in_catalog(
         vector_repo,
         overfetch_factor,
         overfetch_amount,
+        repo,
     } = config.search.clone().unwrap();
 
-    catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalConfig {
+    // Note: this is specific to CLI:
+    // - we are not registering NaturalLanguageSearchIndexer startup job here to
+    //   avoid heavyweight load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
+
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
         overfetch_factor: overfetch_factor.unwrap(),
         overfetch_amount: overfetch_amount.unwrap(),
     });
 
     let indexer = indexer.unwrap_or_default();
-    catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {
+    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
         skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
         skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,
@@ -1105,7 +1125,13 @@ pub fn register_config_in_catalog(
     }
 
     match vector_repo.unwrap_or_default() {
+        config::VectorRepoConfig::Dummy => {
+            catalog_builder.add::<kamu_search_services::DummyNaturalLanguageSearchService>();
+        }
+
         config::VectorRepoConfig::Qdrant(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrant::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
@@ -1116,6 +1142,8 @@ pub fn register_config_in_catalog(
             });
         }
         config::VectorRepoConfig::QdrantContainer(mut cfg) => {
+            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
+
             cfg.merge(config::VectorRepoConfigQdrantContainer::default());
 
             catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();
@@ -1127,6 +1155,52 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    // Note: this is specific to CLI:
+    // - we are not registering SearchIndexer startup job here to avoid heavyweight
+    //   load in CLI commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use
+    //   (could be quite a long startup time, indexing itself + container start, if
+    //   containers are used)
+    // - lazy init wrapper is unnecessary in server mode
+
+    match repo.unwrap_or_default() {
+        config::SearchRepositoryConfig::Dummy => {
+            // no lazy init needed for dummy impl
+            catalog_builder.add::<kamu_search_services::DummySearchService>();
+        }
+
+        config::SearchRepositoryConfig::Elasticsearch(mut cfg) => {
+            cfg.merge(config::SearchRepositoryConfigElasticsearch::default());
+
+            if is_e2e_testing {
+                // TODO: kind of a hack, make lazy init work in e2e tests
+                catalog_builder.add::<kamu_search_services::SearchIndexerImpl>();
+                catalog_builder.add::<kamu_search_services::SearchServiceImpl>();
+            } else {
+                catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            }
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchClientConfig {
+                url: url::Url::parse(&cfg.url).int_err()?,
+                password: cfg.password,
+                timeout_secs: cfg.timeout_secs.unwrap(),
+                enable_compression: cfg.enable_compression.unwrap(),
+                ca_cert_pem_path: cfg.ca_cert_pem_path.map(std::path::PathBuf::from),
+            });
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
+                index_prefix: cfg.index_prefix.unwrap(),
+            });
+        }
+        config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
+            catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
+            catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchContainerRepository>();
+            catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
+                image: cfg.image.unwrap(),
+                start_timeout: cfg.start_timeout.unwrap().into(),
+            });
+        }
+    }
 
     catalog_builder.add_value(PasswordPolicyConfig::default());
 

@@ -1200,6 +1200,7 @@ Command group for system-level functionality
 * `api-server` — Run HTTP + GraphQL server
 * `compact` — Compact a dataset
 * `debug-token` — Validate a Kamu token
+* `depgraph` — Validate a Kamu token
 * `decode` — Decode a manifest file
 * `diagnose` — Run basic system diagnose check
 * `generate-token` — Generate a platform token from a known secret for debugging
@@ -1317,6 +1318,14 @@ Validate a Kamu token
 **Arguments:**
 
 * `<TOKEN>` — Access token
+
+
+
+## `kamu system depgraph`
+
+Validate a Kamu token
+
+**Usage:** `kamu system depgraph`
 
 
 

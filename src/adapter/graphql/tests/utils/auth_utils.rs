@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
@@ -29,14 +31,22 @@ pub async fn authentication_catalogs(
     base_catalog: &dill::Catalog,
     predefined_account_opts: PredefinedAccountOpts,
 ) -> (dill::Catalog, dill::Catalog) {
-    authentication_catalogs_ext(base_catalog, None, predefined_account_opts).await
+    let result = authentication_catalogs_ext(base_catalog, None, predefined_account_opts).await;
+    (result.catalog_anonymous, result.catalog_authorized)
+}
+
+pub struct AuthenticationCatalogsResult {
+    #[expect(dead_code)]
+    pub catalog_no_subject: dill::Catalog,
+    pub catalog_anonymous: dill::Catalog,
+    pub catalog_authorized: dill::Catalog,
 }
 
 pub async fn authentication_catalogs_ext(
     base_catalog: &dill::Catalog,
     subject: Option<CurrentAccountSubject>,
     predefined_account_opts: PredefinedAccountOpts,
-) -> (dill::Catalog, dill::Catalog) {
+) -> AuthenticationCatalogsResult {
     let current_account_subject = subject.unwrap_or_else(CurrentAccountSubject::new_test);
     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
@@ -49,7 +59,7 @@ pub async fn authentication_catalogs_ext(
             .set_properties(predefined_account_opts.into()),
     );
 
-    let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
+    let catalog_no_subject = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
@@ -63,20 +73,31 @@ pub async fn authentication_catalogs_ext(
         .add_value(predefined_accounts_config)
         .build();
 
-    let catalog_anonymous = dill::CatalogBuilder::new_chained(&base_auth_catalog)
+    let catalog_anonymous = dill::CatalogBuilder::new_chained(&catalog_no_subject)
         .add_value(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
         ))
         .build();
-    let catalog_authorized = dill::CatalogBuilder::new_chained(&base_auth_catalog)
+    let catalog_authorized = dill::CatalogBuilder::new_chained(&catalog_no_subject)
         .add_value(current_account_subject)
         .build();
 
-    init_on_startup::run_startup_jobs(&catalog_authorized)
-        .await
-        .unwrap();
+    init_on_startup::run_startup_jobs_ex(
+        &catalog_authorized,
+        init_on_startup::RunStartupJobsOptions {
+            job_selector: Some(init_on_startup::JobSelector::AllOf(HashSet::from([
+                JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+            ]))),
+        },
+    )
+    .await
+    .unwrap();
 
-    (catalog_anonymous, catalog_authorized)
+    AuthenticationCatalogsResult {
+        catalog_no_subject,
+        catalog_anonymous,
+        catalog_authorized,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

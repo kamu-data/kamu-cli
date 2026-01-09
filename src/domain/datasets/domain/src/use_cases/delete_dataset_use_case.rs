@@ -23,6 +23,11 @@ pub trait DeleteDatasetUseCase: Send + Sync {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), DeleteDatasetError>;
+
+    async fn execute_via_handle_preauthorized(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(), DeleteDatasetError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

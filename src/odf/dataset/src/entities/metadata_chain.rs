@@ -354,6 +354,10 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
+        if visitors.is_empty() {
+            return Ok(());
+        }
+
         // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()
@@ -388,16 +392,33 @@ pub trait MetadataChainExt: MetadataChain {
             None
         } else if let Some(tail_hash) = tail_hash {
             // Read from the tail block
-            Some(
-                self.get_block(tail_hash)
-                    .await
-                    .map_err(IterBlocksError::from)?
-                    .sequence_number,
-            )
+            let tail_sequence_number = self
+                .get_block(tail_hash)
+                .await
+                .map_err(IterBlocksError::from)?
+                .sequence_number;
+            Some(tail_sequence_number)
         } else {
             // Tail is the seed block
             None
         };
+
+        // Quick check against divergence based on sequence numbers
+        if let Some(tail_sequence_number) = hint_tail_sequence_number
+            && let Some((head_hash, head_block)) = current_hashed_block.as_ref()
+            && head_block.sequence_number < tail_sequence_number
+        {
+            // Report errors if specified to detect invalid interval
+            if !options.ignore_missing_tail {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash.clone(),
+                    tail: tail_hash.unwrap().clone(),
+                }))?;
+            } else {
+                // No need to iterate
+                return Ok(());
+            }
+        }
 
         // Iterate over blocks until we satisfy all visitors or reach the tail
         while let Some((hash, block)) = &current_hashed_block {

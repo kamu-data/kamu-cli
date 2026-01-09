@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
@@ -1243,8 +1242,8 @@ impl GraphQLAccountsHarness {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
-        let catalog = b.build();
-        let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
+        let base_catalog = b.build();
+        let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
             .add_value(kamu_core::TenancyConfig::MultiTenant)
             .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
             .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
@@ -1262,15 +1261,14 @@ impl GraphQLAccountsHarness {
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(AuthConfig::sample())
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>()
             .build();
 
         let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&final_catalog, predefined_account_opts).await;
+            authentication_catalogs(&catalog, predefined_account_opts).await;
 
         Self {
             schema: kamu_adapter_graphql::schema_quiet(),

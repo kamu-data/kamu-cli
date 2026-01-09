@@ -85,10 +85,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
 
                 odf::dataset::write_dataset_alias(
                     target.as_ref(),
-                    &odf::DatasetAlias::new(
-                        target.get_alias().account_name.clone(),
-                        renamed_message.new_dataset_name.clone(),
-                    ),
+                    &renamed_message.new_dataset_alias,
                 )
                 .await
             }
@@ -118,11 +115,16 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAliasUpdateHandler {
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
         match message {
-            AccountLifecycleMessage::Renamed(renamed_message) => {
+            AccountLifecycleMessage::Updated(updated_message) => {
+                // Only react to account renames
+                if updated_message.old_account_name == updated_message.new_account_name {
+                    return Ok(());
+                }
+
                 // Update dataset aliases for all datasets owned by the renamed account
                 let mut owned_dataset_stream = self
                     .dataset_registry
-                    .all_dataset_handles_by_owner_id(&renamed_message.account_id);
+                    .all_dataset_handles_by_owner_id(&updated_message.account_id);
 
                 use tokio_stream::StreamExt;
                 while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
@@ -136,7 +138,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAliasUpdateHandler {
                     odf::dataset::write_dataset_alias(
                         target.as_ref(),
                         &odf::DatasetAlias::new(
-                            Some(renamed_message.new_account_name.clone()),
+                            Some(updated_message.new_account_name.clone()),
                             dataset_handle.alias.dataset_name,
                         ),
                     )

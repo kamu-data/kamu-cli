@@ -15,7 +15,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{DeleteDatasetError, DeleteDatasetUseCase};
 use kamu_datasets_services::DeleteDatasetUseCaseImpl;
-use time_source::SystemTimeSourceStub;
+use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -40,7 +40,9 @@ async fn test_delete_dataset_success_via_ref() {
     )
     .await;
 
-    harness.create_root_dataset(&alias_foo).await;
+    harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     harness
@@ -88,7 +90,9 @@ async fn test_delete_dataset_success_via_handle() {
     )
     .await;
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     harness
@@ -151,7 +155,9 @@ async fn test_delete_unauthorized() {
     )
     .await;
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     harness.reset_collected_outbox_messages();
 
     assert_matches!(
@@ -176,9 +182,11 @@ async fn test_delete_dataset_respects_dangling_refs() {
 
     let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
 
-    let root = harness.create_root_dataset(&alias_foo).await;
+    let root = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
     let derived = harness
-        .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
+        .create_derived_dataset(&harness.catalog, &alias_bar, vec![alias_foo.as_local_ref()])
         .await;
     harness.reset_collected_outbox_messages();
 
@@ -241,6 +249,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
 struct DeleteUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn DeleteDatasetUseCase>,
+    catalog: dill::Catalog,
 }
 
 impl DeleteUseCaseHarness {
@@ -250,22 +259,26 @@ impl DeleteUseCaseHarness {
     ) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
-                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
-                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-                )),
+                system_time_source_provider: SystemTimeSourceProvider::Stub(
+                    SystemTimeSourceStub::new_set(
+                        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                    ),
+                ),
                 maybe_mock_did_generator,
                 maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
 
-        let catalog = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog())
-            .add::<DeleteDatasetUseCaseImpl>()
-            .build();
+        let catalog =
+            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog())
+                .add::<DeleteDatasetUseCaseImpl>()
+                .build();
 
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
+            catalog,
         }
     }
 }

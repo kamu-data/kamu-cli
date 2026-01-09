@@ -215,8 +215,10 @@ impl AuthenticationServiceImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
                 AccountLifecycleMessage::created(
+                    new_account.registered_at,
                     new_account.id.clone(),
                     new_account.email.clone(),
+                    new_account.account_name.clone(),
                     new_account.display_name.clone(),
                 ),
             )

@@ -16,32 +16,17 @@ use kamu_accounts::{
     AccountConfig,
     AccountDisplayName,
     AccountLifecycleMessage,
-    AccountService,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
-    DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
-};
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::{
-    AccountServiceImpl,
-    CreateAccountUseCaseImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-    UpdateAccountUseCaseImpl,
-};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-    RebacServiceImpl,
 };
 use messaging_outbox::{MockOutbox, Outbox};
 use odf::AccountName;
 use odf::metadata::DidPkh;
 use pretty_assertions::assert_matches;
-use time_source::SystemTimeSourceDefault;
+
+use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,21 +56,17 @@ async fn test_create_account() {
 
     let harness = CreateAccountUseCaseImplHarness::new(mock_outbox).await;
     let creator_account_id = harness
-        .account_service
+        .account_service()
         .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
         .await
         .unwrap()
         .unwrap();
-    let creator_account = harness
-        .account_service
-        .get_account_by_id(&creator_account_id)
-        .await
-        .unwrap();
+    let creator_account = harness.get_account_by_id(&creator_account_id).await;
 
     // Create an account with email
     assert_matches!(
         harness
-            .use_case
+            .create_account_use_case
             .execute_derived(
                 &creator_account,
                 &new_account_name_with_email,
@@ -99,7 +80,7 @@ async fn test_create_account() {
     // Create an account without email
     assert_matches!(
         harness
-            .use_case
+            .create_account_use_case
             .execute_derived(
                 &creator_account,
                 &new_account_name_without_email,
@@ -144,7 +125,7 @@ async fn test_create_wallet_accounts() {
 
     assert_matches!(
         harness
-            .use_case
+            .create_account_use_case
             .execute_multi_wallet_accounts(did_pkhs.clone())
             .await,
         Ok(accounts)
@@ -154,7 +135,7 @@ async fn test_create_wallet_accounts() {
     // Idempotence (but w/o new messages -- controlled by mock_outbox expectations).
     assert_matches!(
         harness
-            .use_case
+            .create_account_use_case
             .execute_multi_wallet_accounts(did_pkhs)
             .await,
         Ok(accounts)
@@ -164,15 +145,14 @@ async fn test_create_wallet_accounts() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct CreateAccountUseCaseImplHarness {
-    use_case: Arc<dyn CreateAccountUseCase>,
-    account_service: Arc<dyn AccountService>,
+    account_base_harness: AccountBaseUseCaseHarness,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
 impl CreateAccountUseCaseImplHarness {
     async fn new(mock_outbox: MockOutbox) -> Self {
-        let mut b = dill::CatalogBuilder::new();
-
         let mut predefined_account_config = PredefinedAccountsConfig::new();
         {
             let account_name = WASYA;
@@ -183,22 +163,14 @@ impl CreateAccountUseCaseImplHarness {
                 ));
         }
 
-        b.add::<AccountServiceImpl>()
-            .add::<InMemoryAccountRepository>()
-            .add_value(predefined_account_config)
-            .add::<SystemTimeSourceDefault>()
-            .add::<LoginPasswordAuthProvider>()
-            .add::<RebacServiceImpl>()
-            .add::<UpdateAccountUseCaseImpl>()
-            .add::<InMemoryRebacRepository>()
-            .add_value(DidSecretEncryptionConfig::sample())
-            .add::<InMemoryDidSecretKeyRepository>()
-            .add_value(DefaultAccountProperties::default())
-            .add_value(DefaultDatasetProperties::default())
-            .add::<CreateAccountUseCaseImpl>()
-            .add::<PredefinedAccountsRegistrator>()
-            .add_value(mock_outbox)
-            .bind::<dyn Outbox, MockOutbox>();
+        let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
+            maybe_predefined_accounts_config: Some(predefined_account_config),
+            ..Default::default()
+        });
+
+        let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
+
+        b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -207,8 +179,8 @@ impl CreateAccountUseCaseImplHarness {
         init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
-            use_case: catalog.get_one().unwrap(),
-            account_service: catalog.get_one().unwrap(),
+            account_base_harness,
+            create_account_use_case: catalog.get_one().unwrap(),
         }
     }
 }

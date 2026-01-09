@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::Utc;
 use dill::*;
 use futures::TryStreamExt;
 use kamu_adapter_flow_dataset::*;
@@ -240,10 +241,9 @@ impl FlowConfigurationHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowConfigTestListener>()
             .add::<FlowConfigurationServiceImpl>()
@@ -339,7 +339,7 @@ impl FlowConfigurationHarness {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_id.clone()),
+                DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone()),
             )
             .await
             .unwrap();

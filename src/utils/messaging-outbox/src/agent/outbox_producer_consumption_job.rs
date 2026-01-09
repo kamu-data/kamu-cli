@@ -11,7 +11,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use database_common_macros::transactional_method;
-use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 use tracing::Instrument;
 
@@ -32,7 +31,7 @@ pub(crate) type ProcessedConsumerTasksCount = usize;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ProducerConsumptionJob {
-    catalog: Catalog,
+    catalog: dill::CatalogWeakRef,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_name: String,
     consumer_names: Vec<String>,
@@ -42,7 +41,7 @@ pub(crate) struct ProducerConsumptionJob {
 
 impl ProducerConsumptionJob {
     pub(crate) fn new(
-        catalog: Catalog,
+        catalog: dill::CatalogWeakRef,
         routes_static_info: Arc<OutboxRoutesStaticInfo>,
         producer_name: String,
         consumer_names: Vec<String>,
@@ -109,10 +108,11 @@ impl ProducerConsumptionJob {
             }
 
             // Create individual transaction objects
+            let catalog = self.catalog.upgrade();
             let transactions: Vec<ConsumeMessageTransaction> = consumer_tasks
                 .into_iter()
                 .map(|(consumer_name, message)| ConsumeMessageTransaction {
-                    catalog: self.catalog.clone(),
+                    catalog: catalog.clone(),
                     consumer_name: consumer_name.to_string(),
                     message: Arc::clone(message),
                     dispatcher: Arc::clone(

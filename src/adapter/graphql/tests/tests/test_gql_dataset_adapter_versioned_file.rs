@@ -14,6 +14,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
 use kamu_datasets_services::*;
+use messaging_outbox::OutboxProvider;
 use serde_json::json;
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
@@ -30,6 +31,9 @@ fn base64usnp_encode(data: &[u8]) -> String {
 async fn test_versioned_file_create_in_band() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -435,6 +439,9 @@ async fn test_versioned_file_create_in_band() {
 async fn test_versioned_file_extra_data() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .build()
         .await;
 
@@ -687,10 +694,14 @@ impl GraphQLDatasetsHarness {
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
+        outbox_provider: Option<OutboxProvider>,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        #[builder(default = PredefinedAccountOpts::default())]
+        predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .maybe_outbox_provider(outbox_provider)
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
@@ -719,7 +730,7 @@ impl GraphQLDatasetsHarness {
             .build();
 
         let (_catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&base_catalog, PredefinedAccountOpts::default()).await;
+            authentication_catalogs(&base_catalog, predefined_account_opts).await;
 
         Self {
             base_gql_harness,
