@@ -613,6 +613,8 @@ pub fn configure_base_catalog(
         },
     );
 
+    b.add_value(kamu_molecule_services::domain::MoleculeConfig::default());
+
     explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<AccountLifecycleMessage>(

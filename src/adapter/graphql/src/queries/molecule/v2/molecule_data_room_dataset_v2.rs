@@ -15,6 +15,7 @@ use database_common::PaginationOpts;
 use file_utils::MediaType;
 use kamu_datasets::FileVersion;
 use kamu_molecule_domain::{
+    MoleculeConfig,
     MoleculeDataRoomActivity,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
@@ -100,12 +101,14 @@ impl MoleculeDataRoomProjection<'_> {
         let view_data_room_entries_uc =
             from_catalog_n!(ctx, dyn MoleculeViewDataRoomEntriesUseCase);
 
+        let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+
         let molecule_entries_listing = view_data_room_entries_uc
             .execute(
                 &self.project.entity,
                 match self.as_of {
                     Some(ref hash) => MoleculeViewDataRoomEntriesMode::Historical(hash.clone()),
-                    None => MoleculeViewDataRoomEntriesMode::LatestProjection, /* LatestSource */
+                    None => molecule_config.view_data_room_entries_mode(),
                 },
                 path_prefix.map(|p| p.into_v1_scalar().into()),
                 max_depth,

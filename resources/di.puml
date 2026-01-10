@@ -289,6 +289,7 @@ class "MoleculeActivitySearchUpdater"
 class "MoleculeAnnouncementSearchUpdater"
 class "MoleculeAnnouncementsServiceImpl"
 class "MoleculeAppendGlobalDataRoomActivityUseCaseImpl"
+class "MoleculeConfig" <<singleton>>
 class "MoleculeCreateAnnouncementUseCaseImpl"
 class "MoleculeCreateDataRoomEntryUseCaseImpl"
 class "MoleculeCreateProjectUseCaseImpl"

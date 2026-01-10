@@ -9,6 +9,8 @@
 
 #![feature(iterator_try_collect)]
 
+pub use kamu_molecule_domain as domain;
+
 mod dependencies;
 mod search;
 mod services;

@@ -10948,6 +10948,8 @@ impl GraphQLMoleculeV2Harness {
             kamu_molecule_services::MoleculeDomainDependenciesOptions::default(),
         );
 
+        base_builder.add_value(kamu_molecule_domain::MoleculeConfig::default());
+
         let base_catalog = base_builder.build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
