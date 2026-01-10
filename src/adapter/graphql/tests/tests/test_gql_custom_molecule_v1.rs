@@ -1499,7 +1499,12 @@ impl GraphQLMoleculeV1Harness {
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
 
-        kamu_molecule_services::register_dependencies(&mut base_builder);
+        kamu_molecule_services::register_dependencies(
+            &mut base_builder,
+            kamu_molecule_services::MoleculeDomainDependenciesOptions {
+                incremental_search_indexing: false,
+            },
+        );
 
         let base_catalog = base_builder.build();
 

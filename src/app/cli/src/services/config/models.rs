@@ -1176,10 +1176,13 @@ impl Default for SearchConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchIndexerConfig {
+    /// Whether incremental indexing is enabled
+    pub incremental_indexing: bool,
+
     /// Whether to clear and re-index on start or use existing vectors if any
     pub clear_on_start: bool,
 
@@ -1193,6 +1196,18 @@ pub struct SearchIndexerConfig {
     /// storing them. It is not needed for normal service operations but can
     /// help debug issues.
     pub payload_include_content: bool,
+}
+
+impl Default for SearchIndexerConfig {
+    fn default() -> Self {
+        Self {
+            incremental_indexing: true,
+            clear_on_start: false,
+            skip_datasets_with_no_description: true,
+            skip_datasets_with_no_data: true,
+            payload_include_content: false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

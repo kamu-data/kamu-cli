@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu_search::SearchIndexerConfig;
 use kamu_search_services::{SearchIndexerImpl, SearchServiceImpl};
 use time_source::SystemTimeSourceProvider;
 
@@ -30,6 +31,7 @@ impl ElasticsearchBaseHarness {
     ) -> Self {
         let mut b = dill::CatalogBuilder::new_chained(es_ctx.catalog());
         b.add::<SearchIndexerImpl>().add::<SearchServiceImpl>();
+        b.add_value(SearchIndexerConfig::default());
 
         system_time_source_provider.embed_into_catalog(&mut b);
 

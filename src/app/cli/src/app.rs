@@ -40,6 +40,7 @@ use tracing::{Instrument, warn};
 
 use crate::accounts::AccountService;
 use crate::cli::Command;
+use crate::config::CLIConfig;
 use crate::error::*;
 use crate::output::*;
 use crate::{
@@ -130,7 +131,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             (_, true) => WorkspaceStatus::Created(tenancy_config),
         };
 
-        let config = load_config(&workspace_layout);
+        let cli_config = load_config(&workspace_layout);
         let current_account =
             AccountService::current_account_indication(args.account.clone(), tenancy_config)
                 .map_err(CLIError::usage_error_from)?;
@@ -138,7 +139,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         prepare_run_dir(&workspace_layout.run_info_dir);
 
         let app_database_config =
-            get_app_database_config(&workspace_layout, &config, workspace_status);
+            get_app_database_config(&workspace_layout, &cli_config, workspace_status);
         let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
         let maybe_db_connection_settings =
             database_config.as_ref().map(build_db_connection_settings);
@@ -150,6 +151,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             let mut base_catalog_builder = configure_base_catalog(
                 &workspace_layout,
                 workspace_status,
+                &cli_config,
                 tenancy_config,
                 args.system_time.map(Into::into),
                 is_e2e_testing,
@@ -172,7 +174,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
 
             register_config_in_catalog(
-                &config,
+                &cli_config,
                 &mut base_catalog_builder,
                 workspace_status,
                 args.password_hashing_mode,
@@ -418,6 +420,7 @@ where
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     workspace_status: WorkspaceStatus,
+    cli_config: &CLIConfig,
     tenancy_config: TenancyConfig,
     system_time: Option<DateTime<Utc>>,
     is_e2e_testing: bool,
@@ -548,16 +551,36 @@ pub fn configure_base_catalog(
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
     }
 
+    let incremental_search_indexing = cli_config
+        .search
+        .as_ref()
+        .unwrap()
+        .indexer
+        .as_ref()
+        .unwrap()
+        .incremental_indexing;
+
     kamu_accounts_services::register_dependencies(
         &mut b,
-        workspace_status.is_indexing_needed(),
-        !is_e2e_testing,
+        kamu_accounts_services::AccountDomainDependenciesOptions {
+            needs_indexing: workspace_status.is_indexing_needed(),
+            production: !is_e2e_testing,
+            incremental_search_indexing,
+        },
     );
 
     odf_server::register_dependencies(&mut b, is_e2e_testing);
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
-    kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
+
+    kamu_datasets_services::register_dependencies(
+        &mut b,
+        kamu_datasets_services::DatasetDomainDependenciesOptions {
+            needs_indexing: workspace_status.is_indexing_needed(),
+            incremental_search_indexing,
+        },
+    );
+
     kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
     b.add::<DatabaseTransactionRunner>();
@@ -583,7 +606,12 @@ pub fn configure_base_catalog(
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
-    kamu_molecule_services::register_dependencies(&mut b);
+    kamu_molecule_services::register_dependencies(
+        &mut b,
+        kamu_molecule_services::MoleculeDomainDependenciesOptions {
+            incremental_search_indexing,
+        },
+    );
 
     explore::register_dependencies(&mut b);
 
@@ -1113,7 +1141,7 @@ pub fn register_config_in_catalog(
     });
 
     let indexer = indexer.unwrap_or_default();
-    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchIndexerConfig {
+    catalog_builder.add_value(kamu_search::SearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
         skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
         skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,

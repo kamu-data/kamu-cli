@@ -322,7 +322,6 @@ class "MoleculeViewProjectsUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
 class "NaturalLanguageSearchConfig" <<singleton>>
 class "NaturalLanguageSearchImplLazyInit" <<singleton>>
-class "NaturalLanguageSearchIndexerConfig" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
 class "OAuthDeviceCodeServiceImpl"
@@ -372,6 +371,7 @@ class "ResetPlannerImpl"
 class "ResourceLoaderImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
+class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
@@ -741,6 +741,7 @@ class "WsSmartTransferProtocolClient"
 "DidSecretService"  --> "DidSecretKeyRepository"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"
+"DatasetSearchSchemaProvider"  --> "SearchIndexerConfig"
 "MessageConsumer" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
@@ -748,6 +749,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetSearchUpdater"  --> "DatasetEntryService"
 "DatasetSearchUpdater"  --> "DatasetRegistry"
 "DatasetSearchUpdater"  --> "SearchService"
+"DatasetSearchUpdater"  --> "SearchIndexerConfig"
 "AccountQuotaStorageChecker" <|-- "AccountQuotaCheckerStorageImpl"
 "AccountQuotaCheckerStorageImpl"  --> "AccountQuotaEventStore"
 "AccountQuotaCheckerStorageImpl"  --> "DatasetStatisticsService"

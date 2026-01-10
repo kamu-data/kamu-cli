@@ -14,12 +14,32 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut dill::CatalogBuilder) {
+#[derive(Debug, Clone, Copy)]
+pub struct MoleculeDomainDependenciesOptions {
+    pub incremental_search_indexing: bool,
+}
+
+impl Default for MoleculeDomainDependenciesOptions {
+    fn default() -> Self {
+        Self {
+            incremental_search_indexing: true,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_dependencies(
+    b: &mut dill::CatalogBuilder,
+    options: MoleculeDomainDependenciesOptions,
+) {
     b.add::<MoleculeSearchSchemaProvider>();
-    b.add::<MoleculeProjectSearchUpdater>();
-    b.add::<MoleculeDataRoomSearchUpdater>();
-    b.add::<MoleculeAnnouncementSearchUpdater>();
-    b.add::<MoleculeActivitySearchUpdater>();
+    if options.incremental_search_indexing {
+        b.add::<MoleculeProjectSearchUpdater>();
+        b.add::<MoleculeDataRoomSearchUpdater>();
+        b.add::<MoleculeAnnouncementSearchUpdater>();
+        b.add::<MoleculeActivitySearchUpdater>();
+    }
 
     b.add::<MoleculeDatasetAccessorFactory>();
 

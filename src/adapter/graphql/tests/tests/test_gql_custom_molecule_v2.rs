@@ -10943,7 +10943,10 @@ impl GraphQLMoleculeV2Harness {
             .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>()
             .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
 
-        kamu_molecule_services::register_dependencies(&mut base_builder);
+        kamu_molecule_services::register_dependencies(
+            &mut base_builder,
+            kamu_molecule_services::MoleculeDomainDependenciesOptions::default(),
+        );
 
         let base_catalog = base_builder.build();
 
