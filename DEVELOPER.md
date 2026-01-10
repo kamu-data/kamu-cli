@@ -159,6 +159,29 @@ Typical commands to work with migrations include:
 * `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
 
 
+### Working with Elasticsearch
+
+Typical commands to work with Elasticsearch engine locally:
+* `make elasticsearch-setup-http` - starts Elasticsearch and Kibana, connected to each other (use this one by default)
+* `make elasticsearch-setup-https` - the same, but enables HTTPS/TLS communcations (for experiments only, requires changing URLs in tests)
+* `make elasticsearch-stop` - stops Elasticsearch and Kibana, but does not remove a container volume, so data survives the restart
+* `make elasticsearch-clean` - stops Elasticsearch and Kibana, and additionally wipes container volumes, guaranteeing clean data after restart
+* `make elasticsearch-test-gc` - runs cleanup of all test indices in the local Elasticsearch instance
+
+Once started, these services could be accessed directly from the browser:
+* in HTTP mode (use by default ):
+  * Elasticsearch: http://localhost:9200/
+  * Kibana: http://localhost:5601/
+* in HTTPS/TLS mode:
+  * Elasticsearch: https://localhost:9200/
+  * Kibana: http://localhost:5601/ (still http, although internally it connects to Elasticsearch via HTTPS/TLS)  
+* when prompted for authentication, use:
+  * login: elastic
+  * password: root
+
+Healthy instance of Elasticsearch is required to execute Elasticsearch-related tests: `make test-elasticsearch`.
+This test group is included into the full test suite as well.
+
 ### Run Linters
 Use the following command:
 ```sh
@@ -190,13 +213,15 @@ In most cases, you can skip tests involving very heavy Spark and Flink engines a
 make test-fast
 ```
 
-If testing with databases is required (including E2E tests), use:
+If testing with databases and/or Elasticsearch is required (including E2E tests), use:
 ```sh
 make sqlx-local-setup # Start database-related containers 
+make elasticsearch-setup-http # Start Elasticsearch & Kibana without HTTPS/TLS
 
 make test-full # or `make test-e2e` for E2E only
 
 make sqlx-local-clean
+make elasticsearch-clean
 ```
 
 ---

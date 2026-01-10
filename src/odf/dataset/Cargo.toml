@@ -41,7 +41,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", features = ["serde"] }
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 mockall = { optional = true, version = "0.14", default-features = false }
 pin-project = { version = "1", default-features = false }

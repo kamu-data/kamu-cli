@@ -17,6 +17,7 @@ use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
+use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
@@ -1071,6 +1072,9 @@ impl GraphQLDatasetsHarness {
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 

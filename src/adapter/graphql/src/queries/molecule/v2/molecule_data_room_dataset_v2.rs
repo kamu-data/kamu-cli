@@ -15,10 +15,12 @@ use database_common::PaginationOpts;
 use file_utils::MediaType;
 use kamu_datasets::FileVersion;
 use kamu_molecule_domain::{
+    MoleculeConfig,
     MoleculeDataRoomActivity,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
     MoleculeViewDataRoomEntriesError,
+    MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
 };
 
@@ -92,16 +94,22 @@ impl MoleculeDataRoomProjection<'_> {
         per_page: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
     ) -> Result<MoleculeDataRoomEntryConnection> {
+        // TODO: enforce max per_page limit
         let per_page = per_page.unwrap_or(Self::DEFAULT_ENTRIES_PER_PAGE);
         let page = page.unwrap_or(0);
 
         let view_data_room_entries_uc =
             from_catalog_n!(ctx, dyn MoleculeViewDataRoomEntriesUseCase);
 
+        let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+
         let molecule_entries_listing = view_data_room_entries_uc
             .execute(
                 &self.project.entity,
-                self.as_of.clone(),
+                match self.as_of {
+                    Some(ref hash) => MoleculeViewDataRoomEntriesMode::Historical(hash.clone()),
+                    None => molecule_config.view_data_room_entries_mode(),
+                },
                 path_prefix.map(|p| p.into_v1_scalar().into()),
                 max_depth,
                 filters.map(Into::into),

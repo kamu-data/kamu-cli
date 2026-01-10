@@ -9,7 +9,6 @@
 
 use async_graphql::value;
 use bon::bon;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
@@ -61,9 +60,7 @@ impl GraphQLAccountQuotasHarness {
             .add_value(JwtAuthenticationConfig::default())
             .add_value(QuotaDefaultsConfig::default())
             .add_value(AuthConfig::sample())
-            .add_builder(
-                OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
-            )
+            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .build();
 

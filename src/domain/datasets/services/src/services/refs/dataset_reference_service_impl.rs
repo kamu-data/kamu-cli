@@ -30,6 +30,7 @@ use messaging_outbox::{
     Outbox,
     OutboxExt,
 };
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +49,7 @@ use messaging_outbox::{
 pub struct DatasetReferenceServiceImpl {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
+    system_time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -118,6 +120,7 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
                 DatasetReferenceMessage::updated(
+                    self.system_time_source.now(),
                     dataset_id,
                     block_ref,
                     maybe_prev_block_hash,

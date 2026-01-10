@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::Utc;
-use dill::Component;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, *};
@@ -883,9 +882,7 @@ impl PullTestHarness {
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add_builder(
-                OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
-            )
+            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_value(IpfsClient::default())
             .add_value(odf::dataset::IpfsGateway::default())

@@ -1108,6 +1108,9 @@ pub struct SearchConfig {
     /// requested from vector store to compensate for filtering out results that
     /// may be inaccessible to user.
     pub overfetch_amount: Option<usize>,
+
+    /// Search repository configuration
+    pub repo: Option<SearchRepositoryConfig>,
 }
 
 impl SearchConfig {
@@ -1136,6 +1139,16 @@ impl SearchConfig {
             })),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
+            repo: Some(SearchRepositoryConfig::Elasticsearch(
+                SearchRepositoryConfigElasticsearch {
+                    url: "http://localhost:9200".to_string(),
+                    password: Some("root".to_string()),
+                    ca_cert_pem_path: None, // not used for http
+                    index_prefix: Some(String::new()),
+                    timeout_secs: Some(30),
+                    enable_compression: Some(false),
+                },
+            )),
         }
     }
 }
@@ -1155,6 +1168,7 @@ impl Default for SearchConfig {
             )),
             overfetch_factor: Some(2.0),
             overfetch_amount: Some(10),
+            repo: Some(SearchRepositoryConfig::default()),
         }
     }
 }
@@ -1162,10 +1176,13 @@ impl Default for SearchConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchIndexerConfig {
+    /// Whether incremental indexing is enabled
+    pub incremental_indexing: bool,
+
     /// Whether to clear and re-index on start or use existing vectors if any
     pub clear_on_start: bool,
 
@@ -1179,6 +1196,18 @@ pub struct SearchIndexerConfig {
     /// storing them. It is not needed for normal service operations but can
     /// help debug issues.
     pub payload_include_content: bool,
+}
+
+impl Default for SearchIndexerConfig {
+    fn default() -> Self {
+        Self {
+            incremental_indexing: true,
+            clear_on_start: false,
+            skip_datasets_with_no_description: true,
+            skip_datasets_with_no_data: true,
+            payload_include_content: false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1268,6 +1297,7 @@ impl Default for EmbeddingsEncoderConfigOpenAi {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum VectorRepoConfig {
+    Dummy,
     Qdrant(VectorRepoConfigQdrant),
     QdrantContainer(VectorRepoConfigQdrantContainer),
 }
@@ -1318,6 +1348,65 @@ impl Default for VectorRepoConfigQdrantContainer {
         Self {
             image: Some(kamu::utils::docker_images::QDRANT.to_string()),
             dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum SearchRepositoryConfig {
+    #[default]
+    Dummy,
+    Elasticsearch(SearchRepositoryConfigElasticsearch),
+    ElasticsearchContainer(SearchRepositoryConfigElasticsearchContainer),
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct SearchRepositoryConfigElasticsearch {
+    #[merge(skip)]
+    pub url: String,
+    pub password: Option<String>,
+    pub ca_cert_pem_path: Option<String>,
+    pub index_prefix: Option<String>,
+    pub timeout_secs: Option<u64>,
+    pub enable_compression: Option<bool>,
+}
+
+impl Default for SearchRepositoryConfigElasticsearch {
+    fn default() -> Self {
+        Self {
+            url: "http://localhost:9200".to_string(),
+            password: None,
+            ca_cert_pem_path: None,
+            index_prefix: Some(String::new()),
+            timeout_secs: Some(30),
+            enable_compression: Some(false),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[merge(strategy = overwrite_none)]
+pub struct SearchRepositoryConfigElasticsearchContainer {
+    pub image: Option<String>,
+    pub start_timeout: Option<DurationString>,
+}
+
+impl Default for SearchRepositoryConfigElasticsearchContainer {
+    fn default() -> Self {
+        Self {
+            image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
         }
     }

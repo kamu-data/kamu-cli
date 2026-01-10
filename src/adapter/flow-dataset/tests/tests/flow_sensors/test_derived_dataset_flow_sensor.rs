@@ -328,8 +328,6 @@ impl DerivedDatasetFlowSensorHarness {
             .mock_dataset_increment_query_service
             .unwrap_or_default();
 
-        use dill::Component;
-
         let mut b = dill::CatalogBuilder::new();
         b.add_value(mock_transform_flow_evaluator);
         b.bind::<dyn TransformFlowEvaluator, MockTransformFlowEvaluator>();
@@ -338,9 +336,7 @@ impl DerivedDatasetFlowSensorHarness {
         b.add_value(mock_dataset_increment_query_service);
         b.bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>();
         b.add::<DependencyGraphServiceImpl>();
-        b.add_builder(
-            OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
-        );
+        b.add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers));
         b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
         register_message_dispatcher::<DatasetDependenciesMessage>(

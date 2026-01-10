@@ -27,7 +27,7 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::*;
 use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
+use time_source::SystemTimeSourceProvider;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,9 +43,10 @@ impl BaseGQLDatasetHarness {
     pub fn new(
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        base_catalog: Option<&dill::Catalog>,
+        outbox_provider: Option<OutboxProvider>,
+        system_time_source_provider: Option<SystemTimeSourceProvider>,
     ) -> Self {
-        use dill::Component;
-
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -55,14 +56,13 @@ impl BaseGQLDatasetHarness {
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = if let Some(base_catalog) = base_catalog {
+                dill::CatalogBuilder::new_chained(base_catalog)
+            } else {
+                dill::CatalogBuilder::new()
+            };
 
             b.add_value(kamu_adapter_graphql::Config::default())
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(ConsumerFilter::AllConsumers),
-                )
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DidGeneratorDefault>()
                 .add_value(tenancy_config)
                 .add::<DatabaseTransactionRunner>()
@@ -76,7 +76,6 @@ impl BaseGQLDatasetHarness {
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
-                .add::<SystemTimeSourceDefault>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
@@ -96,6 +95,12 @@ impl BaseGQLDatasetHarness {
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));
+
+            let outbox_provider = outbox_provider.unwrap_or_default();
+            outbox_provider.embed_into_catalog(&mut b);
+
+            let system_time_source_provider = system_time_source_provider.unwrap_or_default();
+            system_time_source_provider.embed_into_catalog(&mut b);
 
             if let Some(mock) = mock_dataset_action_authorizer {
                 b.add_value(mock)

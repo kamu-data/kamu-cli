@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::{Catalog, component};
 use internal_error::InternalError;
 
 use crate::{ConsumerFilter, MessageDispatcher, Outbox, group_message_dispatchers_by_producer};
@@ -18,18 +17,18 @@ use crate::{ConsumerFilter, MessageDispatcher, Outbox, group_message_dispatchers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxImmediateImpl {
-    catalog: Catalog,
+    catalog: dill::Catalog,
     message_dispatchers_by_producers: HashMap<String, Arc<dyn MessageDispatcher>>,
     consumer_filter: ConsumerFilter<'static>,
 }
 
-#[component(pub)]
+#[dill::component(pub)]
 impl OutboxImmediateImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        catalog: Catalog,
+        catalog: dill::Catalog,
         message_dispatchers: Vec<Arc<dyn MessageDispatcher>>,
-        consumer_filter: ConsumerFilter<'static>,
+        #[dill::component(explicit)] consumer_filter: ConsumerFilter<'static>,
     ) -> Self {
         Self {
             catalog,

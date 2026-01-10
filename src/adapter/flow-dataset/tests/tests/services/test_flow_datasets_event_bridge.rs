@@ -256,10 +256,9 @@ impl FlowDatasetsEventBridgeHarness {
         b.add_value(mock_dataset_increment_query_service);
         b.bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>();
         b.add_builder(FlowScopeTestRemover::builder().with_removed_dataset_id(dataset_id.clone()));
-        b.add_builder(
-            OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        );
+        b.add_builder(OutboxImmediateImpl::builder(
+            messaging_outbox::ConsumerFilter::AllConsumers,
+        ));
         b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
         register_message_dispatcher::<DatasetDependenciesMessage>(
@@ -304,7 +303,7 @@ impl FlowDatasetsEventBridgeHarness {
     }
 
     async fn mimic_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
-        let message = DatasetLifecycleMessage::deleted(dataset_id.clone());
+        let message = DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone());
         self.outbox
             .post_message(MESSAGE_PRODUCER_KAMU_DATASET_SERVICE, message)
             .await

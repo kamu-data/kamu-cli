@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::Component;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu_accounts::{
     AccountConfig,
@@ -280,32 +279,30 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
-        b.add_builder(
-            OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
-        )
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
-        .add::<PredefinedAccountsRegistrator>()
-        .add::<RebacServiceImpl>()
-        .add::<InMemoryRebacRepository>()
-        .add::<UpdateAccountUseCaseImpl>()
-        .add::<CreateAccountUseCaseImpl>()
-        .add_value(DefaultAccountProperties::default())
-        .add_value(DefaultDatasetProperties::default())
-        .add_value(PredefinedAccountsConfig {
-            predefined: predefined_account
-                .into_iter()
-                .map(AccountConfig::test_config_from_name)
-                .collect(),
-        })
-        .add::<LoginPasswordAuthProvider>()
-        .add::<FakeDatasetEntryService>()
-        .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
-        .add::<AccountServiceImpl>()
-        .add::<InMemoryDidSecretKeyRepository>()
-        .add_value(DidSecretEncryptionConfig::sample())
-        .add::<InMemoryAccountRepository>();
+        b.add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add::<UpdateAccountUseCaseImpl>()
+            .add::<CreateAccountUseCaseImpl>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
+            .add_value(PredefinedAccountsConfig {
+                predefined: predefined_account
+                    .into_iter()
+                    .map(AccountConfig::test_config_from_name)
+                    .collect(),
+            })
+            .add::<LoginPasswordAuthProvider>()
+            .add::<FakeDatasetEntryService>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryDidSecretKeyRepository>()
+            .add_value(DidSecretEncryptionConfig::sample())
+            .add::<InMemoryAccountRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
@@ -364,6 +361,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.system_time_source.now(),
                     dataset_handle.id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,
@@ -403,6 +401,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::created(
+                    self.system_time_source.now(),
                     dataset_handle.id.clone(),
                     owner_id,
                     odf::DatasetVisibility::Public,

@@ -12,8 +12,24 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut dill::CatalogBuilder, needs_indexing: bool) {
-    if needs_indexing {
+#[derive(Clone, Copy)]
+pub struct DatasetDomainDependenciesOptions {
+    pub needs_indexing: bool,
+    pub incremental_search_indexing: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_dependencies(
+    b: &mut dill::CatalogBuilder,
+    options: DatasetDomainDependenciesOptions,
+) {
+    b.add::<DatasetSearchSchemaProvider>();
+    if options.incremental_search_indexing {
+        b.add::<DatasetSearchUpdater>();
+    }
+
+    if options.needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();
         b.add::<DatasetStatisticsIndexer>();

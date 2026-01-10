@@ -23,8 +23,9 @@ use crate::output::*;
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct SearchCommand {
+    catalog: dill::Catalog,
     search_svc: Arc<dyn SearchServiceRemote>,
-    search_local_svc: Arc<dyn SearchServiceLocal>,
+    natural_language_search_svc: Arc<dyn NaturalLanguageSearchService>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -63,9 +64,14 @@ impl SearchCommand {
             return Err(CLIError::usage_error("Please provide a search prompt"));
         }
 
+        let context = kamu_search::SearchContext {
+            catalog: &self.catalog,
+        };
+
         let res = self
-            .search_local_svc
+            .natural_language_search_svc
             .search_natural_language(
+                context,
                 &prompt,
                 SearchNatLangOpts {
                     limit: self.max_results,

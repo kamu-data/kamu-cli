@@ -37,6 +37,7 @@ pub struct PostgresFlowSystemEventBridge {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
+#[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl PostgresFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::PgPool>) -> Self {

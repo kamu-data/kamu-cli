@@ -22,6 +22,7 @@ use super::object_store_with_tracing::ObjectStoreWithTracing;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
+#[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn ObjectStoreBuilder)]
 pub struct ObjectStoreBuilderS3 {
     #[dill::component(explicit)]

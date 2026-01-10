@@ -7445,22 +7445,6 @@ async fn test_abort_flow_after_task_finishes() {
         .times(1)
         .in_sequence(&mut evaluation_seq)
         .returning(|_| Ok(TransformStatus::UpToDate));
-    // bar: after foo finishes task 0
-    mock_transform_flow_evaluator
-        .expect_evaluate_transform_status()
-        .times(1)
-        .in_sequence(&mut evaluation_seq)
-        .returning(|_| {
-            Ok(TransformStatus::NewInputDataAvailable {
-                input_advancements: vec![odf::metadata::ExecuteTransformInput {
-                    dataset_id: odf::DatasetID::new_seeded_ed25519(b"foo"),
-                    new_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    prev_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                    prev_offset: Some(5),
-                    new_offset: Some(8),
-                }],
-            })
-        });
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
@@ -7903,7 +7887,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
         .expect_get_increment_between()
-        .times(5)
+        .times(3)
         .returning(|_, _, _| {
             Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,

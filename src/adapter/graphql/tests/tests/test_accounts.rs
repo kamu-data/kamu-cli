@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
@@ -1262,10 +1261,9 @@ impl GraphQLAccountsHarness {
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_value(AuthConfig::sample())
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>()
             .build();
 

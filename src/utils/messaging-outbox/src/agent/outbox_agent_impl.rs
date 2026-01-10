@@ -35,7 +35,7 @@ pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgen
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxAgentImpl {
-    catalog: Catalog,
+    catalog: CatalogWeakRef,
     config: Arc<OutboxConfig>,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
@@ -44,6 +44,7 @@ pub struct OutboxAgentImpl {
 }
 
 #[component(pub)]
+#[scope(Singleton)]
 #[interface(dyn InitOnStartup)]
 #[interface(dyn BackgroundAgent)]
 #[interface(dyn OutboxAgent)]
@@ -52,16 +53,15 @@ pub struct OutboxAgentImpl {
     depends_on: &[],
     requires_transaction: false,
 })]
-#[scope(Singleton)]
 impl OutboxAgentImpl {
     pub fn new(
-        catalog: Catalog,
+        catalog: CatalogWeakRef,
         config: Arc<OutboxConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
         metrics: Arc<OutboxAgentMetrics>,
     ) -> Self {
         let routes_static_info = Arc::new(Self::make_static_routes_info(
-            &catalog,
+            &catalog.upgrade(),
             message_dispatchers_by_producers,
         ));
 
@@ -145,6 +145,8 @@ impl OutboxAgentImpl {
 
     #[transactional_method2(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>, outbox_message_repository: Arc<dyn OutboxMessageRepository>)]
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
+        let base_catalog = self.catalog.upgrade();
+
         // Load existing consumption records
         use futures::TryStreamExt;
         let consumptions = outbox_consumption_repository
@@ -180,7 +182,7 @@ impl OutboxAgentImpl {
                     // we set the last consumed message ID to the latest produced message ID
                     // otherwise, we set it to 0
                     let last_consumed_message_id = if let Some(consumer_metadata) =
-                        particular_consumer_metadata_for(&self.catalog, consumer_name)
+                        particular_consumer_metadata_for(&base_catalog, consumer_name)
                         && consumer_metadata.initial_consumer_boundary
                             == InitialConsumerBoundary::Latest
                         && let Some(latest_produced_message_id) = latest_produced_message_id_maybe

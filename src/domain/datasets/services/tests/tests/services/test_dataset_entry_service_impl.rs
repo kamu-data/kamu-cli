@@ -644,8 +644,6 @@ impl DatasetEntryServiceHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = {
-            use dill::Component;
-
             let mut b = dill::CatalogBuilder::new();
 
             use odf::dataset::DatasetStorageUnitLocalFs;
@@ -676,10 +674,9 @@ impl DatasetEntryServiceHarness {
 
             b.add_value(DidSecretEncryptionConfig::sample());
 
-            b.add_builder(
-                OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            );
+            b.add_builder(OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ));
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
             b.add_value(CurrentAccountSubject::new_test());

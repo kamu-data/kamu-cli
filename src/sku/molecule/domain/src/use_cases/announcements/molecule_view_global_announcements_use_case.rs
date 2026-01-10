@@ -19,9 +19,18 @@ pub trait MoleculeViewGlobalAnnouncementsUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeViewGlobalAnnouncementsMode,
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum MoleculeViewGlobalAnnouncementsMode {
+    LatestProjection,
+    LatestSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

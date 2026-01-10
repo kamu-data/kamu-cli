@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
+    MoleculeConfig,
     MoleculeDataRoomFileActivityType,
     MoleculeProjectActivity,
     MoleculeViewDataRoomActivitiesError,
@@ -144,9 +145,12 @@ impl MoleculeProjectV2 {
         let view_project_activities_uc =
             from_catalog_n!(ctx, dyn MoleculeViewProjectActivitiesUseCase);
 
+        let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+
         let listing = view_project_activities_uc
             .execute(
                 &self.entity,
+                molecule_config.view_project_activities_mode(),
                 filters.map(Into::into),
                 Some(PaginationOpts {
                     limit: per_page,

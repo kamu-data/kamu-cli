@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
+    MoleculeConfig,
     MoleculeDataRoomFileActivityType,
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
@@ -174,10 +175,11 @@ impl MoleculeV2 {
     ) -> Result<MoleculeActivityEventV2Connection> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (view_global_activities_uc, molecule_view_projects_uc) = from_catalog_n!(
+        let (view_global_activities_uc, molecule_view_projects_uc, molecule_config) = from_catalog_n!(
             ctx,
             dyn MoleculeViewGlobalActivitiesUseCase,
-            dyn MoleculeViewProjectsUseCase
+            dyn MoleculeViewProjectsUseCase,
+            MoleculeConfig
         );
 
         let page = page.unwrap_or(0);
@@ -186,6 +188,7 @@ impl MoleculeV2 {
         let listing = view_global_activities_uc
             .execute(
                 &molecule_subject,
+                molecule_config.view_global_activities_mode(),
                 filters.map(Into::into),
                 Some(PaginationOpts::from_page(page, per_page)),
             )
@@ -265,10 +268,11 @@ impl MoleculeV2 {
     ) -> Result<MoleculeSemanticSearchHitConnection> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let (search_uc, molecule_view_projects_uc) = from_catalog_n!(
+        let (search_uc, molecule_view_projects_uc, molecule_config) = from_catalog_n!(
             ctx,
             dyn MoleculeSearchUseCase,
-            dyn MoleculeViewProjectsUseCase
+            dyn MoleculeViewProjectsUseCase,
+            MoleculeConfig
         );
 
         let page = page.unwrap_or(0);
@@ -277,6 +281,7 @@ impl MoleculeV2 {
         let listing = search_uc
             .execute(
                 &molecule_subject,
+                molecule_config.search_mode(),
                 prompt.as_str(),
                 filters.map(Into::into),
                 Some(PaginationOpts::from_page(page, per_page)),

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_webhooks::*;
@@ -86,7 +87,7 @@ async fn test_subscriptions_removed_with_dataset() {
         .outbox
         .post_message(
             MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            DatasetLifecycleMessage::deleted(dataset_id_1.clone()),
+            DatasetLifecycleMessage::deleted(Utc::now(), dataset_id_1.clone()),
         )
         .await
         .unwrap();
@@ -118,10 +119,9 @@ impl TestWebhookDatasetRemovalHandlerHarness {
         b.add::<WebhookDatasetRemovalHandler>()
             .add::<WebhookSecretGeneratorImpl>()
             .add_value(WebhooksConfig::default())
-            .add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<InMemoryWebhookSubscriptionEventStore>();
 

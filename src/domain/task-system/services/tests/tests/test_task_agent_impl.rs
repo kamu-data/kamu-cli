@@ -84,22 +84,12 @@ async fn test_run_single_task() {
     let mut mock_outbox = MockOutbox::new();
     TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
 
-    // Expect logical plan runner to run probe
-    let mut mock_task_planner = MockTaskDefinitionPlanner::new();
-    let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_plan_probe_plan_expectations(
-        &mut mock_task_planner,
-        LogicalPlanProbe::default(),
-        1,
-    );
-    TaskAgentHarness::add_run_probe_plan_expectations(
-        &mut mock_task_runner,
-        LogicalPlanProbe::default(),
-        1,
-    );
-
     // Schedule the only task
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_planner, mock_task_runner);
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
     let task_id = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -123,22 +113,12 @@ async fn test_run_two_of_three_tasks() {
     TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
     TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
 
-    // Expect logical plan runner to run probe twice
-    let mut mock_task_planner = MockTaskDefinitionPlanner::new();
-    let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_plan_probe_plan_expectations(
-        &mut mock_task_planner,
-        LogicalPlanProbe::default(),
-        2,
+    // Schedule 3 tasks (use real probe planner/runner registered in harness)
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
     );
-    TaskAgentHarness::add_run_probe_plan_expectations(
-        &mut mock_task_runner,
-        LogicalPlanProbe::default(),
-        2,
-    );
-
-    // Schedule 3 tasks
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_planner, mock_task_runner);
     let task_id_1 = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -303,48 +283,6 @@ impl TaskAgentHarness {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
-    }
-    fn add_plan_probe_plan_expectations(
-        mock_task_planner: &mut MockTaskDefinitionPlanner,
-        probe: LogicalPlanProbe,
-        times: usize,
-    ) {
-        let probe_clone = probe.clone();
-
-        mock_task_planner
-            .expect_prepare_task_definition()
-            .withf(move |_task_id, plan| {
-                plan.plan_type == LogicalPlanProbe::TYPE_ID
-                    && LogicalPlanProbe::from_logical_plan(plan).unwrap() == probe_clone
-            })
-            .times(times)
-            .returning(move |_, _| {
-                Ok(TaskDefinition::new(TaskDefinitionProbe {
-                    probe: probe.clone(),
-                }))
-            });
-    }
-
-    fn add_run_probe_plan_expectations(
-        mock_task_runner: &mut MockTaskRunner,
-        probe: LogicalPlanProbe,
-        times: usize,
-    ) {
-        let probe_plan = probe.clone();
-
-        mock_task_runner
-            .expect_run_task()
-            .withf(move |td| {
-                td.downcast_ref::<TaskDefinitionProbe>()
-                    .is_some_and(|task_probe| task_probe.probe == probe_plan)
-            })
-            .times(times)
-            .returning(move |_| {
-                Ok(probe
-                    .end_with_outcome
-                    .clone()
-                    .unwrap_or(TaskOutcome::Success(TaskResult::empty())))
-            });
     }
 }
 

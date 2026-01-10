@@ -7,20 +7,38 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_graphql::value;
 use base64::Engine as _;
+use bon::bon;
 use chrono::Utc;
 use indoc::indoc;
-use kamu_accounts::LoggedAccount;
+use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{
+    CreateDatasetFromSnapshotUseCase,
+    CreateDatasetResult,
+    DatasetRegistry,
+    DatasetRegistryExt,
+};
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
+use messaging_outbox::{OutboxAgent, OutboxProvider};
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
 use serde_json::json;
+use time_source::SystemTimeSourceProvider;
 
-use super::test_gql_custom_molecule_v1::GraphQLMoleculeV1Harness;
-use crate::utils::{GraphQLQueryRequest, PredefinedAccountOpts};
+use crate::utils::{
+    AuthenticationCatalogsResult,
+    BaseGQLDatasetHarness,
+    GraphQLQueryRequest,
+    PredefinedAccountOpts,
+    authentication_catalogs_ext,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -385,9 +403,11 @@ const SEARCH_QUERY: &str = indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_provision_project() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_provision_project(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -608,11 +628,13 @@ async fn test_molecule_v2_provision_project() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_disable_enable_project() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_disable_enable_project(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -649,7 +671,7 @@ async fn test_molecule_v2_disable_enable_project() {
         .await;
 
     async fn query_project(
-        harness: &GraphQLMoleculeV1Harness,
+        harness: &GraphQLMoleculeV2Harness,
         uid: &str,
     ) -> async_graphql::Response {
         GraphQLQueryRequest::new(
@@ -789,9 +811,11 @@ async fn test_molecule_v2_disable_enable_project() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_disable_enable_project_errors() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_disable_enable_project_errors(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -830,9 +854,13 @@ async fn test_molecule_v2_disable_enable_project_errors() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
+    es_ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -891,11 +919,13 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_data_room_quota_exceeded() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_data_room_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -992,11 +1022,13 @@ async fn test_molecule_v2_data_room_quota_exceeded() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_data_room_operations() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -1289,6 +1321,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1478,6 +1512,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -1650,6 +1686,8 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -1996,6 +2034,8 @@ async fn test_molecule_v2_data_room_operations() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -2336,6 +2376,8 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let all_entries_nodes = json!([
         {
@@ -3230,6 +3272,9 @@ async fn test_molecule_v2_data_room_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
+
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
@@ -3552,6 +3597,9 @@ async fn test_molecule_v2_data_room_operations() {
         cas_failure_payload["actualHead"].is_string()
             && cas_failure_payload["actualHead"] != cas_failure_payload["expectedHead"]
     );
+
+    harness.synchronize_agents().await;
+
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
@@ -3754,11 +3802,13 @@ async fn test_molecule_v2_data_room_operations() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_data_room_as_of_block_hash() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_data_room_as_of_block_hash(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -3895,6 +3945,8 @@ async fn test_molecule_v2_data_room_as_of_block_hash() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     const PROJECT_DATA_ROOM_LATEST_QUERY: &str = indoc!(
         r#"
         query ($ipnftUid: String!) {
@@ -3975,6 +4027,8 @@ async fn test_molecule_v2_data_room_as_of_block_hash() {
         json!(true),
     );
 
+    harness.synchronize_agents().await;
+
     const PROJECTS_DATA_ROOM_AS_OF_QUERY: &str = indoc!(
         r#"
         query ($dataRoomBlockHash: Multihash!, $fileBlockHash: Multihash!) {
@@ -4046,11 +4100,13 @@ async fn test_molecule_v2_data_room_as_of_block_hash() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_announcements_quota_exceeded() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_announcements_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -4118,9 +4174,11 @@ async fn test_molecule_v2_announcements_quota_exceeded() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_announcements_operations() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -4492,6 +4550,8 @@ async fn test_molecule_v2_announcements_operations() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     // Announcements are listed as expected
     let all_announcements_tail_nodes = value!([
@@ -5490,9 +5550,11 @@ async fn test_molecule_v2_announcements_operations() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_activity() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -5523,6 +5585,8 @@ async fn test_molecule_v2_activity() {
         },
         Some(true),
     );
+
+    harness.synchronize_agents().await;
 
     // Activities are empty
     let expected_activity_node = value!({
@@ -5678,6 +5742,8 @@ async fn test_molecule_v2_activity() {
         file_dataset_id
     };
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -5828,6 +5894,8 @@ async fn test_molecule_v2_activity() {
         })
     );
 
+    harness.synchronize_agents().await;
+
     let expected_activity_node = value!({
         "activity": {
             "nodes": [
@@ -5935,6 +6003,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -6065,6 +6135,8 @@ async fn test_molecule_v2_activity() {
 
         new_announcement_id
     };
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -6207,6 +6279,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     let expected_activity_node = value!({
         "activity": {
@@ -6354,6 +6428,8 @@ async fn test_molecule_v2_activity() {
             }
         })
     );
+
+    harness.synchronize_agents().await;
 
     // Check project activity events
 
@@ -6552,6 +6628,8 @@ async fn test_molecule_v2_activity() {
 
         new_announcement_id
     };
+
+    harness.synchronize_agents().await;
 
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
@@ -9455,9 +9533,15 @@ async fn test_molecule_v2_activity() {
     );
 }
 
-#[tokio::test]
-async fn test_molecule_v2_activity_access_level_rules_filters() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_activity_access_level_rules_filters(
+    es_ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -9502,7 +9586,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters() {
     }
 
     async fn create_file(
-        harness: &GraphQLMoleculeV1Harness,
+        harness: &GraphQLMoleculeV2Harness,
         ipnft_uid: &str,
         path: &str,
         access_level: &str,
@@ -9544,6 +9628,8 @@ async fn test_molecule_v2_activity_access_level_rules_filters() {
         create_file(&harness, PROJECT_1_UID, "/p1-holders.txt", "holders").await;
     let project_2_private =
         create_file(&harness, PROJECT_2_UID, "/p2-private.txt", "private").await;
+
+    harness.synchronize_agents().await;
 
     // Global activity filtered by scoped access rules should only include matching
     // entries
@@ -9604,9 +9690,11 @@ async fn test_molecule_v2_activity_access_level_rules_filters() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_search() {
-    let harness = GraphQLMoleculeV1Harness::builder()
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -10060,6 +10148,9 @@ async fn test_molecule_v2_search() {
         file_dataset_id
     };
 
+    // Synchronize outbox and search agents
+    harness.synchronize_agents().await;
+
     ////////////
     // Search //
     ////////////
@@ -10167,17 +10258,7 @@ async fn test_molecule_v2_search() {
 
     // Empty prompt
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10191,17 +10272,7 @@ async fn test_molecule_v2_search() {
 
     // Prompt: "tEXt" (files + announcements (body))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tEXt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("tEXt", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10215,17 +10286,7 @@ async fn test_molecule_v2_search() {
 
     // Prompt: "tESt" (files + announcements (headline))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "tESt",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("tESt", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10239,17 +10300,7 @@ async fn test_molecule_v2_search() {
 
     // Prompt: "bLaH" (only announcements (body))
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "bLaH",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("bLaH", None).await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10261,19 +10312,9 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Prompt: "lain" (only files)
+    // Prompt: "plain" (only files)
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lain",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+        harness.execute_search_query("plain", None).await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10287,20 +10328,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byIpnftUids: [PROJECT_1_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10314,20 +10349,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byIpnftUids: [PROJECT_2_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10341,20 +10370,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byIpnftUids: [PROJECT_2_UID, PROJECT_1_UID]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10368,20 +10391,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byKind: [FILE]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10395,20 +10412,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byKind: ANNOUNCEMENT
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10422,20 +10433,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byKind: [ANNOUNCEMENT, FILE]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                }))
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10449,20 +10454,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byTags: [test-tag1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10476,20 +10475,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byTags: [test-tag2]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10503,20 +10496,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byTags: [test-tag2, test-tag1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2", "test-tag1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10530,20 +10517,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byCategories: [test-category-1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10557,20 +10538,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byCategories: [test-category-2]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10584,20 +10559,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byCategories: [test-category-2, test-category-1]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byCategories": ["test-category-2", "test-category-1"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10611,20 +10580,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byAccessLevels: ["public"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10638,20 +10601,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byAccessLevels: ["holders"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10665,20 +10622,14 @@ async fn test_molecule_v2_search() {
 
     // Filters: byAccessLevels: ["holders", "public"]
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "",
-                "filters": {
+        harness
+            .execute_search_query(
+                "",
+                Some(serde_json::json!({
                     "byAccessLevels": ["holders", "public"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 project_2_file_1_dataset_search_hit_node,
@@ -10690,26 +10641,20 @@ async fn test_molecule_v2_search() {
         })
     );
 
-    // Filters combo: "lah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
+    // Filters combo: "blah blah 1" + [test-category-1] + [test-tag2] + ["public"] +
     //                + "ONLY_ANNOUNCEMENTS"
     pretty_assertions::assert_eq!(
-        GraphQLQueryRequest::new(
-            SEARCH_QUERY,
-            async_graphql::Variables::from_json(json!({
-                "prompt": "lah blah 1",
-                "filters": {
+        harness
+            .execute_search_query(
+                "blah blah 1",
+                Some(serde_json::json!({
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
                     "byKinds": ["ANNOUNCEMENT"],
-                }
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["search"],
+                })),
+            )
+            .await,
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
@@ -10725,15 +10670,17 @@ async fn test_molecule_v2_search() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(resourcegen)]
-#[test_log::test(tokio::test)]
-async fn test_molecule_v2_dump_dataset_snapshots() {
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_molecule_v2_dump_dataset_snapshots(es_ctx: Arc<ElasticsearchTestContext>) {
     // NOTE: Instead of dumping the source snapshots of datasets here we create
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
     const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV1Harness::builder()
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .es_ctx(es_ctx)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -10924,6 +10871,202 @@ async fn dump_snapshot(
     path.push(format!("../../../resources/molecule/{file_name}.yaml"));
 
     std::fs::write(path, &yaml).unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+pub struct GraphQLMoleculeV2Harness {
+    base_gql_harness: BaseGQLDatasetHarness,
+    es_base_harness: ElasticsearchBaseHarness,
+    schema: kamu_adapter_graphql::Schema,
+    catalog_authorized: dill::Catalog,
+    outbox_agent: Arc<dyn OutboxAgent>,
+    molecule_account_id: odf::AccountID,
+}
+
+#[bon]
+impl GraphQLMoleculeV2Harness {
+    #[builder]
+    async fn new(
+        es_ctx: Arc<ElasticsearchTestContext>,
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        #[builder(default = PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })]
+        predefined_account_opts: PredefinedAccountOpts,
+    ) -> Self {
+        let es_base_harness =
+            ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default);
+
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .base_catalog(es_base_harness.catalog())
+            .tenancy_config(tenancy_config)
+            .outbox_provider(OutboxProvider::Dispatching)
+            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .system_time_source_provider(SystemTimeSourceProvider::Inherited)
+            .build();
+
+        let base_gql_catalog = base_gql_harness.catalog();
+
+        let cache_dir = base_gql_harness.temp_dir().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
+
+        let mut base_builder = dill::CatalogBuilder::new_chained(base_gql_catalog);
+        base_builder
+            .add::<kamu_datasets_services::FindVersionedFileVersionUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateVersionedFileUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewVersionedFileHistoryUseCaseImpl>()
+            .add::<kamu_datasets_services::FindCollectionEntriesUseCaseImpl>()
+            .add::<kamu_datasets_services::UpdateCollectionEntriesUseCaseImpl>()
+            .add::<kamu_datasets_services::ViewCollectionEntriesUseCaseImpl>()
+            .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
+            .add::<kamu::QueryServiceImpl>()
+            .add::<kamu::QueryDatasetDataUseCaseImpl>()
+            .add::<kamu::SessionContextBuilder>()
+            .add::<kamu::ObjectStoreRegistryImpl>()
+            .add::<kamu::ObjectStoreBuilderLocalFs>()
+            .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())
+            .add::<kamu::EngineProvisionerNull>()
+            .add::<kamu::DataFormatRegistryImpl>()
+            .add::<kamu::PushIngestPlannerImpl>()
+            .add::<kamu::PushIngestExecutorImpl>()
+            .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
+            .add_value(kamu_core::ServerUrlConfig::new_test(None))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>()
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
+
+        kamu_molecule_services::register_dependencies(
+            &mut base_builder,
+            kamu_molecule_services::MoleculeDomainDependenciesOptions::default(),
+        );
+
+        base_builder.add_value(kamu_molecule_domain::MoleculeConfig::default());
+
+        let base_catalog = base_builder.build();
+
+        let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
+
+        let AuthenticationCatalogsResult {
+            catalog_no_subject,
+            catalog_authorized,
+            ..
+        } = authentication_catalogs_ext(
+            &base_catalog,
+            Some(CurrentAccountSubject::Logged(LoggedAccount {
+                account_id: molecule_account_id.clone(),
+                account_name: "molecule".parse().unwrap(),
+            })),
+            predefined_account_opts,
+        )
+        .await;
+
+        // Initialize outbox agent
+        let outbox_agent = catalog_authorized.get_one::<dyn OutboxAgent>().unwrap();
+        outbox_agent.run_initialization().await.unwrap();
+
+        // Ensure search indexes schemas are properly initialized
+        {
+            let indexing_catalog = dill::CatalogBuilder::new_chained(&catalog_no_subject)
+                .add_value(KamuBackgroundCatalog::new(
+                    catalog_no_subject,
+                    CurrentAccountSubject::new_test(),
+                ))
+                .build();
+            ElasticsearchBaseHarness::run_initial_indexing(&indexing_catalog).await;
+        }
+
+        Self {
+            base_gql_harness,
+            es_base_harness,
+            schema: kamu_adapter_graphql::schema_quiet(),
+            catalog_authorized,
+            outbox_agent: base_catalog.get_one::<dyn OutboxAgent>().unwrap(),
+            molecule_account_id,
+        }
+    }
+
+    async fn create_projects_dataset(&self) -> CreateDatasetResult {
+        let snapshot =
+            kamu_molecule_domain::MoleculeDatasetSnapshots::projects("molecule".parse().unwrap());
+
+        let create_dataset = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        create_dataset
+            .execute(snapshot, Default::default())
+            .await
+            .unwrap()
+    }
+
+    async fn execute_authorized_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        let catalog = self.catalog_authorized.clone();
+        self.schema
+            .execute(
+                query
+                    .into()
+                    .data(account_entity_data_loader(&catalog))
+                    .data(dataset_handle_data_loader(&catalog))
+                    .data(catalog),
+            )
+            .await
+    }
+
+    async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
+        let dataset_reg = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+        let projects_dataset = dataset_reg
+            .get_dataset_by_ref(&dataset_alias.as_local_ref())
+            .await
+            .unwrap();
+
+        let last_block = projects_dataset
+            .as_metadata_chain()
+            .get_block_by_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap();
+
+        usize::try_from(last_block.sequence_number).unwrap() + 1
+    }
+
+    async fn execute_search_query(
+        &self,
+        prompt: &str,
+        filters: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let gql_value = GraphQLQueryRequest::new(
+            SEARCH_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "prompt": prompt,
+                "filters": filters,
+            })),
+        )
+        .execute(&self.schema, &self.catalog_authorized)
+        .await
+        .data;
+
+        let json_value = gql_value.into_json().unwrap();
+        json_value["molecule"]["v2"]["search"].clone()
+    }
+
+    async fn synchronize_agents(&self) {
+        self.outbox_agent.run_while_has_tasks().await.unwrap();
+        self.es_base_harness.es_ctx().refresh_indices().await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

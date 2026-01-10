@@ -11,7 +11,7 @@ content:
         url: "https://www.alphavantage.co/query\
           ?function=TIME_SERIES_DAILY\
           &symbol=SPY\
-          &outputsize=full\
+          &outputsize=compact\
           &datatype=csv\
           &apikey=${{ env.ALPHA_VANTAGE_API_KEY }}"
       read:

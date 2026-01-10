@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
+const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,12 +32,14 @@ pub enum DatasetLifecycleMessage {
 
 impl DatasetLifecycleMessage {
     pub fn created(
+        event_time: DateTime<Utc>,
         dataset_id: odf::DatasetID,
         owner_account_id: odf::AccountID,
         dataset_visibility: odf::DatasetVisibility,
         dataset_name: odf::DatasetName,
     ) -> Self {
         Self::Created(DatasetLifecycleMessageCreated {
+            event_time,
             dataset_id,
             owner_account_id,
             dataset_visibility,
@@ -44,15 +47,23 @@ impl DatasetLifecycleMessage {
         })
     }
 
-    pub fn renamed(dataset_id: odf::DatasetID, new_dataset_name: odf::DatasetName) -> Self {
+    pub fn renamed(
+        event_time: DateTime<Utc>,
+        dataset_id: odf::DatasetID,
+        new_dataset_alias: odf::DatasetAlias,
+    ) -> Self {
         Self::Renamed(DatasetLifecycleMessageRenamed {
+            event_time,
             dataset_id,
-            new_dataset_name,
+            new_dataset_alias,
         })
     }
 
-    pub fn deleted(dataset_id: odf::DatasetID) -> Self {
-        Self::Deleted(DatasetLifecycleMessageDeleted { dataset_id })
+    pub fn deleted(event_time: DateTime<Utc>, dataset_id: odf::DatasetID) -> Self {
+        Self::Deleted(DatasetLifecycleMessageDeleted {
+            event_time,
+            dataset_id,
+        })
     }
 }
 
@@ -67,6 +78,9 @@ impl Message for DatasetLifecycleMessage {
 /// Contains details about a newly created dataset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageCreated {
+    /// Event time
+    pub event_time: DateTime<Utc>,
+
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
@@ -86,11 +100,14 @@ pub struct DatasetLifecycleMessageCreated {
 /// Contains details about a dataset that has been renamed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageRenamed {
+    /// Event time
+    pub event_time: DateTime<Utc>,
+
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
-    /// The new name assigned to the dataset.
-    pub new_dataset_name: odf::DatasetName,
+    /// The new alias assigned to the dataset.
+    pub new_dataset_alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +115,9 @@ pub struct DatasetLifecycleMessageRenamed {
 /// Contains details about a dataset that has been deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
+    /// Event time
+    pub event_time: DateTime<Utc>,
+
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 }

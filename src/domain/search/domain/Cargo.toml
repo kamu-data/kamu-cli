@@ -26,11 +26,14 @@ default = []
 
 
 [dependencies]
+database-common = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
+serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 

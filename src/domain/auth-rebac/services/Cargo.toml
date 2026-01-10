@@ -32,7 +32,7 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true }
 
 async-trait = "0.1"
-dill = { version = "0.14", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = "0.3"
 tokio = { version = "1", default-features = false, features = [] }
 tracing = { version = "0.1", default-features = false }
@@ -42,6 +42,7 @@ tracing = { version = "0.1", default-features = false }
 kamu = { workspace = true, default-features = false, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 
+chrono = "0.4"
 indoc = { version = "2" }
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",

@@ -21,7 +21,8 @@ use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
+#[scope(Singleton)]
 #[interface(dyn BackgroundAgent)]
 #[interface(dyn TaskAgent)]
 #[interface(dyn InitOnStartup)]
@@ -30,9 +31,8 @@ use tracing::Instrument as _;
     depends_on: &[],
     requires_transaction: false,
 })]
-#[scope(Singleton)]
 pub struct TaskAgentImpl {
-    catalog: Catalog,
+    catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<TaskAgentConfig>,
 }
@@ -44,12 +44,14 @@ impl TaskAgentImpl {
         &self,
         plan: &LogicalPlan,
     ) -> Result<Arc<dyn TaskDefinitionPlanner>, InternalError> {
-        self.catalog
+        let catalog = self.catalog.upgrade();
+
+        catalog
             .builders_for_with_meta::<dyn TaskDefinitionPlanner, _>(
                 |meta: &TaskDefinitionPlannerMeta| meta.logic_plan_type == plan.plan_type.as_str(),
             )
             .next()
-            .map(|builder| builder.get(&self.catalog))
+            .map(|builder| builder.get(&catalog))
             .transpose()
             .int_err()?
             .ok_or_else(|| {
@@ -64,12 +66,14 @@ impl TaskAgentImpl {
         &self,
         task_definition: &TaskDefinition,
     ) -> Result<Arc<dyn TaskRunner>, InternalError> {
-        self.catalog
+        let catalog = self.catalog.upgrade();
+
+        catalog
             .builders_for_with_meta::<dyn TaskRunner, _>(|meta: &TaskRunnerMeta| {
                 meta.task_type == task_definition.task_type()
             })
             .next()
-            .map(|builder| builder.get(&self.catalog))
+            .map(|builder| builder.get(&catalog))
             .transpose()
             .int_err()?
             .ok_or_else(|| {

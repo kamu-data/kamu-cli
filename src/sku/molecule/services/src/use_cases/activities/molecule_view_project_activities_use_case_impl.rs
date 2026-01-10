@@ -10,22 +10,110 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_molecule_domain::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_molecule_domain::{
+    molecule_activity_search_schema as activity_schema,
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
+    *,
+};
+use kamu_search::*;
 
-use crate::{MoleculeDatasetAccessorFactory, utils};
+use crate::{MoleculeDatasetAccessorFactory, map_molecule_activities_filters_to_search, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectActivitiesUseCase)]
 pub struct MoleculeViewProjectActivitiesUseCaseImpl {
+    catalog: dill::Catalog,
     accessor_factory: Arc<MoleculeDatasetAccessorFactory>,
     view_project_announcements_uc: Arc<dyn MoleculeViewProjectAnnouncementsUseCase>,
+    search_service: Arc<dyn SearchService>,
 }
 
 impl MoleculeViewProjectActivitiesUseCaseImpl {
-    async fn get_data_room_activities_listing(
+    async fn project_activities_from_source(
+        &self,
+        molecule_project: &MoleculeProject,
+        filters: Option<MoleculeActivitiesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        // Helper to conditionally fetch data
+        async fn fetch_or_empty<Fut>(
+            enabled: bool,
+            fut: Fut,
+        ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>
+        where
+            Fut: std::future::Future<
+                    Output = Result<
+                        MoleculeProjectActivityListing,
+                        MoleculeViewDataRoomActivitiesError,
+                    >,
+                >,
+        {
+            if enabled {
+                fut.await
+            } else {
+                Ok(MoleculeProjectActivityListing::default())
+            }
+        }
+
+        let by_kinds = filters
+            .as_ref()
+            .and_then(|f| f.by_kinds.as_deref())
+            .unwrap_or(&[]);
+
+        let fetch_data_room =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
+        let fetch_announcements =
+            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+
+        if !fetch_data_room && !fetch_announcements {
+            return Ok(MoleculeProjectActivityListing::default());
+        }
+
+        let data_room_fut = fetch_or_empty(
+            fetch_data_room,
+            self.data_room_activities_listing_from_source(molecule_project, filters.clone()),
+        );
+
+        let announcements_fut = fetch_or_empty(
+            fetch_announcements,
+            self.announcement_activities_listing_from_source(molecule_project, filters.clone()),
+        );
+
+        let (mut data_room_listing, mut announcement_activities_listing) =
+            tokio::try_join!(data_room_fut, announcements_fut)?;
+
+        // Get the total count before pagination
+        let total_count =
+            data_room_listing.total_count + announcement_activities_listing.total_count;
+
+        // Merge lists
+        let mut list = {
+            let mut v = Vec::with_capacity(total_count);
+            v.append(&mut data_room_listing.list);
+            v.append(&mut announcement_activities_listing.list);
+            v
+        };
+
+        // Sort by event time descending
+        list.sort_unstable_by_key(|item: &MoleculeProjectActivity| {
+            std::cmp::Reverse(item.event_time())
+        });
+
+        // Pagination
+        if let Some(pagination) = pagination {
+            let safe_offset = pagination.offset.min(total_count);
+            list.drain(..safe_offset);
+            list.truncate(pagination.limit);
+        }
+
+        Ok(MoleculeProjectActivityListing { list, total_count })
+    }
+
+    async fn data_room_activities_listing_from_source(
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
@@ -173,7 +261,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         })
     }
 
-    async fn get_announcement_activities_listing(
+    async fn announcement_activities_listing_from_source(
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
@@ -182,6 +270,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             .view_project_announcements_uc
             .execute(
                 molecule_project,
+                MoleculeViewProjectAnnouncementsMode::LatestSource,
                 filters.map(|filters| MoleculeAnnouncementsFilters {
                     by_tags: filters.by_tags,
                     by_categories: filters.by_categories,
@@ -210,6 +299,92 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             total_count: announcements_listing.total_count,
         })
     }
+
+    async fn project_activities_from_search(
+        &self,
+        molecule_project: &MoleculeProject,
+        filters: Option<MoleculeActivitiesFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+        };
+
+        let entity_schemas = {
+            if let Some(by_kinds) = filters.as_ref().and_then(|f| f.by_kinds.as_deref())
+                && !by_kinds.is_empty()
+            {
+                let mut schemas = vec![];
+                if by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
+                    schemas.push(activity_schema::SCHEMA_NAME);
+                }
+                if by_kinds.contains(&MoleculeActivityKind::Announcement) {
+                    schemas.push(announcement_schema::SCHEMA_NAME);
+                }
+                schemas
+            } else {
+                vec![
+                    activity_schema::SCHEMA_NAME,
+                    announcement_schema::SCHEMA_NAME,
+                ]
+            }
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // ipnft_uid equality
+            and_clauses.push(field_eq_str(
+                molecule_schema::fields::IPNFT_UID,
+                &molecule_project.ipnft_uid,
+            ));
+
+            // filters by categories, tags, access levels
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_activities_filters_to_search(filters));
+            }
+
+            SearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .search_service
+            .search(
+                ctx,
+                SearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas,
+                    source: SearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
+                    page: pagination.into(),
+                    options: SearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeProjectActivityListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| match hit.schema_name {
+                    activity_schema::SCHEMA_NAME => {
+                        MoleculeDataRoomActivity::from_search_index_json(hit.source)
+                            .map(MoleculeProjectActivity::DataRoomActivity)
+                    }
+                    announcement_schema::SCHEMA_NAME => {
+                        MoleculeAnnouncement::from_search_index_json(hit.id, hit.source)
+                            .map(MoleculeProjectActivity::Announcement)
+                    }
+                    _ => Err(InternalError::new(format!(
+                        "Unexpected schema name: {schema_name}",
+                        schema_name = hit.schema_name
+                    ))),
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,81 +396,21 @@ impl MoleculeViewProjectActivitiesUseCase for MoleculeViewProjectActivitiesUseCa
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
+        mode: MoleculeViewProjectActivitiesMode,
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        // Helper to conditionally fetch data
-        async fn fetch_or_empty<Fut>(
-            enabled: bool,
-            fut: Fut,
-        ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>
-        where
-            Fut: std::future::Future<
-                    Output = Result<
-                        MoleculeProjectActivityListing,
-                        MoleculeViewDataRoomActivitiesError,
-                    >,
-                >,
-        {
-            if enabled {
-                fut.await
-            } else {
-                Ok(MoleculeProjectActivityListing::default())
+        match mode {
+            MoleculeViewProjectActivitiesMode::LatestSource => {
+                self.project_activities_from_source(molecule_project, filters, pagination)
+                    .await
+            }
+
+            MoleculeViewProjectActivitiesMode::LatestProjection => {
+                self.project_activities_from_search(molecule_project, filters, pagination)
+                    .await
             }
         }
-
-        let by_kinds = filters
-            .as_ref()
-            .and_then(|f| f.by_kinds.as_deref())
-            .unwrap_or(&[]);
-
-        let fetch_data_room =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
-        let fetch_announcements =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
-
-        if !fetch_data_room && !fetch_announcements {
-            return Ok(MoleculeProjectActivityListing::default());
-        }
-
-        let data_room_fut = fetch_or_empty(
-            fetch_data_room,
-            self.get_data_room_activities_listing(molecule_project, filters.clone()),
-        );
-
-        let announcements_fut = fetch_or_empty(
-            fetch_announcements,
-            self.get_announcement_activities_listing(molecule_project, filters.clone()),
-        );
-
-        let (mut data_room_listing, mut announcement_activities_listing) =
-            tokio::try_join!(data_room_fut, announcements_fut)?;
-
-        // Get the total count before pagination
-        let total_count =
-            data_room_listing.total_count + announcement_activities_listing.total_count;
-
-        // Merge lists
-        let mut list = {
-            let mut v = Vec::with_capacity(total_count);
-            v.append(&mut data_room_listing.list);
-            v.append(&mut announcement_activities_listing.list);
-            v
-        };
-
-        // Sort by event time descending
-        list.sort_unstable_by_key(|item: &MoleculeProjectActivity| {
-            std::cmp::Reverse(item.event_time())
-        });
-
-        // Pagination
-        if let Some(pagination) = pagination {
-            let safe_offset = pagination.offset.min(total_count);
-            list.drain(..safe_offset);
-            list.truncate(pagination.limit);
-        }
-
-        Ok(MoleculeProjectActivityListing { list, total_count })
     }
 }
 

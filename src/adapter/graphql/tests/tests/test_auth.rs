@@ -9,7 +9,6 @@
 
 use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
 use kamu_accounts::testing::{DUMMY_LOGIN_METHOD, MockAuthenticationService};
 use kamu_accounts::{AccountProvider, AuthenticationService, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
@@ -193,10 +192,9 @@ impl AuthGQLHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<InMemoryDidSecretKeyRepository>()
-                .add_builder(
-                    messaging_outbox::OutboxImmediateImpl::builder()
-                        .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-                )
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DatabaseTransactionRunner>();
 

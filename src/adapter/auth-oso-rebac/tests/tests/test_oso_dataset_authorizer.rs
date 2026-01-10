@@ -12,7 +12,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::Component;
+use chrono::Utc;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
     AccountConfig,
@@ -684,10 +684,7 @@ impl DatasetAuthorizerHarness {
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryRebacRepository>()
-                .add_builder(
-                    OutboxImmediateImpl::builder()
-                        .with_consumer_filter(ConsumerFilter::AllConsumers),
-                )
+                .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(odf::dataset::MockDatasetStorageUnit::new())
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
@@ -765,6 +762,7 @@ impl DatasetAuthorizerHarness {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                     DatasetLifecycleMessage::created(
+                        Utc::now(),
                         dataset_handle.id.clone(),
                         account_id,
                         visibility,
