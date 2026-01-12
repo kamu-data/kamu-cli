@@ -24,8 +24,9 @@ pub struct MoleculeMut {
 impl MoleculeMut {
     /// Shortcut for `v1 { create_project() }`.
     #[graphql(
-        guard = "LoggedInGuard",
-        deprecation = "Use `v2 { create_project() }` instead."
+        deprecation = "Use `v2 { create_project() }` instead",
+        visible = "v1_enabled",
+        guard = "LoggedInGuard.and(FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1))"
     )]
     #[tracing::instrument(level = "info", name = MoleculeMut_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
     async fn create_project(
@@ -44,7 +45,11 @@ impl MoleculeMut {
     /// Looks up the project
     ///
     /// Shortcut for `v1 { project() }`.
-    #[graphql(deprecation = "Use `v2 { project }` instead.")]
+    #[graphql(
+        deprecation = "Use `v2 { project }` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     #[tracing::instrument(level = "info", name = MoleculeMut_project, skip_all, fields(?ipnft_uid))]
     async fn project(
         &self,
@@ -55,7 +60,11 @@ impl MoleculeMut {
     }
 
     /// 1-st Molecule API version (mutation).
-    #[graphql(deprecation = "Use `v2` instead")]
+    #[graphql(
+        deprecation = "Use `v2` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     async fn v1(&self) -> v1::MoleculeMutV1 {
         v1::MoleculeMutV1
     }
@@ -64,6 +73,17 @@ impl MoleculeMut {
     async fn v2(&self) -> v2::MoleculeMutV2 {
         v2::MoleculeMutV2::default()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: to hide from GQL introspection
+fn v1_enabled(ctx: &Context<'_>) -> bool {
+    FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)
+        .is_enabled(ctx)
+        .is_ok()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
