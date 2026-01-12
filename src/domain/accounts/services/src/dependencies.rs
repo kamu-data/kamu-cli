@@ -13,9 +13,20 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, production: bool) {
+#[derive(Clone, Copy)]
+pub struct AccountDomainDependenciesOptions {
+    pub needs_indexing: bool,
+    pub production: bool,
+    pub incremental_search_indexing: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_dependencies(b: &mut CatalogBuilder, options: AccountDomainDependenciesOptions) {
     b.add::<AccountSearchSchemaProvider>();
-    b.add::<AccountSearchUpdater>();
+    if options.incremental_search_indexing {
+        b.add::<AccountSearchUpdater>();
+    }
 
     b.add::<AccessTokenServiceImpl>();
     b.add::<AccountServiceImpl>();
@@ -32,10 +43,10 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, produ
 
     b.add::<DidSecretService>();
 
-    if needs_indexing {
+    if options.needs_indexing {
         b.add::<OAuthDeviceCodeServiceImpl>();
 
-        if production {
+        if options.production {
             b.add::<OAuthDeviceCodeGeneratorDefault>();
         } else {
             b.add::<PredefinedOAuthDeviceCodeGenerator>();

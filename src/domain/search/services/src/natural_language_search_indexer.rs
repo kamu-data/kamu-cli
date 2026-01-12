@@ -19,25 +19,6 @@ use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct NaturalLanguageSearchIndexerConfig {
-    // Whether to clear and re-index on start or work with existing vectors is any exist
-    pub clear_on_start: bool,
-
-    /// Whether to skip indexing datasets that have no readme or description
-    pub skip_datasets_with_no_description: bool,
-
-    /// Whether to skip indexing datasets that have no data
-    pub skip_datasets_with_no_data: bool,
-
-    /// Whether to include the original text as payload of the vectors when
-    /// storing them. It is not needed for normal service operations but can
-    /// help debug issues.
-    pub payload_include_content: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[dill::component(pub)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
@@ -47,7 +28,7 @@ pub struct NaturalLanguageSearchIndexerConfig {
 })]
 pub struct NaturalLanguageSearchIndexer {
     catalog: dill::Catalog,
-    config: Arc<NaturalLanguageSearchIndexerConfig>,
+    config: Arc<SearchIndexerConfig>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
     vector_repo: Arc<dyn VectorRepository>,

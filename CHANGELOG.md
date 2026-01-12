@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- `SearchIndexerConfig` is respected both by natural and full-text search engine
+- Ability to disable incremental full-text search indexing via config option
+
 ## [0.256.0] - 2026-01-08
 ### Added
 - Prototyped full-text search capabilities via `Elasticsearch`:
