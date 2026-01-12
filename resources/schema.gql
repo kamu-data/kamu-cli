@@ -3150,20 +3150,20 @@ type Molecule {
 	
 	Shortcut for `v1 { project }`.
 	"""
-	project(ipnftUid: String!): MoleculeProject @deprecated(reason: "Use `v2 { project }` instead.")
+	project(ipnftUid: String!): MoleculeProject @deprecated(reason: "Use `v2 { project }` instead")
 	"""
 	List the registered projects.
 	
 	Shortcut for `v1 { projects }`.
 	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection! @deprecated(reason: "Use `v2 { projects }` instead.")
+	projects(page: Int, perPage: Int): MoleculeProjectConnection! @deprecated(reason: "Use `v2 { projects }` instead")
 	"""
 	Latest activity events across all projects in reverse chronological
 	order.
 	
 	Shortcut for `v1 { activity }`.
 	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead.")
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead")
 	"""
 	1-st Molecule API version (query).
 	"""
@@ -3488,13 +3488,13 @@ type MoleculeMut {
 	"""
 	Shortcut for `v1 { create_project() }`.
 	"""
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead.")
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead")
 	"""
 	Looks up the project
 	
 	Shortcut for `v1 { project() }`.
 	"""
-	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead.")
+	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead")
 	"""
 	1-st Molecule API version (mutation).
 	"""
