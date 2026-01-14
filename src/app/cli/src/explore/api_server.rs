@@ -27,7 +27,7 @@ use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags, graphql_handler};
+use super::{UIConfiguration, UIFeatureFlags, extend_graphql_request};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -103,7 +103,19 @@ impl APIServer {
         };
 
         let graphql_router = OpenApiRouter::new()
-            .route("/graphql", axum::routing::post(graphql_handler))
+            .route(
+                "/graphql",
+                axum::routing::post(
+                    graphql_http::graphql_handler::<
+                        kamu_adapter_graphql::Query,
+                        kamu_adapter_graphql::Mutation,
+                        async_graphql::EmptySubscription,
+                    >,
+                ),
+            )
+            .layer(Extension(graphql_http::GraphqlRequestContext::new(
+                extend_graphql_request,
+            )))
             .layer(graphql_http::middleware::GraphqlTracingLayer::new(
                 kamu_adapter_graphql::schema(),
                 kamu_adapter_graphql::schema_quiet(),

@@ -12,7 +12,22 @@ use axum::response::IntoResponse;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use internal_error::InternalError;
-use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Adds request-scoped data (e.g., data loaders) to the GraphQL request.
+#[derive(Clone, Copy)]
+pub struct GraphqlRequestContext {
+    pub extend_request: fn(async_graphql::Request, &Catalog) -> async_graphql::Request,
+}
+
+impl GraphqlRequestContext {
+    pub fn new(
+        extend_request: fn(async_graphql::Request, &Catalog) -> async_graphql::Request,
+    ) -> Self {
+        Self { extend_request }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,16 +69,19 @@ impl IntoResponse for GqlResponseError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[transactional_handler]
-pub async fn graphql_handler(
-    Extension(schema): Extension<kamu_adapter_graphql::Schema>,
+pub async fn graphql_handler<Query, Mutation, Subscription>(
+    Extension(schema): Extension<async_graphql::Schema<Query, Mutation, Subscription>>,
     Extension(catalog): Extension<Catalog>,
+    Extension(request_context): Extension<GraphqlRequestContext>,
     req: async_graphql_axum::GraphQLRequest,
-) -> Result<async_graphql_axum::GraphQLResponse, GqlResponseError> {
-    let graphql_request = req
-        .into_inner()
-        .data(account_entity_data_loader(&catalog))
-        .data(dataset_handle_data_loader(&catalog))
-        .data(catalog);
+) -> Result<async_graphql_axum::GraphQLResponse, GqlResponseError>
+where
+    Query: async_graphql::ObjectType + Send + Sync + 'static,
+    Mutation: async_graphql::ObjectType + Send + Sync + 'static,
+    Subscription: async_graphql::SubscriptionType + Send + Sync + 'static,
+{
+    let graphql_request =
+        (request_context.extend_request)(req.into_inner(), &catalog).data(catalog);
     let graphql_response: async_graphql_axum::GraphQLResponse =
         schema.execute(graphql_request).await.into();
 

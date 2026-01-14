@@ -27,9 +27,15 @@ default = []
 
 [dependencies]
 async-graphql = { version = "7", default-features = false }
+async-graphql-axum = { version = "7", default-features = false }
 axum = { version = "0.8", default-features = false }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+dill = { version = "0.15", default-features = false }
 http = { version = "1", default-features = false }
+internal-error = { workspace = true }
 tower = { version = "0.5", default-features = false }
+tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
