@@ -47,7 +47,6 @@ pub(crate) fn not_found_response() -> axum::response::Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(dead_code)]
 pub(crate) fn unauthorized_access_response<B>(body_maybe: Option<B>) -> axum::response::Response
 where
     B: Into<axum::body::Body>,

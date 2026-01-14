@@ -15,6 +15,7 @@ use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_core::auth;
 use kamu_core::auth::DatasetActionAccess;
 use kamu_datasets::DatasetRegistry;
@@ -101,6 +102,23 @@ where
                 .extensions()
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in http server extensions");
+
+            let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+            if let CurrentAccountSubject::Anonymous(reason) = current_account_subject.as_ref() {
+                let message = match reason {
+                    AnonymousAccountReason::AuthenticationInvalid => {
+                        Some("Authentication token invalid")
+                    }
+                    AnonymousAccountReason::AuthenticationExpired => {
+                        Some("Authentication token expired")
+                    }
+                    AnonymousAccountReason::NoAuthenticationProvided => None,
+                };
+
+                if let Some(message) = message {
+                    return Ok(unauthorized_access_response(Some(message)));
+                }
+            }
 
             let dataset_ref = request
                 .extensions()

@@ -316,6 +316,33 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_f
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_invalid_token_returns_unauthorized() {
+    let server_harness = ServerHarness::new(
+        CurrentAccountSubject::Anonymous(AnonymousAccountReason::AuthenticationInvalid),
+        ServerHarness::mock_dataset_action_authorizer(HashSet::new()),
+    )
+    .await;
+
+    let test_url = server_harness.test_url("foo");
+    let api_server_handle = server_harness.api_server_run();
+
+    let client_handle = async {
+        let client = reqwest::Client::new();
+        let response = client.get(test_url).send().await.unwrap();
+
+        assert_eq!(http::StatusCode::UNAUTHORIZED, response.status());
+        assert_eq!(
+            "Authentication token invalid",
+            response.text().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const SAFE_METHODS: [http::Method; 2] = [http::Method::GET, http::Method::HEAD];
 
 const UNSAFE_METHODS: [http::Method; 4] = [

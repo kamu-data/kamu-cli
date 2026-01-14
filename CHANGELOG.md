@@ -15,6 +15,8 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - `SearchIndexerConfig` is respected both by natural and full-text search engine
 - Ability to disable incremental full-text search indexing via config option
+### Fixed
+- Requests with invalid/expired tokens now returns unauthorized response
 
 ## [0.256.0] - 2026-01-08
 ### Added
