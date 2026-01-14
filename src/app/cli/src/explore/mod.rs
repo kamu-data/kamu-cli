@@ -10,7 +10,7 @@
 mod api_server;
 mod dependencies;
 mod flight_sql_service_factory;
-mod graphql_handler;
+mod graphql_request_context;
 mod notebook_server_factory;
 mod spark_livy_server_factory;
 mod sql_shell_impl;
@@ -22,7 +22,7 @@ mod web_ui_server;
 pub use api_server::*;
 pub use dependencies::*;
 pub use flight_sql_service_factory::*;
-pub(crate) use graphql_handler::*;
+pub(crate) use graphql_request_context::*;
 pub use notebook_server_factory::*;
 pub use spark_livy_server_factory::*;
 pub use sql_shell_impl::*;

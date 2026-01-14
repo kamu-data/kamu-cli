@@ -5478,9 +5478,15 @@ name = "graphql-http"
 version = "0.256.0"
 dependencies = [
  "async-graphql",
+ "async-graphql-axum",
  "axum 0.8.8",
+ "database-common",
+ "database-common-macros",
+ "dill",
  "http 1.4.0",
+ "internal-error",
  "tower 0.5.2",
+ "tracing",
 ]
 
 [[package]]
