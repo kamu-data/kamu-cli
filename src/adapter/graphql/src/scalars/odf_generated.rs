@@ -27,7 +27,7 @@ use crate::queries::Dataset;
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub prev_checkpoint: Option<Multihash<'static>>,
@@ -75,7 +75,7 @@ impl From<odf::metadata::AddData> for AddData {
 /// source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddPushSource {
     /// Identifies the source within this dataset.
     pub source_name: String,
@@ -104,7 +104,7 @@ impl From<odf::metadata::AddPushSource> for AddPushSource {
 /// Embedded attachment item.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentEmbedded {
     /// Path to an attachment if it was materialized into a file.
     pub path: String,
@@ -144,7 +144,7 @@ impl From<odf::metadata::Attachments> for Attachments {
 /// For attachments that are specified inline and are embedded in the metadata.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentsembedded-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentsEmbedded {
     /// List of embedded items.
     pub items: Vec<AttachmentEmbedded>,
@@ -163,7 +163,7 @@ impl From<odf::metadata::AttachmentsEmbedded> for AttachmentsEmbedded {
 /// Describes a checkpoint produced by an engine
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Checkpoint {
     /// Hash sum of the checkpoint file.
     pub physical_hash: Multihash<'static>,
@@ -214,7 +214,7 @@ impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
 /// Describes a slice of data added to a dataset or produced via transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DataSlice {
     /// Logical hash sum of the data in this slice.
     pub logical_hash: Multihash<'static>,
@@ -273,7 +273,7 @@ impl Into<odf::metadata::DatasetKind> for DatasetKind {
 /// existing ones.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetSnapshot {
     /// Alias of the dataset.
     pub name: DatasetAlias<'static>,
@@ -300,7 +300,7 @@ impl From<odf::metadata::DatasetSnapshot> for DatasetSnapshot {
 /// Specifies the mapping of system columns onto dataset schema.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetvocabulary-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabulary {
     /// Name of the offset column.
     pub offset_column: String,
@@ -328,7 +328,7 @@ impl From<odf::metadata::DatasetVocabulary> for DatasetVocabulary {
 /// Disables the previously defined polling source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DisablePollingSource {
     pub _dummy: Option<String>,
 }
@@ -344,7 +344,7 @@ impl From<odf::metadata::DisablePollingSource> for DisablePollingSource {
 /// Disables the previously defined source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DisablePushSource {
     /// Identifies the source to be disabled.
     pub source_name: String,
@@ -363,7 +363,7 @@ impl From<odf::metadata::DisablePushSource> for DisablePushSource {
 /// Defines an environment variable passed into some job.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EnvVar {
     /// Name of the variable.
     pub name: String,
@@ -407,7 +407,7 @@ impl From<odf::metadata::EventTimeSource> for EventTimeSource {
 /// Extracts event time from the source's metadata.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrommetadata-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EventTimeSourceFromMetadata {
     pub _dummy: Option<String>,
 }
@@ -423,7 +423,7 @@ impl From<odf::metadata::EventTimeSourceFromMetadata> for EventTimeSourceFromMet
 /// Extracts event time from the path component of the source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrompath-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EventTimeSourceFromPath {
     /// Regular expression where first group contains the timestamp string.
     pub pattern: String,
@@ -445,7 +445,7 @@ impl From<odf::metadata::EventTimeSourceFromPath> for EventTimeSourceFromPath {
 /// Assigns event time from the system time source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefromsystemtime-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EventTimeSourceFromSystemTime {
     pub _dummy: Option<String>,
 }
@@ -461,7 +461,7 @@ impl From<odf::metadata::EventTimeSourceFromSystemTime> for EventTimeSourceFromS
 /// Indicates that derivative transformation has been performed.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteTransform {
     /// Defines inputs used in this transaction. Slices corresponding to every
     /// input dataset must be present.
@@ -504,7 +504,7 @@ impl From<odf::metadata::ExecuteTransform> for ExecuteTransform {
 /// Describes a slice of the input dataset used during a transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
     pub dataset_id: DatasetID<'static>,
@@ -621,7 +621,7 @@ impl From<odf::metadata::FetchStep> for FetchStep {
 /// Runs the specified OCI container to fetch data from an arbitrary source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepcontainer-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FetchStepContainer {
     /// Image name and and an optional tag.
     pub image: String,
@@ -651,7 +651,7 @@ impl From<odf::metadata::FetchStepContainer> for FetchStepContainer {
 /// Connects to an Ethereum node to stream transaction logs.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepethereumlogs-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FetchStepEthereumLogs {
     /// Identifier of the chain to scan logs from. This parameter may be used
     /// for RPC endpoint lookup as well as asserting that provided `nodeUrl`
@@ -688,7 +688,7 @@ impl From<odf::metadata::FetchStepEthereumLogs> for FetchStepEthereumLogs {
 /// Uses glob operator to match files on the local file system.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepfilesglob-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FetchStepFilesGlob {
     /// Path with a glob pattern.
     pub path: String,
@@ -718,7 +718,7 @@ impl From<odf::metadata::FetchStepFilesGlob> for FetchStepFilesGlob {
 /// Connects to an MQTT broker to fetch events from the specified topic.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepmqtt-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FetchStepMqtt {
     /// Hostname of the MQTT broker.
     pub host: String,
@@ -749,7 +749,7 @@ impl From<odf::metadata::FetchStepMqtt> for FetchStepMqtt {
 /// Pulls data from one of the supported sources by its URL.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepurl-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FetchStepUrl {
     /// URL of the data source
     pub url: String,
@@ -807,7 +807,7 @@ impl From<odf::metadata::MergeStrategy> for MergeStrategy {
 /// entirety, without any deduplication.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategyAppend {
     pub _dummy: Option<String>,
 }
@@ -828,7 +828,7 @@ impl From<odf::metadata::MergeStrategyAppend> for MergeStrategyAppend {
 /// is done.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategyChangelogStream {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -854,7 +854,7 @@ impl From<odf::metadata::MergeStrategyChangelogStream> for MergeStrategyChangelo
 /// were not previously seen will be appended.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyledger-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategyLedger {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -899,7 +899,7 @@ impl From<odf::metadata::MergeStrategyLedger> for MergeStrategyLedger {
 /// modified rows.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategysnapshot-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategySnapshot {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime.
@@ -931,7 +931,7 @@ impl From<odf::metadata::MergeStrategySnapshot> for MergeStrategySnapshot {
 /// pair, looking up the previous values.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategyUpsertStream {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -952,7 +952,7 @@ impl From<odf::metadata::MergeStrategyUpsertStream> for MergeStrategyUpsertStrea
 /// modifications of a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MetadataBlock {
     /// System time when this block was written.
     pub system_time: DateTime<Utc>,
@@ -1056,7 +1056,7 @@ impl Into<odf::metadata::MqttQos> for MqttQos {
 /// MQTT topic subscription parameters.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MqttTopicSubscription {
     /// Name of the topic (may include patterns).
     pub path: String,
@@ -1080,7 +1080,7 @@ impl From<odf::metadata::MqttTopicSubscription> for MqttTopicSubscription {
 /// Describes a range of data as a closed arithmetic interval of offsets
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct OffsetInterval {
     /// Start of the closed interval [start; end].
     pub start: u64,
@@ -1122,7 +1122,7 @@ impl From<odf::metadata::PrepStep> for PrepStep {
 /// Pulls data from one of the supported sources by its URL.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstepdecompress-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct PrepStepDecompress {
     /// Name of a compression algorithm used on data.
     pub format: CompressionFormat,
@@ -1145,7 +1145,7 @@ impl From<odf::metadata::PrepStepDecompress> for PrepStepDecompress {
 /// Executes external command to process the data using piped input/output.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepsteppipe-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct PrepStepPipe {
     /// Command to execute and its arguments.
     pub command: Vec<String>,
@@ -1165,7 +1165,7 @@ impl From<odf::metadata::PrepStepPipe> for PrepStepPipe {
 /// usually as part of ingest preprocessing step
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RawQueryRequest {
     /// Paths to input data files to perform query over. Must all have identical
     /// schema.
@@ -1215,7 +1215,7 @@ impl From<odf::metadata::RawQueryResponse> for RawQueryResponse {
 /// Internal error during query execution
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseinternalerror-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RawQueryResponseInternalError {
     /// Brief description of an error
     pub message: String,
@@ -1237,7 +1237,7 @@ impl From<odf::metadata::RawQueryResponseInternalError> for RawQueryResponseInte
 /// Query did not pass validation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseinvalidquery-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RawQueryResponseInvalidQuery {
     /// Explanation of an error
     pub message: String,
@@ -1256,7 +1256,7 @@ impl From<odf::metadata::RawQueryResponseInvalidQuery> for RawQueryResponseInval
 /// Reports query progress
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseprogress-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RawQueryResponseProgress {
     pub _dummy: Option<String>,
 }
@@ -1272,7 +1272,7 @@ impl From<odf::metadata::RawQueryResponseProgress> for RawQueryResponseProgress 
 /// Query executed successfully
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponsesuccess-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RawQueryResponseSuccess {
     /// Number of records produced by the query
     pub num_records: u64,
@@ -1321,7 +1321,7 @@ impl From<odf::metadata::ReadStep> for ReadStep {
 /// Reader for comma-separated files.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepCsv {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1396,7 +1396,7 @@ impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
 /// Reader for ESRI Shapefile format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepEsriShapefile {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1424,7 +1424,7 @@ impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
 /// own column.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepGeoJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1444,7 +1444,7 @@ impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
 /// Reader for JSON files that contain an array of objects within them.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepJson {
     /// Path in the form of `a.b.c` to a sub-element of the root JSON object
     /// that is an array or objects. If not specified it is assumed that the
@@ -1489,7 +1489,7 @@ impl From<odf::metadata::ReadStepJson> for ReadStepJson {
 /// every individual feature object to appear on its own line.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepNdGeoJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1510,7 +1510,7 @@ impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
 /// same schema.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepNdJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1548,7 +1548,7 @@ impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
 /// Reader for Apache Parquet format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ReadStepParquet {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1568,7 +1568,7 @@ impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
 /// Defines a header (e.g. HTTP) to be passed into some request.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct RequestHeader {
     /// Name of the header.
     pub name: String,
@@ -1591,7 +1591,7 @@ impl From<odf::metadata::RequestHeader> for RequestHeader {
 /// the chain.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Seed {
     /// Unique identity of the dataset.
     pub dataset_id: DatasetID<'static>,
@@ -1613,7 +1613,7 @@ impl From<odf::metadata::Seed> for Seed {
 /// Associates a set of files with this dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetAttachments {
     /// One of the supported attachment sources.
     pub attachments: Attachments,
@@ -1662,7 +1662,7 @@ impl From<odf::metadata::SetDataSchema> for SetDataSchema {
 /// Provides basic human-readable information about a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetInfo {
     /// Brief single-sentence summary of a dataset.
     pub description: Option<String>,
@@ -1684,7 +1684,7 @@ impl From<odf::metadata::SetInfo> for SetInfo {
 /// Defines a license that applies to this dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetLicense {
     /// Abbreviated name of the license.
     pub short_name: String,
@@ -1713,7 +1713,7 @@ impl From<odf::metadata::SetLicense> for SetLicense {
 /// root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetPollingSource {
     /// Determines where data is sourced from.
     pub fetch: FetchStep,
@@ -1745,7 +1745,7 @@ impl From<odf::metadata::SetPollingSource> for SetPollingSource {
 /// Defines a transformation that produces data in a derivative dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetTransform {
     /// Datasets that will be used as sources.
     pub inputs: Vec<TransformInput>,
@@ -1767,7 +1767,7 @@ impl From<odf::metadata::SetTransform> for SetTransform {
 /// Lets you manipulate names of the system columns to avoid conflicts.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetVocab {
     /// Name of the offset column.
     pub offset_column: Option<String>,
@@ -1813,7 +1813,7 @@ impl From<odf::metadata::SourceCaching> for SourceCaching {
 /// After source was processed once it will never be ingested again.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecachingforever-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceCachingForever {
     pub _dummy: Option<String>,
 }
@@ -1858,7 +1858,7 @@ impl Into<odf::metadata::SourceOrdering> for SourceOrdering {
 /// The state of the source the data was added from to allow fast resuming.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceState {
     /// Identifies the source that the state corresponds to.
     pub source_name: String,
@@ -1884,7 +1884,7 @@ impl From<odf::metadata::SourceState> for SourceState {
 /// Defines a query in a multi-step SQL transformation.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SqlQueryStep {
     /// Name of the temporary view that will be created from result of the
     /// query. Step without this alias will be treated as an output of the
@@ -1909,7 +1909,7 @@ impl From<odf::metadata::SqlQueryStep> for SqlQueryStep {
 /// streams.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TemporalTable {
     /// Name of the dataset to be converted into a temporal table.
     pub name: String,
@@ -1949,7 +1949,7 @@ impl From<odf::metadata::Transform> for Transform {
 /// Transform using one of the SQL dialects.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformsql-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformSql {
     pub engine: String,
     pub version: Option<String>,
@@ -2026,7 +2026,7 @@ impl TransformInputDatasetNotAccessible {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 #[graphql(complex)]
 pub struct TransformInput {
     pub dataset_ref: DatasetRef<'static>,
@@ -2061,7 +2061,7 @@ impl From<odf::metadata::TransformInput> for TransformInput {
 /// transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequest {
     /// Unique identifier of the output dataset.
     pub dataset_id: DatasetID<'static>,
@@ -2111,7 +2111,7 @@ impl From<odf::metadata::TransformRequest> for TransformRequest {
 /// Sent as part of the engine transform request operation to describe the input
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestInput {
     /// Unique identifier of the dataset.
     pub dataset_id: DatasetID<'static>,
@@ -2177,7 +2177,7 @@ impl From<odf::metadata::TransformResponse> for TransformResponse {
 /// Internal error during query execution
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseinternalerror-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformResponseInternalError {
     /// Brief description of an error
     pub message: String,
@@ -2199,7 +2199,7 @@ impl From<odf::metadata::TransformResponseInternalError> for TransformResponseIn
 /// Query did not pass validation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseinvalidquery-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformResponseInvalidQuery {
     /// Explanation of an error
     pub message: String,
@@ -2218,7 +2218,7 @@ impl From<odf::metadata::TransformResponseInvalidQuery> for TransformResponseInv
 /// Reports query progress
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseprogress-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformResponseProgress {
     pub _dummy: Option<String>,
 }
@@ -2234,7 +2234,7 @@ impl From<odf::metadata::TransformResponseProgress> for TransformResponseProgres
 /// Query executed successfully
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponsesuccess-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformResponseSuccess {
     /// Data slice produced by the transaction, if any.
     pub new_offset_interval: Option<OffsetInterval>,
@@ -2256,7 +2256,7 @@ impl From<odf::metadata::TransformResponseSuccess> for TransformResponseSuccess 
 /// Represents a watermark in the event stream.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Watermark {
     /// Moment in processing time when watermark was emitted.
     pub system_time: DateTime<Utc>,
