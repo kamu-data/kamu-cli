@@ -1260,6 +1260,10 @@ struct QuotaExceededDetails {
     limit: Option<u64>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn quota_result(err: QuotaError) -> Result<QuotaExceededDetails, GqlError> {
     match err {
         QuotaError::Exceeded(e) => Ok(QuotaExceededDetails {
@@ -1272,9 +1276,11 @@ fn quota_result(err: QuotaError) -> Result<QuotaExceededDetails, GqlError> {
             incoming: None,
             limit: None,
         }),
-        QuotaError::Internal(e) => Err(e.into()),
+        e @ QuotaError::Internal(_) => Err(e.int_err().into()),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn quota_exceeded_message(used: Option<u64>, incoming: Option<u64>, limit: Option<u64>) -> String {
     match (used, incoming, limit) {
@@ -1284,3 +1290,5 @@ fn quota_exceeded_message(used: Option<u64>, incoming: Option<u64>, limit: Optio
         _ => "Quota exceeded".to_string(),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
