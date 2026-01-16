@@ -25,7 +25,11 @@ impl Molecule {
     /// Looks up the project.
     ///
     /// Shortcut for `v1 { project }`.
-    #[graphql(deprecation = "Use `v2 { project }` instead.")]
+    #[graphql(
+        deprecation = "Use `v2 { project }` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     #[tracing::instrument(level = "info", name = Molecule_project, skip_all, fields(?ipnft_uid))]
     async fn project(
         &self,
@@ -38,7 +42,11 @@ impl Molecule {
     /// List the registered projects.
     ///
     /// Shortcut for `v1 { projects }`.
-    #[graphql(deprecation = "Use `v2 { projects }` instead.")]
+    #[graphql(
+        deprecation = "Use `v2 { projects }` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     #[tracing::instrument(level = "info", name = Molecule_projects, skip_all)]
     async fn projects(
         &self,
@@ -53,7 +61,11 @@ impl Molecule {
     /// order.
     ///
     /// Shortcut for `v1 { activity }`.
-    #[graphql(deprecation = "Use `v2 { activity }` instead.")]
+    #[graphql(
+        deprecation = "Use `v2 { activity }` instead",
+        visible = "v1_enabled",
+        guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)"
+    )]
     #[tracing::instrument(level = "info", name = Molecule_activity, skip_all)]
     async fn activity(
         &self,

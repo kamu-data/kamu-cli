@@ -1502,7 +1502,11 @@ impl GraphQLMoleculeV1Harness {
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500));
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
+            .add_value(
+                kamu_adapter_graphql::GqlFeatureFlags::new()
+                    .with_feature(kamu_adapter_graphql::GqlFeature::MoleculeApiV1),
+            );
 
         kamu_molecule_services::register_dependencies(&mut base_builder);
 
