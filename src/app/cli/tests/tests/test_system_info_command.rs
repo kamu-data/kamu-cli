@@ -13,6 +13,7 @@ use std::sync::Arc;
 use container_runtime::ContainerRuntimeConfig;
 use dill::TypedBuilder;
 use kamu::domain::TenancyConfig;
+use kamu_cli::config::CLIConfig;
 use kamu_cli::*;
 use observability::build_info::BuildInfo;
 
@@ -24,6 +25,7 @@ async fn test_system_info_command() {
     let cat = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::NoWorkspace,
+        &CLIConfig::default(),
         TenancyConfig::SingleTenant,
         None,
         false,

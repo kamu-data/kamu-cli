@@ -88,6 +88,40 @@ impl MoleculeDataRoomActivity {
         })
     }
 
+    pub fn from_search_index_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct DataRoomActivityRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            pub offset: u64,
+
+            #[serde(flatten)]
+            pub payload: MoleculeDataRoomActivityPayloadRecord,
+        }
+
+        let record = serde_json::from_value::<DataRoomActivityRecord>(record).int_err()?;
+
+        Ok(Self {
+            offset: record.offset,
+            system_time: record.timestamp_columns.system_time,
+            event_time: record.timestamp_columns.event_time,
+            ipnft_uid: record.payload.ipnft_uid,
+            activity_type: record.payload.activity_type,
+            path: record.payload.path,
+            r#ref: record.payload.r#ref,
+            description: record.payload.description,
+            version: record.payload.version,
+            content_type: record.payload.content_type,
+            content_length: record.payload.content_length,
+            content_hash: record.payload.content_hash,
+            access_level: record.payload.access_level,
+            change_by: record.payload.change_by,
+            categories: record.payload.categories,
+            tags: record.payload.tags,
+        })
+    }
+
     pub fn from_data_room_operation(
         offset: u64,
         activity_type: MoleculeDataRoomFileActivityType,

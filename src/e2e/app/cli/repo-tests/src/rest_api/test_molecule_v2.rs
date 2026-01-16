@@ -12,10 +12,12 @@ use base64::Engine as _;
 use indoc::indoc;
 use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use serde_json::{Value, json};
+use tokio_retry::Retry;
+use tokio_retry::strategy::FixedInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MULTITENANT_MOLECULE_QUOTA_CONFIG: &str = indoc::indoc!(
+pub const MULTITENANT_MOLECULE_CONFIG: &str = indoc::indoc!(
     r#"
     kind: CLIConfig
     version: 1
@@ -36,6 +38,47 @@ pub const MULTITENANT_MOLECULE_QUOTA_CONFIG: &str = indoc::indoc!(
         storage: 1000000000
     "#
 );
+
+pub const ELASTICSEARCH_CONFIG_EXTENSION: &str = indoc::indoc!(
+    r#"
+      search:
+        repo:
+          kind: elasticsearch
+          # url: https://localhost:9200
+          url: http://localhost:9200
+          password: root
+          indexPrefix: <random_prefix>
+
+          # Bind absolute path for HTTPS with self-signed certs
+          # caCertPemPath: .local/elasticsearch/certs/ca/ca.crt
+    "#
+);
+
+pub fn get_multitenant_molecule_config_with_elasticsearch() -> String {
+    let random_prefix = random_strings::get_random_name(Some("kamu-test-e2e-"), 10).to_lowercase();
+
+    let elasticsearch_config =
+        ELASTICSEARCH_CONFIG_EXTENSION.replace("<random_prefix>", &random_prefix);
+
+    // Parse both YAML configs
+    let mut base_config: serde_yaml::Value =
+        serde_yaml::from_str(MULTITENANT_MOLECULE_CONFIG).unwrap();
+    let search_config: serde_yaml::Value = serde_yaml::from_str(&elasticsearch_config).unwrap();
+
+    // Merge search config into content section
+    if let (Some(content_map), Some(search_map)) = (
+        base_config
+            .get_mut("content")
+            .and_then(|c| c.as_mapping_mut()),
+        search_config.as_mapping(),
+    ) {
+        for (key, value) in search_map {
+            content_map.insert(key.clone(), value.clone());
+        }
+    }
+
+    serde_yaml::to_string(&base_config).unwrap()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,95 +357,120 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
     );
 
     // Project activity (should surface admin changeBy on remove)
-    let project_activity = kamu_api_server_client
-        .graphql_api_call_ex(Request::new(LIST_PROJECT_ACTIVITY_QUERY).variables(
-            Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
-                "filters": {
-                    "byTags": [tag],
-                },
-            })),
-        ))
-        .await;
-    assert!(
-        project_activity.errors.is_empty(),
-        "Project activity query failed: {project_activity:?}"
-    );
-    let project_nodes = project_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
-        ["project"]["activity"]["nodes"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        project_nodes.len(),
-        3,
-        "Unexpected project activity: {project_nodes:?}"
-    );
-    assert_eq!(
-        project_nodes[0]["__typename"],
-        json!("MoleculeActivityFileRemovedV2"),
-        "{project_nodes:?}"
-    );
-    assert_eq!(
-        project_nodes[0]["entry"]["changeBy"],
-        json!(ADMIN_DID),
-        "Project remove changeBy mismatch: {project_nodes:?}"
-    );
-    assert_eq!(
-        project_nodes[1]["entry"]["changeBy"],
-        json!(USER_DID),
-        "Update changeBy mismatch: {project_nodes:?}"
-    );
-    assert_eq!(
-        project_nodes[2]["entry"]["changeBy"],
-        json!(USER_DID),
-        "Add changeBy mismatch: {project_nodes:?}"
-    );
+    // Retrying due to eventual consistency of ES indexing
+    let retry_strategy = FixedInterval::from_millis(5_000).take(6); // 30s
+    Retry::spawn(retry_strategy, || async {
+        let project_activity = kamu_api_server_client
+            .graphql_api_call_ex(Request::new(LIST_PROJECT_ACTIVITY_QUERY).variables(
+                Variables::from_json(json!({
+                    "ipnftUid": ipnft_uid,
+                    "filters": {
+                        "byTags": [tag],
+                    },
+                })),
+            ))
+            .await;
+        assert!(
+            project_activity.errors.is_empty(),
+            "Project activity query failed: {project_activity:?}"
+        );
+        let project_nodes = project_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+            ["project"]["activity"]["nodes"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        if project_nodes.len() < 3 {
+            return Err(());
+        }
+
+        assert_eq!(
+            project_nodes.len(),
+            3,
+            "Unexpected project activity: {project_nodes:?}"
+        );
+        assert_eq!(
+            project_nodes[0]["__typename"],
+            json!("MoleculeActivityFileRemovedV2"),
+            "{project_nodes:?}"
+        );
+        assert_eq!(
+            project_nodes[0]["entry"]["changeBy"],
+            json!(ADMIN_DID),
+            "Project remove changeBy mismatch: {project_nodes:?}"
+        );
+        assert_eq!(
+            project_nodes[1]["entry"]["changeBy"],
+            json!(USER_DID),
+            "Update changeBy mismatch: {project_nodes:?}"
+        );
+        assert_eq!(
+            project_nodes[2]["entry"]["changeBy"],
+            json!(USER_DID),
+            "Add changeBy mismatch: {project_nodes:?}"
+        );
+
+        Ok::<(), ()>(())
+    })
+    .await
+    .unwrap();
 
     // Global activity should mirror the same changeBy values
-    let global_activity = kamu_api_server_client
-        .graphql_api_call_ex(Request::new(LIST_GLOBAL_ACTIVITY_QUERY).variables(
-            Variables::from_json(json!({
-                "filters": {
-                    "byTags": [tag],
-                },
-            })),
-        ))
-        .await;
-    assert!(
-        global_activity.errors.is_empty(),
-        "Global activity query failed: {global_activity:?}"
-    );
-    let global_nodes = global_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
-        ["activity"]["nodes"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
-    assert_eq!(
-        global_nodes.len(),
-        3,
-        "Unexpected global activity: {global_nodes:?}"
-    );
-    assert_eq!(
-        global_nodes[0]["__typename"],
-        json!("MoleculeActivityFileRemovedV2"),
-        "{global_nodes:?}"
-    );
-    assert_eq!(
-        global_nodes[0]["entry"]["changeBy"],
-        json!(ADMIN_DID),
-        "Global remove changeBy mismatch: {global_nodes:?}"
-    );
-    assert_eq!(
-        global_nodes[1]["entry"]["changeBy"],
-        json!(USER_DID),
-        "Global update changeBy mismatch: {global_nodes:?}"
-    );
-    assert_eq!(
-        global_nodes[2]["entry"]["changeBy"],
-        json!(USER_DID),
-        "Global add changeBy mismatch: {global_nodes:?}"
-    );
+    // Retrying due to eventual consistency of ES indexing
+    let retry_strategy = FixedInterval::from_millis(5_000).take(6); // 30s
+    Retry::spawn(retry_strategy, || async {
+        let global_activity = kamu_api_server_client
+            .graphql_api_call_ex(Request::new(LIST_GLOBAL_ACTIVITY_QUERY).variables(
+                Variables::from_json(json!({
+                    "filters": {
+                        "byTags": [tag],
+                    },
+                })),
+            ))
+            .await;
+        assert!(
+            global_activity.errors.is_empty(),
+            "Global activity query failed: {global_activity:?}"
+        );
+        let global_nodes = global_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+            ["activity"]["nodes"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        if global_nodes.len() < 3 {
+            return Err(());
+        }
+        assert_eq!(
+            global_nodes.len(),
+            3,
+            "Unexpected global activity: {global_nodes:?}"
+        );
+        assert_eq!(
+            global_nodes[0]["__typename"],
+            json!("MoleculeActivityFileRemovedV2"),
+            "{global_nodes:?}"
+        );
+        assert_eq!(
+            global_nodes[0]["entry"]["changeBy"],
+            json!(ADMIN_DID),
+            "Global remove changeBy mismatch: {global_nodes:?}"
+        );
+        assert_eq!(
+            global_nodes[1]["entry"]["changeBy"],
+            json!(USER_DID),
+            "Global update changeBy mismatch: {global_nodes:?}"
+        );
+        assert_eq!(
+            global_nodes[2]["entry"]["changeBy"],
+            json!(USER_DID),
+            "Global add changeBy mismatch: {global_nodes:?}"
+        );
+
+        Ok::<(), ()>(())
+    })
+    .await
+    .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

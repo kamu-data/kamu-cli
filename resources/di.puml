@@ -85,6 +85,34 @@ interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
 interface "MetricsProvider" <<i>>
 interface "ModifyAccountPasswordUseCase" <<i>>
+interface "MoleculeAnnouncementsService" <<i>>
+interface "MoleculeAppendGlobalDataRoomActivityUseCase" <<i>>
+interface "MoleculeCreateAnnouncementUseCase" <<i>>
+interface "MoleculeCreateDataRoomEntryUseCase" <<i>>
+interface "MoleculeCreateProjectUseCase" <<i>>
+interface "MoleculeCreateVersionedFileDatasetUseCase" <<i>>
+interface "MoleculeDataRoomCollectionService" <<i>>
+interface "MoleculeDisableProjectUseCase" <<i>>
+interface "MoleculeEnableProjectUseCase" <<i>>
+interface "MoleculeFindDataRoomEntryUseCase" <<i>>
+interface "MoleculeFindProjectAnnouncementUseCase" <<i>>
+interface "MoleculeFindProjectUseCase" <<i>>
+interface "MoleculeGlobalDataRoomActivitiesService" <<i>>
+interface "MoleculeMoveDataRoomEntryUseCase" <<i>>
+interface "MoleculeProjectsService" <<i>>
+interface "MoleculeReadVersionedFileEntryUseCase" <<i>>
+interface "MoleculeRemoveDataRoomEntryUseCase" <<i>>
+interface "MoleculeSearchUseCase" <<i>>
+interface "MoleculeUpdateDataRoomEntryUseCase" <<i>>
+interface "MoleculeUpdateVersionedFileMetadataUseCase" <<i>>
+interface "MoleculeUploadVersionedFileVersionUseCase" <<i>>
+interface "MoleculeVersionedFileContentProvider" <<i>>
+interface "MoleculeViewDataRoomEntriesUseCase" <<i>>
+interface "MoleculeViewGlobalActivitiesUseCase" <<i>>
+interface "MoleculeViewGlobalAnnouncementsUseCase" <<i>>
+interface "MoleculeViewProjectActivitiesUseCase" <<i>>
+interface "MoleculeViewProjectAnnouncementsUseCase" <<i>>
+interface "MoleculeViewProjectsUseCase" <<i>>
 interface "NaturalLanguageSearchService" <<i>>
 interface "OAuthDeviceCodeGenerator" <<i>>
 interface "OAuthDeviceCodeRepository" <<i>>
@@ -250,13 +278,51 @@ class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
 class "MetadataChainDbBackedConfig" <<singleton>>
 class "MetadataQueryServiceImpl"
 class "ModifyAccountPasswordUseCaseImpl"
+class "MoleculeActivitySearchUpdater"
+class "MoleculeAnnouncementSearchUpdater"
+class "MoleculeAnnouncementsServiceImpl"
+class "MoleculeAppendGlobalDataRoomActivityUseCaseImpl"
+class "MoleculeConfig" <<singleton>>
+class "MoleculeCreateAnnouncementUseCaseImpl"
+class "MoleculeCreateDataRoomEntryUseCaseImpl"
+class "MoleculeCreateProjectUseCaseImpl"
+class "MoleculeCreateVersionedFileDatasetUseCaseImpl"
+class "MoleculeDataRoomCollectionServiceImpl"
+class "MoleculeDataRoomSearchUpdater"
+class "MoleculeDatasetAccessorFactory"
+class "MoleculeDisableProjectUseCaseImpl"
+class "MoleculeEnableProjectUseCaseImpl"
+class "MoleculeFindDataRoomEntryUseCaseImpl"
+class "MoleculeFindProjectAnnouncementUseCaseImpl"
+class "MoleculeFindProjectUseCaseImpl"
+class "MoleculeGlobalDataRoomActivitiesServiceImpl"
+class "MoleculeMoveDataRoomEntryUseCaseImpl"
+class "MoleculeProjectSearchUpdater"
+class "MoleculeProjectsServiceImpl"
+class "MoleculeReadVersionedFileEntryUseCaseImpl"
+class "MoleculeRemoveDataRoomEntryUseCaseImpl"
+class "MoleculeSearchSchemaProvider"
+class "MoleculeSearchUseCaseImpl"
+class "MoleculeUpdateDataRoomEntryUseCaseImpl"
+class "MoleculeUpdateVersionedFileMetadataUseCaseImpl"
+class "MoleculeUploadVersionedFileVersionUseCaseImpl"
+class "MoleculeVersionedFileContentProviderImpl"
+class "MoleculeViewDataRoomEntriesUseCaseImpl"
+class "MoleculeViewGlobalActivitiesUseCaseImpl"
+class "MoleculeViewGlobalAnnouncementsUseCaseImpl"
+class "MoleculeViewProjectActivitiesUseCaseImpl"
+class "MoleculeViewProjectAnnouncementsUseCaseImpl"
+class "MoleculeViewProjectsUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
 class "NaturalLanguageSearchConfig" <<singleton>>
 class "NaturalLanguageSearchImplLazyInit" <<singleton>>
-class "NaturalLanguageSearchIndexerConfig" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
 class "OAuthDeviceCodeServiceImpl"
@@ -306,6 +372,7 @@ class "ResetPlannerImpl"
 class "ResourceLoaderImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
+class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
@@ -675,6 +742,7 @@ class "WsSmartTransferProtocolClient"
 "DidSecretService"  --> "DidSecretKeyRepository"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"
+"DatasetSearchSchemaProvider"  --> "SearchIndexerConfig"
 "MessageConsumer" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
@@ -682,6 +750,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetSearchUpdater"  --> "DatasetEntryService"
 "DatasetSearchUpdater"  --> "DatasetRegistry"
 "DatasetSearchUpdater"  --> "SearchService"
+"DatasetSearchUpdater"  --> "SearchIndexerConfig"
 "AccountQuotaStorageChecker" <|-- "AccountQuotaCheckerStorageImpl"
 "AccountQuotaCheckerStorageImpl"  --> "AccountQuotaEventStore"
 "AccountQuotaCheckerStorageImpl"  --> "DatasetStatisticsService"
@@ -851,6 +920,117 @@ class "WsSmartTransferProtocolClient"
 "SqliteOutboxMessageConsumptionRepository"  --> "TransactionRefT"
 "OutboxMessageRepository" <|-- "SqliteOutboxMessageRepository"
 "SqliteOutboxMessageRepository"  --> "TransactionRefT"
+"SearchEntitySchemaProvider" <|-- "MoleculeSearchSchemaProvider"
+"MoleculeSearchSchemaProvider"  --> "Catalog"
+"MessageConsumer" <|-- "MoleculeActivitySearchUpdater"
+"MessageConsumerT" <|-- "MoleculeActivitySearchUpdater"
+"MoleculeActivitySearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeAnnouncementSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeAnnouncementSearchUpdater"
+"MoleculeAnnouncementSearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeDataRoomSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeDataRoomSearchUpdater"
+"MoleculeDataRoomSearchUpdater"  --> "SearchService"
+"MessageConsumer" <|-- "MoleculeProjectSearchUpdater"
+"MessageConsumerT" <|-- "MoleculeProjectSearchUpdater"
+"MoleculeProjectSearchUpdater"  --> "SearchService"
+"MoleculeAnnouncementsService" <|-- "MoleculeAnnouncementsServiceImpl"
+"MoleculeAnnouncementsServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeDataRoomCollectionService" <|-- "MoleculeDataRoomCollectionServiceImpl"
+"MoleculeDataRoomCollectionServiceImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeDataRoomCollectionServiceImpl"  --> "FindCollectionEntriesUseCase"
+"MoleculeDataRoomCollectionServiceImpl"  --> "UpdateCollectionEntriesUseCase"
+"MoleculeDataRoomCollectionServiceImpl"  --> "ViewCollectionEntriesUseCase"
+"MoleculeDatasetAccessorFactory"  --> "RebacDatasetRegistryFacade"
+"MoleculeDatasetAccessorFactory"  --> "QueryService"
+"MoleculeDatasetAccessorFactory"  --> "PushIngestDataUseCase"
+"MoleculeDatasetAccessorFactory"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeGlobalDataRoomActivitiesService" <|-- "MoleculeGlobalDataRoomActivitiesServiceImpl"
+"MoleculeGlobalDataRoomActivitiesServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeProjectsService" <|-- "MoleculeProjectsServiceImpl"
+"MoleculeProjectsServiceImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeVersionedFileContentProvider" <|-- "MoleculeVersionedFileContentProviderImpl"
+"MoleculeVersionedFileContentProviderImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeAppendGlobalDataRoomActivityUseCase" <|-- "MoleculeAppendGlobalDataRoomActivityUseCaseImpl"
+"MoleculeAppendGlobalDataRoomActivityUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeAppendGlobalDataRoomActivityUseCaseImpl"  --> "Outbox"
+"MoleculeViewGlobalActivitiesUseCase" <|-- "MoleculeViewGlobalActivitiesUseCaseImpl"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "Catalog"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "MoleculeViewGlobalAnnouncementsUseCase"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeViewGlobalActivitiesUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectActivitiesUseCase" <|-- "MoleculeViewProjectActivitiesUseCaseImpl"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "Catalog"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "MoleculeViewProjectAnnouncementsUseCase"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectActivitiesUseCaseImpl"  --> "MoleculeDatasetAccessorFactory"
+"MoleculeCreateAnnouncementUseCase" <|-- "MoleculeCreateAnnouncementUseCaseImpl"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "MoleculeFindDataRoomEntryUseCase"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeCreateAnnouncementUseCaseImpl"  --> "Outbox"
+"MoleculeFindProjectAnnouncementUseCase" <|-- "MoleculeFindProjectAnnouncementUseCaseImpl"
+"MoleculeFindProjectAnnouncementUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewGlobalAnnouncementsUseCase" <|-- "MoleculeViewGlobalAnnouncementsUseCaseImpl"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "Catalog"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewGlobalAnnouncementsUseCaseImpl"  --> "SearchService"
+"MoleculeViewProjectAnnouncementsUseCase" <|-- "MoleculeViewProjectAnnouncementsUseCaseImpl"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "Catalog"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeViewProjectAnnouncementsUseCaseImpl"  --> "SearchService"
+"MoleculeCreateDataRoomEntryUseCase" <|-- "MoleculeCreateDataRoomEntryUseCaseImpl"
+"MoleculeCreateDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeCreateDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeFindDataRoomEntryUseCase" <|-- "MoleculeFindDataRoomEntryUseCaseImpl"
+"MoleculeFindDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeMoveDataRoomEntryUseCase" <|-- "MoleculeMoveDataRoomEntryUseCaseImpl"
+"MoleculeMoveDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeMoveDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeRemoveDataRoomEntryUseCase" <|-- "MoleculeRemoveDataRoomEntryUseCaseImpl"
+"MoleculeRemoveDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeRemoveDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeUpdateDataRoomEntryUseCase" <|-- "MoleculeUpdateDataRoomEntryUseCaseImpl"
+"MoleculeUpdateDataRoomEntryUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeUpdateDataRoomEntryUseCaseImpl"  --> "Outbox"
+"MoleculeViewDataRoomEntriesUseCase" <|-- "MoleculeViewDataRoomEntriesUseCaseImpl"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "Catalog"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "MoleculeDataRoomCollectionService"
+"MoleculeViewDataRoomEntriesUseCaseImpl"  --> "SearchService"
+"MoleculeCreateProjectUseCase" <|-- "MoleculeCreateProjectUseCaseImpl"
+"MoleculeCreateProjectUseCaseImpl"  --> "AccountService"
+"MoleculeCreateProjectUseCaseImpl"  --> "CreateAccountUseCase"
+"MoleculeCreateProjectUseCaseImpl"  --> "RebacService"
+"MoleculeCreateProjectUseCaseImpl"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeCreateProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeCreateProjectUseCaseImpl"  --> "Outbox"
+"MoleculeDisableProjectUseCase" <|-- "MoleculeDisableProjectUseCaseImpl"
+"MoleculeDisableProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeDisableProjectUseCaseImpl"  --> "Outbox"
+"MoleculeEnableProjectUseCase" <|-- "MoleculeEnableProjectUseCaseImpl"
+"MoleculeEnableProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeEnableProjectUseCaseImpl"  --> "Outbox"
+"MoleculeFindProjectUseCase" <|-- "MoleculeFindProjectUseCaseImpl"
+"MoleculeFindProjectUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeViewProjectsUseCase" <|-- "MoleculeViewProjectsUseCaseImpl"
+"MoleculeViewProjectsUseCaseImpl"  --> "MoleculeProjectsService"
+"MoleculeSearchUseCase" <|-- "MoleculeSearchUseCaseImpl"
+"MoleculeSearchUseCaseImpl"  --> "Catalog"
+"MoleculeSearchUseCaseImpl"  --> "MoleculeAnnouncementsService"
+"MoleculeSearchUseCaseImpl"  --> "MoleculeGlobalDataRoomActivitiesService"
+"MoleculeSearchUseCaseImpl"  --> "SearchService"
+"MoleculeCreateVersionedFileDatasetUseCase" <|-- "MoleculeCreateVersionedFileDatasetUseCaseImpl"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "AccountService"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "RebacService"
+"MoleculeCreateVersionedFileDatasetUseCaseImpl"  --> "CreateDatasetFromSnapshotUseCase"
+"MoleculeReadVersionedFileEntryUseCase" <|-- "MoleculeReadVersionedFileEntryUseCaseImpl"
+"MoleculeReadVersionedFileEntryUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeReadVersionedFileEntryUseCaseImpl"  --> "FindVersionedFileVersionUseCase"
+"MoleculeUpdateVersionedFileMetadataUseCase" <|-- "MoleculeUpdateVersionedFileMetadataUseCaseImpl"
+"MoleculeUpdateVersionedFileMetadataUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeUpdateVersionedFileMetadataUseCaseImpl"  --> "UpdateVersionedFileUseCase"
+"MoleculeUploadVersionedFileVersionUseCase" <|-- "MoleculeUploadVersionedFileVersionUseCaseImpl"
+"MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
 "EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
 "EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
 "VectorRepository" <|-- "VectorRepositoryQdrantContainer"

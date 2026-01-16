@@ -10,18 +10,25 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
-use kamu_molecule_domain::*;
+use kamu_molecule_domain::{
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_search_schema_common as molecule_schema,
+    *,
+};
+use kamu_search::*;
 
-use crate::{MoleculeAnnouncementsService, utils};
+use crate::{MoleculeAnnouncementsService, map_molecule_announcements_filters_to_search, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeViewGlobalAnnouncementsUseCase)]
 pub struct MoleculeViewGlobalAnnouncementsUseCaseImpl {
+    catalog: dill::Catalog,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,6 +112,59 @@ impl MoleculeViewGlobalAnnouncementsUseCaseImpl {
             list: announcements,
         })
     }
+
+    async fn global_announcements_from_search(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        filters: Option<MoleculeAnnouncementsFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // molecule_account_id equality
+            and_clauses.push(field_eq_str(
+                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
+                molecule_subject.account_id.to_string().as_str(),
+            ));
+
+            // filters by categories, tags, access levels
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_announcements_filters_to_search(filters));
+            }
+
+            SearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .search_service
+            .search(
+                ctx,
+                SearchRequest {
+                    query: None, // no textual query, just filtering
+                    entity_schemas: vec![announcement_schema::SCHEMA_NAME],
+                    source: SearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
+                    page: pagination.into(),
+                    options: SearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeGlobalAnnouncementListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source))
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,11 +180,20 @@ impl MoleculeViewGlobalAnnouncementsUseCase for MoleculeViewGlobalAnnouncementsU
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeViewGlobalAnnouncementsMode,
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalAnnouncementListing, MoleculeViewGlobalAnnouncementsError> {
-        self.global_announcements_from_source(molecule_subject, filters, pagination)
-            .await
+        match mode {
+            MoleculeViewGlobalAnnouncementsMode::LatestSource => {
+                self.global_announcements_from_source(molecule_subject, filters, pagination)
+                    .await
+            }
+            MoleculeViewGlobalAnnouncementsMode::LatestProjection => {
+                self.global_announcements_from_search(molecule_subject, filters, pagination)
+                    .await
+            }
+        }
     }
 }
 

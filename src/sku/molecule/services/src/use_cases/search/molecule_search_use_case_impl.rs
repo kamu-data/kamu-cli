@@ -15,21 +15,82 @@ use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
-use kamu_molecule_domain::*;
+use kamu_molecule_domain::{
+    molecule_announcement_search_schema as announcement_schema,
+    molecule_data_room_entry_search_schema as dataroom_entry_schema,
+    molecule_search_schema_common as molecule_schema,
+    *,
+};
+use kamu_search::*;
 use odf::utils::data::DataFrameExt;
 
-use crate::{MoleculeAnnouncementsService, MoleculeGlobalDataRoomActivitiesService};
+use crate::{
+    MoleculeAnnouncementsService,
+    MoleculeGlobalDataRoomActivitiesService,
+    map_molecule_search_filters,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn MoleculeSearchUseCase)]
 pub struct MoleculeSearchUseCaseImpl {
+    catalog: dill::Catalog,
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 impl MoleculeSearchUseCaseImpl {
+    async fn search_via_changelog(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
+        let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
+
+        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
+            self.get_global_data_room_activities_listing(
+                molecule_subject,
+                prompt,
+                filters.clone(),
+                &search_entity_kinds
+            ),
+            self.get_global_announcement_activities_listing(
+                molecule_subject,
+                prompt,
+                filters,
+                &search_entity_kinds
+            ),
+        )?;
+
+        // Get the total count before pagination
+        let total_count =
+            data_room_listing.total_count + announcement_activities_listing.total_count;
+
+        // Merge lists
+        let mut list = {
+            let mut v = Vec::with_capacity(total_count);
+            v.append(&mut data_room_listing.list);
+            v.append(&mut announcement_activities_listing.list);
+            v
+        };
+
+        // Sort by event time descending
+        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.event_time()));
+
+        // Pagination
+        if let Some(pagination) = pagination {
+            let safe_offset = pagination.offset.min(total_count);
+            list.drain(..safe_offset);
+            list.truncate(pagination.limit);
+        }
+
+        Ok(MoleculeSearchHitsListing { list, total_count })
+    }
+
     fn project_global_data_room_activities(
         ledger: DataFrameExt,
     ) -> Result<DataFrameExt, DataFusionError> {
@@ -211,6 +272,131 @@ impl MoleculeSearchUseCaseImpl {
 
         Ok(MoleculeSearchHitsListing { list, total_count })
     }
+
+    async fn search_via_search_index(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
+        let prompt = prompt.trim();
+
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+        };
+
+        let entity_schemas = {
+            let mut entity_schemas = vec![];
+
+            let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
+
+            if search_entity_kinds.contains(&MoleculeSearchEntityKind::DataRoomActivity) {
+                entity_schemas.push(dataroom_entry_schema::SCHEMA_NAME);
+            }
+
+            if search_entity_kinds.contains(&MoleculeSearchEntityKind::Announcement) {
+                entity_schemas.push(announcement_schema::SCHEMA_NAME);
+            }
+
+            entity_schemas
+        };
+
+        let filter = {
+            let mut and_clauses = vec![];
+
+            // molecule_account_id equality
+            and_clauses.push(field_eq_str(
+                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
+                molecule_subject.account_id.to_string().as_str(),
+            ));
+
+            // filters by ipnft_uids, categories, tags, access levels
+            // Note: kinds are schema choice, not filter
+            if let Some(filters) = filters {
+                and_clauses.extend(map_molecule_search_filters(filters));
+            }
+
+            SearchFilterExpr::and_clauses(and_clauses)
+        };
+
+        let search_results = self
+            .search_service
+            .search(
+                ctx,
+                SearchRequest {
+                    // TODO: consider eating empty prompt at engine level
+                    query: if prompt.is_empty() {
+                        None
+                    } else {
+                        Some(prompt.to_string())
+                    },
+                    entity_schemas,
+                    source: SearchRequestSourceSpec::All,
+                    filter: Some(filter),
+                    sort: vec![
+                        // Consider enabling!
+                        // SearchSortSpec::Relevance,
+                        SearchSortSpec::ByField {
+                            field: molecule_schema::fields::EVENT_TIME,
+                            direction: SearchSortDirection::Descending,
+                            nulls_first: false,
+                        },
+                    ],
+                    page: pagination.into(),
+                    options: SearchOptions::default(),
+                },
+            )
+            .await?;
+
+        Ok(MoleculeSearchHitsListing {
+            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| match hit.schema_name {
+                    dataroom_entry_schema::SCHEMA_NAME => {
+                        // Extract "ipnft_uid" field from source
+                        let ipnft_uid = if let Some(obj) = hit.source.as_object() {
+                            obj.get(molecule_schema::fields::IPNFT_UID)
+                                .and_then(|v| v.as_str())
+                                .map(ToString::to_string)
+                                .ok_or_else(|| {
+                                    InternalError::new(
+                                        "Missing or invalid ipnft_uid field in search hit",
+                                    )
+                                })?
+                        } else {
+                            unreachable!()
+                        };
+
+                        // Recover data room entry
+                        let data_room_entry =
+                            MoleculeDataRoomEntry::from_search_index_json(hit.source)?;
+
+                        // Convert it do dummy activity
+                        let activity = MoleculeDataRoomActivity::from_data_room_operation(
+                            0, /* unknown */
+                            MoleculeDataRoomFileActivityType::Added,
+                            data_room_entry,
+                            ipnft_uid,
+                        );
+
+                        // Finally wrap as search hit
+                        Ok(MoleculeSearchHit::DataRoomActivity(activity))
+                    }
+                    announcement_schema::SCHEMA_NAME => {
+                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)
+                            .map(MoleculeSearchHit::Announcement)
+                    }
+                    _ => Err(InternalError::new(format!(
+                        "Unexpected schema name: {schema_name}",
+                        schema_name = hit.schema_name
+                    ))),
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,50 +408,21 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeSearchMode,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
-        let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
-
-        let (mut data_room_listing, mut announcement_activities_listing) = tokio::try_join!(
-            self.get_global_data_room_activities_listing(
-                molecule_subject,
-                prompt,
-                filters.clone(),
-                &search_entity_kinds
-            ),
-            self.get_global_announcement_activities_listing(
-                molecule_subject,
-                prompt,
-                filters,
-                &search_entity_kinds
-            ),
-        )?;
-
-        // Get the total count before pagination
-        let total_count =
-            data_room_listing.total_count + announcement_activities_listing.total_count;
-
-        // Merge lists
-        let mut list = {
-            let mut v = Vec::with_capacity(total_count);
-            v.append(&mut data_room_listing.list);
-            v.append(&mut announcement_activities_listing.list);
-            v
-        };
-
-        // Sort by event time descending
-        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.event_time()));
-
-        // Pagination
-        if let Some(pagination) = pagination {
-            let safe_offset = pagination.offset.min(total_count);
-            list.drain(..safe_offset);
-            list.truncate(pagination.limit);
+        match mode {
+            MoleculeSearchMode::ViaChangelog => {
+                self.search_via_changelog(molecule_subject, prompt, filters, pagination)
+                    .await
+            }
+            MoleculeSearchMode::ViaSearchIndex => {
+                self.search_via_search_index(molecule_subject, prompt, filters, pagination)
+                    .await
+            }
         }
-
-        Ok(MoleculeSearchHitsListing { list, total_count })
     }
 }
 

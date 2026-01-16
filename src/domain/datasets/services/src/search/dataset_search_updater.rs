@@ -39,6 +39,7 @@ use crate::search::dataset_search_indexer::*;
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetSearchUpdater {
+    indexer_config: Arc<SearchIndexerConfig>,
     search_service: Arc<dyn SearchService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -69,41 +70,48 @@ impl DatasetSearchUpdater {
         // Did we have updates before?
         if updated_message.maybe_prev_block_hash.is_some() {
             // Prepare partial update to dataset search document
-            let partial_update = partial_update_for_new_interval(
+            if let Some(partial_update) = partial_update_for_new_interval(
+                self.indexer_config.as_ref(),
                 dataset,
                 &entry.owner_id,
                 &updated_message.new_block_hash,
                 updated_message.maybe_prev_block_hash.as_ref(),
             )
-            .await?;
-
-            // Send it to the full text search service for updating
-            self.search_service
-                .bulk_update(
-                    ctx,
-                    dataset_search_schema::SCHEMA_NAME,
-                    vec![SearchIndexUpdateOperation::Update {
-                        id: updated_message.dataset_id.to_string(),
-                        doc: partial_update,
-                    }],
-                )
-                .await
+            .await?
+            {
+                // Send it to the full text search service for updating
+                self.search_service
+                    .bulk_update(
+                        ctx,
+                        dataset_search_schema::SCHEMA_NAME,
+                        vec![SearchIndexUpdateOperation::Update {
+                            id: updated_message.dataset_id.to_string(),
+                            doc: partial_update,
+                        }],
+                    )
+                    .await?;
+            }
         } else {
             // This is the first ref update, reindex from scratch
-            let dataset_document = index_dataset_from_scratch(dataset, &entry.owner_id).await?;
-
-            // Sent it to the full text search service for indexing
-            self.search_service
-                .bulk_update(
-                    ctx,
-                    dataset_search_schema::SCHEMA_NAME,
-                    vec![SearchIndexUpdateOperation::Index {
-                        id: updated_message.dataset_id.to_string(),
-                        doc: dataset_document,
-                    }],
-                )
-                .await
+            if let Some(dataset_document) =
+                index_dataset_from_scratch(self.indexer_config.as_ref(), dataset, &entry.owner_id)
+                    .await?
+            {
+                // Sent it to the full text search service for indexing
+                self.search_service
+                    .bulk_update(
+                        ctx,
+                        dataset_search_schema::SCHEMA_NAME,
+                        vec![SearchIndexUpdateOperation::Index {
+                            id: updated_message.dataset_id.to_string(),
+                            doc: dataset_document,
+                        }],
+                    )
+                    .await?;
+            }
         }
+
+        Ok(())
     }
 
     async fn handle_renamed_dataset(

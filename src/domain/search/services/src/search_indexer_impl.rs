@@ -11,7 +11,12 @@ use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_search::{SearchEntitySchemaProvider, SearchIndexer, SearchRepository};
+use kamu_search::{
+    SearchEntitySchemaProvider,
+    SearchIndexer,
+    SearchIndexerConfig,
+    SearchRepository,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,6 +29,7 @@ use kamu_search::{SearchEntitySchemaProvider, SearchIndexer, SearchRepository};
     requires_transaction: false,
 })]
 pub struct SearchIndexerImpl {
+    indexer_config: Arc<SearchIndexerConfig>,
     search_repo: Arc<dyn SearchRepository>,
     entity_schema_providers: Vec<Arc<dyn SearchEntitySchemaProvider>>,
 }
@@ -150,6 +156,10 @@ impl SearchIndexer for SearchIndexerImpl {
 impl InitOnStartup for SearchIndexerImpl {
     #[tracing::instrument(level = "info", name = SearchIndexerImpl_run_initialization, skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        if self.indexer_config.clear_on_start {
+            self.drop_all_schemas().await?;
+        }
+
         self.ensure_indexes_exist().await?;
         self.run_indexing().await?;
         Ok(())

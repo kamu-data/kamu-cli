@@ -37,6 +37,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-molecule-domain = { workspace = true }
+kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false }
 time-source = { workspace = true }
@@ -46,6 +47,7 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "50", default-features = false }
 dill = { version = "0.15", default-features = false }
+futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 nonempty = { version = "0.12", default-features = false }
 num-bigint = { version = "0.4", default-features = false }

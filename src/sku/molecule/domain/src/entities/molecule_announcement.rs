@@ -58,6 +58,44 @@ impl MoleculeAnnouncement {
             tags: entry.payload.tags.unwrap_or_default(),
         })
     }
+
+    pub fn from_search_index_json(
+        announcement_id: String,
+        mut record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct AnnouncementRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            #[serde(flatten)]
+            pub payload: MoleculeAnnouncementPayloadRecord,
+        }
+
+        // Parse the announcement_id and insert it into the record
+        let announcement_uuid = uuid::Uuid::parse_str(&announcement_id).int_err()?;
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert(
+                "announcement_id".to_string(),
+                serde_json::Value::String(announcement_id),
+            );
+        }
+
+        let record = serde_json::from_value::<AnnouncementRecord>(record).int_err()?;
+
+        Ok(Self {
+            system_time: record.timestamp_columns.system_time,
+            event_time: record.timestamp_columns.event_time,
+            announcement_id: announcement_uuid,
+            headline: record.payload.headline,
+            body: record.payload.body,
+            attachments: record.payload.attachments,
+            access_level: record.payload.access_level,
+            change_by: record.payload.change_by,
+            categories: record.payload.categories.unwrap_or_default(),
+            tags: record.payload.tags.unwrap_or_default(),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,6 +124,49 @@ impl MoleculeGlobalAnnouncement {
                 change_by: entry.payload.announcement.change_by,
                 categories: entry.payload.announcement.categories.unwrap_or_default(),
                 tags: entry.payload.announcement.tags.unwrap_or_default(),
+            },
+        })
+    }
+
+    pub fn from_search_index_json(
+        announcement_id: String,
+        mut record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct GlobalAnnouncementRecord {
+            #[serde(flatten)]
+            pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
+
+            pub ipnft_uid: String,
+
+            #[serde(flatten)]
+            pub payload: MoleculeAnnouncementPayloadRecord,
+        }
+
+        // Parse the announcement_id and insert it into the record
+        let announcement_uuid = uuid::Uuid::parse_str(&announcement_id).int_err()?;
+        if let Some(obj) = record.as_object_mut() {
+            obj.insert(
+                "announcement_id".to_string(),
+                serde_json::Value::String(announcement_id),
+            );
+        }
+
+        let record = serde_json::from_value::<GlobalAnnouncementRecord>(record).int_err()?;
+
+        Ok(Self {
+            ipnft_uid: record.ipnft_uid,
+            announcement: MoleculeAnnouncement {
+                system_time: record.timestamp_columns.system_time,
+                event_time: record.timestamp_columns.event_time,
+                announcement_id: announcement_uuid,
+                headline: record.payload.headline,
+                body: record.payload.body,
+                attachments: record.payload.attachments,
+                access_level: record.payload.access_level,
+                change_by: record.payload.change_by,
+                categories: record.payload.categories.unwrap_or_default(),
+                tags: record.payload.tags.unwrap_or_default(),
             },
         })
     }

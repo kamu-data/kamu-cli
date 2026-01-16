@@ -686,6 +686,9 @@ async fn test_versioned_file_extra_data() {
 async fn test_versioned_file_quota_exceeded() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
             ..Default::default()

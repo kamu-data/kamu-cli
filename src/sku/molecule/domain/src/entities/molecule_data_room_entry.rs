@@ -76,6 +76,13 @@ impl MoleculeDataRoomEntry {
         Ok((offset, op, data_room_entry))
     }
 
+    pub fn from_search_index_json(value: serde_json::Value) -> Result<Self, InternalError> {
+        let collection_entity = kamu_datasets::CollectionEntry::from_json(value).int_err()?;
+        let data_room_entry = Self::from_collection_entry(collection_entity);
+
+        Ok(data_room_entry)
+    }
+
     pub fn is_only_change_by_diff(&self, other: &Self) -> bool {
         if self.path != other.path || self.reference != other.reference {
             return false;

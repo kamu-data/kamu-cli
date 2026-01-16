@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
+    MoleculeConfig,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
     MoleculeFindProjectAnnouncementError,
@@ -63,9 +64,12 @@ impl MoleculeAnnouncements {
         let view_project_announcements_uc =
             from_catalog_n!(ctx, dyn MoleculeViewProjectAnnouncementsUseCase);
 
+        let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+
         let listing = view_project_announcements_uc
             .execute(
                 &self.project.entity,
+                molecule_config.view_project_announcements_mode(),
                 filters.map(Into::into),
                 Some(PaginationOpts {
                     offset: page * per_page,

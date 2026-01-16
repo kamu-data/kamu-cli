@@ -31,11 +31,11 @@ testing = ["dep:mockall", "odf/testing"]
 database-common = { workspace = true }
 crypto-utils = { workspace = true }
 email-utils = { workspace = true }
+event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
-event-sourcing = { workspace = true }
 kamu-search = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
