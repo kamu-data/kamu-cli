@@ -126,7 +126,7 @@ impl From<odf::metadata::AttachmentEmbedded> for AttachmentEmbedded {
 /// Defines the source of attachment files.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
@@ -385,7 +385,7 @@ impl From<odf::metadata::EnvVar> for EnvVar {
 /// Defines the external source of data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum EventTimeSource {
     FromMetadata(EventTimeSourceFromMetadata),
     FromPath(EventTimeSourceFromPath),
@@ -553,7 +553,7 @@ impl From<odf::metadata::ExecuteTransformInput> for ExecuteTransformInput {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
 
-#[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
+#[nutype::nutype(derive(AsRef, Clone, Debug, Into, PartialEq, Eq))]
 pub struct ExtraAttributes(serde_json::Map<String, serde_json::Value>);
 impl Default for ExtraAttributes {
     fn default() -> Self {
@@ -595,7 +595,7 @@ impl async_graphql::ScalarType for ExtraAttributes {
 /// Defines the external source of data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum FetchStep {
     Url(FetchStepUrl),
     FilesGlob(FetchStepFilesGlob),
@@ -778,7 +778,7 @@ impl From<odf::metadata::FetchStepUrl> for FetchStepUrl {
 /// the data that already exists in the dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum MergeStrategy {
     Append(MergeStrategyAppend),
     Ledger(MergeStrategyLedger),
@@ -980,7 +980,7 @@ impl From<odf::metadata::MetadataBlock> for MetadataBlock {
 /// Represents a transaction that occurred on a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum MetadataEvent {
     AddData(AddData),
     ExecuteTransform(ExecuteTransform),
@@ -1102,7 +1102,7 @@ impl From<odf::metadata::OffsetInterval> for OffsetInterval {
 /// Defines the steps to prepare raw data for ingestion.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum PrepStep {
     Decompress(PrepStepDecompress),
     Pipe(PrepStepPipe),
@@ -1191,7 +1191,7 @@ impl From<odf::metadata::RawQueryRequest> for RawQueryRequest {
 /// Sent by an engine to coordinator when performing the raw query operation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum RawQueryResponse {
     Progress(RawQueryResponseProgress),
     Success(RawQueryResponseSuccess),
@@ -1291,7 +1291,7 @@ impl From<odf::metadata::RawQueryResponseSuccess> for RawQueryResponseSuccess {
 /// Defines how raw data should be read into the structured form.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum ReadStep {
     Csv(ReadStepCsv),
     GeoJson(ReadStepGeoJson),
@@ -1795,7 +1795,7 @@ impl From<odf::metadata::SetVocab> for SetVocab {
 /// Defines how external data should be cached.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum SourceCaching {
     Forever(SourceCachingForever),
 }
@@ -1931,7 +1931,7 @@ impl From<odf::metadata::TemporalTable> for TemporalTable {
 /// Engine-specific processing queries that shape the resulting data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum Transform {
     Sql(TransformSql),
 }
@@ -2153,7 +2153,7 @@ impl From<odf::metadata::TransformRequestInput> for TransformRequestInput {
 /// Sent by an engine to coordinator when performing the data transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum TransformResponse {
     Progress(TransformResponseProgress),
     Success(TransformResponseSuccess),
