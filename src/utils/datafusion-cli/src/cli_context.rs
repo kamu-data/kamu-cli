@@ -19,8 +19,8 @@ use std::sync::Arc;
 
 use datafusion::dataframe::DataFrame;
 use datafusion::error::DataFusionError;
-use datafusion::execution::context::SessionState;
 use datafusion::execution::TaskContext;
+use datafusion::execution::context::SessionState;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::SessionContext;
 use object_store::ObjectStore;

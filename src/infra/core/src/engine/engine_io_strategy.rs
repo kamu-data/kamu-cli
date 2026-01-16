@@ -384,7 +384,7 @@ async fn write_schema_file(schema: &SchemaRef, path: &Path) -> Result<(), Intern
         datafusion::dataframe::DataFrameWriteOptions::new().with_single_file_output(true),
         Some(datafusion::config::TableParquetOptions {
             global: datafusion::config::ParquetOptions {
-                writer_version: "1.0".into(),
+                writer_version: datafusion::common::parquet_config::DFParquetWriterVersion::V1_0,
                 compression: Some("snappy".into()),
                 ..Default::default()
             },

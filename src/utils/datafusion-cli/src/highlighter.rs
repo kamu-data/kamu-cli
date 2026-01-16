@@ -20,7 +20,7 @@
 use std::borrow::Cow::{self, Borrowed};
 use std::fmt::Display;
 
-use datafusion::sql::sqlparser::dialect::{dialect_from_str, Dialect, GenericDialect};
+use datafusion::sql::sqlparser::dialect::{Dialect, GenericDialect, dialect_from_str};
 use datafusion::sql::sqlparser::keywords::Keyword;
 use datafusion::sql::sqlparser::tokenizer::{Token, Tokenizer};
 use datafusion_common::config;
@@ -91,8 +91,8 @@ impl Color {
 mod tests {
     use rustyline::highlight::Highlighter;
 
-    use super::config::Dialect;
     use super::SyntaxHighlighter;
+    use super::config::Dialect;
 
     #[test]
     fn highlighter_valid() {

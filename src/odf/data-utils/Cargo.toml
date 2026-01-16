@@ -36,7 +36,7 @@ arrow-json = { version = "57", default-features = false }
 arrow-schema = { version = "57", default-features = false, features = [
     "serde",
 ] }
-datafusion = { version = "51", default-features = false, features = [
+datafusion = { version = "52", default-features = false, features = [
     "parquet",
     "serde",
     "sql",

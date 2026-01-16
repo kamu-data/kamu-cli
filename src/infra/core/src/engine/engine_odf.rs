@@ -289,7 +289,8 @@ impl Engine for ODFEngine {
                 datafusion::dataframe::DataFrameWriteOptions::new().with_single_file_output(true),
                 Some(TableParquetOptions {
                     global: ParquetOptions {
-                        writer_version: "1.0".into(),
+                        writer_version:
+                            datafusion::common::parquet_config::DFParquetWriterVersion::V1_0,
                         compression: Some("snappy".into()),
                         ..Default::default()
                     },

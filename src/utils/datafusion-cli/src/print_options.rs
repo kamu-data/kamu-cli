@@ -23,8 +23,8 @@ use std::sync::Arc;
 
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use datafusion::common::instant::Instant;
 use datafusion::common::DataFusionError;
+use datafusion::common::instant::Instant;
 use datafusion::config::FormatOptions;
 use datafusion::error::Result;
 use datafusion::physical_plan::RecordBatchStream;

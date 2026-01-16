@@ -38,12 +38,12 @@ use datafusion::common::{config_err, exec_datafusion_err, exec_err};
 use datafusion::error::{DataFusionError, Result};
 use datafusion::execution::context::SessionState;
 use log::debug;
+use object_store::Error::Generic;
 // #[cfg(not(test))]
 use object_store::aws::resolve_bucket_region;
 use object_store::aws::{AmazonS3Builder, AmazonS3ConfigKey, AwsCredential};
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::http::HttpBuilder;
-use object_store::Error::Generic;
 use object_store::{ClientOptions, CredentialProvider, ObjectStore};
 use url::Url;
 
@@ -118,13 +118,14 @@ pub async fn get_s3_object_store_builder(
     if let Some(endpoint) = endpoint {
         // Make a nicer error if the user hasn't allowed http and the endpoint
         // is http as the default message is "URL scheme is not allowed"
-        if let Ok(endpoint_url) = Url::try_from(endpoint.as_str()) {
-            if !matches!(allow_http, Some(true)) && endpoint_url.scheme() == "http" {
-                return config_err!(
-                    "Invalid endpoint: {endpoint}. HTTP is not allowed for S3 endpoints. To allow \
-                     HTTP, set 'aws.allow_http' to true"
-                );
-            }
+        if let Ok(endpoint_url) = Url::try_from(endpoint.as_str())
+            && !matches!(allow_http, Some(true))
+            && endpoint_url.scheme() == "http"
+        {
+            return config_err!(
+                "Invalid endpoint: {endpoint}. HTTP is not allowed for S3 endpoints. To allow \
+                 HTTP, set 'aws.allow_http' to true"
+            );
         }
 
         builder = builder.with_endpoint(endpoint);
@@ -553,8 +554,10 @@ mod tests {
 
         let location = "s3://bucket/path/FAKE/file.parquet";
         // Set it to a non-existent file to avoid reading the default configuration file
-        std::env::set_var("AWS_CONFIG_FILE", "data/aws.config");
-        std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", "data/aws.credentials");
+        unsafe {
+            std::env::set_var("AWS_CONFIG_FILE", "data/aws.config");
+            std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", "data/aws.credentials");
+        }
 
         // No options
         let table_url = ListingTableUrl::parse(location)?;
@@ -705,7 +708,9 @@ mod tests {
         let expected_region = "eu-central-1";
         let location = "s3://test-bucket/path/file.parquet";
         // Set it to a non-existent file to avoid reading the default configuration file
-        std::env::set_var("AWS_CONFIG_FILE", "data/aws.config");
+        unsafe {
+            std::env::set_var("AWS_CONFIG_FILE", "data/aws.config");
+        }
 
         let table_url = ListingTableUrl::parse(location)?;
         let aws_options = AwsOptions {

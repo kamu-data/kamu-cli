@@ -132,7 +132,9 @@ pub fn preprocess_default(
                     select.push(
                         Expr::ScalarFunction(
                             datafusion::logical_expr::expr::ScalarFunction::new_udf(
-                                datafusion::functions::datetime::to_timestamp_seconds(),
+                                datafusion::functions::datetime::to_timestamp_seconds(
+                                    &datafusion::config::ConfigOptions::default(),
+                                ),
                                 vec![col_orig],
                             ),
                         )
@@ -152,7 +154,9 @@ pub fn preprocess_default(
                     select.push(
                         Expr::ScalarFunction(
                             datafusion::logical_expr::expr::ScalarFunction::new_udf(
-                                datafusion::functions::datetime::to_timestamp_millis(),
+                                datafusion::functions::datetime::to_timestamp_millis(
+                                    &datafusion::config::ConfigOptions::default(),
+                                ),
                                 vec![col_orig],
                             ),
                         )

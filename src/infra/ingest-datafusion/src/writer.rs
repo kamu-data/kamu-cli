@@ -16,6 +16,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::array::{Array, AsArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
+use datafusion::common::parquet_config::DFParquetWriterVersion;
 use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::functions_aggregate::min_max::{max, min};
@@ -519,7 +520,7 @@ impl DataWriterDataFusion {
         // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
         TableParquetOptions {
             global: ParquetOptions {
-                writer_version: "1.0".into(),
+                writer_version: DFParquetWriterVersion::V1_0,
                 compression: Some("snappy".into()),
                 ..self.ctx.state().default_table_options().parquet.global
             },

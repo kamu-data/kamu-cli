@@ -17,8 +17,8 @@
 
 use std::ops::AddAssign;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 use std::{cmp, fmt};
 
@@ -26,11 +26,11 @@ use arrow::array::{ArrayRef, RecordBatch, StringArray};
 use arrow::util::pretty::pretty_format_batches;
 use async_trait::async_trait;
 use chrono::Utc;
-use datafusion::common::instant::Instant;
 use datafusion::common::HashMap;
+use datafusion::common::instant::Instant;
 use datafusion::error::DataFusionError;
 use datafusion::execution::object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry};
-use futures::stream::BoxStream;
+use futures::stream::{BoxStream, Stream};
 use object_store::path::Path;
 use object_store::{
     GetOptions,
@@ -48,6 +48,59 @@ use object_store::{
 };
 use parking_lot::{Mutex, RwLock};
 use url::Url;
+
+/// A stream wrapper that measures the time until the first response(item or end
+/// of stream) is yielded
+struct TimeToFirstItemStream<S> {
+    inner: S,
+    start: Instant,
+    request_index: usize,
+    requests: Arc<Mutex<Vec<RequestDetails>>>,
+    first_item_yielded: bool,
+}
+
+impl<S> TimeToFirstItemStream<S> {
+    fn new(
+        inner: S,
+        start: Instant,
+        request_index: usize,
+        requests: Arc<Mutex<Vec<RequestDetails>>>,
+    ) -> Self {
+        Self {
+            inner,
+            start,
+            request_index,
+            requests,
+            first_item_yielded: false,
+        }
+    }
+}
+
+impl<S> Stream for TimeToFirstItemStream<S>
+where
+    S: Stream<Item = Result<ObjectMeta>> + Unpin,
+{
+    type Item = Result<ObjectMeta>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let poll_result = std::pin::Pin::new(&mut self.inner).poll_next(cx);
+
+        if !self.first_item_yielded && poll_result.is_ready() {
+            self.first_item_yielded = true;
+            let elapsed = self.start.elapsed();
+
+            let mut requests = self.requests.lock();
+            if let Some(request) = requests.get_mut(self.request_index) {
+                request.duration = Some(elapsed);
+            }
+        }
+
+        poll_result
+    }
+}
 
 /// The profiling mode to use for an [`InstrumentedObjectStore`] instance.
 /// Collecting profiling data will have a small negative impact on both CPU and
@@ -98,7 +151,7 @@ impl From<u8> for InstrumentedObjectStoreMode {
 pub struct InstrumentedObjectStore {
     inner: Arc<dyn ObjectStore>,
     instrument_mode: AtomicU8,
-    requests: Mutex<Vec<RequestDetails>>,
+    requests: Arc<Mutex<Vec<RequestDetails>>>,
 }
 
 impl InstrumentedObjectStore {
@@ -108,7 +161,7 @@ impl InstrumentedObjectStore {
         Self {
             inner: object_store,
             instrument_mode,
-            requests: Mutex::new(Vec::new()),
+            requests: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -222,19 +275,31 @@ impl InstrumentedObjectStore {
 
     fn instrumented_list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let timestamp = Utc::now();
-        let ret = self.inner.list(prefix);
+        let start = Instant::now();
+        let inner_stream = self.inner.list(prefix);
 
-        self.requests.lock().push(RequestDetails {
-            op: Operation::List,
-            path: prefix.cloned().unwrap_or_else(|| Path::from("")),
-            timestamp,
-            duration: None, // list returns a stream, so the duration isn't meaningful
-            size: None,
-            range: None,
-            extra_display: None,
-        });
+        let request_index = {
+            let mut requests = self.requests.lock();
+            requests.push(RequestDetails {
+                op: Operation::List,
+                path: prefix.cloned().unwrap_or_else(|| Path::from("")),
+                timestamp,
+                duration: None,
+                size: None,
+                range: None,
+                extra_display: None,
+            });
+            requests.len() - 1
+        };
 
-        ret
+        let wrapped_stream = TimeToFirstItemStream::new(
+            inner_stream,
+            start,
+            request_index,
+            Arc::clone(&self.requests),
+        );
+
+        Box::pin(wrapped_stream)
     }
 
     async fn instrumented_list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
@@ -751,6 +816,7 @@ impl ObjectStoreRegistry for InstrumentedObjectStoreRegistry {
 
 #[cfg(false)]
 mod tests {
+    use futures::StreamExt;
     use insta::assert_snapshot;
     use object_store::WriteMultipart;
 
@@ -775,9 +841,11 @@ mod tests {
             "TRaCe".parse().unwrap(),
             InstrumentedObjectStoreMode::Trace
         ));
-        assert!("does_not_exist"
-            .parse::<InstrumentedObjectStoreMode>()
-            .is_err());
+        assert!(
+            "does_not_exist"
+                .parse::<InstrumentedObjectStoreMode>()
+                .is_err()
+        );
 
         assert!(matches!(0.into(), InstrumentedObjectStoreMode::Disabled));
         assert!(matches!(1.into(), InstrumentedObjectStoreMode::Summary));
@@ -889,13 +957,15 @@ mod tests {
 
         instrumented.set_instrument_mode(InstrumentedObjectStoreMode::Trace);
         assert!(instrumented.requests.lock().is_empty());
-        let _ = instrumented.list(Some(&path));
+        let mut stream = instrumented.list(Some(&path));
+        // Consume at least one item from the stream to trigger duration measurement
+        let _ = stream.next().await;
         assert_eq!(instrumented.requests.lock().len(), 1);
 
         let request = instrumented.take_requests().pop().unwrap();
         assert_eq!(request.op, Operation::List);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_none());
+        assert!(request.duration.is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());

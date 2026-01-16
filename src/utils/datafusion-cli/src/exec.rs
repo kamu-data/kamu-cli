@@ -19,8 +19,8 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::prelude::*;
 
 use datafusion::common::instant::Instant;
 use datafusion::common::{plan_datafusion_err, plan_err};
@@ -31,20 +31,20 @@ use datafusion::execution::memory_pool::MemoryConsumer;
 use datafusion::logical_expr::{DdlStatement, LogicalPlan};
 use datafusion::physical_plan::execution_plan::EmissionType;
 use datafusion::physical_plan::spill::get_record_batch_memory_size;
-use datafusion::physical_plan::{execute_stream, ExecutionPlanProperties};
+use datafusion::physical_plan::{ExecutionPlanProperties, execute_stream};
 use datafusion::sql::parser::{DFParser, Statement};
 use datafusion::sql::sqlparser;
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
 use futures::StreamExt;
 use log::warn;
 use object_store::Error::Generic;
-use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use rustyline::error::ReadlineError;
 use tokio::signal;
 
 use crate::cli_context::CliSessionContext;
 use crate::command::{Command, OutputFormat};
-use crate::helper::{split_from_semicolon, CliHelper};
+use crate::helper::{CliHelper, split_from_semicolon};
 use crate::object_storage::get_object_store;
 use crate::print_format::PrintFormat;
 use crate::print_options::{MaxRows, PrintOptions};
@@ -154,7 +154,11 @@ pub async fn exec_from_repl(
                                         eprintln!("{e}")
                                     }
                                 } else {
-                                    eprintln!("'\\{}' is not a valid command", &line[1..]);
+                                    eprintln!(
+                                        "'\\{}' is not a valid command, you can use '\\?' to see \
+                                         all commands",
+                                        &line[1..]
+                                    );
                                 }
                             } else {
                                 println!("Output format is {:?}.", print_options.format);
@@ -167,7 +171,10 @@ pub async fn exec_from_repl(
                         }
                     }
                 } else {
-                    eprintln!("'\\{}' is not a valid command", &line[1..]);
+                    eprintln!(
+                        "'\\{}' is not a valid command, you can use '\\?' to see all commands",
+                        &line[1..]
+                    );
                 }
             }
             Ok(line) => {
