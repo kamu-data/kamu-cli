@@ -1633,27 +1633,19 @@ impl From<odf::metadata::SetAttachments> for SetAttachments {
 /// this event.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
-#[derive(Debug, Clone)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetDataSchema {
-    pub schema: std::sync::Arc<odf::schema::DataSchema>,
-}
-
-#[Object]
-impl SetDataSchema {
-    // TODO: Make `format` required argument
-    async fn schema(&self, format: Option<DataSchemaFormat>) -> crate::prelude::DataSchema {
-        crate::prelude::DataSchema::new(
-            self.schema.clone(),
-            format.unwrap_or(DataSchemaFormat::ParquetJson),
-        )
-    }
+    pub schema: crate::prelude::DataSchema,
 }
 
 impl From<odf::metadata::SetDataSchema> for SetDataSchema {
     fn from(v: odf::metadata::SetDataSchema) -> Self {
-        Self {
-            schema: std::sync::Arc::new(v.upgrade().schema),
-        }
+        // TODO: Externalize format decision
+        let schema = crate::prelude::DataSchema::new(
+            std::sync::Arc::new(v.upgrade().schema),
+            DataSchemaFormat::ParquetJson,
+        );
+        Self { schema }
     }
 }
 
