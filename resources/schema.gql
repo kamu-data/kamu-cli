@@ -4658,8 +4658,14 @@ type SetAttachments {
 	attachments: Attachments!
 }
 
+"""
+Specifies the complete schema of Data Slices added to the Dataset following
+this event.
+
+See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+"""
 type SetDataSchema {
-	schema(format: DataSchemaFormat): DataSchema!
+	schema: DataSchema!
 }
 
 interface SetDatasetVisibilityResult {
