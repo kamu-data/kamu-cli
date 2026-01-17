@@ -111,6 +111,10 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
             enable_positions: true, // long prose
         },
     },
+    SearchSchemaField {
+        path: kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS,
+        role: SearchSchemaFieldRole::EmbeddingChunks,
+    },
 ];
 
 pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {

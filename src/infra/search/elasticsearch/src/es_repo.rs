@@ -213,7 +213,10 @@ impl SearchRepository for ElasticsearchRepository {
             schema.version,
         );
 
-        let mappings = es_helpers::ElasticsearchIndexMappings::from_entity_schema(schema);
+        let mappings = es_helpers::ElasticsearchIndexMappings::from_entity_schema(
+            schema,
+            self.repo_config.embedding_dimensions,
+        );
 
         let outcome = index.ensure_version_existence(mappings, schema).await?;
 

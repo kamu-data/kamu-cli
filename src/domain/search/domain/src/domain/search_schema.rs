@@ -15,6 +15,7 @@ pub type SearchFieldPath = &'static str;
 
 pub const SEARCH_ALIAS_TITLE: &str = "title";
 pub const SEARCH_FIELD_IS_BANNED: &str = "is_banned";
+pub const SEARCH_FIELD_SEMANTIC_EMBEDDINGS: &str = "semantic_embeddings";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,6 +52,7 @@ pub enum SearchSchemaFieldRole {
     DateTime,
     Boolean,
     Integer,
+    EmbeddingChunks,
     UnprocessedObject,
     // TODO: Add more field roles as needed
 }

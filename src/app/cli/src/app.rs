@@ -1213,6 +1213,7 @@ pub fn register_config_in_catalog(
             });
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
                 index_prefix: cfg.index_prefix.unwrap(),
+                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
             });
         }
         config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
@@ -1221,6 +1222,7 @@ pub fn register_config_in_catalog(
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
                 image: cfg.image.unwrap(),
                 start_timeout: cfg.start_timeout.unwrap().into(),
+                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
             });
         }
     }
