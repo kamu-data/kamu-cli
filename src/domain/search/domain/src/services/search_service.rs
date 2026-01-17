@@ -79,6 +79,12 @@ pub enum SearchFieldUpdate<T> {
     Present(T),
 }
 
+impl<T> SearchFieldUpdate<T> {
+    pub fn is_present(&self) -> bool {
+        matches!(self, SearchFieldUpdate::Present(_))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Helper to conditionally insert field based on update state

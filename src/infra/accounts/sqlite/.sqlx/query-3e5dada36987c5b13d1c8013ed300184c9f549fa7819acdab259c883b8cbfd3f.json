@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id\n            FROM account_quota_events\n            WHERE account_id = ?1 AND quota_type = ?2\n            ORDER BY id DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3e5dada36987c5b13d1c8013ed300184c9f549fa7819acdab259c883b8cbfd3f"
+}

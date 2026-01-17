@@ -34,19 +34,55 @@ impl GraphQLQueryRequest {
         self
     }
 
-    pub(crate) async fn execute(
+    pub(crate) async fn execute<Query, Mutation, Subscription>(
         self,
-        schema: &kamu_adapter_graphql::Schema,
+        schema: &async_graphql::Schema<Query, Mutation, Subscription>,
         catalog: &dill::Catalog,
-    ) -> async_graphql::Response {
+    ) -> async_graphql::Response
+    where
+        Query: async_graphql::ObjectType + 'static,
+        Mutation: async_graphql::ObjectType + 'static,
+        Subscription: async_graphql::SubscriptionType + 'static,
+    {
+        self.execute_ext(schema, catalog, |r| {
+            r.data(account_entity_data_loader(catalog))
+                .data(dataset_handle_data_loader(catalog))
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_without_data_loaders<Query, Mutation, Subscription>(
+        self,
+        schema: &async_graphql::Schema<Query, Mutation, Subscription>,
+        catalog: &dill::Catalog,
+    ) -> async_graphql::Response
+    where
+        Query: async_graphql::ObjectType + 'static,
+        Mutation: async_graphql::ObjectType + 'static,
+        Subscription: async_graphql::SubscriptionType + 'static,
+    {
+        self.execute_ext(schema, catalog, |r| r).await
+    }
+
+    pub(crate) async fn execute_ext<Query, Mutation, Subscription, F>(
+        self,
+        schema: &async_graphql::Schema<Query, Mutation, Subscription>,
+        catalog: &dill::Catalog,
+        on_request_created: F,
+    ) -> async_graphql::Response
+    where
+        Query: async_graphql::ObjectType + 'static,
+        Mutation: async_graphql::ObjectType + 'static,
+        Subscription: async_graphql::SubscriptionType + 'static,
+        F: FnOnce(async_graphql::Request) -> async_graphql::Request,
+    {
         let request = {
             let mut r = async_graphql::Request::new(self.request_code);
+            r = on_request_created(r);
             if let Some(variables) = self.variables {
                 r = r.variables(variables);
             }
-            r.data(account_entity_data_loader(catalog))
-                .data(dataset_handle_data_loader(catalog))
-                .data(catalog.clone())
+            r.data(catalog.clone())
         };
         let response = schema.execute(request).await;
 

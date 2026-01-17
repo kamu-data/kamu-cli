@@ -32,3 +32,14 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_ingest_respects_account_quota,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_QUOTA_INGEST_TEST_CONFIG),
+    extra_test_groups = "containerized, ingest, quota"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

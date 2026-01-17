@@ -8,8 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{EmptySubscription, Object, value};
+use indoc::indoc;
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_graphql::{ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE, LoggedInGuard};
+use kamu_adapter_graphql::traits::ResponseExt;
+use kamu_adapter_graphql::*;
+use pretty_assertions::assert_eq;
+
+use crate::utils::GraphQLQueryRequest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -155,6 +160,59 @@ async fn logged_in_guard_anonymous() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn feature_enabled_guard_with_feature_enabled() {
+    let catalog = dill::CatalogBuilder::new()
+        .add_value(GqlFeatureFlags::new().with_feature(GqlFeature::MoleculeApiV1))
+        .build();
+
+    let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription).finish();
+
+    assert_eq!(
+        GraphQLQueryRequest::from(indoc!(
+            r#"
+            query {
+              moleculeV1,
+            }
+            "#
+        ))
+        .execute_without_data_loaders(&schema, &catalog)
+        .await
+        .data,
+        value!({
+            "moleculeV1": "temporary works",
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn feature_enabled_guard_with_feature_disabled() {
+    let catalog = dill::CatalogBuilder::new()
+        .add_value(GqlFeatureFlags::new())
+        .build();
+
+    let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription).finish();
+
+    assert_eq!(
+        *GraphQLQueryRequest::from(indoc!(
+            r#"
+            query {
+              moleculeV1,
+            }
+            "#
+        ))
+        .expect_error()
+        .execute_without_data_loaders(&schema, &catalog)
+        .await
+        .error_messages(),
+        ["Feature 'molecule_api_v1' is disabled"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct TestQuery;
 
 struct TestMutation;
@@ -168,6 +226,11 @@ impl TestQuery {
 
     async fn unguarded_query(&self) -> u32 {
         2
+    }
+
+    #[graphql(guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)")]
+    async fn molecule_v1(&self) -> &str {
+        "temporary works"
     }
 }
 
@@ -184,3 +247,5 @@ impl TestMutation {
 }
 
 type TestSchema = async_graphql::Schema<TestQuery, TestMutation, EmptySubscription>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,6 +15,7 @@ use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
 use kamu_adapter_http::AccessToken;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_cli::config::CLIConfig;
 use kamu_cli::services::config::DatabaseConfig;
 use kamu_cli::{self, Interact, OutputConfig, WorkspaceLayout, WorkspaceStatus};
 
@@ -75,6 +76,7 @@ fn test_di_cli_graph_validates(
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::Created(tenancy_config),
+        &CLIConfig::default(),
         tenancy_config,
         None,
         false,
@@ -118,6 +120,7 @@ fn test_di_server_graph_validates(
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::Created(tenancy_config),
+        &CLIConfig::default(),
         tenancy_config,
         None,
         false,
@@ -181,6 +184,7 @@ async fn update_di_graph() {
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::Created(tenancy_config),
+        &CLIConfig::default(),
         tenancy_config,
         None,
         false,
