@@ -43,6 +43,8 @@ pub struct DatasetSearchUpdater {
     search_service: Arc<dyn SearchService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
+    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +55,13 @@ impl DatasetSearchUpdater {
         ctx: SearchContext<'_>,
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
+        // Pprepare indexing helper
+        let indexing_helper = DatasetIndexingHelper {
+            indexer_config: self.indexer_config.as_ref(),
+            embeddings_chunker: self.embeddings_chunker.as_ref(),
+            embeddings_encoder: self.embeddings_encoder.as_ref(),
+        };
+
         // Resolve entry
         let entry = self
             .dataset_entry_service
@@ -85,14 +94,14 @@ impl DatasetSearchUpdater {
             // In this case, we need to reindex from scratch.
             if maybe_existing_document.is_some() {
                 // Prepare partial update to dataset search document
-                if let Some(partial_update) = partial_update_for_new_interval(
-                    self.indexer_config.as_ref(),
-                    dataset,
-                    &entry.owner_id,
-                    &updated_message.new_block_hash,
-                    updated_message.maybe_prev_block_hash.as_ref(),
-                )
-                .await?
+                if let Some(partial_update) = indexing_helper
+                    .partial_update_for_new_interval(
+                        dataset,
+                        &entry.owner_id,
+                        &updated_message.new_block_hash,
+                        updated_message.maybe_prev_block_hash.as_ref(),
+                    )
+                    .await?
                 {
                     // Send it to the full text search service for updating
                     self.search_service
@@ -122,13 +131,9 @@ impl DatasetSearchUpdater {
         }
 
         // Reindex from scratch
-        if let Some(dataset_document) = index_dataset_from_scratch(
-            self.indexer_config.as_ref(),
-            dataset,
-            &entry.owner_id,
-            &updated_message.new_block_hash,
-        )
-        .await?
+        if let Some(dataset_document) = indexing_helper
+            .index_dataset_from_scratch(dataset, &entry.owner_id, &updated_message.new_block_hash)
+            .await?
         {
             // Send it to the full text search service for indexing
             self.search_service

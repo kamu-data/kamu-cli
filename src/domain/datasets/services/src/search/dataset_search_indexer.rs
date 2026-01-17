@@ -17,188 +17,260 @@ use odf::dataset::MetadataChainExt;
 // Helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "debug", skip_all, fields(
-    dataset_id = %dataset.get_id(),
-    head = %head,
-))]
-pub(crate) async fn index_dataset_from_scratch(
-    indexer_config: &SearchIndexerConfig,
-    dataset: ResolvedDataset,
-    owner_id: &odf::AccountID,
-    head: &odf::Multihash,
-) -> Result<Option<serde_json::Value>, InternalError> {
-    // Find key blocks that contribute to search
-    let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
-    let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
-    let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
-
-    // Also need the seed event for created_at
-    let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
-
-    use odf::dataset::*;
-    let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 4] = [
-        &mut attachments_visitor,
-        &mut info_visitor,
-        &mut schema_visitor,
-        &mut seed_visitor,
-    ];
-
-    use dataset_search_schema::*;
-
-    // Visit entire metadata chain
-    match dataset
-        .as_metadata_chain()
-        .accept_by_hash(&mut visitors, head)
-        .await
-    {
-        Ok(_) => {
-            // Extract interested parts from visitors
-            let schema_fields = extract_schema_field_names(schema_visitor);
-            let (description, keywords) = extract_description_and_keywords(info_visitor);
-            let attachments = extract_attachment_contents(attachments_visitor);
-
-            // Apply indexing configuration filters
-            if indexer_config.skip_datasets_with_no_data && !schema_fields.is_present() {
-                return Ok(None);
-            }
-            if indexer_config.skip_datasets_with_no_description
-                && !description.is_present()
-                && !attachments.is_present()
-            {
-                return Ok(None);
-            }
-
-            // Seed event: created_at
-            let seed_event_time = seed_visitor.into_block().unwrap().system_time;
-
-            // Head event: ref_changed_at
-            let head_event_time = dataset
-                .as_metadata_chain()
-                .get_block_by_ref(&odf::BlockRef::Head)
-                .await
-                .int_err()?
-                .system_time;
-
-            // Prepare full text search document with mandatory fields
-            let alias = dataset.get_alias();
-            let mut index_doc: serde_json::Value = serde_json::json!({
-                fields::DATASET_NAME: alias.dataset_name.to_string(),
-                fields::ALIAS: alias.to_string(),
-                fields::OWNER_NAME: alias
-                    .account_name
-                    .as_ref()
-                    .map(std::string::ToString::to_string)
-                    .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
-                fields::OWNER_ID: owner_id.to_string(),
-                fields::KIND: match dataset.get_kind() {
-                    odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
-                    odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
-                },
-                fields::CREATED_AT: seed_event_time.to_rfc3339(),
-                fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
-            });
-
-            // Add optional fields only if present
-            let index_doc_mut = index_doc.as_object_mut().unwrap();
-            if let SearchFieldUpdate::Present(v) = schema_fields {
-                index_doc_mut.insert(fields::SCHEMA_FIELDS.to_string(), serde_json::json!(v));
-            }
-            if let SearchFieldUpdate::Present(v) = description {
-                index_doc_mut.insert(fields::DESCRIPTION.to_string(), serde_json::json!(v));
-            }
-            if let SearchFieldUpdate::Present(v) = keywords {
-                index_doc_mut.insert(fields::KEYWORDS.to_string(), serde_json::json!(v));
-            }
-            if let SearchFieldUpdate::Present(v) = attachments {
-                index_doc_mut.insert(fields::ATTACHMENTS.to_string(), serde_json::json!(v));
-            }
-
-            Ok(Some(index_doc))
-        }
-
-        Err(e) => Err(e.int_err()),
-    }
+pub(crate) struct DatasetIndexingHelper<'a> {
+    pub indexer_config: &'a SearchIndexerConfig,
+    pub embeddings_chunker: &'a dyn EmbeddingsChunker,
+    pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+impl DatasetIndexingHelper<'_> {
+    #[tracing::instrument(level = "debug", skip_all, fields(
+        dataset_id = %dataset.get_id(),
+        head = %head,
+    ))]
+    pub(crate) async fn index_dataset_from_scratch(
+        &self,
+        dataset: ResolvedDataset,
+        owner_id: &odf::AccountID,
+        head: &odf::Multihash,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        // Find key blocks that contribute to search
+        let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
+        let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
+        let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
 
-#[tracing::instrument(level = "debug", skip_all, fields(
-    dataset_id = %dataset.get_id(),
-    new_head = %new_head,
-    maybe_prev_head = ?maybe_prev_head,
-))]
-pub(crate) async fn partial_update_for_new_interval(
-    indexer_config: &SearchIndexerConfig,
-    dataset: ResolvedDataset,
-    owner_id: &odf::AccountID,
-    new_head: &odf::Multihash,
-    maybe_prev_head: Option<&odf::Multihash>,
-) -> Result<Option<serde_json::Value>, InternalError> {
-    // Extract key blocks that contribute to search
-    let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
-    let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
-    let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
+        // Also need the seed event for created_at
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
 
-    use odf::dataset::*;
-    let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 3] = [
-        &mut attachments_visitor,
-        &mut info_visitor,
-        &mut schema_visitor,
-    ];
+        use odf::dataset::*;
+        let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 4] = [
+            &mut attachments_visitor,
+            &mut info_visitor,
+            &mut schema_visitor,
+            &mut seed_visitor,
+        ];
 
-    // Only need to visit blocks between maybe_prev_head and new_head
-    let result = dataset
-        .as_metadata_chain()
-        .accept_by_interval_ext(
-            &mut visitors,
-            Some(new_head),
-            maybe_prev_head,
-            AcceptByIntervalOptions {
-                ignore_missing_tail: false, // Detect divergence errors
-                ..Default::default()
-            },
-        )
-        .await;
+        use dataset_search_schema::*;
 
-    // In case divergence is detected, fall back to full indexing
-    match result {
-        Ok(_) => {}
-        Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
-            return index_dataset_from_scratch(indexer_config, dataset, owner_id, new_head).await;
+        // Visit entire metadata chain
+        match dataset
+            .as_metadata_chain()
+            .accept_by_hash(&mut visitors, head)
+            .await
+        {
+            Ok(_) => {
+                // Extract interested parts from visitors
+                let schema_fields = extract_schema_field_names(schema_visitor);
+                let (description, keywords) = extract_description_and_keywords(info_visitor);
+                let attachments = extract_attachment_contents(attachments_visitor);
+
+                // Apply indexing configuration filters
+                if self.indexer_config.skip_datasets_with_no_data && !schema_fields.is_present() {
+                    return Ok(None);
+                }
+                if self.indexer_config.skip_datasets_with_no_description
+                    && !description.is_present()
+                    && !attachments.is_present()
+                {
+                    return Ok(None);
+                }
+
+                // Prepare semantic embedding vectors
+                let embeddings_document = self
+                    .prepare_semantic_embeddings_document(&description, &keywords, &attachments)
+                    .await?;
+
+                // Seed event: created_at
+                let seed_event_time = seed_visitor.into_block().unwrap().system_time;
+
+                // Head event: ref_changed_at
+                let head_event_time = dataset
+                    .as_metadata_chain()
+                    .get_block_by_ref(&odf::BlockRef::Head)
+                    .await
+                    .int_err()?
+                    .system_time;
+
+                // Prepare hybrid search document with mandatory fields
+                let alias = dataset.get_alias();
+                let mut index_doc: serde_json::Value = serde_json::json!({
+                    fields::DATASET_NAME: alias.dataset_name.to_string(),
+                    fields::ALIAS: alias.to_string(),
+                    fields::OWNER_NAME: alias
+                        .account_name
+                        .as_ref()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_else(|| DEFAULT_ACCOUNT_NAME_STR.to_string()),
+                    fields::OWNER_ID: owner_id.to_string(),
+                    fields::KIND: match dataset.get_kind() {
+                        odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
+                        odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
+                    },
+                    fields::CREATED_AT: seed_event_time.to_rfc3339(),
+                    fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
+                });
+
+                // Add optional fields only if present
+                let index_doc_mut = index_doc.as_object_mut().unwrap();
+                if let SearchFieldUpdate::Present(v) = schema_fields {
+                    index_doc_mut.insert(fields::SCHEMA_FIELDS.to_string(), serde_json::json!(v));
+                }
+                if let SearchFieldUpdate::Present(v) = description {
+                    index_doc_mut.insert(fields::DESCRIPTION.to_string(), serde_json::json!(v));
+                }
+                if let SearchFieldUpdate::Present(v) = keywords {
+                    index_doc_mut.insert(fields::KEYWORDS.to_string(), serde_json::json!(v));
+                }
+                if let SearchFieldUpdate::Present(v) = attachments {
+                    index_doc_mut.insert(fields::ATTACHMENTS.to_string(), serde_json::json!(v));
+                }
+                if let SearchFieldUpdate::Present(v) = embeddings_document {
+                    index_doc_mut.insert(
+                        kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string(),
+                        serde_json::json!(v),
+                    );
+                }
+
+                Ok(Some(index_doc))
+            }
+
+            Err(e) => Err(e.int_err()),
         }
-        Err(e) => return Err(e.int_err()),
     }
 
-    // Extract interested parts from visitors
-    let schema_fields = extract_schema_field_names(schema_visitor);
-    let (description, keywords) = extract_description_and_keywords(info_visitor);
-    let attachments = extract_attachment_contents(attachments_visitor);
+    #[tracing::instrument(level = "debug", skip_all, fields(
+        dataset_id = %dataset.get_id(),
+        new_head = %new_head,
+        maybe_prev_head = ?maybe_prev_head,
+    ))]
+    pub(crate) async fn partial_update_for_new_interval(
+        &self,
+        dataset: ResolvedDataset,
+        owner_id: &odf::AccountID,
+        new_head: &odf::Multihash,
+        maybe_prev_head: Option<&odf::Multihash>,
+    ) -> Result<Option<serde_json::Value>, InternalError> {
+        // Extract key blocks that contribute to search
+        let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
+        let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
+        let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
 
-    // New head event: ref_changed_at
-    // Note: ES should receive an update, even if other parts were not touched,
-    //  otherwise ordering of datasets by ref_changed_at would be broken
-    let new_head_event_time = dataset
-        .as_metadata_chain()
-        .get_block(new_head)
-        .await
-        .int_err()?
-        .system_time;
+        use odf::dataset::*;
+        let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 3] = [
+            &mut attachments_visitor,
+            &mut info_visitor,
+            &mut schema_visitor,
+        ];
 
-    use dataset_search_schema::*;
+        // Only need to visit blocks between maybe_prev_head and new_head
+        let result = dataset
+            .as_metadata_chain()
+            .accept_by_interval_ext(
+                &mut visitors,
+                Some(new_head),
+                maybe_prev_head,
+                AcceptByIntervalOptions {
+                    ignore_missing_tail: false, // Detect divergence errors
+                    ..Default::default()
+                },
+            )
+            .await;
 
-    // Prepare partial update to full text search document
-    // Only include fields that were actually touched in the interval
-    let mut update = serde_json::Map::from_iter([(
-        fields::REF_CHANGED_AT.to_string(),
-        serde_json::json!(new_head_event_time.to_rfc3339()),
-    )]);
+        // In case divergence is detected, fall back to full indexing
+        match result {
+            Ok(_) => {}
+            Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
+                return self
+                    .index_dataset_from_scratch(dataset, owner_id, new_head)
+                    .await;
+            }
+            Err(e) => return Err(e.int_err()),
+        }
 
-    insert_search_incremental_update_field(&mut update, fields::SCHEMA_FIELDS, schema_fields);
-    insert_search_incremental_update_field(&mut update, fields::DESCRIPTION, description);
-    insert_search_incremental_update_field(&mut update, fields::KEYWORDS, keywords);
-    insert_search_incremental_update_field(&mut update, fields::ATTACHMENTS, attachments);
+        // Extract interested parts from visitors
+        let schema_fields = extract_schema_field_names(schema_visitor);
+        let (description, keywords) = extract_description_and_keywords(info_visitor);
+        let attachments = extract_attachment_contents(attachments_visitor);
 
-    Ok(Some(serde_json::Value::Object(update)))
+        // New head event: ref_changed_at
+        // Note: ES should receive an update, even if other parts were not touched,
+        //  otherwise ordering of datasets by ref_changed_at would be broken
+        let new_head_event_time = dataset
+            .as_metadata_chain()
+            .get_block(new_head)
+            .await
+            .int_err()?
+            .system_time;
+
+        use dataset_search_schema::*;
+
+        // Prepare partial update to full text search document
+        // Only include fields that were actually touched in the interval
+        let mut update = serde_json::Map::from_iter([(
+            fields::REF_CHANGED_AT.to_string(),
+            serde_json::json!(new_head_event_time.to_rfc3339()),
+        )]);
+
+        insert_search_incremental_update_field(&mut update, fields::SCHEMA_FIELDS, schema_fields);
+        insert_search_incremental_update_field(&mut update, fields::DESCRIPTION, description);
+        insert_search_incremental_update_field(&mut update, fields::KEYWORDS, keywords);
+        insert_search_incremental_update_field(&mut update, fields::ATTACHMENTS, attachments);
+
+        // TODO: incrementally update embeddings
+
+        Ok(Some(serde_json::Value::Object(update)))
+    }
+
+    async fn prepare_semantic_embeddings_document(
+        &self,
+        description: &SearchFieldUpdate<String>,
+        keywords: &SearchFieldUpdate<Vec<String>>,
+        attachments: &SearchFieldUpdate<Vec<String>>,
+    ) -> Result<SearchFieldUpdate<Vec<serde_json::Value>>, InternalError> {
+        // Aggregate all text parts
+        let mut texts = Vec::new();
+        if let SearchFieldUpdate::Present(description) = description {
+            texts.push(description.clone());
+        }
+        if let SearchFieldUpdate::Present(keywords) = keywords {
+            for keyword in keywords {
+                texts.push(keyword.clone());
+            }
+        }
+        if let SearchFieldUpdate::Present(attachments) = attachments {
+            for attachment in attachments {
+                texts.push(attachment.clone());
+            }
+        }
+        if texts.is_empty() {
+            return Ok(SearchFieldUpdate::Absent);
+        }
+
+        let chunks = self.embeddings_chunker.chunk(texts).await?;
+        if chunks.is_empty() {
+            return Ok(SearchFieldUpdate::Empty);
+        }
+
+        let vectors = self.embeddings_encoder.encode(chunks).await?;
+
+        #[derive(serde::Serialize)]
+        struct ChunkDoc<'a> {
+            chunk_id: String,
+            embedding: &'a [f32], // flat per chunk
+        }
+
+        let chunk_docs = vectors
+            .iter()
+            .enumerate()
+            .map(|(i, vector)| ChunkDoc {
+                chunk_id: format!("chunk_{i}"),
+                embedding: vector,
+            })
+            .map(|doc| serde_json::to_value(doc).unwrap())
+            .collect::<Vec<_>>();
+
+        Ok(SearchFieldUpdate::Present(chunk_docs))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,6 +370,8 @@ pub(crate) async fn index_datasets(
     dataset_entry_service: &dyn DatasetEntryService,
     dataset_registry: &dyn DatasetRegistry,
     search_repo: &dyn SearchRepository,
+    embeddings_chunker: &dyn EmbeddingsChunker,
+    embeddings_encoder: &dyn EmbeddingsEncoder,
     indexer_config: &SearchIndexerConfig,
 ) -> Result<usize, InternalError> {
     const BULK_SIZE: usize = 500;
@@ -306,6 +380,12 @@ pub(crate) async fn index_datasets(
 
     let mut operations = Vec::new();
     let mut total_indexed = 0;
+
+    let indexing_helper = DatasetIndexingHelper {
+        indexer_config,
+        embeddings_chunker,
+        embeddings_encoder,
+    };
 
     use futures::TryStreamExt;
     use kamu_datasets::DatasetRegistryExt;
@@ -332,8 +412,9 @@ pub(crate) async fn index_datasets(
         };
 
         // Index dataset
-        let maybe_dataset_document =
-            index_dataset_from_scratch(indexer_config, dataset, &entry.owner_id, &head).await?;
+        let maybe_dataset_document = indexing_helper
+            .index_dataset_from_scratch(dataset, &entry.owner_id, &head)
+            .await?;
         if let Some(dataset_document) = maybe_dataset_document {
             let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 

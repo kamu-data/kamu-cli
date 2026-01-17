@@ -1111,6 +1111,7 @@ impl SearchConfig {
                     index_prefix: Some(String::new()),
                     timeout_secs: Some(30),
                     enable_compression: Some(false),
+                    embedding_dimensions: Some(Self::DEFAULT_DIMENSIONS),
                 },
             )),
         }
@@ -1342,6 +1343,7 @@ pub struct SearchRepositoryConfigElasticsearch {
     pub index_prefix: Option<String>,
     pub timeout_secs: Option<u64>,
     pub enable_compression: Option<bool>,
+    pub embedding_dimensions: Option<usize>,
 }
 
 impl Default for SearchRepositoryConfigElasticsearch {
@@ -1353,6 +1355,7 @@ impl Default for SearchRepositoryConfigElasticsearch {
             index_prefix: Some(String::new()),
             timeout_secs: Some(30),
             enable_compression: Some(false),
+            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
         }
     }
 }
@@ -1365,6 +1368,7 @@ impl Default for SearchRepositoryConfigElasticsearch {
 pub struct SearchRepositoryConfigElasticsearchContainer {
     pub image: Option<String>,
     pub start_timeout: Option<DurationString>,
+    pub embedding_dimensions: Option<usize>,
 }
 
 impl Default for SearchRepositoryConfigElasticsearchContainer {
@@ -1372,6 +1376,7 @@ impl Default for SearchRepositoryConfigElasticsearchContainer {
         Self {
             image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
         }
     }
 }

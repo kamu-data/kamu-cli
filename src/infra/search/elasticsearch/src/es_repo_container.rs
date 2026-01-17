@@ -21,7 +21,7 @@ use crate::*;
 /// that will be cleaned up on exit
 pub struct ElasticsearchContainerRepository {
     runtime: Arc<container_runtime::ContainerRuntime>,
-    config: Arc<ElasticsearchContainerConfig>,
+    container_config: Arc<ElasticsearchContainerConfig>,
     state: tokio::sync::OnceCell<State>,
 }
 
@@ -37,11 +37,11 @@ struct State {
 impl ElasticsearchContainerRepository {
     pub fn new(
         runtime: Arc<container_runtime::ContainerRuntime>,
-        config: Arc<ElasticsearchContainerConfig>,
+        container_config: Arc<ElasticsearchContainerConfig>,
     ) -> Self {
         Self {
             runtime,
-            config,
+            container_config,
             state: tokio::sync::OnceCell::new(),
         }
     }
@@ -60,7 +60,7 @@ impl ElasticsearchContainerRepository {
 
         let container = self
             .runtime
-            .run_attached(self.config.image.clone())
+            .run_attached(self.container_config.image.clone())
             .random_container_name_with_prefix("kamu-search-elasticsearch-")
             .expose_ports([9200])
             .environment_vars([
@@ -80,7 +80,7 @@ impl ElasticsearchContainerRepository {
 
         let runtime_host = self.runtime.get_runtime_host_addr();
         let rest_api_port = container
-            .wait_for_host_socket(9200, self.config.start_timeout)
+            .wait_for_host_socket(9200, self.container_config.start_timeout)
             .await
             .int_err()?;
 
@@ -97,6 +97,7 @@ impl ElasticsearchContainerRepository {
             }),
             Arc::new(ElasticsearchRepositoryConfig {
                 index_prefix: String::new(),
+                embedding_dimensions: self.container_config.embedding_dimensions,
             }),
         );
 

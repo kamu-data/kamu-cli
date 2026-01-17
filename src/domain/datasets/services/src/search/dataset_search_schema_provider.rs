@@ -23,6 +23,8 @@ use crate::search::dataset_search_indexer::*;
 pub struct DatasetSearchSchemaProvider {
     catalog: dill::Catalog,
     indexer_config: Arc<SearchIndexerConfig>,
+    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
+    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +42,8 @@ impl DatasetSearchSchemaProvider {
             dataset_entry_service.as_ref(),
             dataset_registry.as_ref(),
             search_repo.as_ref(),
+            self.embeddings_chunker.as_ref(),
+            self.embeddings_encoder.as_ref(),
             self.indexer_config.as_ref(),
         )
         .await

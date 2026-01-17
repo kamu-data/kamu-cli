@@ -140,7 +140,10 @@ impl ElasticsearchIndexMappings {
         })
     }
 
-    pub fn from_entity_schema(entity_schema: &SearchEntitySchema) -> Self {
+    pub fn from_entity_schema(
+        entity_schema: &SearchEntitySchema,
+        embedding_dimensions: usize,
+    ) -> Self {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
             let field_mapping = match field.role {
@@ -173,6 +176,10 @@ impl ElasticsearchIndexMappings {
                 SearchSchemaFieldRole::Integer => serde_json::json!({
                     "type": "integer"
                 }),
+
+                SearchSchemaFieldRole::EmbeddingChunks => {
+                    Self::map_embedding_chunks_field(embedding_dimensions)
+                }
 
                 SearchSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
@@ -301,6 +308,33 @@ impl ElasticsearchIndexMappings {
             "type": "keyword",
             "normalizer": "kamu_keyword_norm",
             "ignore_above": 256
+        })
+    }
+
+    fn map_embedding_chunks_field(embedding_dimensions: usize) -> serde_json::Value {
+        serde_json::json!({
+            "type": "nested",
+            "properties": {
+                "chunk_id": {
+                    "type": "keyword"
+                },
+                "embedding": {
+                    "type": "dense_vector",
+                    "dims": embedding_dimensions,
+                    // Elastic’s documentation explicitly recommends cosine for transformer-based text embeddings
+                    "similarity": "cosine",
+                    "index_options": {
+                        // Index for approximate nearest neighbor search (ANN)
+                        "type": "hnsw",
+                        // Maximum number of outgoing connections per node in the HNSW graph.
+                        // Higher values lead to better accuracy, but slow down  indexing and enlarge memory usage.
+                        "m": 16,
+                        // Size of the candidate pool / beam used while selecting those neighbors
+                        "ef_construction": 128
+                    }
+                }
+            },
+
         })
     }
 
