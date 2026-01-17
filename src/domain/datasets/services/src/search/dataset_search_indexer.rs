@@ -302,22 +302,24 @@ pub(crate) async fn index_datasets(
             .int_err()?;
 
         // Index dataset
-        let dataset_document =
+        let maybe_dataset_document =
             index_dataset_from_scratch(indexer_config, dataset, &entry.owner_id).await?;
-        let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
+        if let Some(dataset_document) = maybe_dataset_document {
+            let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
-        tracing::debug!(
-            dataset_id = %entry.id,
-            dataset_name = %entry.name,
-            search_document = %dataset_document_json,
-            "Indexed dataset search document",
-        );
+            tracing::debug!(
+                dataset_id = %entry.id,
+                dataset_name = %entry.name,
+                search_document = %dataset_document_json,
+                "Indexed dataset search document",
+            );
 
-        // Add dataset document to the chunk
-        operations.push(SearchIndexUpdateOperation::Index {
-            id: entry.id.to_string(),
-            doc: dataset_document_json,
-        });
+            // Add dataset document to the chunk
+            operations.push(SearchIndexUpdateOperation::Index {
+                id: entry.id.to_string(),
+                doc: dataset_document_json,
+            });
+        }
 
         // Index in chunks to avoid memory overwhelming
         if operations.len() >= BULK_SIZE {

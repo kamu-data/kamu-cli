@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Hotfix: do not put empty dataset documents into Elasticsearch during full reindexing.
+
 ## [0.256.1] - 2026-01-17
 ### Added
 - `SearchIndexerConfig` is respected both by natural and full-text search engine
