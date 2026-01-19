@@ -69,46 +69,83 @@ impl DatasetSearchUpdater {
 
         // Did we have updates before?
         if updated_message.maybe_prev_block_hash.is_some() {
-            // Prepare partial update to dataset search document
-            if let Some(partial_update) = partial_update_for_new_interval(
-                self.indexer_config.as_ref(),
-                dataset,
-                &entry.owner_id,
-                &updated_message.new_block_hash,
-                updated_message.maybe_prev_block_hash.as_ref(),
-            )
-            .await?
-            {
-                // Send it to the full text search service for updating
-                self.search_service
-                    .bulk_update(
-                        ctx,
-                        dataset_search_schema::SCHEMA_NAME,
-                        vec![SearchIndexUpdateOperation::Update {
-                            id: updated_message.dataset_id.to_string(),
-                            doc: partial_update,
-                        }],
-                    )
-                    .await?;
+            // Find existing document and prepare partial update
+            let maybe_existing_document = self
+                .search_service
+                .find_document_by_id(
+                    ctx,
+                    dataset_search_schema::SCHEMA_NAME,
+                    &updated_message.dataset_id.to_string(),
+                )
+                .await?;
+
+            // Is document present?
+            // Note, even if we had previous updates, the document may be missing,
+            // if it's empty (does not contain any useful indexable fields).
+            // In this case, we need to reindex from scratch.
+            if maybe_existing_document.is_some() {
+                // Prepare partial update to dataset search document
+                if let Some(partial_update) = partial_update_for_new_interval(
+                    self.indexer_config.as_ref(),
+                    dataset,
+                    &entry.owner_id,
+                    &updated_message.new_block_hash,
+                    updated_message.maybe_prev_block_hash.as_ref(),
+                )
+                .await?
+                {
+                    // Send it to the full text search service for updating
+                    self.search_service
+                        .bulk_update(
+                            ctx,
+                            dataset_search_schema::SCHEMA_NAME,
+                            vec![SearchIndexUpdateOperation::Update {
+                                id: updated_message.dataset_id.to_string(),
+                                doc: partial_update,
+                            }],
+                        )
+                        .await?;
+                } else {
+                    tracing::info!(
+                        dataset_id = %updated_message.dataset_id,
+                        "Dataset search document is empty after partial update preparation, skipping indexing",
+                    );
+                }
+
+                return Ok(());
             }
+
+            tracing::info!(
+                dataset_id = %updated_message.dataset_id,
+                "Dataset search document not found during partial update, falling back to full reindex",
+            );
+        }
+
+        // Reindex from scratch
+        if let Some(dataset_document) = index_dataset_from_scratch(
+            self.indexer_config.as_ref(),
+            dataset,
+            &entry.owner_id,
+            &updated_message.new_block_hash,
+        )
+        .await?
+        {
+            // Send it to the full text search service for indexing
+            self.search_service
+                .bulk_update(
+                    ctx,
+                    dataset_search_schema::SCHEMA_NAME,
+                    vec![SearchIndexUpdateOperation::Index {
+                        id: updated_message.dataset_id.to_string(),
+                        doc: dataset_document,
+                    }],
+                )
+                .await?;
         } else {
-            // This is the first ref update, reindex from scratch
-            if let Some(dataset_document) =
-                index_dataset_from_scratch(self.indexer_config.as_ref(), dataset, &entry.owner_id)
-                    .await?
-            {
-                // Sent it to the full text search service for indexing
-                self.search_service
-                    .bulk_update(
-                        ctx,
-                        dataset_search_schema::SCHEMA_NAME,
-                        vec![SearchIndexUpdateOperation::Index {
-                            id: updated_message.dataset_id.to_string(),
-                            doc: dataset_document,
-                        }],
-                    )
-                    .await?;
-            }
+            tracing::info!(
+                dataset_id = %updated_message.dataset_id,
+                "Dataset search document is empty after indexing from scratch, skipping indexing",
+            );
         }
 
         Ok(())

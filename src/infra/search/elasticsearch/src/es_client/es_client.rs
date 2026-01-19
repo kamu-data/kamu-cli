@@ -167,6 +167,11 @@ impl ElasticsearchClient {
             .send()
             .await?;
 
+        // 404 means document does not exist
+        if response.status_code().as_u16() == 404 {
+            return Ok(None);
+        }
+
         let response = ensure_client_response(response).await?;
         let body: es_client::GetDocumentByIdResponse = response.json().await?;
         if body.found {

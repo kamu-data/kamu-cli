@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - Hotfix: do not put empty dataset documents into Elasticsearch during full reindexing.
+- Hotfix: improved handling of `skipDatasetsWithNoDescription` and `skipDatasetsWithNoData` options when 
+   processing incremental updates to datasets search indices
+- Hotfix: handling 404 error from Elasticsearch when requesting non-existing document by ID
 
 ## [0.256.1] - 2026-01-17
 ### Added
