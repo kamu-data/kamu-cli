@@ -90,12 +90,21 @@ impl DatasetSearchUpdater {
                         }],
                     )
                     .await?;
+            } else {
+                tracing::warn!(
+                    dataset_id = %updated_message.dataset_id,
+                    "Dataset search document is empty after partial update preparation, skipping indexing",
+                );
             }
         } else {
             // This is the first ref update, reindex from scratch
-            if let Some(dataset_document) =
-                index_dataset_from_scratch(self.indexer_config.as_ref(), dataset, &entry.owner_id)
-                    .await?
+            if let Some(dataset_document) = index_dataset_from_scratch(
+                self.indexer_config.as_ref(),
+                dataset,
+                &entry.owner_id,
+                &updated_message.new_block_hash,
+            )
+            .await?
             {
                 // Sent it to the full text search service for indexing
                 self.search_service
@@ -108,6 +117,11 @@ impl DatasetSearchUpdater {
                         }],
                     )
                     .await?;
+            } else {
+                tracing::warn!(
+                    dataset_id = %updated_message.dataset_id,
+                    "Dataset search document is empty after indexing from scratch, skipping indexing",
+                );
             }
         }
 
