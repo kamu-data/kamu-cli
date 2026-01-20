@@ -1102,9 +1102,6 @@ pub fn register_config_in_catalog(
     let indexer = indexer.unwrap_or_default();
     catalog_builder.add_value(kamu_search::SearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
-        skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
-        skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,
-        payload_include_content: indexer.payload_include_content,
     });
 
     match embeddings_chunker.unwrap_or_default() {

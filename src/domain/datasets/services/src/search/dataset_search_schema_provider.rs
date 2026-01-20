@@ -22,7 +22,6 @@ use crate::search::dataset_search_indexer::*;
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct DatasetSearchSchemaProvider {
     catalog: dill::Catalog,
-    indexer_config: Arc<SearchIndexerConfig>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
@@ -44,7 +43,6 @@ impl DatasetSearchSchemaProvider {
             search_repo.as_ref(),
             self.embeddings_chunker.as_ref(),
             self.embeddings_encoder.as_ref(),
-            self.indexer_config.as_ref(),
         )
         .await
     }

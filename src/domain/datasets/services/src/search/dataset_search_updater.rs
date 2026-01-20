@@ -39,7 +39,6 @@ use crate::search::dataset_search_indexer::*;
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetSearchUpdater {
-    indexer_config: Arc<SearchIndexerConfig>,
     search_service: Arc<dyn SearchService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -57,7 +56,6 @@ impl DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         // Pprepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
-            indexer_config: self.indexer_config.as_ref(),
             embeddings_chunker: self.embeddings_chunker.as_ref(),
             embeddings_encoder: self.embeddings_encoder.as_ref(),
         };
@@ -94,32 +92,26 @@ impl DatasetSearchUpdater {
             // In this case, we need to reindex from scratch.
             if maybe_existing_document.is_some() {
                 // Prepare partial update to dataset search document
-                if let Some(partial_update) = indexing_helper
+                let partial_update = indexing_helper
                     .partial_update_for_new_interval(
                         dataset,
                         &entry.owner_id,
                         &updated_message.new_block_hash,
                         updated_message.maybe_prev_block_hash.as_ref(),
                     )
-                    .await?
-                {
-                    // Send it to the full text search service for updating
-                    self.search_service
-                        .bulk_update(
-                            ctx,
-                            dataset_search_schema::SCHEMA_NAME,
-                            vec![SearchIndexUpdateOperation::Update {
-                                id: updated_message.dataset_id.to_string(),
-                                doc: partial_update,
-                            }],
-                        )
-                        .await?;
-                } else {
-                    tracing::info!(
-                        dataset_id = %updated_message.dataset_id,
-                        "Dataset search document is empty after partial update preparation, skipping indexing",
-                    );
-                }
+                    .await?;
+
+                // Send it to the full text search service for updating
+                self.search_service
+                    .bulk_update(
+                        ctx,
+                        dataset_search_schema::SCHEMA_NAME,
+                        vec![SearchIndexUpdateOperation::Update {
+                            id: updated_message.dataset_id.to_string(),
+                            doc: partial_update,
+                        }],
+                    )
+                    .await?;
 
                 return Ok(());
             }
@@ -131,27 +123,21 @@ impl DatasetSearchUpdater {
         }
 
         // Reindex from scratch
-        if let Some(dataset_document) = indexing_helper
+        let dataset_document = indexing_helper
             .index_dataset_from_scratch(dataset, &entry.owner_id, &updated_message.new_block_hash)
-            .await?
-        {
-            // Send it to the full text search service for indexing
-            self.search_service
-                .bulk_update(
-                    ctx,
-                    dataset_search_schema::SCHEMA_NAME,
-                    vec![SearchIndexUpdateOperation::Index {
-                        id: updated_message.dataset_id.to_string(),
-                        doc: dataset_document,
-                    }],
-                )
-                .await?;
-        } else {
-            tracing::info!(
-                dataset_id = %updated_message.dataset_id,
-                "Dataset search document is empty after indexing from scratch, skipping indexing",
-            );
-        }
+            .await?;
+
+        // Send it to the full text search service for indexing
+        self.search_service
+            .bulk_update(
+                ctx,
+                dataset_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Index {
+                    id: updated_message.dataset_id.to_string(),
+                    doc: dataset_document,
+                }],
+            )
+            .await?;
 
         Ok(())
     }
