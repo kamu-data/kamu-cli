@@ -338,6 +338,11 @@ impl SearchRepository for ElasticsearchRepository {
         })
     }
 
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_vector_search, skip_all)]
+    async fn vector_search(&self, _: SearchRequest) -> Result<SearchResponse, InternalError> {
+        unimplemented!()
+    }
+
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]
     async fn find_document_by_id(
         &self,

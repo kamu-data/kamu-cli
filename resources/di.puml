@@ -50,6 +50,7 @@ interface "DatasetLfsBuilder" <<i>>
 interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
+interface "DatasetSearchService" <<i>>
 interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
@@ -80,7 +81,6 @@ interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
 interface "MetricsProvider" <<i>>
 interface "ModifyAccountPasswordUseCase" <<i>>
-interface "NaturalLanguageSearchService" <<i>>
 interface "OAuthDeviceCodeGenerator" <<i>>
 interface "OAuthDeviceCodeRepository" <<i>>
 interface "OAuthDeviceCodeService" <<i>>
@@ -133,7 +133,6 @@ interface "TransformRequestPlanner" <<i>>
 interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionFileUseCase" <<i>>
-interface "VectorRepository" <<i>>
 interface "VerificationService" <<i>>
 interface "VerifyDatasetUseCase" <<i>>
 interface "Web3AuthEip4361NonceRepository" <<i>>
@@ -188,6 +187,7 @@ class "DatasetProperties" <<singleton>>
 class "DatasetReferenceIndexer"
 class "DatasetReferenceServiceImpl"
 class "DatasetSearchSchemaProvider"
+class "DatasetSearchServiceImpl"
 class "DatasetSearchUpdater"
 class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
@@ -243,8 +243,6 @@ class "MetadataChainDbBackedConfig" <<singleton>>
 class "MetadataQueryServiceImpl"
 class "ModifyAccountPasswordUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
-class "NaturalLanguageSearchConfig" <<singleton>>
-class "NaturalLanguageSearchImplLazyInit" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
 class "OAuthDeviceCodeServiceImpl"
@@ -348,8 +346,6 @@ class "TransformRequestPlannerImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionFileUseCaseImpl"
-class "VectorRepositoryConfigQdrantContainer" <<singleton>>
-class "VectorRepositoryQdrantContainer" <<singleton>>
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "Web3AuthEip4361NonceServiceImpl"
@@ -655,6 +651,9 @@ class "WsSmartTransferProtocolClient"
 "DatasetSearchSchemaProvider"  --> "EmbeddingsChunker"
 "DatasetSearchSchemaProvider"  --> "EmbeddingsEncoder"
 "DatasetSearchSchemaProvider"  --> "SearchIndexerConfig"
+"DatasetSearchService" <|-- "DatasetSearchServiceImpl"
+"DatasetSearchServiceImpl"  --> "DatasetRegistry"
+"DatasetSearchServiceImpl"  --> "SearchService"
 "MessageConsumer" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
@@ -820,14 +819,9 @@ class "WsSmartTransferProtocolClient"
 "SqliteOutboxMessageRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
 "EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
-"VectorRepository" <|-- "VectorRepositoryQdrantContainer"
-"VectorRepositoryQdrantContainer"  --> "ContainerRuntime"
-"VectorRepositoryQdrantContainer"  --> "VectorRepositoryConfigQdrantContainer"
 "SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
-"NaturalLanguageSearchService" <|-- "NaturalLanguageSearchImplLazyInit"
-"NaturalLanguageSearchImplLazyInit"  --> "KamuBackgroundCatalog"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

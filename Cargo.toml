@@ -78,7 +78,6 @@ members = [
     "src/infra/datasets/sqlite",
     ## Search
     "src/infra/search/openai",
-    "src/infra/search/qdrant",
     "src/infra/search/elasticsearch",
     "src/infra/search/elasticsearch-macros",
     ## Task System
@@ -221,7 +220,6 @@ kamu-datasets-sqlite = { version = "0.256.1", path = "src/infra/datasets/sqlite"
 kamu-datasets-repo-tests = { version = "0.256.1", path = "src/infra/datasets/repo-tests", default-features = false }
 ## Search
 kamu-search-openai = { version = "0.256.1", path = "src/infra/search/openai", default-features = false }
-kamu-search-qdrant = { version = "0.256.1", path = "src/infra/search/qdrant", default-features = false }
 kamu-search-elasticsearch = { version = "0.256.1", path = "src/infra/search/elasticsearch", default-features = false }
 kamu-search-elasticsearch-macros = { version = "0.256.1", path = "src/infra/search/elasticsearch-macros", default-features = false }
 ## Task System

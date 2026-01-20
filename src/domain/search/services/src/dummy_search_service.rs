@@ -40,6 +40,19 @@ impl SearchService for DummySearchService {
         })
     }
 
+    async fn vector_search(
+        &self,
+        _: SearchContext<'_>,
+        _req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: 0,
+            hits: vec![],
+        })
+    }
+
     async fn find_document_by_id(
         &self,
         _ctx: SearchContext<'_>,

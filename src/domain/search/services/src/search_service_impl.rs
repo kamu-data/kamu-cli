@@ -36,6 +36,14 @@ impl SearchService for SearchServiceImpl {
         self.search_repo.search(req).await
     }
 
+    async fn vector_search(
+        &self,
+        _: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_repo.vector_search(req).await
+    }
+
     async fn find_document_by_id(
         &self,
         _: SearchContext<'_>,

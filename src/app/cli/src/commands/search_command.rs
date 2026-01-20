@@ -9,10 +9,11 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::array::{Float32Array, RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::array::{Float64Array, RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use internal_error::*;
 use kamu::domain::*;
+use kamu_datasets::DatasetSearchService;
 use kamu_search::*;
 
 use super::{CLIError, Command};
@@ -24,8 +25,8 @@ use crate::output::*;
 #[dill::interface(dyn Command)]
 pub struct SearchCommand {
     catalog: dill::Catalog,
-    search_svc: Arc<dyn SearchServiceRemote>,
-    natural_language_search_svc: Arc<dyn NaturalLanguageSearchService>,
+    search_svc_remote: Arc<dyn SearchServiceRemote>,
+    dataset_search_svc: Arc<dyn DatasetSearchService>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -69,12 +70,13 @@ impl SearchCommand {
         };
 
         let res = self
-            .natural_language_search_svc
-            .search_natural_language(
+            .dataset_search_svc
+            .vector_search(
                 context,
-                &prompt,
-                SearchNatLangOpts {
+                prompt,
+                SearchPaginationSpec {
                     limit: self.max_results,
+                    offset: 0,
                 },
             )
             .await
@@ -96,14 +98,9 @@ impl SearchCommand {
             schema.clone(),
             vec![
                 Arc::new(StringArray::from_iter_values(
-                    res.datasets.iter().map(|h| h.handle.alias.to_string()),
+                    res.hits.iter().map(|h| h.handle.alias.to_string()),
                 )),
-                Arc::new(
-                    res.datasets
-                        .iter()
-                        .map(|h| h.score)
-                        .collect::<Float32Array>(),
-                ),
+                Arc::new(res.hits.iter().map(|h| h.score).collect::<Float64Array>()),
             ],
         )
         .unwrap();
@@ -119,7 +116,7 @@ impl SearchCommand {
 
     async fn search_remote(&self) -> Result<(), CLIError> {
         let mut result = self
-            .search_svc
+            .search_svc_remote
             .search(
                 self.query.as_deref(),
                 SearchRemoteOpts {

@@ -86,6 +86,15 @@ impl SearchService for SearchImplLazyInit {
         inner.search(ctx, req).await
     }
 
+    async fn vector_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        let inner = self.inner().await?;
+        inner.vector_search(ctx, req).await
+    }
+
     async fn find_document_by_id(
         &self,
         ctx: SearchContext<'_>,

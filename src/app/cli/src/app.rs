@@ -1096,24 +1096,8 @@ pub fn register_config_in_catalog(
         indexer,
         embeddings_chunker,
         embeddings_encoder,
-        vector_repo,
-        overfetch_factor,
-        overfetch_amount,
         repo,
     } = config.search.clone().unwrap();
-
-    // Note: this is specific to CLI:
-    // - we are not registering NaturalLanguageSearchIndexer startup job here to
-    //   avoid heavyweight load in CLI commands
-    // - lazy init wrapper encapsulates the indexing launch on first search API use
-    //   (could be quite a long startup time, indexing itself + container start, if
-    //   containers are used)
-    // - lazy init wrapper is unnecessary in server mode
-
-    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
-        overfetch_factor: overfetch_factor.unwrap(),
-        overfetch_amount: overfetch_amount.unwrap(),
-    });
 
     let indexer = indexer.unwrap_or_default();
     catalog_builder.add_value(kamu_search::SearchIndexerConfig {
@@ -1146,38 +1130,6 @@ pub fn register_config_in_catalog(
             });
         }
     }
-
-    match vector_repo.unwrap_or_default() {
-        config::VectorRepoConfig::Dummy => {
-            catalog_builder.add::<kamu_search_services::DummyNaturalLanguageSearchService>();
-        }
-
-        config::VectorRepoConfig::Qdrant(mut cfg) => {
-            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
-
-            cfg.merge(config::VectorRepoConfigQdrant::default());
-
-            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
-            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrant {
-                url: cfg.url,
-                collection_name: cfg.collection_name.unwrap(),
-                dimensions: cfg.dimensions.unwrap(),
-            });
-        }
-        config::VectorRepoConfig::QdrantContainer(mut cfg) => {
-            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
-
-            cfg.merge(config::VectorRepoConfigQdrantContainer::default());
-
-            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();
-            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrantContainer {
-                image: cfg.image.unwrap(),
-                dimensions: cfg.dimensions.unwrap(),
-                start_timeout: cfg.start_timeout.unwrap().into(),
-            });
-        }
-    }
-    //
 
     // Note: this is specific to CLI:
     // - we are not registering SearchIndexer startup job here to avoid heavyweight

@@ -112,7 +112,7 @@ sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb sqlx-local-
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
+#	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
@@ -123,7 +123,7 @@ sqlx-local-setup-postgres:
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
+##	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
@@ -187,93 +187,6 @@ sqlx-add-migration:
 	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
 
 ###############################################################################
-# Qdrant
-###############################################################################
-
-QDRANT_IMAGE ?= docker.io/qdrant/qdrant:v1.16.2
-
-# Host access
-QDRANT_URL ?= http://localhost:6333
-
-# Container/network
-QDRANT_CONTAINER ?= kamu-qdrant
-QDRANT_NET ?= kamu-qdrant-net
-
-# Persistence (optional but recommended)
-QDRANT_DATA_VOL ?= kamu-qdrant-data
-
-QDRANT_TIMEOUT_SECS ?= 60
-QDRANT_POLL_INTERVAL_SECS ?= 1
-
-# Convenience curl flags
-QDRANT_CURL := curl -fsS
-
-
-.PHONY: qdrant-setup
-qdrant-setup:
-	@echo "Creating Qdrant network..."
-	$(KAMU_CONTAINER_RUNTIME_TYPE) network create $(QDRANT_NET) || true
-
-	@echo "Pulling Qdrant image..."
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull $(QDRANT_IMAGE)
-
-	@echo "Stopping and removing existing Qdrant container, if any..."
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop $(QDRANT_CONTAINER) || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm $(QDRANT_CONTAINER) || true
-
-	@echo "Starting Qdrant container..."
-	@$(KAMU_CONTAINER_RUNTIME_TYPE) run \
-		--name $(QDRANT_CONTAINER) \
-		--network $(QDRANT_NET) \
-		-p 6333:6333 \
-		-p 6334:6334 \
-		-v $(QDRANT_DATA_VOL):/qdrant/storage \
-		-d \
-		$(QDRANT_IMAGE)
-
-	@$(MAKE) qdrant-wait
-	@$(MAKE) qdrant-info
-
-.PHONY: qdrant-stop
-qdrant-stop:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop $(QDRANT_CONTAINER) || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm $(QDRANT_CONTAINER) || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) network rm $(QDRANT_NET) || true
-
-.PHONY: qdrant-clean
-qdrant-clean:
-	$(MAKE) qdrant-stop
-	$(KAMU_CONTAINER_RUNTIME_TYPE) volume rm $(QDRANT_DATA_VOL) || true
-
-.PHONY: qdrant-wait
-qdrant-wait:
-	@echo "Waiting for Qdrant at $(QDRANT_URL) (timeout: $(QDRANT_TIMEOUT_SECS)s)..."
-	@start_time=$$(date +%s); \
-	attempt=1; \
-	while true; do \
-		echo "Attempt $$attempt: Checking Qdrant..."; \
-		if $(QDRANT_CURL) "$(QDRANT_URL)/healthz" >/dev/null 2>&1; then \
-			echo "Qdrant is up"; \
-			break; \
-		fi; \
-		now=$$(date +%s); \
-		if [ $$((now - start_time)) -ge $(QDRANT_TIMEOUT_SECS) ]; then \
-			echo "Timed out waiting for Qdrant"; \
-			echo "Try: $(KAMU_CONTAINER_RUNTIME_TYPE) logs --tail 200 $(QDRANT_CONTAINER)"; \
-			exit 1; \
-		fi; \
-		attempt=$$((attempt + 1)); \
-		sleep $(QDRANT_POLL_INTERVAL_SECS); \
-	done
-
-.PHONY: qdrant-info
-qdrant-info:
-	@echo "Qdrant version:"
-	@$(QDRANT_CURL) "$(QDRANT_URL)/" | head -n 50 || true
-
-.PHONY: qdrant-collections-list
-qdrant-collections-list:
-	@$(QDRANT_CURL) "$(QDRANT_URL)/collections" | head -n 200
-
-###############################################################################
 # Elasticsearch
 ###############################################################################
 
@@ -299,7 +212,7 @@ ES_CERT_PASS ?= root
 elasticsearch-setup-https:
 	$(MAKE) elasticsearch-certs
 	$(MAKE) elasticsearch-net
-	$(MAKE) elasticsearch-pull
+#	$(MAKE) elasticsearch-pull
 	$(MAKE) elasticsearch-stop-containers
 	$(MAKE) elasticsearch-start-https
 	$(MAKE) elasticsearch-wait \
@@ -316,7 +229,7 @@ elasticsearch-setup-https:
 .PHONY: elasticsearch-setup-http
 elasticsearch-setup-http:
 	$(MAKE) elasticsearch-net
-	$(MAKE) elasticsearch-pull
+#	$(MAKE) elasticsearch-pull
 	$(MAKE) elasticsearch-stop-containers
 	$(MAKE) elasticsearch-start-http
 	$(MAKE) elasticsearch-wait \

@@ -29,6 +29,12 @@ pub trait SearchService: Send + Sync {
         req: SearchRequest,
     ) -> Result<SearchResponse, InternalError>;
 
+    async fn vector_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: SearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
     async fn find_document_by_id(
         &self,
         ctx: SearchContext<'_>,

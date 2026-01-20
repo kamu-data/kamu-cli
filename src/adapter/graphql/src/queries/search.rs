@@ -11,7 +11,6 @@ use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
-use kamu_search::SearchNatLangError;
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -204,51 +203,55 @@ impl Search {
         // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let natural_language_search_service =
-            from_catalog_n!(ctx, dyn kamu_search::NaturalLanguageSearchService);
+        let datasets_search_service = from_catalog_n!(ctx, dyn kamu_datasets::DatasetSearchService);
+
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
         let context = kamu_search::SearchContext { catalog };
 
-        // TODO: Support "next page token" style pagination
-        let page = 0;
-        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+        // Run vector search request
+        let search_results = {
+            use kamu_search::*;
 
-        let limit = per_page;
+            datasets_search_service
+                .vector_search(
+                    context,
+                    prompt,
+                    SearchPaginationSpec {
+                        limit: per_page,
+                        offset: 0, /* page * per_page, */
+                    },
+                )
+                .await
+                .int_err()
+        }?;
 
-        let res = natural_language_search_service
-            .search_natural_language(context, &prompt, kamu_search::SearchNatLangOpts { limit })
-            .await
-            .map_err(|e| match e {
-                SearchNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
-                SearchNatLangError::Internal(e) => GqlError::Internal(e),
-            })?;
+        let total_count = search_results.total_hits;
 
-        let total_count = res.datasets.len();
-
-        // TODO: PERF: Avoid expensive resolution of one account at a time by including
-        // account information into dataset handles
+        // Build final result with GQL dataset objects
         let mut nodes: Vec<SearchResultEx> = Vec::new();
-        for hit in res.datasets {
-            let Some(account) = Account::from_dataset_alias(ctx, &hit.handle.alias).await? else {
-                tracing::warn!(
-                    "Skipped dataset '{}' with unresolved account",
-                    hit.handle.alias
-                );
+        for hit in search_results.hits {
+            let hdl = hit.handle;
+
+            let Some(owner) = Account::from_dataset_alias(ctx, &hdl.alias).await? else {
+                tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
                 continue;
             };
 
+            // Note: we assume search will encapsulate ReBAC filtering in nearest future
             nodes.push(SearchResultEx {
-                item: SearchResult::Dataset(Dataset::new_access_checked(account, hit.handle)),
+                item: SearchResult::Dataset(Dataset::new_access_checked(owner, hdl)),
                 score: hit.score,
             });
         }
 
         Ok(SearchResultExConnection::new(
             nodes,
-            page,
+            0, /* page */
             per_page,
-            total_count,
+            usize::try_from(total_count).unwrap(),
         ))
     }
 
@@ -352,7 +355,7 @@ page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
 #[derive(SimpleObject, Debug)]
 pub struct SearchResultEx {
     pub item: SearchResult,
-    pub score: f32,
+    pub score: f64,
 }
 
 page_based_connection!(SearchResultEx, SearchResultExConnection, SearchResultExEdge);

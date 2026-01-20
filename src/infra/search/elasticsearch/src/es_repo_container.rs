@@ -117,6 +117,10 @@ impl SearchRepository for ElasticsearchContainerRepository {
         self.inner().await?.search(req).await
     }
 
+    async fn vector_search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.vector_search(req).await
+    }
+
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
