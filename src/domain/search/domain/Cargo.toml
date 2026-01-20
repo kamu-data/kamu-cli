@@ -28,7 +28,6 @@ default = []
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
