@@ -43,7 +43,7 @@ impl SearchService for DummySearchService {
     async fn vector_search(
         &self,
         _: SearchContext<'_>,
-        _req: SearchRequest,
+        _req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         Ok(SearchResponse {
             took_ms: 0,

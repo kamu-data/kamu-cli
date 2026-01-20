@@ -89,7 +89,7 @@ impl SearchService for SearchImplLazyInit {
     async fn vector_search(
         &self,
         ctx: SearchContext<'_>,
-        req: SearchRequest,
+        req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         let inner = self.inner().await?;
         inner.vector_search(ctx, req).await

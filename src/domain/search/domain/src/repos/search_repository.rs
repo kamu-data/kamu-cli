@@ -31,7 +31,10 @@ pub trait SearchRepository: Send + Sync {
 
     async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError>;
 
-    async fn vector_search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError>;
+    async fn vector_search(
+        &self,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
 
     async fn find_document_by_id(
         &self,

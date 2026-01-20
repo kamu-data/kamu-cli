@@ -39,7 +39,7 @@ impl SearchService for SearchServiceImpl {
     async fn vector_search(
         &self,
         _: SearchContext<'_>,
-        req: SearchRequest,
+        req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         self.search_repo.vector_search(req).await
     }

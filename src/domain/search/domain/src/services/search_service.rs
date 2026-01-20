@@ -9,13 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{
-    SearchEntityId,
-    SearchEntitySchemaName,
-    SearchFieldPath,
-    SearchRequest,
-    SearchResponse,
-};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +26,7 @@ pub trait SearchService: Send + Sync {
     async fn vector_search(
         &self,
         ctx: SearchContext<'_>,
-        req: SearchRequest,
+        req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError>;
 
     async fn find_document_by_id(

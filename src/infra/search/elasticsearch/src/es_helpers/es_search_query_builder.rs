@@ -17,8 +17,8 @@ impl ElasticsearchQueryBuilder {
     pub fn build_search_query(request: &SearchRequest) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),
-            "sort": Self::sort_argument(request),
-            "_source": Self::source_argument(request),
+            "sort": Self::sort_argument(&request.sort),
+            "_source": Self::source_argument(&request.source),
             "from": request.page.offset,
             "size": request.page.limit,
         });
@@ -34,6 +34,18 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
+    pub fn build_vector_search_query(
+        request: &VectorSearchRequest,
+        embedding_field: SearchFieldPath,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "track_total_hits": false,
+            "knn": Self::knn_argument(embedding_field, &request.query_embedding, request.filter.as_ref()),
+            "_source": Self::source_argument(&request.source),
+            "size": request.limit,
+        })
+    }
+
     fn query_argument(request: &SearchRequest) -> serde_json::Value {
         let textual_query = Self::textual_query(request);
         if let Some(filter_expr) = &request.filter {
@@ -47,6 +59,26 @@ impl ElasticsearchQueryBuilder {
         } else {
             textual_query
         }
+    }
+
+    fn knn_argument(
+        embedding_field: &str,
+        prompt_embedding: &[f32],
+        filter: Option<&SearchFilterExpr>,
+    ) -> serde_json::Value {
+        let mut query_json = serde_json::json!({
+            "field": embedding_field,
+            "query_vector": prompt_embedding,
+            "k": 200,
+            "num_candidates": 1000
+        });
+
+        if let Some(filter_expr) = filter {
+            let filter_json = Self::filter(filter_expr);
+            query_json["filter"] = filter_json;
+        }
+
+        query_json
     }
 
     fn textual_query(request: &SearchRequest) -> serde_json::Value {
@@ -172,8 +204,8 @@ impl ElasticsearchQueryBuilder {
         }
     }
 
-    fn source_argument(request: &kamu_search::SearchRequest) -> serde_json::Value {
-        match &request.source {
+    fn source_argument(source_spec: &kamu_search::SearchRequestSourceSpec) -> serde_json::Value {
+        match source_spec {
             SearchRequestSourceSpec::None => serde_json::json!(false),
 
             SearchRequestSourceSpec::All => serde_json::json!(true),
@@ -194,13 +226,12 @@ impl ElasticsearchQueryBuilder {
         }
     }
 
-    fn sort_argument(req: &SearchRequest) -> serde_json::Value {
+    fn sort_argument(sort_specs: &[SearchSortSpec]) -> serde_json::Value {
         fn relevance_sort() -> serde_json::Value {
             serde_json::json!({"_score": {"order": "desc"}})
         }
 
-        let parts = req
-            .sort
+        let parts = sort_specs
             .iter()
             .map(|sort_part| match sort_part {
                 kamu_search::SearchSortSpec::Relevance => relevance_sort(),

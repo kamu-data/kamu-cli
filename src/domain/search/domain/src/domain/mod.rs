@@ -12,9 +12,11 @@ mod search_request;
 mod search_response;
 mod search_schema;
 mod search_sorting;
+mod vector_search_request;
 
 pub use search_filter::*;
 pub use search_request::*;
 pub use search_response::*;
 pub use search_schema::*;
 pub use search_sorting::*;
+pub use vector_search_request::*;

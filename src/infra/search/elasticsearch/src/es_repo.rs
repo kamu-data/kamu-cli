@@ -168,6 +168,93 @@ impl ElasticsearchRepository {
             })
             .collect()
     }
+
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
+    async fn search_common(
+        &self,
+        entity_schemas: &[Arc<SearchEntitySchema>],
+        es_query_body: serde_json::Value,
+    ) -> Result<SearchResponse, InternalError> {
+        let client = self.es_client().await?;
+
+        // Resolve read aliases
+        let read_index_aliases = self.resolve_read_index_aliases(client, entity_schemas)?;
+        let read_index_alias_refs = read_index_aliases
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+
+        // Resolve write index names to schemas
+        let schema_names_by_write_index = self.map_write_index_names(client, entity_schemas)?;
+
+        // Execute request
+        let es_response: es_client::SearchResponse = client
+            .search(es_query_body, &read_index_alias_refs)
+            .await
+            .int_err()?;
+
+        // Translate parsed Elasticsearch response to domain model
+        Ok(SearchResponse {
+            took_ms: es_response.took,
+            timeout: es_response.timed_out,
+            total_hits: es_response.hits.total.value,
+            hits: es_response
+                .hits
+                .hits
+                .into_iter()
+                .map(|hit| SearchHit {
+                    id: hit.id.unwrap_or_default(),
+                    schema_name: schema_names_by_write_index
+                        .get(&hit.index)
+                        .copied()
+                        .unwrap_or("<unknown>"),
+                    score: hit.score,
+                    source: hit.source.unwrap_or_default(),
+                    highlights: if let Some(highlight_json) = hit.highlight {
+                        ElasticsearchHighlightExtractor::extract_highlights(&highlight_json)
+                    } else {
+                        None
+                    },
+                    explanation: hit.explanation,
+                })
+                .collect(),
+        })
+    }
+
+    fn resolve_embedding_field(
+        &self,
+        entity_schemas: &[Arc<SearchEntitySchema>],
+    ) -> Result<SearchFieldPath, InternalError> {
+        assert!(!entity_schemas.is_empty());
+
+        let mut embedding_field_path: Option<SearchFieldPath> = None;
+
+        for schema in entity_schemas {
+            let Some(embedding_field) = schema.find_embedding_chunks_field() else {
+                return Err(InternalError::new(format!(
+                    "Entity schema '{}' does not have an embedding chunks field",
+                    schema.schema_name
+                )));
+            };
+
+            match embedding_field_path {
+                None => {
+                    embedding_field_path = Some(embedding_field.path);
+                }
+                Some(expected_path) => {
+                    if embedding_field.path != expected_path {
+                        return Err(InternalError::new(format!(
+                            "Entity schema '{}' has embedding field '{}', but expected '{}' to \
+                             match other schemas",
+                            schema.schema_name, embedding_field.path, expected_path
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(embedding_field_path.unwrap())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,61 +373,33 @@ impl SearchRepository for ElasticsearchRepository {
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
     async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
-        let client = self.es_client().await?;
-
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Resolve read aliases
-        let read_index_aliases = self.resolve_read_index_aliases(client, &entity_schemas)?;
-        let read_index_alias_refs = read_index_aliases
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>();
+        // Build Elasticsearch full-text search request body
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(&req);
 
-        // Resolve write index names to schemas
-        let schema_names_by_write_index = self.map_write_index_names(client, &entity_schemas)?;
-
-        // Build Elasticsearch request body
-        let req_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(&req);
-
-        // Execute request
-        let es_response: es_client::SearchResponse = client
-            .search(req_body, &read_index_alias_refs)
-            .await
-            .int_err()?;
-
-        // Translate parsed Elasticsearch response to domain model
-        Ok(SearchResponse {
-            took_ms: es_response.took,
-            timeout: es_response.timed_out,
-            total_hits: es_response.hits.total.value,
-            hits: es_response
-                .hits
-                .hits
-                .into_iter()
-                .map(|hit| SearchHit {
-                    id: hit.id.unwrap_or_default(),
-                    schema_name: schema_names_by_write_index
-                        .get(&hit.index)
-                        .copied()
-                        .unwrap_or("<unknown>"),
-                    score: hit.score,
-                    source: hit.source.unwrap_or_default(),
-                    highlights: if let Some(highlight_json) = hit.highlight {
-                        ElasticsearchHighlightExtractor::extract_highlights(&highlight_json)
-                    } else {
-                        None
-                    },
-                    explanation: hit.explanation,
-                })
-                .collect(),
-        })
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_vector_search, skip_all)]
-    async fn vector_search(&self, _: SearchRequest) -> Result<SearchResponse, InternalError> {
-        unimplemented!()
+    async fn vector_search(
+        &self,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Determine embedding field
+        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+        // Build Elasticsearch vector request body
+        let es_query_body =
+            es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(&req, embedding_field);
+
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]

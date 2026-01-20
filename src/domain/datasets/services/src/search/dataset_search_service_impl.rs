@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use internal_error::ResultIntoInternal;
 use kamu_datasets::*;
 use kamu_search::*;
 
@@ -21,6 +22,7 @@ use kamu_search::*;
 pub struct DatasetSearchServiceImpl {
     search_service: Arc<dyn SearchService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +35,25 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         prompt: String,
         pagination: SearchPaginationSpec,
     ) -> Result<DatasetSearchResponse, DatasetSearchError> {
+        // Protect against empty prompts
+        let prompt = prompt.trim();
+        if prompt.is_empty() {
+            return Ok(DatasetSearchResponse {
+                total_hits: 0,
+                hits: vec![],
+            });
+        }
+
+        // Build embeddings for the prompt
+        let prompt_vec = self
+            .embeddings_encoder
+            .encode(vec![prompt.to_string()])
+            .await
+            .int_err()?
+            .into_iter()
+            .next()
+            .unwrap();
+
         // Run vector search request
         let search_results = {
             use kamu_datasets::dataset_search_schema as dataset_schema;
@@ -41,21 +62,12 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
             self.search_service
                 .vector_search(
                     ctx,
-                    SearchRequest {
-                        query: if prompt.is_empty() {
-                            None
-                        } else {
-                            Some(prompt)
-                        },
+                    VectorSearchRequest {
+                        query_embedding: prompt_vec,
                         source: SearchRequestSourceSpec::None,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,
-                        sort: vec![],
-                        page: pagination,
-                        options: SearchOptions {
-                            enable_explain: false,
-                            enable_highlighting: false,
-                        },
+                        limit: pagination.limit,
                     },
                 )
                 .await

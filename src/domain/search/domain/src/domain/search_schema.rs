@@ -31,6 +31,16 @@ pub struct SearchEntitySchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl SearchEntitySchema {
+    pub fn find_embedding_chunks_field(&self) -> Option<&SearchSchemaField> {
+        self.fields
+            .iter()
+            .find(|f| matches!(f.role, SearchSchemaFieldRole::EmbeddingChunks))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct SearchSchemaField {
     pub path: SearchFieldPath,
