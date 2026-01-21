@@ -10,3 +10,4 @@
 mod test_dataset_updated_webhook_sensor;
 mod test_flow_controller_webhook_deliver;
 mod test_flow_webhooks_event_bridge;
+mod test_webhook_recovery_job;
