@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};
+use kamu_datasets::DatasetEntryService;
 use kamu_flow_system as fs;
 use kamu_webhooks::{
     WebhookEventTypeCatalog,
@@ -21,7 +21,6 @@ use kamu_webhooks::{
     WebhookSubscriptionStatus,
     WebhooksConfig,
 };
-use messaging_outbox::JOB_MESSAGING_OUTBOX_STARTUP;
 use time_source::SystemTimeSource;
 
 use crate::webhook_deliver_binding;
@@ -36,10 +35,7 @@ pub const WEBHOOK_RECOVERY_JOB: &str = "webhook_recovery_job";
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {
     job_name: WEBHOOK_RECOVERY_JOB,
-    depends_on: &[
-        JOB_MESSAGING_OUTBOX_STARTUP,
-        JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
-    ],
+    depends_on: &[],
     requires_transaction: true,
 })]
 pub struct WebhookTriggerStartupRecoveryJob {
