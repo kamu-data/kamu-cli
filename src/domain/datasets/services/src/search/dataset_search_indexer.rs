@@ -64,9 +64,12 @@ impl DatasetIndexingHelper<'_> {
                 let attachments = extract_attachment_contents(attachments_visitor);
 
                 // Prepare semantic embedding vectors
-                let embeddings_document = self
-                    .prepare_semantic_embeddings_document(&description, &keywords, &attachments)
-                    .await?;
+                let embeddings_document = prepare_semantic_embeddings_document(
+                    self.embeddings_chunker,
+                    self.embeddings_encoder,
+                    &[&description, &keywords, &attachments],
+                )
+                .await?;
 
                 // Seed event: created_at
                 let seed_event_time = seed_visitor.into_block().unwrap().system_time;
@@ -137,6 +140,7 @@ impl DatasetIndexingHelper<'_> {
         owner_id: &odf::AccountID,
         new_head: &odf::Multihash,
         maybe_prev_head: Option<&odf::Multihash>,
+        existing_document: serde_json::Value,
     ) -> Result<serde_json::Value, InternalError> {
         // Extract key blocks that contribute to search
         let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
@@ -200,64 +204,94 @@ impl DatasetIndexingHelper<'_> {
         )]);
 
         insert_search_incremental_update_field(&mut update, fields::SCHEMA_FIELDS, schema_fields);
-        insert_search_incremental_update_field(&mut update, fields::DESCRIPTION, description);
-        insert_search_incremental_update_field(&mut update, fields::KEYWORDS, keywords);
-        insert_search_incremental_update_field(&mut update, fields::ATTACHMENTS, attachments);
 
-        // TODO: incrementally update embeddings
+        // Other fields contribute to semantic embeddings,
+        // so we need to handle them together
+        let new_description = !description.is_absent();
+        let new_keywords = !keywords.is_absent();
+        let new_attachments = !attachments.is_absent();
+
+        if !new_description && !new_keywords && !new_attachments {
+            // No semantic affecting changes, return early
+            return Ok(serde_json::Value::Object(update));
+        }
+
+        // Embeddings need all fields, even if parts have not been changed
+
+        let relevant_description = description.or_existing(|| {
+            existing_document
+                .get(fields::DESCRIPTION)
+                .and_then(|v| v.as_str())
+                .map(ToString::to_string)
+        });
+
+        let relevant_keywords = keywords.or_existing(|| {
+            existing_document
+                .get(fields::KEYWORDS)
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| item.as_str().map(ToString::to_string))
+                        .collect::<Vec<String>>()
+                })
+        });
+
+        let relevant_attachments = attachments.or_existing(|| {
+            existing_document
+                .get(fields::ATTACHMENTS)
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| item.as_str().map(ToString::to_string))
+                        .collect::<Vec<String>>()
+                })
+        });
+
+        // Recompute embeddings document
+        let embeddings_document = prepare_semantic_embeddings_document(
+            self.embeddings_chunker,
+            self.embeddings_encoder,
+            &[
+                &relevant_description,
+                &relevant_keywords,
+                &relevant_attachments,
+            ],
+        )
+        .await?;
+
+        // Insert only modified fields
+        if new_description {
+            insert_search_incremental_update_field(
+                &mut update,
+                fields::DESCRIPTION,
+                relevant_description,
+            );
+        }
+
+        if new_keywords {
+            insert_search_incremental_update_field(
+                &mut update,
+                fields::KEYWORDS,
+                relevant_keywords,
+            );
+        }
+
+        if new_attachments {
+            insert_search_incremental_update_field(
+                &mut update,
+                fields::ATTACHMENTS,
+                relevant_attachments,
+            );
+        }
+
+        // Finally, insert updated embeddings
+        insert_search_incremental_update_field(
+            &mut update,
+            kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS,
+            embeddings_document,
+        );
 
         Ok(serde_json::Value::Object(update))
-    }
-
-    async fn prepare_semantic_embeddings_document(
-        &self,
-        description: &SearchFieldUpdate<String>,
-        keywords: &SearchFieldUpdate<Vec<String>>,
-        attachments: &SearchFieldUpdate<Vec<String>>,
-    ) -> Result<SearchFieldUpdate<Vec<serde_json::Value>>, InternalError> {
-        // Aggregate all text parts
-        let mut texts = Vec::new();
-        if let SearchFieldUpdate::Present(description) = description {
-            texts.push(description.clone());
-        }
-        if let SearchFieldUpdate::Present(keywords) = keywords {
-            for keyword in keywords {
-                texts.push(keyword.clone());
-            }
-        }
-        if let SearchFieldUpdate::Present(attachments) = attachments {
-            for attachment in attachments {
-                texts.push(attachment.clone());
-            }
-        }
-        if texts.is_empty() {
-            return Ok(SearchFieldUpdate::Absent);
-        }
-
-        let chunks = self.embeddings_chunker.chunk(texts).await?;
-        if chunks.is_empty() {
-            return Ok(SearchFieldUpdate::Empty);
-        }
-
-        let vectors = self.embeddings_encoder.encode(chunks).await?;
-
-        #[derive(serde::Serialize)]
-        struct ChunkDoc<'a> {
-            chunk_id: String,
-            embedding: &'a [f32], // flat per chunk
-        }
-
-        let chunk_docs = vectors
-            .iter()
-            .enumerate()
-            .map(|(i, vector)| ChunkDoc {
-                chunk_id: format!("chunk_{i}"),
-                embedding: vector,
-            })
-            .map(|doc| serde_json::to_value(doc).unwrap())
-            .collect::<Vec<_>>();
-
-        Ok(SearchFieldUpdate::Present(chunk_docs))
     }
 }
 
@@ -299,7 +333,7 @@ fn extract_schema_field_names(
                 .map(|f| f.name.clone())
                 .collect();
             if schema_field_names.is_empty() {
-                SearchFieldUpdate::Empty
+                SearchFieldUpdate::Cleared
             } else {
                 SearchFieldUpdate::Present(schema_field_names)
             }
@@ -316,13 +350,13 @@ fn extract_description_and_keywords(
         .into_event()
         .map(|e| {
             let description_update = match e.description {
-                None => SearchFieldUpdate::Empty,
-                Some(s) if s.is_empty() => SearchFieldUpdate::Empty,
+                None => SearchFieldUpdate::Cleared,
+                Some(s) if s.is_empty() => SearchFieldUpdate::Cleared,
                 Some(s) => SearchFieldUpdate::Present(s),
             };
             let keywords_update = match e.keywords {
-                None => SearchFieldUpdate::Empty,
-                Some(v) if v.is_empty() => SearchFieldUpdate::Empty,
+                None => SearchFieldUpdate::Cleared,
+                Some(v) if v.is_empty() => SearchFieldUpdate::Cleared,
                 Some(v) => SearchFieldUpdate::Present(v),
             };
             (description_update, keywords_update)
@@ -339,9 +373,15 @@ fn extract_attachment_contents(
         .into_event()
         .map(|e| match e.attachments {
             odf::metadata::Attachments::Embedded(a) => {
-                let items: Vec<String> = a.items.into_iter().map(|a| a.content).collect();
+                let items: Vec<String> = a
+                    .items
+                    .into_iter()
+                    .map(|item| item.content)
+                    .filter(|content| !content.trim().is_empty())
+                    .collect();
+
                 if items.is_empty() {
-                    SearchFieldUpdate::Empty
+                    SearchFieldUpdate::Cleared
                 } else {
                     SearchFieldUpdate::Present(items)
                 }

@@ -197,7 +197,7 @@ impl ElasticsearchRepository {
         Ok(SearchResponse {
             took_ms: es_response.took,
             timeout: es_response.timed_out,
-            total_hits: es_response.hits.total.value,
+            total_hits: es_response.hits.total.map(|total| total.value).unwrap_or(0),
             hits: es_response
                 .hits
                 .hits

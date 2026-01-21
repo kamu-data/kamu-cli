@@ -90,7 +90,7 @@ impl DatasetSearchUpdater {
             // Note, even if we had previous updates, the document may be missing,
             // if it's empty (does not contain any useful indexable fields).
             // In this case, we need to reindex from scratch.
-            if maybe_existing_document.is_some() {
+            if let Some(existing_document) = maybe_existing_document {
                 // Prepare partial update to dataset search document
                 let partial_update = indexing_helper
                     .partial_update_for_new_interval(
@@ -98,6 +98,7 @@ impl DatasetSearchUpdater {
                         &entry.owner_id,
                         &updated_message.new_block_hash,
                         updated_message.maybe_prev_block_hash.as_ref(),
+                        existing_document,
                     )
                     .await?;
 
