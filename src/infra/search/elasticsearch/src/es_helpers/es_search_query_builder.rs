@@ -67,7 +67,7 @@ impl ElasticsearchQueryBuilder {
         filter: Option<&SearchFilterExpr>,
     ) -> serde_json::Value {
         let mut query_json = serde_json::json!({
-            "field": embedding_field,
+            "field": format!("{}.embedding", embedding_field),
             "query_vector": prompt_embedding,
             "k": 200,
             "num_candidates": 1000
