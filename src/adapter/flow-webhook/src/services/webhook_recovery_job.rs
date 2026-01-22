@@ -12,7 +12,6 @@ use std::sync::Arc;
 use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::DatasetEntryService;
 use kamu_flow_system as fs;
 use kamu_webhooks::{
     WebhookEventTypeCatalog,
@@ -27,7 +26,7 @@ use crate::webhook_deliver_binding;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const WEBHOOK_RECOVERY_JOB: &str = "webhook_recovery_job";
+pub const WEBHOOK_RECOVERY_JOB: &str = "dev.kamu.flow_webhook.webhook_recovery_job";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +38,6 @@ pub const WEBHOOK_RECOVERY_JOB: &str = "webhook_recovery_job";
     requires_transaction: true,
 })]
 pub struct WebhookTriggerStartupRecoveryJob {
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
     webhook_subscription_query_service: Arc<dyn WebhookSubscriptionQueryService>,
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -56,17 +54,13 @@ impl InitOnStartup for WebhookTriggerStartupRecoveryJob {
         name = "WebhookTriggerStartupRecoveryJob::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        use futures::TryStreamExt;
-        let mut entries_stream = self.dataset_entry_service.all_entries();
-        while let Some(dataset_entry) = entries_stream.try_next().await? {
-            let subscriptions = self
-                .webhook_subscription_query_service
-                .list_dataset_webhook_subscriptions(&dataset_entry.id)
-                .await?;
+        let subscriptions = self
+            .webhook_subscription_query_service
+            .list_all_webhook_subscriptions()
+            .await?;
 
-            for subscription in subscriptions {
-                self.sync_subscription(&subscription).await?;
-            }
+        for subscription in subscriptions {
+            self.sync_subscription(&subscription).await?;
         }
 
         Ok(())
