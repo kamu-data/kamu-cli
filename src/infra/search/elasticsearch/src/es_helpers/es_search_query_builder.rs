@@ -9,13 +9,33 @@
 
 use kamu_search::*;
 
+use crate::es_helpers::{MultiMatchPolicy, PhraseSearchPolicy};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ElasticsearchQueryBuilder {}
 
 impl ElasticsearchQueryBuilder {
-    pub fn build_search_query(
-        textual_prompt: Option<&str>,
+    pub fn build_listing_query(
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        sort: &[SearchSortSpec],
+        page: &SearchPaginationSpec,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "query": Self::maybe_filter_argument(filter, Self::all_query()),
+            "sort": Self::sort_argument(sort),
+            "_source": Self::source_argument(source),
+            "from": page.offset,
+            "size": page.limit,
+        })
+    }
+
+    pub fn build_best_fields_search_query(
+        textual_prompt: &str,
+        operator: FullTextSearchTermOperator,
+        tie_breaker: f32,
+        text_fields_policy: &MultiMatchPolicy,
         filter: Option<&SearchFilterExpr>,
         source: &SearchRequestSourceSpec,
         sort: &[SearchSortSpec],
@@ -23,20 +43,95 @@ impl ElasticsearchQueryBuilder {
         options: &TextSearchOptions,
     ) -> serde_json::Value {
         let mut query_json = serde_json::json!({
-            "query": Self::query_argument(textual_prompt, filter),
+            "query": Self::maybe_filter_argument(filter, serde_json::json!({
+                "multi_match": {
+                    "query": textual_prompt,
+                    "type": "best_fields",
+                    "operator": operator.to_string(),
+                    "tie_breaker": tie_breaker,
+                    "fields": text_fields_policy
+                        .specs
+                        .iter()
+                        .map(|spec| format!("{}^{}", spec.field_name, spec.boost))
+                        .collect::<Vec<_>>(),
+                }
+            })),
             "sort": Self::sort_argument(sort),
             "_source": Self::source_argument(source),
             "from": page.offset,
             "size": page.limit,
         });
 
-        if let Some(highlight_json) = Self::highlight_argument(options) {
-            query_json["highlight"] = highlight_json;
-        }
+        Self::apply_text_search_options(&mut query_json, options);
 
-        if options.enable_explain {
-            query_json["explain"] = serde_json::json!(true);
-        }
+        query_json
+    }
+
+    pub fn build_most_fields_search_query(
+        textual_prompt: &str,
+        operator: FullTextSearchTermOperator,
+        text_fields_policy: &MultiMatchPolicy,
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        sort: &[SearchSortSpec],
+        page: &SearchPaginationSpec,
+        options: &TextSearchOptions,
+    ) -> serde_json::Value {
+        let mut query_json = serde_json::json!({
+            "query": Self::maybe_filter_argument(filter, serde_json::json!({
+                "multi_match": {
+                    "query": textual_prompt,
+                    "type": "most_fields",
+                    "operator": operator.to_string(),
+                    "fields": text_fields_policy
+                        .specs
+                        .iter()
+                        .map(|spec| format!("{}^{}", spec.field_name, spec.boost))
+                        .collect::<Vec<_>>(),
+                }
+            })),
+            "sort": Self::sort_argument(sort),
+            "_source": Self::source_argument(source),
+            "from": page.offset,
+            "size": page.limit,
+        });
+
+        Self::apply_text_search_options(&mut query_json, options);
+
+        query_json
+    }
+
+    pub fn build_phrase_search_query(
+        textual_prompt: &str,
+        phrase_fields_policy: &PhraseSearchPolicy,
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        page: &SearchPaginationSpec,
+        options: &TextSearchOptions,
+    ) -> serde_json::Value {
+        let mut query_json = serde_json::json!({
+            "query": Self::maybe_filter_argument(filter, serde_json::json!({
+                "bool": {
+                    "should": phrase_fields_policy.specs.iter().map(|spec| {
+                        serde_json::json!({
+                            "match_phrase": {
+                                spec.field_name.clone(): {
+                                    "query": textual_prompt,
+                                    "slop": spec.slop,
+                                    "boost": spec.boost,
+                                }
+                            }
+                        })
+                    }).collect::<Vec<_>>(),
+                    "minimum_should_match": 1,
+                }
+            })),
+            "_source": Self::source_argument(source),
+            "from": page.offset,
+            "size": page.limit,
+        });
+
+        Self::apply_text_search_options(&mut query_json, options);
 
         query_json
     }
@@ -105,21 +200,20 @@ impl ElasticsearchQueryBuilder {
         query_json
     }*/
 
-    fn query_argument(
-        prompt: Option<&str>,
+    fn maybe_filter_argument(
         filter: Option<&SearchFilterExpr>,
+        inner_query: serde_json::Value,
     ) -> serde_json::Value {
-        let textual_query = Self::textual_query(prompt);
         if let Some(filter_expr) = filter {
             let filter = Self::filter(filter_expr);
             serde_json::json!({
                 "bool": {
-                    "must": textual_query,
+                    "must": inner_query,
                     "filter": filter,
                 }
             })
         } else {
-            textual_query
+            inner_query
         }
     }
 
@@ -144,9 +238,10 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
-    fn textual_query(prompt: Option<&str>) -> serde_json::Value {
-        let query = prompt.map(str::trim);
-        if let Some(query) = query {
+    #[expect(dead_code)]
+    fn simple_textual_query(prompt: &str) -> serde_json::Value {
+        let query = prompt.trim();
+        if !query.is_empty() {
             serde_json::json!({
                 "simple_query_string": {
                     "query": query,
@@ -158,6 +253,12 @@ impl ElasticsearchQueryBuilder {
                 "match_all": {}
             })
         }
+    }
+
+    fn all_query() -> serde_json::Value {
+        serde_json::json!({
+            "match_all": {}
+        })
     }
 
     fn filter(filter_expr: &SearchFilterExpr) -> serde_json::Value {
@@ -335,6 +436,16 @@ impl ElasticsearchQueryBuilder {
             }))
         } else {
             None
+        }
+    }
+
+    fn apply_text_search_options(query_json: &mut serde_json::Value, options: &TextSearchOptions) {
+        if let Some(highlight_json) = Self::highlight_argument(options) {
+            query_json["highlight"] = highlight_json;
+        }
+
+        if options.enable_explain {
+            query_json["explain"] = serde_json::json!(true);
         }
     }
 }

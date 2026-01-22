@@ -17,7 +17,7 @@ use kamu_search::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "kamu-datasets";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -93,23 +93,15 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: false, // short prose
-        },
+        role: SearchSchemaFieldRole::Description,
     },
     SearchSchemaField {
         path: fields::KEYWORDS,
-        role: SearchSchemaFieldRole::Identifier {
-            hierarchical: true,
-            enable_edge_ngrams: true,
-            enable_inner_ngrams: false,
-        },
+        role: SearchSchemaFieldRole::Keyword,
     },
     SearchSchemaField {
         path: fields::ATTACHMENTS,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: true, // long prose
-        },
+        role: SearchSchemaFieldRole::Prose,
     },
     SearchSchemaField {
         path: kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS,
@@ -123,7 +115,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     fields: SCHEMA_FIELDS,
     title_field: fields::ALIAS,
     enable_banning: false, // Potentially might be useful for datasets
-    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

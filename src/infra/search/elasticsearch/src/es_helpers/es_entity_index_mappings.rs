@@ -159,9 +159,9 @@ impl ElasticsearchIndexMappings {
 
                 SearchSchemaFieldRole::Name => Self::map_name_field(),
 
-                SearchSchemaFieldRole::Prose { enable_positions } => {
-                    Self::map_prose_field(enable_positions)
-                }
+                SearchSchemaFieldRole::Description => Self::map_description_field(),
+
+                SearchSchemaFieldRole::Prose => Self::map_prose_field(),
 
                 SearchSchemaFieldRole::Keyword => Self::map_keyword_field(),
 
@@ -268,19 +268,21 @@ impl ElasticsearchIndexMappings {
         base_mapping
     }
 
-    fn map_prose_field(enable_positions: bool) -> serde_json::Value {
-        let mut mapping = serde_json::json!({
+    fn map_description_field() -> serde_json::Value {
+        serde_json::json!({
             "type": "text",
             "analyzer": "kamu_english_html",
             "search_analyzer": "kamu_english_html",
-        });
+        })
+    }
 
-        if enable_positions {
-            mapping["term_vector"] =
-                serde_json::Value::String("with_positions_offsets".to_string());
-        }
-
-        mapping
+    fn map_prose_field() -> serde_json::Value {
+        serde_json::json!({
+            "type": "text",
+            "analyzer": "kamu_english_html",
+            "search_analyzer": "kamu_english_html",
+            "term_vector": "with_positions_offsets"
+        })
     }
 
     fn map_name_field() -> serde_json::Value {

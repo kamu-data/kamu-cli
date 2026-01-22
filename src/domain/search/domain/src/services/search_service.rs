@@ -17,6 +17,12 @@ use crate::*;
 pub trait SearchService: Send + Sync {
     async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError>;
 
+    async fn listing_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
     async fn text_search(
         &self,
         ctx: SearchContext<'_>,

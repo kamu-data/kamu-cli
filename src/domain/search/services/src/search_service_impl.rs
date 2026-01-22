@@ -28,6 +28,14 @@ impl SearchService for SearchServiceImpl {
         self.search_repo.health().await
     }
 
+    async fn listing_search(
+        &self,
+        _: SearchContext<'_>,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_repo.listing_search(req).await
+    }
+
     async fn text_search(
         &self,
         _: SearchContext<'_>,

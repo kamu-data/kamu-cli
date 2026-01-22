@@ -27,6 +27,19 @@ impl SearchService for DummySearchService {
         }))
     }
 
+    async fn listing_search(
+        &self,
+        _: SearchContext<'_>,
+        _req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: Some(0),
+            hits: vec![],
+        })
+    }
+
     async fn text_search(
         &self,
         _: SearchContext<'_>,

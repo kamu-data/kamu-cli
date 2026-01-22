@@ -77,6 +77,15 @@ impl SearchService for SearchImplLazyInit {
         inner.health(ctx).await
     }
 
+    async fn listing_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        let inner = self.inner().await?;
+        inner.listing_search(ctx, req).await
+    }
+
     async fn text_search(
         &self,
         ctx: SearchContext<'_>,

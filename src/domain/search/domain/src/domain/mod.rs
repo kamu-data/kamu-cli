@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod hybrid_search_request;
+mod listing_search_request;
 mod search_filter;
 mod search_pagination_spec;
 mod search_request_source_spec;
@@ -18,6 +19,7 @@ mod text_search_request;
 mod vector_search_request;
 
 pub use hybrid_search_request::*;
+pub use listing_search_request::*;
 pub use search_filter::*;
 pub use search_pagination_spec::*;
 pub use search_request_source_spec::*;

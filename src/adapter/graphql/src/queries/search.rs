@@ -136,39 +136,49 @@ impl Search {
         let search_results = {
             use kamu_search::*;
 
-            search_service
-                .text_search(
-                    context,
-                    TextSearchRequest {
-                        prompt: if prompt.is_empty() {
-                            None
-                        } else {
-                            Some(prompt)
+            let entity_schemas = vec![account_schema::SCHEMA_NAME, dataset_schema::SCHEMA_NAME];
+
+            let source_spec = SearchRequestSourceSpec::Complex {
+                include_patterns: vec![],
+                exclude_patterns: vec![kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string()],
+            };
+
+            let page_spec = SearchPaginationSpec {
+                limit: per_page,
+                offset: page * per_page,
+            };
+
+            if prompt.trim().is_empty() {
+                search_service
+                    .listing_search(
+                        context,
+                        ListingSearchRequest {
+                            source: source_spec,
+                            entity_schemas,
+                            filter: None,
+                            sort: sort!(SEARCH_ALIAS_TITLE),
+                            page: page_spec,
                         },
-                        source: SearchRequestSourceSpec::Complex {
-                            include_patterns: vec![],
-                            exclude_patterns: vec![
-                                kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string(),
-                            ],
+                    )
+                    .await
+            } else {
+                search_service
+                    .text_search(
+                        context,
+                        TextSearchRequest {
+                            intent: TextSearchIntent::make_full_text(prompt),
+                            source: source_spec,
+                            entity_schemas,
+                            filter: None,
+                            page: page_spec,
+                            options: TextSearchOptions {
+                                enable_explain: false,
+                                enable_highlighting: true,
+                            },
                         },
-                        entity_schemas: vec![
-                            account_schema::SCHEMA_NAME,
-                            dataset_schema::SCHEMA_NAME,
-                        ],
-                        filter: None,
-                        // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
-                        sort: vec![],
-                        page: SearchPaginationSpec {
-                            limit: per_page,
-                            offset: page * per_page,
-                        },
-                        options: TextSearchOptions {
-                            enable_explain: false,
-                            enable_highlighting: true,
-                        },
-                    },
-                )
-                .await
+                    )
+                    .await
+            }
         }?;
 
         // Convert into GQL response

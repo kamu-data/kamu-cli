@@ -13,11 +13,11 @@ use crate::*;
 
 #[derive(Debug, Default)]
 pub struct HybridSearchRequest {
-    /// Natural-language prompt used for lexical and/or semantic retrieval
+    /// Natural-language prompt used for lexical retrieval
     pub prompt: String,
 
-    /// Whether to use embeddings
-    pub semantic_mode: SemanticSearchMode,
+    /// Provided embeddings for the prompt
+    pub prompt_embedding: Vec<f32>,
 
     /// Allowed entity types (empty means all)
     pub entity_schemas: Vec<SearchEntitySchemaName>,
@@ -33,18 +33,6 @@ pub struct HybridSearchRequest {
 
     /// Hybrid tuning options
     pub options: HybridSearchOptions,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Default)]
-pub enum SemanticSearchMode {
-    /// Cheapest: lexical-only (BM25)
-    #[default]
-    Disabled,
-
-    /// Provided embedding
-    ProvidedEmbedding { prompt_embedding: Vec<f32> },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

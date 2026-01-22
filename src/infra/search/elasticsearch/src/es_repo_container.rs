@@ -113,6 +113,13 @@ impl SearchRepository for ElasticsearchContainerRepository {
         self.inner().await?.health().await
     }
 
+    async fn listing_search(
+        &self,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.listing_search(req).await
+    }
+
     async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
         self.inner().await?.text_search(req).await
     }

@@ -301,8 +301,7 @@ impl AccountIndexingHarness {
         let search_repo = self.es_base_harness.es_ctx().search_repo();
 
         let seach_response = search_repo
-            .text_search(TextSearchRequest {
-                prompt: None,
+            .listing_search(ListingSearchRequest {
                 entity_schemas: vec![account_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::All,
                 filter: None,
@@ -311,7 +310,6 @@ impl AccountIndexingHarness {
                     limit: 100,
                     offset: 0,
                 },
-                options: TextSearchOptions::default(),
             })
             .await
             .unwrap();

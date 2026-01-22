@@ -1068,8 +1068,7 @@ impl DatasetIndexingHarness {
 
         let seach_response = self
             .search_repo()
-            .text_search(TextSearchRequest {
-                prompt: None,
+            .listing_search(ListingSearchRequest {
                 entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::All,
                 filter: None,
@@ -1078,7 +1077,6 @@ impl DatasetIndexingHarness {
                     limit: 100,
                     offset: 0,
                 },
-                options: TextSearchOptions::default(),
             })
             .await
             .unwrap();

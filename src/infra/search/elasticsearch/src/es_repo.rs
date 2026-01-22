@@ -18,6 +18,10 @@ use crate::{ElasticsearchClientConfig, ElasticsearchRepositoryConfig, es_client,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const MULTI_MATCH_BEST_FIELDS_TIE_BREAKER: f32 = 0.2;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ElasticsearchRepository {
     client_config: Arc<ElasticsearchClientConfig>,
     repo_config: Arc<ElasticsearchRepositoryConfig>,
@@ -370,20 +374,129 @@ impl SearchRepository for ElasticsearchRepository {
         client.documents_in_index(&index_name).await.int_err()
     }
 
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_listing_search, skip_all)]
+    async fn listing_search(
+        &self,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Build Elasticsearch full-text search request body
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_listing_query(
+            req.filter.as_ref(),
+            &req.source,
+            &req.sort,
+            &req.page,
+        );
+
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
+    }
+
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_text_search, skip_all)]
     async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Build Elasticsearch full-text search request body
-        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
-            req.prompt.as_deref(),
-            req.filter.as_ref(),
-            &req.source,
-            &req.sort,
-            &req.page,
-            &req.options,
-        );
+        // Build Elasticsearch full-text search request body, depending on intent
+        let es_query_body = match req.intent {
+            TextSearchIntent::FullText {
+                prompt,
+                term_operator,
+                field_relation,
+            } => {
+                let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(
+                                schema.as_ref(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                match field_relation {
+                    FullTextSearchFieldRelation::BestFields => {
+                        es_helpers::ElasticsearchQueryBuilder::build_best_fields_search_query(
+                            &prompt,
+                            term_operator,
+                            MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
+                            &multi_match_policy,
+                            req.filter.as_ref(),
+                            &req.source,
+                            &[], // sort by relevance
+                            &req.page,
+                            &req.options,
+                        )
+                    }
+                    FullTextSearchFieldRelation::MostFields => {
+                        es_helpers::ElasticsearchQueryBuilder::build_most_fields_search_query(
+                            &prompt,
+                            term_operator,
+                            &multi_match_policy,
+                            req.filter.as_ref(),
+                            &req.source,
+                            &[], // sort by relevance
+                            &req.page,
+                            &req.options,
+                        )
+                    }
+                }
+            }
+
+            TextSearchIntent::Prefix { prompt } => {
+                let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::MultiMatchPolicyBuilder::build_autocomplete_policy(
+                                schema.as_ref(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                es_helpers::ElasticsearchQueryBuilder::build_most_fields_search_query(
+                    &prompt,
+                    FullTextSearchTermOperator::Or,
+                    &multi_match_policy,
+                    req.filter.as_ref(),
+                    &req.source,
+                    &[SearchSortSpec::ByField {
+                        field: SEARCH_ALIAS_TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
+                    }],
+                    &req.page,
+                    &req.options,
+                )
+            }
+
+            TextSearchIntent::Phrase { prompt, user_slop } => {
+                let phrase_search_policy = es_helpers::PhraseSearchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::PhraseSearchPolicyBuilder::build_policy(
+                                schema.as_ref(),
+                                user_slop,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                es_helpers::ElasticsearchQueryBuilder::build_phrase_search_query(
+                    &prompt,
+                    &phrase_search_policy,
+                    req.filter.as_ref(),
+                    &req.source,
+                    &req.page,
+                    &req.options,
+                )
+            }
+        };
 
         // Run common search procedure
         self.search_common(&entity_schemas, es_query_body).await
@@ -422,82 +535,69 @@ impl SearchRepository for ElasticsearchRepository {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        match &req.semantic_mode {
-            SemanticSearchMode::Disabled => {
-                // Textual query only with relevance ranking
-                let text_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
-                    Some(&req.prompt),
-                    req.filter.as_ref(),
-                    &req.source,
-                    &[],
-                    &SearchPaginationSpec {
-                        limit: req.limit,
-                        offset: 0,
-                    },
-                    &TextSearchOptions {
-                        enable_explain: req.options.enable_explain,
-                        enable_highlighting: false,
-                    },
-                );
+        // Determine embedding field
+        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
 
-                self.search_common(&entity_schemas, text_es_query_body)
-                    .await
-            }
+        // Build multi-match policy for textual part
+        let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+            &entity_schemas
+                .iter()
+                .map(|schema| {
+                    es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(schema.as_ref())
+                })
+                .collect::<Vec<_>>(),
+        );
 
-            SemanticSearchMode::ProvidedEmbedding { prompt_embedding } => {
-                // Determine embedding field
-                let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+        // Textual query part
+        let text_es_query_body =
+            es_helpers::ElasticsearchQueryBuilder::build_best_fields_search_query(
+                &req.prompt,
+                FullTextSearchTermOperator::Or,
+                MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
+                &multi_match_policy,
+                req.filter.as_ref(),
+                &req.source,
+                &[],
+                &SearchPaginationSpec {
+                    limit: req.options.rrf.rank_window_size,
+                    offset: 0,
+                },
+                &TextSearchOptions {
+                    enable_explain: req.options.enable_explain,
+                    enable_highlighting: false,
+                },
+            );
 
-                // Textual query part
-                let text_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
-                    Some(&req.prompt),
-                    req.filter.as_ref(),
-                    &req.source,
-                    &[],
-                    &SearchPaginationSpec {
-                        limit: req.options.rrf.rank_window_size,
-                        offset: 0,
-                    },
-                    &TextSearchOptions {
-                        enable_explain: req.options.enable_explain,
-                        enable_highlighting: false,
-                    },
-                );
+        // Vector query part
+        let vector_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
+            embedding_field,
+            &req.prompt_embedding,
+            req.filter.as_ref(),
+            &req.source,
+            req.options.rrf.rank_window_size,
+            &VectorSearchOptions {
+                enable_explain: req.options.enable_explain,
+                knn: req.options.knn,
+            },
+        );
 
-                // Vector query part
-                let vector_es_query_body =
-                    es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
-                        embedding_field,
-                        prompt_embedding,
-                        req.filter.as_ref(),
-                        &req.source,
-                        req.options.rrf.rank_window_size,
-                        &VectorSearchOptions {
-                            enable_explain: req.options.enable_explain,
-                            knn: req.options.knn,
-                        },
-                    );
+        // Run both vector and text searches in parallel
+        let (text_search_response, vector_search_response) = tokio::join!(
+            self.search_common(&entity_schemas, text_es_query_body),
+            self.search_common(&entity_schemas, vector_es_query_body),
+        );
+        let text_search_response = text_search_response?;
+        let vector_search_response = vector_search_response?;
 
-                // Run both vector and text searches in parallel
-                let (text_search_response, vector_search_response) = tokio::join!(
-                    self.search_common(&entity_schemas, text_es_query_body),
-                    self.search_common(&entity_schemas, vector_es_query_body),
-                );
-                let text_search_response = text_search_response?;
-                let vector_search_response = vector_search_response?;
+        // Combine results using RRF
+        let combined_response = es_helpers::ElasticsearchRRFCombiner::combine_search_responses(
+            text_search_response,
+            vector_search_response,
+            req.options.rrf,
+            req.limit,
+        );
 
-                // Combine results using RRF
-                let combined_response =
-                    es_helpers::ElasticsearchRRFCombiner::combine_search_responses(
-                        text_search_response,
-                        vector_search_response,
-                        req.options.rrf,
-                        req.limit,
-                    );
-
-                Ok(combined_response)
-            }
-        }
+        Ok(combined_response)
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]

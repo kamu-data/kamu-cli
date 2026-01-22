@@ -160,7 +160,7 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         }
 
         // Build embeddings for the prompt
-        let prompt_vec = self
+        let prompt_embedding = self
             .embeddings_encoder
             .encode(vec![prompt.to_string()])
             .await
@@ -179,9 +179,7 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                     ctx,
                     HybridSearchRequest {
                         prompt: prompt.to_string(),
-                        semantic_mode: SemanticSearchMode::ProvidedEmbedding {
-                            prompt_embedding: prompt_vec,
-                        },
+                        prompt_embedding,
                         source: SearchRequestSourceSpec::None,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,

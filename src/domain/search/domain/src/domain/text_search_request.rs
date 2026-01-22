@@ -11,10 +11,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TextSearchRequest {
-    /// Free-text prompt
-    pub prompt: Option<String>,
+    /// Text search intent
+    pub intent: TextSearchIntent,
 
     /// Allowed entity types (empty means all)
     pub entity_schemas: Vec<SearchEntitySchemaName>,
@@ -25,14 +25,63 @@ pub struct TextSearchRequest {
     /// Structured filter
     pub filter: Option<SearchFilterExpr>,
 
-    /// Sorting specification, Relevance by default
-    pub sort: Vec<SearchSortSpec>,
-
     /// Pagination specification
     pub page: SearchPaginationSpec,
 
     /// Options
     pub options: TextSearchOptions,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum TextSearchIntent {
+    /// Full-text search over multiple fields
+    FullText {
+        prompt: String,
+        term_operator: FullTextSearchTermOperator,
+        field_relation: FullTextSearchFieldRelation,
+    },
+
+    /// Autocomplete / prefix
+    Prefix { prompt: String },
+
+    /// Exact phrase
+    Phrase { prompt: String, user_slop: u32 },
+}
+
+impl TextSearchIntent {
+    pub fn make_full_text(prompt: impl Into<String>) -> Self {
+        Self::FullText {
+            prompt: prompt.into(),
+            term_operator: FullTextSearchTermOperator::Or,
+            field_relation: FullTextSearchFieldRelation::BestFields,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, strum::Display)]
+pub enum FullTextSearchTermOperator {
+    /// Terms in the query must all be present
+    #[strum(to_string = "and")]
+    And,
+
+    /// Any of the terms in the query should be present
+    #[strum(to_string = "or")]
+    Or,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum FullTextSearchFieldRelation {
+    /// Best score among multiple fields is taken
+    BestFields,
+
+    /// Scores from multiple fields are summed
+    MostFields,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

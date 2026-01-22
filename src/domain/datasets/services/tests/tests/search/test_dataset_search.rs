@@ -755,11 +755,10 @@ impl DatasetSearchHarness {
         let seach_response = self
             .search_repo()
             .text_search(TextSearchRequest {
-                prompt: Some(query.to_string()),
+                intent: TextSearchIntent::make_full_text(query),
                 entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::None,
                 filter: None,
-                sort: sort!(dataset_search_schema::fields::DATASET_NAME),
                 page: SearchPaginationSpec {
                     limit: 100,
                     offset: 0,

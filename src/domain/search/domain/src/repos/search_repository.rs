@@ -29,6 +29,11 @@ pub trait SearchRepository: Send + Sync {
         schema_name: SearchEntitySchemaName,
     ) -> Result<u64, InternalError>;
 
+    async fn listing_search(
+        &self,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
     async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError>;
 
     async fn vector_search(
