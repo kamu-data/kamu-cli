@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following order:
 - Hotfix: improved handling of `skipDatasetsWithNoDescription` and `skipDatasetsWithNoData` options when 
    processing incremental updates to datasets search indices
 - Hotfix: handling 404 error from Elasticsearch when requesting non-existing document by ID
+- Requests with invalid/expired tokens now returns unauthorized response
 
 ## [0.256.1] - 2026-01-17
 ### Added
