@@ -28,12 +28,12 @@ impl SearchService for SearchServiceImpl {
         self.search_repo.health().await
     }
 
-    async fn search(
+    async fn text_search(
         &self,
         _: SearchContext<'_>,
-        req: SearchRequest,
+        req: TextSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
-        self.search_repo.search(req).await
+        self.search_repo.text_search(req).await
     }
 
     async fn vector_search(
@@ -42,6 +42,14 @@ impl SearchService for SearchServiceImpl {
         req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         self.search_repo.vector_search(req).await
+    }
+
+    async fn hybrid_search(
+        &self,
+        _: SearchContext<'_>,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_repo.hybrid_search(req).await
     }
 
     async fn find_document_by_id(

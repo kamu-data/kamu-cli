@@ -33,7 +33,7 @@ async fn test_no_results_in_empty_index(ctx: Arc<ElasticsearchTestContext>) {
         .await;
 
     let res = harness.search_dataset("test").await;
-    assert_eq!(res.0.total_hits, 0);
+    assert_eq!(res.0.total_hits, Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,19 +60,19 @@ async fn test_find_dataset_by_full_name_match(ctx: Arc<ElasticsearchTestContext>
     }
 
     let res = harness.search_dataset("alpha").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["alpha"].to_string()]);
 
     let res = harness.search_dataset("beta").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]);
 
     let res = harness.search_dataset("gamma").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["gamma"].to_string()]);
 
     let res = harness.search_dataset("delta").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,11 +99,11 @@ async fn test_find_datasets_by_full_name_different_case(ctx: Arc<ElasticsearchTe
     }
 
     let res = harness.search_dataset("ALPHA").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["alpha"].to_string()]);
 
     let res = harness.search_dataset("BeTa").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]);
 }
 
@@ -130,7 +130,7 @@ async fn test_find_dataset_by_name_prefix(ctx: Arc<ElasticsearchTestContext>) {
     }
 
     let res = harness.search_dataset("alph").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -140,11 +140,11 @@ async fn test_find_dataset_by_name_prefix(ctx: Arc<ElasticsearchTestContext>) {
     );
 
     let res = harness.search_dataset("bet").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]);
 
     let res = harness.search_dataset("Alp").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -177,7 +177,7 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     }
 
     let res = harness.search_dataset("lph").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -187,7 +187,7 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     );
 
     let res = harness.search_dataset("bet").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -197,11 +197,11 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     );
 
     let res = harness.search_dataset("TRO").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["zetatron"].to_string()]);
 
     let res = harness.search_dataset("eta").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -212,18 +212,18 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
 
     // Minimum 3 characters for substring search
     let res_2 = harness.search_dataset("et").await;
-    assert_eq!(res_2.total_hits(), 0);
+    assert_eq!(res_2.total_hits(), Some(0));
 
     // Maximum 6 characters for substring search
     let res_6 = harness.search_dataset("lphabe").await;
-    assert_eq!(res_6.total_hits(), 1);
+    assert_eq!(res_6.total_hits(), Some(1));
     assert_eq!(
         res_6.ids(),
         vec![dataset_ids_by_name["alphabet"].to_string()]
     );
 
     let res_7 = harness.search_dataset("lphabet").await;
-    assert_eq!(res_7.total_hits(), 0);
+    assert_eq!(res_7.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -249,14 +249,14 @@ async fn test_find_dataset_by_name_part_or_part_prefix(ctx: Arc<ElasticsearchTes
     }
 
     let res = harness.search_dataset("alpha").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(
         res.ids(),
         vec![dataset_ids_by_name["alpha-beta"].to_string()]
     );
 
     let res = harness.search_dataset("beta").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -266,7 +266,7 @@ async fn test_find_dataset_by_name_part_or_part_prefix(ctx: Arc<ElasticsearchTes
     );
 
     let res = harness.search_dataset("gamma").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -276,14 +276,14 @@ async fn test_find_dataset_by_name_part_or_part_prefix(ctx: Arc<ElasticsearchTes
     );
 
     let res = harness.search_dataset("delta").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(
         res.ids(),
         vec![dataset_ids_by_name["gamma-delta"].to_string()]
     );
 
     let res = harness.search_dataset("GAM").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -293,7 +293,7 @@ async fn test_find_dataset_by_name_part_or_part_prefix(ctx: Arc<ElasticsearchTes
     );
 
     let res = harness.search_dataset("ETA").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -341,52 +341,52 @@ async fn test_find_dataset_by_description_word(ctx: Arc<ElasticsearchTestContext
     }
 
     let res = harness.search_dataset("first").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["alpha"].to_string()]);
 
     let res = harness.search_dataset("better").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]);
 
     let res = harness.search_dataset("speeding").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["gamma"].to_string()]);
 
     // Ascii folding
     let res = harness.search_dataset("resume").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]); // résumé
 
     // Possessive stemming
     let res = harness.search_dataset("candidate").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["beta"].to_string()]); // candidate's
 
     // Stemming activation
     let res = harness.search_dataset("collections").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["alpha"].to_string()]); // we have "collection"
 
     let res = harness.search_dataset("kill").await;
-    assert_eq!(res.total_hits(), 1); // we have "kills"
+    assert_eq!(res.total_hits(), Some(1)); // we have "kills"
     assert_eq!(res.ids(), vec![dataset_ids_by_name["gamma"].to_string()]);
 
     // Should not match stop words
     let res = harness.search_dataset("the").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     let res = harness.search_dataset("than").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     // No superlatives/comparatives
     let res = harness.search_dataset("fastest").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     let res = harness.search_dataset("fast").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     let res = harness.search_dataset("faster").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["gamma"].to_string()]);
 }
 
@@ -446,53 +446,53 @@ async fn test_find_dataset_by_attachment_content(ctx: Arc<ElasticsearchTestConte
     }
 
     let res = harness.search_dataset("essential").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["delta"].to_string()]);
 
     let res = harness.search_dataset("guide").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["epsilon"].to_string()]);
 
     let res = harness.search_dataset("running").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["zeta"].to_string()]);
 
     // Ascii folding
     let res = harness.search_dataset("naive").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["epsilon"].to_string()]); // naïve
 
     // Possessive stemming
     let res = harness.search_dataset("user").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["epsilon"].to_string()]); // User's
 
     // Stemming activation
     let res = harness.search_dataset("documents").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["delta"].to_string()]); // we have "document"
 
     let res = harness.search_dataset("require").await;
-    assert_eq!(res.total_hits(), 1); // we have "requires"
+    assert_eq!(res.total_hits(), Some(1)); // we have "requires"
     assert_eq!(res.ids(), vec![dataset_ids_by_name["zeta"].to_string()]);
 
     // Should not match stop words
     let res = harness.search_dataset("this").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     let res = harness.search_dataset("however").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     // No superlatives/comparatives
     let res = harness.search_dataset("successfully").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["zeta"].to_string()]);
 
     let res = harness.search_dataset("successful").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 
     let res = harness.search_dataset("success").await;
-    assert_eq!(res.total_hits(), 0);
+    assert_eq!(res.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -560,20 +560,20 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
 
     // Exact match
     let res = harness.search_dataset("customer_id").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["theta"].to_string()]);
 
     let res = harness.search_dataset("user_name").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["iota"].to_string()]);
 
     let res = harness.search_dataset("product_sku").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["kappa"].to_string()]);
 
     // Prefix match
     let res = harness.search_dataset("customer").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -583,7 +583,7 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
     );
 
     let res = harness.search_dataset("cust").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -594,25 +594,25 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
 
     // ASCII folding
     let res = harness.search_dataset("cafe_location").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["iota"].to_string()]); // café
 
     // Case insensitive
     let res = harness.search_dataset("PRODUCT_SKU").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["kappa"].to_string()]);
 
     let res = harness.search_dataset("User_Name").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["iota"].to_string()]);
 
     // No partial match within field name
     let res = harness.search_dataset("order").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["theta"].to_string()]);
 
     let res = harness.search_dataset("uct").await;
-    assert_eq!(res.total_hits(), 0); // should not match "product_sku"
+    assert_eq!(res.total_hits(), Some(0)); // should not match "product_sku"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -661,20 +661,20 @@ async fn test_find_dataset_by_keyword(ctx: Arc<ElasticsearchTestContext>) {
 
     // Exact match
     let res = harness.search_dataset("finance").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["lambda"].to_string()]);
 
     let res = harness.search_dataset("machine-learning").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["mu"].to_string()]);
 
     let res = harness.search_dataset("sales").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["nu"].to_string()]);
 
     // Prefix match
     let res = harness.search_dataset("quart").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -684,26 +684,26 @@ async fn test_find_dataset_by_keyword(ctx: Arc<ElasticsearchTestContext>) {
     );
 
     let res = harness.search_dataset("machine").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["mu"].to_string()]);
 
     // ASCII folding
     let res = harness.search_dataset("naive-bayes").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["mu"].to_string()]); // naïve
 
     // Case insensitive
     let res = harness.search_dataset("FINANCE").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["lambda"].to_string()]);
 
     let res = harness.search_dataset("Classification").await;
-    assert_eq!(res.total_hits(), 1);
+    assert_eq!(res.total_hits(), Some(1));
     assert_eq!(res.ids(), vec![dataset_ids_by_name["mu"].to_string()]);
 
     // Prefix with case insensitivity
     let res = harness.search_dataset("QUART").await;
-    assert_eq!(res.total_hits(), 2);
+    assert_eq!(res.total_hits(), Some(2));
     assert_eq!(
         res.ids(),
         vec![
@@ -714,10 +714,10 @@ async fn test_find_dataset_by_keyword(ctx: Arc<ElasticsearchTestContext>) {
 
     // No partial match within keyword
     let res = harness.search_dataset("cast").await;
-    assert_eq!(res.total_hits(), 0); // should not match "forecast"
+    assert_eq!(res.total_hits(), Some(0)); // should not match "forecast"
 
     let res = harness.search_dataset("earn").await;
-    assert_eq!(res.total_hits(), 0); // should not match "machine-learning"
+    assert_eq!(res.total_hits(), Some(0)); // should not match "machine-learning"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -754,8 +754,8 @@ impl DatasetSearchHarness {
 
         let seach_response = self
             .search_repo()
-            .search(SearchRequest {
-                query: Some(query.to_string()),
+            .text_search(TextSearchRequest {
+                prompt: Some(query.to_string()),
                 entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::None,
                 filter: None,
@@ -764,7 +764,7 @@ impl DatasetSearchHarness {
                     limit: 100,
                     offset: 0,
                 },
-                options: SearchOptions::default(),
+                options: TextSearchOptions::default(),
             })
             .await
             .unwrap();

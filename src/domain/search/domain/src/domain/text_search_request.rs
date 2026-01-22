@@ -7,34 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::SearchEntitySchemaName;
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
-pub struct SearchResponse {
-    pub took_ms: u64,
-    pub timeout: bool,
-    pub total_hits: Option<u64>,
-    pub hits: Vec<SearchHit>,
-}
+pub struct TextSearchRequest {
+    /// Free-text prompt
+    pub prompt: Option<String>,
 
-#[derive(Debug)]
-pub struct SearchHit {
-    pub id: String,
-    pub schema_name: SearchEntitySchemaName,
-    pub score: Option<f64>,
-    pub highlights: Option<Vec<SearchHighlight>>,
-    pub source: serde_json::Value,
-    pub explanation: Option<serde_json::Value>,
+    /// Allowed entity types (empty means all)
+    pub entity_schemas: Vec<SearchEntitySchemaName>,
+
+    /// Requested source fields. If empty, only IDs will be returned.
+    pub source: SearchRequestSourceSpec,
+
+    /// Structured filter
+    pub filter: Option<SearchFilterExpr>,
+
+    /// Sorting specification, Relevance by default
+    pub sort: Vec<SearchSortSpec>,
+
+    /// Pagination specification
+    pub page: SearchPaginationSpec,
+
+    /// Options
+    pub options: TextSearchOptions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct SearchHighlight {
-    pub field: String,
-    pub best_fragment: String,
+#[derive(Debug, Default)]
+pub struct TextSearchOptions {
+    pub enable_explain: bool,
+    pub enable_highlighting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

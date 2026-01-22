@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{SearchContext, SearchPaginationSpec};
+use kamu_search::SearchContext;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,7 +17,14 @@ pub trait DatasetSearchService: Send + Sync {
         &self,
         ctx: SearchContext<'_>,
         prompt: String,
-        pagination: SearchPaginationSpec,
+        limit: usize,
+    ) -> Result<DatasetSearchResponse, DatasetSearchError>;
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        prompt: String,
+        limit: usize,
     ) -> Result<DatasetSearchResponse, DatasetSearchError>;
 }
 
@@ -26,7 +33,7 @@ pub trait DatasetSearchService: Send + Sync {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DatasetSearchResponse {
     pub hits: Vec<DatasetSearchHit>,
-    pub total_hits: u64,
+    pub total_hits: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

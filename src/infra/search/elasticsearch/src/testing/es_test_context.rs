@@ -202,7 +202,7 @@ where
 pub struct SearchTestResponse(pub kamu_search::SearchResponse);
 
 impl SearchTestResponse {
-    pub fn total_hits(&self) -> u64 {
+    pub fn total_hits(&self) -> Option<u64> {
         self.0.total_hits
     }
 

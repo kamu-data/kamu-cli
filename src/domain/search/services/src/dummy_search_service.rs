@@ -27,15 +27,15 @@ impl SearchService for DummySearchService {
         }))
     }
 
-    async fn search(
+    async fn text_search(
         &self,
         _: SearchContext<'_>,
-        _req: SearchRequest,
+        _req: TextSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         Ok(SearchResponse {
             took_ms: 0,
             timeout: false,
-            total_hits: 0,
+            total_hits: Some(0),
             hits: vec![],
         })
     }
@@ -48,7 +48,20 @@ impl SearchService for DummySearchService {
         Ok(SearchResponse {
             took_ms: 0,
             timeout: false,
-            total_hits: 0,
+            total_hits: None,
+            hits: vec![],
+        })
+    }
+
+    async fn hybrid_search(
+        &self,
+        _ctx: SearchContext<'_>,
+        _req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: None,
             hits: vec![],
         })
     }

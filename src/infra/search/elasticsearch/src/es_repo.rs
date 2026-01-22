@@ -169,7 +169,6 @@ impl ElasticsearchRepository {
             .collect()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
     async fn search_common(
         &self,
         entity_schemas: &[Arc<SearchEntitySchema>],
@@ -197,7 +196,7 @@ impl ElasticsearchRepository {
         Ok(SearchResponse {
             took_ms: es_response.took,
             timeout: es_response.timed_out,
-            total_hits: es_response.hits.total.map(|total| total.value).unwrap_or(0),
+            total_hits: es_response.hits.total.map(|total| total.value),
             hits: es_response
                 .hits
                 .hits
@@ -371,8 +370,8 @@ impl SearchRepository for ElasticsearchRepository {
         client.documents_in_index(&index_name).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
-    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_text_search, skip_all)]
+    async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
@@ -400,6 +399,26 @@ impl SearchRepository for ElasticsearchRepository {
 
         // Run common search procedure
         self.search_common(&entity_schemas, es_query_body).await
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_hybrid_search, skip_all)]
+    async fn hybrid_search(
+        &self,
+        _req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        /*// Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Determine embedding field
+        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+        // Build Elasticsearch hybrid request body
+        let es_query_body =
+            es_helpers::ElasticsearchQueryBuilder::build_hybrid_search_query(&req, embedding_field);
+
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await*/
+        unimplemented!()
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]

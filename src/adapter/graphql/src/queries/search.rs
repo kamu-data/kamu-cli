@@ -137,10 +137,10 @@ impl Search {
             use kamu_search::*;
 
             search_service
-                .search(
+                .text_search(
                     context,
-                    SearchRequest {
-                        query: if prompt.is_empty() {
+                    TextSearchRequest {
+                        prompt: if prompt.is_empty() {
                             None
                         } else {
                             Some(prompt)
@@ -157,7 +157,7 @@ impl Search {
                             limit: per_page,
                             offset: page * per_page,
                         },
-                        options: SearchOptions {
+                        options: TextSearchOptions {
                             enable_explain: false,
                             enable_highlighting: true,
                         },
@@ -170,7 +170,7 @@ impl Search {
         Ok(FullTextSearchResponse {
             took_ms: search_results.took_ms,
             timeout: search_results.timeout,
-            total_hits: search_results.total_hits,
+            total_hits: search_results.total_hits.unwrap_or_default(),
             hits: search_results
                 .hits
                 .into_iter()
@@ -195,40 +195,30 @@ impl Search {
 
     /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
-    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?limit))]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,
         prompt: String,
-        // page: Option<usize>,
-        per_page: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<SearchResultExConnection> {
         let datasets_search_service = from_catalog_n!(ctx, dyn kamu_datasets::DatasetSearchService);
 
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
-        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+        let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
         let context = kamu_search::SearchContext { catalog };
 
         // Run vector search request
         let search_results = {
-            use kamu_search::*;
-
             datasets_search_service
-                .vector_search(
-                    context,
-                    prompt,
-                    SearchPaginationSpec {
-                        limit: per_page,
-                        offset: 0, /* page * per_page, */
-                    },
-                )
+                .vector_search(context, prompt, limit)
                 .await
                 .int_err()
         }?;
 
-        let total_count = search_results.total_hits;
+        let total_count = search_results.total_hits.unwrap_or_default();
 
         // Build final result with GQL dataset objects
         let mut nodes: Vec<SearchResultEx> = Vec::new();
@@ -250,7 +240,60 @@ impl Search {
         Ok(SearchResultExConnection::new(
             nodes,
             0, /* page */
-            per_page,
+            limit,
+            usize::try_from(total_count).unwrap(),
+        ))
+    }
+
+    /// Searches for datasets and other objects managed by the
+    /// current node using a prompt, mixing full-text and natural language
+    /// methods
+    #[tracing::instrument(level = "info", name = Search_query_hybrid, skip_all, fields(?limit))]
+    async fn query_hybrid(
+        &self,
+        ctx: &Context<'_>,
+        prompt: String,
+        limit: Option<usize>,
+    ) -> Result<SearchResultExConnection> {
+        let datasets_search_service = from_catalog_n!(ctx, dyn kamu_datasets::DatasetSearchService);
+
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
+        let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+        let context = kamu_search::SearchContext { catalog };
+
+        // Run vector search request
+        let search_results = {
+            datasets_search_service
+                .hybrid_search(context, prompt, limit)
+                .await
+                .int_err()
+        }?;
+
+        let total_count = search_results.total_hits.unwrap_or_default();
+
+        // Build final result with GQL dataset objects
+        let mut nodes: Vec<SearchResultEx> = Vec::new();
+        for hit in search_results.hits {
+            let hdl = hit.handle;
+
+            let Some(owner) = Account::from_dataset_alias(ctx, &hdl.alias).await? else {
+                tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
+                continue;
+            };
+
+            // Note: we assume search will encapsulate ReBAC filtering in nearest future
+            nodes.push(SearchResultEx {
+                item: SearchResult::Dataset(Dataset::new_access_checked(owner, hdl)),
+                score: hit.score,
+            });
+        }
+
+        Ok(SearchResultExConnection::new(
+            nodes,
+            0, /* page */
+            limit,
             usize::try_from(total_count).unwrap(),
         ))
     }

@@ -77,13 +77,13 @@ impl SearchService for SearchImplLazyInit {
         inner.health(ctx).await
     }
 
-    async fn search(
+    async fn text_search(
         &self,
         ctx: SearchContext<'_>,
-        req: SearchRequest,
+        req: TextSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         let inner = self.inner().await?;
-        inner.search(ctx, req).await
+        inner.text_search(ctx, req).await
     }
 
     async fn vector_search(
@@ -93,6 +93,15 @@ impl SearchService for SearchImplLazyInit {
     ) -> Result<SearchResponse, InternalError> {
         let inner = self.inner().await?;
         inner.vector_search(ctx, req).await
+    }
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        let inner = self.inner().await?;
+        inner.hybrid_search(ctx, req).await
     }
 
     async fn find_document_by_id(

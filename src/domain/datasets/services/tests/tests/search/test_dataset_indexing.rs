@@ -39,7 +39,7 @@ async fn test_dataset_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) 
         .await;
 
     let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 0);
+    assert_eq!(dataset_index_response.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         .await;
 
     let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 2);
+    assert_eq!(dataset_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         dataset_index_response.ids(),
@@ -139,7 +139,7 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         .await;
 
     let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 2);
+    assert_eq!(dataset_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         dataset_index_response.ids(),
@@ -203,7 +203,7 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
 
     let datasets_index_response = harness.view_datasets_index().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -270,7 +270,7 @@ async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -354,7 +354,7 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 
     let datasets_index_response = harness.view_datasets_index().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -434,7 +434,7 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 
     let datasets_index_response = harness.view_datasets_index().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 2);
+    assert_eq!(datasets_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -494,7 +494,7 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
     harness.rename_account("alice", "alicia").await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -568,7 +568,7 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
     harness.delete_account("alice").await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -655,7 +655,7 @@ async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTes
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -721,7 +721,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -775,7 +775,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -826,7 +826,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -866,7 +866,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -929,7 +929,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         .await;
 
     let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -1068,8 +1068,8 @@ impl DatasetIndexingHarness {
 
         let seach_response = self
             .search_repo()
-            .search(SearchRequest {
-                query: None,
+            .text_search(TextSearchRequest {
+                prompt: None,
                 entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::All,
                 filter: None,
@@ -1078,7 +1078,7 @@ impl DatasetIndexingHarness {
                     limit: 100,
                     offset: 0,
                 },
-                options: SearchOptions::default(),
+                options: TextSearchOptions::default(),
             })
             .await
             .unwrap();

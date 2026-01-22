@@ -14,7 +14,7 @@ use kamu_search::*;
 pub struct ElasticsearchQueryBuilder {}
 
 impl ElasticsearchQueryBuilder {
-    pub fn build_search_query(request: &SearchRequest) -> serde_json::Value {
+    pub fn build_search_query(request: &TextSearchRequest) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "query": Self::query_argument(request),
             "sort": Self::sort_argument(&request.sort),
@@ -46,7 +46,7 @@ impl ElasticsearchQueryBuilder {
         })
     }
 
-    fn query_argument(request: &SearchRequest) -> serde_json::Value {
+    fn query_argument(request: &TextSearchRequest) -> serde_json::Value {
         let textual_query = Self::textual_query(request);
         if let Some(filter_expr) = &request.filter {
             let filter = Self::filter(filter_expr);
@@ -81,8 +81,8 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
-    fn textual_query(request: &SearchRequest) -> serde_json::Value {
-        let query = request.query.as_ref().map(|q| q.trim());
+    fn textual_query(request: &TextSearchRequest) -> serde_json::Value {
+        let query = request.prompt.as_ref().map(|q| q.trim());
         if let Some(query) = query {
             serde_json::json!({
                 "simple_query_string": {
@@ -261,7 +261,7 @@ impl ElasticsearchQueryBuilder {
         }
     }
 
-    fn highlight_argument(request: &SearchRequest) -> Option<serde_json::Value> {
+    fn highlight_argument(request: &TextSearchRequest) -> Option<serde_json::Value> {
         if request.options.enable_highlighting {
             Some(serde_json::json!({
                 "pre_tags": ["<em>"],

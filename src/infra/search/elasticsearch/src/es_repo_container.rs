@@ -113,8 +113,8 @@ impl SearchRepository for ElasticsearchContainerRepository {
         self.inner().await?.health().await
     }
 
-    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
-        self.inner().await?.search(req).await
+    async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.text_search(req).await
     }
 
     async fn vector_search(
@@ -122,6 +122,13 @@ impl SearchRepository for ElasticsearchContainerRepository {
         req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         self.inner().await?.vector_search(req).await
+    }
+
+    async fn hybrid_search(
+        &self,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.hybrid_search(req).await
     }
 
     async fn ensure_entity_index(

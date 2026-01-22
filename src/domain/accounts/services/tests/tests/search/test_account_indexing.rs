@@ -31,7 +31,7 @@ async fn test_account_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) 
     let harness = AccountIndexingHarness::new(ctx, None).await;
 
     let accounts_index_response = harness.view_accounts_index().await;
-    assert_eq!(accounts_index_response.total_hits(), 0);
+    assert_eq!(accounts_index_response.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ async fn test_predefined_accounts_appear_in_index(ctx: Arc<ElasticsearchTestCont
     let harness = AccountIndexingHarness::new(ctx, Some(predefined_account_config)).await;
 
     let accounts_index_response = harness.view_accounts_index().await;
-    assert_eq!(accounts_index_response.total_hits(), 2);
+    assert_eq!(accounts_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         accounts_index_response.ids(),
@@ -99,7 +99,7 @@ async fn test_creating_accounts_reflected_in_index(ctx: Arc<ElasticsearchTestCon
 
     let accounts_index_response = harness.view_accounts_index().await;
 
-    assert_eq!(accounts_index_response.total_hits(), 3);
+    assert_eq!(accounts_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         accounts_index_response.ids(),
@@ -155,7 +155,7 @@ async fn test_updating_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
 
     let accounts_index_response = harness.view_accounts_index().await;
 
-    assert_eq!(accounts_index_response.total_hits(), 3);
+    assert_eq!(accounts_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         accounts_index_response.ids(),
@@ -208,7 +208,7 @@ async fn test_deleting_account_reflected_in_index(ctx: Arc<ElasticsearchTestCont
     harness.delete_account(&harness.catalog, "bob").await;
 
     let accounts_index_response = harness.view_accounts_index().await;
-    assert_eq!(accounts_index_response.total_hits(), 2);
+    assert_eq!(accounts_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         accounts_index_response.ids(),
@@ -301,8 +301,8 @@ impl AccountIndexingHarness {
         let search_repo = self.es_base_harness.es_ctx().search_repo();
 
         let seach_response = search_repo
-            .search(SearchRequest {
-                query: None,
+            .text_search(TextSearchRequest {
+                prompt: None,
                 entity_schemas: vec![account_search_schema::SCHEMA_NAME],
                 source: SearchRequestSourceSpec::All,
                 filter: None,
@@ -311,7 +311,7 @@ impl AccountIndexingHarness {
                     limit: 100,
                     offset: 0,
                 },
-                options: SearchOptions::default(),
+                options: TextSearchOptions::default(),
             })
             .await
             .unwrap();

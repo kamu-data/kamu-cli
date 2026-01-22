@@ -17,16 +17,22 @@ use crate::*;
 pub trait SearchService: Send + Sync {
     async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError>;
 
-    async fn search(
+    async fn text_search(
         &self,
         ctx: SearchContext<'_>,
-        req: SearchRequest,
+        req: TextSearchRequest,
     ) -> Result<SearchResponse, InternalError>;
 
     async fn vector_search(
         &self,
         ctx: SearchContext<'_>,
         req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: HybridSearchRequest,
     ) -> Result<SearchResponse, InternalError>;
 
     async fn find_document_by_id(
@@ -139,9 +145,8 @@ pub async fn prepare_semantic_embeddings_document(
     if !anything_present {
         if anything_cleared {
             return Ok(SearchFieldUpdate::Cleared);
-        } else {
-            return Ok(SearchFieldUpdate::Absent);
         }
+        return Ok(SearchFieldUpdate::Absent);
     }
 
     // Aggregate all contributing text parts

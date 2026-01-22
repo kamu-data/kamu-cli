@@ -14,7 +14,6 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use internal_error::*;
 use kamu::domain::*;
 use kamu_datasets::DatasetSearchService;
-use kamu_search::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -69,22 +68,15 @@ impl SearchCommand {
             catalog: &self.catalog,
         };
 
-        let res = self
+        let response = self
             .dataset_search_svc
-            .vector_search(
-                context,
-                prompt,
-                SearchPaginationSpec {
-                    limit: self.max_results,
-                    offset: 0,
-                },
-            )
+            .vector_search(context, prompt, self.max_results)
             .await
             .int_err()?;
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("Alias", DataType::Utf8, false),
-            Field::new("Score", DataType::Float32, false),
+            Field::new("Score", DataType::Float64, false),
         ]));
 
         let records_format = RecordsFormat::new()
@@ -98,9 +90,15 @@ impl SearchCommand {
             schema.clone(),
             vec![
                 Arc::new(StringArray::from_iter_values(
-                    res.hits.iter().map(|h| h.handle.alias.to_string()),
+                    response.hits.iter().map(|h| h.handle.alias.to_string()),
                 )),
-                Arc::new(res.hits.iter().map(|h| h.score).collect::<Float64Array>()),
+                Arc::new(
+                    response
+                        .hits
+                        .iter()
+                        .map(|h| h.score)
+                        .collect::<Float64Array>(),
+                ),
             ],
         )
         .unwrap();
