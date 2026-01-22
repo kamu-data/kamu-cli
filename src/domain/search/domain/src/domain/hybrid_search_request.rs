@@ -44,28 +44,50 @@ pub enum SemanticSearchMode {
     Disabled,
 
     /// Provided embedding
-    ProvidedEmbedding { vector: Vec<f32> },
+    ProvidedEmbedding { prompt_embedding: Vec<f32> },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct HybridSearchOptions {
-    pub rrf_rank_window_size: usize,
-    pub rrf_rank_constant: usize,
-    pub knn_k: usize,
-    pub knn_num_candidates: usize,
+    pub rrf: RRFOptions,
+    pub knn: KnnOptions,
     pub enable_explain: bool,
 }
 
-impl Default for HybridSearchOptions {
+impl HybridSearchOptions {
+    pub fn for_limit(limit: usize) -> Self {
+        Self {
+            rrf: RRFOptions::for_limit(limit),
+            knn: KnnOptions::for_limit(limit),
+            enable_explain: false,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub struct RRFOptions {
+    pub rank_window_size: usize,
+    pub rank_constant: usize,
+}
+
+impl RRFOptions {
+    pub fn for_limit(limit: usize) -> Self {
+        Self {
+            rank_window_size: (10 * limit).clamp(50, 500),
+            rank_constant: 60,
+        }
+    }
+}
+
+impl Default for RRFOptions {
     fn default() -> Self {
         Self {
-            rrf_rank_window_size: 100,
-            rrf_rank_constant: 60,
-            knn_k: 200,
-            knn_num_candidates: 1000,
-            enable_explain: false,
+            rank_window_size: 100,
+            rank_constant: 60,
         }
     }
 }

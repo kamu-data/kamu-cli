@@ -126,11 +126,15 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                 .vector_search(
                     ctx,
                     VectorSearchRequest {
-                        query_embedding: prompt_vec,
+                        prompt_embedding: prompt_vec,
                         source: SearchRequestSourceSpec::None,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,
                         limit,
+                        options: VectorSearchOptions {
+                            enable_explain: false,
+                            knn: KnnOptions::for_limit(limit),
+                        },
                     },
                 )
                 .await
@@ -175,7 +179,9 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                     ctx,
                     HybridSearchRequest {
                         prompt: prompt.to_string(),
-                        semantic_mode: SemanticSearchMode::ProvidedEmbedding { vector: prompt_vec },
+                        semantic_mode: SemanticSearchMode::ProvidedEmbedding {
+                            prompt_embedding: prompt_vec,
+                        },
                         source: SearchRequestSourceSpec::None,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,

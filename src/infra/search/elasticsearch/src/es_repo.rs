@@ -376,7 +376,14 @@ impl SearchRepository for ElasticsearchRepository {
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
         // Build Elasticsearch full-text search request body
-        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(&req);
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
+            req.prompt.as_deref(),
+            req.filter.as_ref(),
+            &req.source,
+            &req.sort,
+            &req.page,
+            &req.options,
+        );
 
         // Run common search procedure
         self.search_common(&entity_schemas, es_query_body).await
@@ -394,8 +401,14 @@ impl SearchRepository for ElasticsearchRepository {
         let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
 
         // Build Elasticsearch vector request body
-        let es_query_body =
-            es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(&req, embedding_field);
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
+            embedding_field,
+            &req.prompt_embedding,
+            req.filter.as_ref(),
+            &req.source,
+            req.limit,
+            &req.options,
+        );
 
         // Run common search procedure
         self.search_common(&entity_schemas, es_query_body).await
@@ -404,21 +417,87 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_hybrid_search, skip_all)]
     async fn hybrid_search(
         &self,
-        _req: HybridSearchRequest,
+        req: HybridSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
-        /*// Resolve entity schemas
+        // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Determine embedding field
-        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+        match &req.semantic_mode {
+            SemanticSearchMode::Disabled => {
+                // Textual query only with relevance ranking
+                let text_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
+                    Some(&req.prompt),
+                    req.filter.as_ref(),
+                    &req.source,
+                    &[],
+                    &SearchPaginationSpec {
+                        limit: req.limit,
+                        offset: 0,
+                    },
+                    &TextSearchOptions {
+                        enable_explain: req.options.enable_explain,
+                        enable_highlighting: false,
+                    },
+                );
 
-        // Build Elasticsearch hybrid request body
-        let es_query_body =
-            es_helpers::ElasticsearchQueryBuilder::build_hybrid_search_query(&req, embedding_field);
+                self.search_common(&entity_schemas, text_es_query_body)
+                    .await
+            }
 
-        // Run common search procedure
-        self.search_common(&entity_schemas, es_query_body).await*/
-        unimplemented!()
+            SemanticSearchMode::ProvidedEmbedding { prompt_embedding } => {
+                // Determine embedding field
+                let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+                // Textual query part
+                let text_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(
+                    Some(&req.prompt),
+                    req.filter.as_ref(),
+                    &req.source,
+                    &[],
+                    &SearchPaginationSpec {
+                        limit: req.options.rrf.rank_window_size,
+                        offset: 0,
+                    },
+                    &TextSearchOptions {
+                        enable_explain: req.options.enable_explain,
+                        enable_highlighting: false,
+                    },
+                );
+
+                // Vector query part
+                let vector_es_query_body =
+                    es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
+                        embedding_field,
+                        prompt_embedding,
+                        req.filter.as_ref(),
+                        &req.source,
+                        req.options.rrf.rank_window_size,
+                        &VectorSearchOptions {
+                            enable_explain: req.options.enable_explain,
+                            knn: req.options.knn,
+                        },
+                    );
+
+                // Run both vector and text searches in parallel
+                let (text_search_response, vector_search_response) = tokio::join!(
+                    self.search_common(&entity_schemas, text_es_query_body),
+                    self.search_common(&entity_schemas, vector_es_query_body),
+                );
+                let text_search_response = text_search_response?;
+                let vector_search_response = vector_search_response?;
+
+                // Combine results using RRF
+                let combined_response =
+                    es_helpers::ElasticsearchRRFCombiner::combine_search_responses(
+                        text_search_response,
+                        vector_search_response,
+                        req.options.rrf,
+                        req.limit,
+                    );
+
+                Ok(combined_response)
+            }
+        }
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]

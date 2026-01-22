@@ -14,20 +14,27 @@ use kamu_search::*;
 pub struct ElasticsearchQueryBuilder {}
 
 impl ElasticsearchQueryBuilder {
-    pub fn build_search_query(request: &TextSearchRequest) -> serde_json::Value {
+    pub fn build_search_query(
+        textual_prompt: Option<&str>,
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        sort: &[SearchSortSpec],
+        page: &SearchPaginationSpec,
+        options: &TextSearchOptions,
+    ) -> serde_json::Value {
         let mut query_json = serde_json::json!({
-            "query": Self::query_argument(request),
-            "sort": Self::sort_argument(&request.sort),
-            "_source": Self::source_argument(&request.source),
-            "from": request.page.offset,
-            "size": request.page.limit,
+            "query": Self::query_argument(textual_prompt, filter),
+            "sort": Self::sort_argument(sort),
+            "_source": Self::source_argument(source),
+            "from": page.offset,
+            "size": page.limit,
         });
 
-        if let Some(highlight_json) = Self::highlight_argument(request) {
+        if let Some(highlight_json) = Self::highlight_argument(options) {
             query_json["highlight"] = highlight_json;
         }
 
-        if request.options.enable_explain {
+        if options.enable_explain {
             query_json["explain"] = serde_json::json!(true);
         }
 
@@ -35,20 +42,75 @@ impl ElasticsearchQueryBuilder {
     }
 
     pub fn build_vector_search_query(
-        request: &VectorSearchRequest,
         embedding_field: SearchFieldPath,
+        prompt_embedding: &[f32],
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        limit: usize,
+        options: &VectorSearchOptions,
     ) -> serde_json::Value {
-        serde_json::json!({
+        let mut query_json = serde_json::json!({
             "track_total_hits": false,
-            "knn": Self::knn_argument(embedding_field, &request.query_embedding, request.filter.as_ref()),
-            "_source": Self::source_argument(&request.source),
-            "size": request.limit,
-        })
+            "knn": Self::knn_argument(embedding_field, prompt_embedding, filter, options.knn),
+            "_source": Self::source_argument(source),
+            "size": limit,
+        });
+
+        if options.enable_explain {
+            query_json["explain"] = serde_json::json!(true);
+        }
+
+        query_json
     }
 
-    fn query_argument(request: &TextSearchRequest) -> serde_json::Value {
-        let textual_query = Self::textual_query(request);
-        if let Some(filter_expr) = &request.filter {
+    // Unfortunately, paid feature
+    /*pub fn build_hybrid_search_query(
+        embedding_field: SearchFieldPath,
+        textual_prompt: &str,
+        prompt_embedding: &[f32],
+        filter: Option<&SearchFilterExpr>,
+        source: &SearchRequestSourceSpec,
+        limit: usize,
+        options: &HybridSearchOptions,
+    ) -> serde_json::Value {
+        let mut query_json = serde_json::json!({
+             "track_total_hits": false,
+            "_source": Self::source_argument(source),
+            "size": limit,
+            "retriever": {
+                "rrf": {
+                    "retrievers": [
+                        {
+                            "standard": Self::query_argument(Some(textual_prompt), filter)
+                        },
+                        {
+                            "knn": Self::knn_argument(
+                                embedding_field,
+                                prompt_embedding,
+                                filter,
+                                options.knn,
+                            )
+                        }
+                    ],
+                    "rank_window_size": options.rrf.rank_window_size,
+                    "rank_constant": options.rrf.rank_constant,
+                }
+            }
+        });
+
+        if options.enable_explain {
+            query_json["explain"] = serde_json::json!(true);
+        }
+
+        query_json
+    }*/
+
+    fn query_argument(
+        prompt: Option<&str>,
+        filter: Option<&SearchFilterExpr>,
+    ) -> serde_json::Value {
+        let textual_query = Self::textual_query(prompt);
+        if let Some(filter_expr) = filter {
             let filter = Self::filter(filter_expr);
             serde_json::json!({
                 "bool": {
@@ -65,12 +127,13 @@ impl ElasticsearchQueryBuilder {
         embedding_field: &str,
         prompt_embedding: &[f32],
         filter: Option<&SearchFilterExpr>,
+        knn_opts: KnnOptions,
     ) -> serde_json::Value {
         let mut query_json = serde_json::json!({
             "field": format!("{}.embedding", embedding_field),
             "query_vector": prompt_embedding,
-            "k": 200,
-            "num_candidates": 1000
+            "k": knn_opts.k,
+            "num_candidates": knn_opts.num_candidates
         });
 
         if let Some(filter_expr) = filter {
@@ -81,8 +144,8 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
-    fn textual_query(request: &TextSearchRequest) -> serde_json::Value {
-        let query = request.prompt.as_ref().map(|q| q.trim());
+    fn textual_query(prompt: Option<&str>) -> serde_json::Value {
+        let query = prompt.map(str::trim);
         if let Some(query) = query {
             serde_json::json!({
                 "simple_query_string": {
@@ -261,8 +324,8 @@ impl ElasticsearchQueryBuilder {
         }
     }
 
-    fn highlight_argument(request: &TextSearchRequest) -> Option<serde_json::Value> {
-        if request.options.enable_highlighting {
+    fn highlight_argument(options: &TextSearchOptions) -> Option<serde_json::Value> {
+        if options.enable_highlighting {
             Some(serde_json::json!({
                 "pre_tags": ["<em>"],
                 "post_tags": ["</em>"],
