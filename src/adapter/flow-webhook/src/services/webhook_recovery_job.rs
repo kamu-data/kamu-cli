@@ -135,6 +135,10 @@ impl WebhookTriggerStartupRecoveryJob {
             )
             .await
             .int_err()?;
+        tracing::warn!(
+            ?flow_binding,
+            "Recovered webhook subscription trigger to active"
+        );
 
         Ok(())
     }
@@ -153,7 +157,12 @@ impl WebhookTriggerStartupRecoveryJob {
             Some(fs::FlowTriggerStatus::Active) => {
                 self.flow_trigger_service
                     .pause_flow_trigger(now, flow_binding)
-                    .await
+                    .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to paused"
+                );
+                Ok(())
             }
             Some(fs::FlowTriggerStatus::StoppedAutomatically) => {
                 self.flow_trigger_service
@@ -161,7 +170,12 @@ impl WebhookTriggerStartupRecoveryJob {
                     .await?;
                 self.flow_trigger_service
                     .pause_flow_trigger(now, flow_binding)
-                    .await
+                    .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to paused"
+                );
+                Ok(())
             }
             None => {
                 self.flow_trigger_service
@@ -175,7 +189,12 @@ impl WebhookTriggerStartupRecoveryJob {
                     .int_err()?;
                 self.flow_trigger_service
                     .pause_flow_trigger(now, flow_binding)
-                    .await
+                    .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to paused"
+                );
+                Ok(())
             }
         }
     }
@@ -195,6 +214,10 @@ impl WebhookTriggerStartupRecoveryJob {
                 self.flow_trigger_service
                     .apply_trigger_auto_stop_decision(now, flow_binding)
                     .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to auto-stopped"
+                );
                 Ok(())
             }
             Some(fs::FlowTriggerStatus::PausedByUser) => {
@@ -205,6 +228,10 @@ impl WebhookTriggerStartupRecoveryJob {
                 self.flow_trigger_service
                     .apply_trigger_auto_stop_decision(now, flow_binding)
                     .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to auto-stopped"
+                );
                 Ok(())
             }
             None => {
@@ -220,6 +247,10 @@ impl WebhookTriggerStartupRecoveryJob {
                 self.flow_trigger_service
                     .apply_trigger_auto_stop_decision(now, flow_binding)
                     .await?;
+                tracing::warn!(
+                    ?flow_binding,
+                    "Recovered webhook subscription trigger to auto-stopped"
+                );
                 Ok(())
             }
         }
