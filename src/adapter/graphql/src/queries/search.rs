@@ -145,7 +145,12 @@ impl Search {
                         } else {
                             Some(prompt)
                         },
-                        source: SearchRequestSourceSpec::All,
+                        source: SearchRequestSourceSpec::Complex {
+                            include_patterns: vec![],
+                            exclude_patterns: vec![
+                                kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string(),
+                            ],
+                        },
                         entity_schemas: vec![
                             account_schema::SCHEMA_NAME,
                             dataset_schema::SCHEMA_NAME,

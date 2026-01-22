@@ -150,7 +150,7 @@ impl ElasticsearchQueryBuilder {
             serde_json::json!({
                 "simple_query_string": {
                     "query": query,
-                    "default_operator": "and"
+                    "default_operator": "or"
                 }
             })
         } else {
