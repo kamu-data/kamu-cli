@@ -28,5 +28,5 @@ pub fn parquet_schema_to_arrow_schema(parquet_schema: Arc<Type>) -> Arc<Schema> 
 }
 
 pub fn dataframe_schema_to_parquet_schema(df_schema: &DFSchema) -> Arc<Type> {
-    arrow_schema_to_parquet_schema(&df_schema.into())
+    arrow_schema_to_parquet_schema(df_schema.inner())
 }

@@ -12,11 +12,20 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Fixed
+- Hotfix: do not put empty dataset documents into Elasticsearch during full reindexing.
+- Hotfix: improved handling of `skipDatasetsWithNoDescription` and `skipDatasetsWithNoData` options when 
+   processing incremental updates to datasets search indices
+- Hotfix: handling 404 error from Elasticsearch when requesting non-existing document by ID
+- Requests with invalid/expired tokens now returns unauthorized response
+
+## [0.256.1] - 2026-01-17
 ### Added
 - `SearchIndexerConfig` is respected both by natural and full-text search engine
 - Ability to disable incremental full-text search indexing via config option
-### Fixed
-- Requests with invalid/expired tokens now returns unauthorized response
+### Changed
+- Upgraded core to `datafusion v52`
+- Upgraded to `kamu-engine-datafusion v0.9.0` based on latest `datafusion`
 
 ## [0.256.0] - 2026-01-08
 ### Added

@@ -11,15 +11,21 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
+use odf::dataset::MetadataChainExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "debug", skip_all, fields(
+    dataset_id = %dataset.get_id(),
+    head = %head,
+))]
 pub(crate) async fn index_dataset_from_scratch(
     indexer_config: &SearchIndexerConfig,
     dataset: ResolvedDataset,
     owner_id: &odf::AccountID,
+    head: &odf::Multihash,
 ) -> Result<Option<serde_json::Value>, InternalError> {
     // Find key blocks that contribute to search
     let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
@@ -40,7 +46,11 @@ pub(crate) async fn index_dataset_from_scratch(
     use dataset_search_schema::*;
 
     // Visit entire metadata chain
-    match dataset.as_metadata_chain().accept(&mut visitors).await {
+    match dataset
+        .as_metadata_chain()
+        .accept_by_hash(&mut visitors, head)
+        .await
+    {
         Ok(_) => {
             // Extract interested parts from visitors
             let schema_fields = extract_schema_field_names(schema_visitor);
@@ -112,6 +122,11 @@ pub(crate) async fn index_dataset_from_scratch(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "debug", skip_all, fields(
+    dataset_id = %dataset.get_id(),
+    new_head = %new_head,
+    maybe_prev_head = ?maybe_prev_head,
+))]
 pub(crate) async fn partial_update_for_new_interval(
     indexer_config: &SearchIndexerConfig,
     dataset: ResolvedDataset,
@@ -149,7 +164,7 @@ pub(crate) async fn partial_update_for_new_interval(
     match result {
         Ok(_) => {}
         Err(AcceptVisitorError::Traversal(IterBlocksError::InvalidInterval(_))) => {
-            return index_dataset_from_scratch(indexer_config, dataset, owner_id).await;
+            return index_dataset_from_scratch(indexer_config, dataset, owner_id, new_head).await;
         }
         Err(e) => return Err(e.int_err()),
     }
@@ -301,23 +316,40 @@ pub(crate) async fn index_datasets(
             .await
             .int_err()?;
 
+        // Resolve HEAD
+        let maybe_head = dataset
+            .as_metadata_chain()
+            .try_get_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
+        let Some(head) = maybe_head else {
+            tracing::warn!(
+                dataset_id = %entry.id,
+                dataset_name = %entry.name,
+                "Dataset has no HEAD, skipping indexing",
+            );
+            continue;
+        };
+
         // Index dataset
-        let dataset_document =
-            index_dataset_from_scratch(indexer_config, dataset, &entry.owner_id).await?;
-        let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
+        let maybe_dataset_document =
+            index_dataset_from_scratch(indexer_config, dataset, &entry.owner_id, &head).await?;
+        if let Some(dataset_document) = maybe_dataset_document {
+            let dataset_document_json = serde_json::to_value(dataset_document).int_err()?;
 
-        tracing::debug!(
-            dataset_id = %entry.id,
-            dataset_name = %entry.name,
-            search_document = %dataset_document_json,
-            "Indexed dataset search document",
-        );
+            tracing::debug!(
+                dataset_id = %entry.id,
+                dataset_name = %entry.name,
+                search_document = %dataset_document_json,
+                "Indexed dataset search document",
+            );
 
-        // Add dataset document to the chunk
-        operations.push(SearchIndexUpdateOperation::Index {
-            id: entry.id.to_string(),
-            doc: dataset_document_json,
-        });
+            // Add dataset document to the chunk
+            operations.push(SearchIndexUpdateOperation::Index {
+                id: entry.id.to_string(),
+                doc: dataset_document_json,
+            });
+        }
 
         // Index in chunks to avoid memory overwhelming
         if operations.len() >= BULK_SIZE {

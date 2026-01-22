@@ -44,7 +44,7 @@ test-utils = { workspace = true }
 
 async-graphql = { version = "7", default-features = false }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "50", default-features = false, features = [] }
+datafusion = { version = "52", default-features = false, features = [] }
 indoc = "2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [

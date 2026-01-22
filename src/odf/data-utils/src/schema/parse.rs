@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use arrow_schema::SchemaRef;
+use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
@@ -83,6 +84,12 @@ pub fn parse_ddl_to_odf_schema(
             | SqlDataType::Char(_)
             | SqlDataType::CharacterVarying(_)
             | SqlDataType::CharVarying(_)
+            | SqlDataType::DecimalUnsigned(_)
+            | SqlDataType::DecUnsigned(_)
+            | SqlDataType::FloatUnsigned(_)
+            | SqlDataType::RealUnsigned
+            | SqlDataType::DoubleUnsigned(_)
+            | SqlDataType::DoublePrecisionUnsigned
             | SqlDataType::Nvarchar(_)
             | SqlDataType::Uuid
             | SqlDataType::CharacterLargeObject(_)
@@ -132,7 +139,7 @@ pub fn parse_ddl_to_odf_schema(
             | SqlDataType::Time(_, _)
             | SqlDataType::Datetime(_)
             | SqlDataType::Datetime64(_, _)
-            | SqlDataType::Interval
+            | SqlDataType::Interval { .. }
             | SqlDataType::JSON
             | SqlDataType::JSONB
             | SqlDataType::Regclass
@@ -253,9 +260,9 @@ pub async fn parse_ddl_to_arrow_schema(
     ctx: &SessionContext,
     ddl: &str,
     force_utc_time: bool,
-) -> Result<Schema, DataFusionError> {
+) -> Result<SchemaRef, DataFusionError> {
     let df_schema = parse_ddl_to_datafusion_schema(ctx, ddl, force_utc_time).await?;
-    Ok(df_schema.into())
+    Ok(df_schema.inner().clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

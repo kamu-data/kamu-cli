@@ -154,6 +154,7 @@ impl SqlShellCommand {
             quiet: false,
             color: true,
             maxrows: MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT),
+            instrumented_registry: Arc::new(kamu_datafusion_cli::object_storage::instrumented::InstrumentedObjectStoreRegistry::new()),
         };
 
         let ctx = self.query_svc.create_session().await.unwrap();
