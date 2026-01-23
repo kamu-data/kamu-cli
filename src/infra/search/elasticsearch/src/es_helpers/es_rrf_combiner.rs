@@ -46,7 +46,8 @@ impl ElasticsearchRRFCombiner {
             };
             let rank = i + 1;
             let entry = map.entry(key).or_default();
-            entry.fused += Self::rrf_inc(rrf_options.rank_constant, rank);
+            entry.fused +=
+                Self::rrf_inc(rrf_options.rank_constant, rank) * rrf_options.textual_weight;
             entry.text_rank = Some(rank);
             // Keep the textual hit (for highlighting/explain/source)
             entry.text_hit = Some(hit);
@@ -59,7 +60,8 @@ impl ElasticsearchRRFCombiner {
             };
             let rank = i + 1;
             let entry = map.entry(key).or_default();
-            entry.fused += Self::rrf_inc(rrf_options.rank_constant, rank);
+            entry.fused +=
+                Self::rrf_inc(rrf_options.rank_constant, rank) * rrf_options.vector_weight;
             entry.vector_rank = Some(rank);
             entry.vector_hit = Some(hit);
         }

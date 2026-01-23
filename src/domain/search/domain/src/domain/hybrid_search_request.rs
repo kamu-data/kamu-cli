@@ -60,6 +60,8 @@ impl HybridSearchOptions {
 pub struct RRFOptions {
     pub rank_window_size: usize,
     pub rank_constant: usize,
+    pub textual_weight: f64,
+    pub vector_weight: f64,
 }
 
 impl RRFOptions {
@@ -67,6 +69,8 @@ impl RRFOptions {
         Self {
             rank_window_size: (10 * limit).clamp(50, 500),
             rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
         }
     }
 }
@@ -76,6 +80,8 @@ impl Default for RRFOptions {
         Self {
             rank_window_size: 100,
             rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
         }
     }
 }
