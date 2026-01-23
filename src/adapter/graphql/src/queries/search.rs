@@ -174,6 +174,7 @@ impl Search {
                             options: TextSearchOptions {
                                 enable_explain: false,
                                 enable_highlighting: true,
+                                boosting_overrides: TextBoostingOverrides::default(),
                             },
                         },
                     )

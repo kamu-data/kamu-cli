@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole};
+use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole, TextBoostingOverrides};
 
 use crate::es_helpers::{FIELD_SUFFIX_NGRAM, FIELD_SUFFIX_SUBSTR, FIELD_SUFFIX_TOKENS};
 
@@ -16,7 +16,10 @@ use crate::es_helpers::{FIELD_SUFFIX_NGRAM, FIELD_SUFFIX_SUBSTR, FIELD_SUFFIX_TO
 pub struct MultiMatchPolicyBuilder {}
 
 impl MultiMatchPolicyBuilder {
-    pub fn build_full_text_policy(schema: &SearchEntitySchema) -> MultiMatchPolicy {
+    pub fn build_full_text_policy(
+        schema: &SearchEntitySchema,
+        text_boosting_overrides: TextBoostingOverrides,
+    ) -> MultiMatchPolicy {
         let mut specs = Vec::new();
 
         for field in schema.fields {
@@ -24,11 +27,11 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 6.0,
+                        boost: 6.0 * text_boosting_overrides.name_boost,
                     });
                     specs.push(MultiMatchFieldSpec {
                         field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                        boost: 1.5,
+                        boost: 1.5 * text_boosting_overrides.name_boost,
                     });
                 }
 
@@ -40,26 +43,26 @@ impl MultiMatchPolicyBuilder {
                     if *hierarchical {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_TOKENS),
-                            boost: 4.0,
+                            boost: 4.0 * text_boosting_overrides.identifier_boost,
                         });
                     } else {
                         specs.push(MultiMatchFieldSpec {
                             field_name: field.path.to_string(),
-                            boost: 4.0,
+                            boost: 4.0 * text_boosting_overrides.identifier_boost,
                         });
                     }
 
                     if *enable_edge_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                            boost: 1.0,
+                            boost: 1.0 * text_boosting_overrides.identifier_boost,
                         });
                     }
 
                     if *enable_inner_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_SUBSTR),
-                            boost: 0.3,
+                            boost: 0.3 * text_boosting_overrides.identifier_boost,
                         });
                     }
                 }
@@ -67,14 +70,14 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Description => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 3.5,
+                        boost: 3.5 * text_boosting_overrides.description_boost,
                     });
                 }
 
                 SearchSchemaFieldRole::Prose => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 1.0,
+                        boost: 1.0 * text_boosting_overrides.prose_boost,
                     });
                 }
 
@@ -92,7 +95,10 @@ impl MultiMatchPolicyBuilder {
         MultiMatchPolicy { specs }
     }
 
-    pub fn build_autocomplete_policy(schema: &SearchEntitySchema) -> MultiMatchPolicy {
+    pub fn build_autocomplete_policy(
+        schema: &SearchEntitySchema,
+        text_boosting_overrides: TextBoostingOverrides,
+    ) -> MultiMatchPolicy {
         let mut specs = Vec::new();
 
         for field in schema.fields {
@@ -100,11 +106,11 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                        boost: 8.0,
+                        boost: 8.0 * text_boosting_overrides.name_boost,
                     });
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 2.0,
+                        boost: 2.0 * text_boosting_overrides.name_boost,
                     });
                 }
 
@@ -116,18 +122,18 @@ impl MultiMatchPolicyBuilder {
                     if *enable_edge_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                            boost: 5.0,
+                            boost: 5.0 * text_boosting_overrides.identifier_boost,
                         });
                     }
                     if *hierarchical {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_TOKENS),
-                            boost: 1.0,
+                            boost: 1.0 * text_boosting_overrides.identifier_boost,
                         });
                     } else {
                         specs.push(MultiMatchFieldSpec {
                             field_name: field.path.to_string(),
-                            boost: 1.0,
+                            boost: 1.0 * text_boosting_overrides.identifier_boost,
                         });
                     }
                 }

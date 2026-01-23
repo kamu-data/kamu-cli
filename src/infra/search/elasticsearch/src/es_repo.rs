@@ -412,6 +412,7 @@ impl SearchRepository for ElasticsearchRepository {
                         .map(|schema| {
                             es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(
                                 schema.as_ref(),
+                                req.options.boosting_overrides,
                             )
                         })
                         .collect::<Vec<_>>(),
@@ -453,6 +454,7 @@ impl SearchRepository for ElasticsearchRepository {
                         .map(|schema| {
                             es_helpers::MultiMatchPolicyBuilder::build_autocomplete_policy(
                                 schema.as_ref(),
+                                req.options.boosting_overrides,
                             )
                         })
                         .collect::<Vec<_>>(),
@@ -482,6 +484,7 @@ impl SearchRepository for ElasticsearchRepository {
                             es_helpers::PhraseSearchPolicyBuilder::build_policy(
                                 schema.as_ref(),
                                 user_slop,
+                                req.options.boosting_overrides,
                             )
                         })
                         .collect::<Vec<_>>(),
@@ -543,7 +546,10 @@ impl SearchRepository for ElasticsearchRepository {
             &entity_schemas
                 .iter()
                 .map(|schema| {
-                    es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(schema.as_ref())
+                    es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(
+                        schema.as_ref(),
+                        req.options.text_boosting_overrides,
+                    )
                 })
                 .collect::<Vec<_>>(),
         );
@@ -565,6 +571,7 @@ impl SearchRepository for ElasticsearchRepository {
                 &TextSearchOptions {
                     enable_explain: req.options.enable_explain,
                     enable_highlighting: false,
+                    boosting_overrides: req.options.text_boosting_overrides,
                 },
             );
 

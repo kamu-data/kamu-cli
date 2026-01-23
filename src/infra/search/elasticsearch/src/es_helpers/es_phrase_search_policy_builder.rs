@@ -7,14 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole};
+use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole, TextBoostingOverrides};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PhraseSearchPolicyBuilder {}
 
 impl PhraseSearchPolicyBuilder {
-    pub fn build_policy(schema: &SearchEntitySchema, user_slop: u32) -> PhraseSearchPolicy {
+    pub fn build_policy(
+        schema: &SearchEntitySchema,
+        user_slop: u32,
+        text_boosting_overrides: TextBoostingOverrides,
+    ) -> PhraseSearchPolicy {
         let mut specs = Vec::new();
 
         for field in schema.fields {
@@ -22,7 +26,7 @@ impl PhraseSearchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 8.0,
+                        boost: 8.0 * text_boosting_overrides.name_boost,
                         slop: std::cmp::min(user_slop, 1),
                     });
                 }
@@ -30,7 +34,7 @@ impl PhraseSearchPolicyBuilder {
                 SearchSchemaFieldRole::Description => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 4.0,
+                        boost: 4.0 * text_boosting_overrides.description_boost,
                         slop: std::cmp::min(user_slop, 2),
                     });
                 }
@@ -38,7 +42,7 @@ impl PhraseSearchPolicyBuilder {
                 SearchSchemaFieldRole::Prose => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 1.0,
+                        boost: 1.0 * text_boosting_overrides.prose_boost,
                         slop: std::cmp::min(user_slop, 6),
                     });
                 }

@@ -41,6 +41,7 @@ pub struct HybridSearchRequest {
 pub struct HybridSearchOptions {
     pub rrf: RRFOptions,
     pub knn: KnnOptions,
+    pub text_boosting_overrides: TextBoostingOverrides,
     pub enable_explain: bool,
 }
 
@@ -49,6 +50,7 @@ impl HybridSearchOptions {
         Self {
             rrf: RRFOptions::for_limit(limit),
             knn: KnnOptions::for_limit(limit),
+            text_boosting_overrides: TextBoostingOverrides::default(),
             enable_explain: false,
         }
     }

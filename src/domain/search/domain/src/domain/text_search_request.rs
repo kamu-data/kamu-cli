@@ -90,6 +90,35 @@ pub enum FullTextSearchFieldRelation {
 pub struct TextSearchOptions {
     pub enable_explain: bool,
     pub enable_highlighting: bool,
+    pub boosting_overrides: TextBoostingOverrides,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub struct TextBoostingOverrides {
+    /// Multiply all prose boosts by this factor (default 1.0)
+    pub prose_boost: f32,
+
+    /// Multiple all description boosts by this factor (default 1.0)
+    pub description_boost: f32,
+
+    /// Multiply all identifier boosts by this factor (default 1.0)
+    pub identifier_boost: f32,
+
+    /// Multiply all name/title boosts by this factor (default 1.0)
+    pub name_boost: f32,
+}
+
+impl Default for TextBoostingOverrides {
+    fn default() -> Self {
+        Self {
+            prose_boost: 1.0,
+            description_boost: 1.0,
+            identifier_boost: 1.0,
+            name_boost: 1.0,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
