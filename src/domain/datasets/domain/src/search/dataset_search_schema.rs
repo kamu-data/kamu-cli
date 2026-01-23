@@ -97,7 +97,11 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::KEYWORDS,
-        role: SearchSchemaFieldRole::Keyword,
+        role: SearchSchemaFieldRole::Identifier {
+            hierarchical: true,
+            enable_edge_ngrams: true,
+            enable_inner_ngrams: false,
+        },
     },
     SearchSchemaField {
         path: fields::ATTACHMENTS,

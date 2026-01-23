@@ -19,12 +19,12 @@ impl ElasticsearchRRFCombiner {
     /// Implements Reciprocal Rank Fusion (RRF) to combine two search responses:
     ///   one from textual search and another from vector (semantic) search.
     /// The formula used is:
-    ///     score(d) = W_text * (1 / (k + rank_text(d)))
-    ///              + W_vector * (1 / (k + rank_vector(d)))
+    ///     score(d) = `W_text` * (1 / (k + `rank_text`(d)))
+    ///              + `W_vector` * (1 / (k + `rank_vector`(d)))
     ///
     /// where
-    ///     k is the rank constant from RRFOptions,
-    ///     W_text and W_vector are the weights from RRFOptions.
+    ///     k is the rank constant from `RRFOptions`,
+    ///     `W_text` and `W_vector` are the weights from `RRFOptions`.
     ///
     /// The final output is sorted by the combined score.
     pub fn combine_search_responses(

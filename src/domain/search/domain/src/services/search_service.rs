@@ -167,11 +167,14 @@ pub async fn prepare_semantic_embeddings_document(
     // Split parts into chunks
     let chunks = embeddings_chunker.chunk(texts).await?;
     if chunks.is_empty() {
-        return Ok(SearchFieldUpdate::Cleared);
+        return Ok(SearchFieldUpdate::Absent);
     }
 
     // Encode chunks into embedding vectors
     let vectors = embeddings_encoder.encode(chunks).await?;
+    if vectors.is_empty() {
+        return Ok(SearchFieldUpdate::Absent);
+    }
 
     #[derive(serde::Serialize)]
     struct ChunkDoc<'a> {

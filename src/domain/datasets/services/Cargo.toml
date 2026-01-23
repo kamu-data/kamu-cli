@@ -82,6 +82,7 @@ kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-messaging-outbox-inmem = { workspace = true }
+kamu-search = { workspace = true, features = ["testing"] }
 kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
     "testing",
 ] }

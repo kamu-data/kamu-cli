@@ -418,6 +418,15 @@ impl SearchRepository for ElasticsearchRepository {
                         .collect::<Vec<_>>(),
                 );
 
+                let sort_spec = vec![
+                    SearchSortSpec::Relevance,
+                    SearchSortSpec::ByField {
+                        field: SEARCH_ALIAS_TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
+                    },
+                ];
+
                 match field_relation {
                     FullTextSearchFieldRelation::BestFields => {
                         es_helpers::ElasticsearchQueryBuilder::build_best_fields_search_query(
@@ -427,7 +436,7 @@ impl SearchRepository for ElasticsearchRepository {
                             &multi_match_policy,
                             req.filter.as_ref(),
                             &req.source,
-                            &[], // sort by relevance
+                            &sort_spec,
                             &req.page,
                             &req.options,
                         )
@@ -439,7 +448,7 @@ impl SearchRepository for ElasticsearchRepository {
                             &multi_match_policy,
                             req.filter.as_ref(),
                             &req.source,
-                            &[], // sort by relevance
+                            &sort_spec,
                             &req.page,
                             &req.options,
                         )
@@ -563,7 +572,14 @@ impl SearchRepository for ElasticsearchRepository {
                 &multi_match_policy,
                 req.filter.as_ref(),
                 &req.source,
-                &[],
+                &[
+                    SearchSortSpec::Relevance,
+                    SearchSortSpec::ByField {
+                        field: SEARCH_ALIAS_TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
+                    },
+                ],
                 &SearchPaginationSpec {
                     limit: req.options.rrf.rank_window_size,
                     offset: 0,

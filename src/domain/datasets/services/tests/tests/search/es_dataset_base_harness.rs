@@ -78,6 +78,18 @@ impl ElasticsearchDatasetBaseHarness {
             b.add::<DatasetAccountLifecycleHandler>();
             b.add::<DeleteDatasetUseCaseImpl>();
 
+            // Embedding mocks
+            let mut embeddings_chunker = MockEmbeddingsChunker::new();
+            embeddings_chunker.expect_chunk().returning(Ok);
+
+            let mut embeddings_encoder = MockEmbeddingsEncoder::new();
+            embeddings_encoder.expect_encode().returning(|_| Ok(vec![]));
+
+            b.add_value(embeddings_chunker);
+            b.bind::<dyn EmbeddingsChunker, MockEmbeddingsChunker>();
+            b.add_value(embeddings_encoder);
+            b.bind::<dyn EmbeddingsEncoder, MockEmbeddingsEncoder>();
+
             register_message_dispatcher::<AccountLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,

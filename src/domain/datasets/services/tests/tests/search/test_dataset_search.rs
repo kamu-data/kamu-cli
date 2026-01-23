@@ -181,6 +181,8 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     assert_eq!(
         res.ids(),
         vec![
+            // Both "alpha" and "alphabet" match via inner ngram
+            // Tie-breaker by title field
             dataset_ids_by_name["alpha"].to_string(),
             dataset_ids_by_name["alphabet"].to_string(),
         ]
@@ -191,8 +193,10 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     assert_eq!(
         res.ids(),
         vec![
-            dataset_ids_by_name["alphabet"].to_string(),
+            // "beta" scores higher, as it matches via edge-ngram.
+            // "alphabet" matches only via inner ngram, which has lower boost.
             dataset_ids_by_name["beta"].to_string(),
+            dataset_ids_by_name["alphabet"].to_string(),
         ]
     );
 
@@ -205,6 +209,8 @@ async fn test_find_dataset_by_name_substring(ctx: Arc<ElasticsearchTestContext>)
     assert_eq!(
         res.ids(),
         vec![
+            // Both "beta" and "zetatron" match via inner ngram
+            // Tie-breaker by title field
             dataset_ids_by_name["beta"].to_string(),
             dataset_ids_by_name["zetatron"].to_string(),
         ]
@@ -558,10 +564,19 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
         dataset_ids_by_name.insert((*dataset_name).to_string(), res.dataset_handle.id);
     }
 
-    // Exact match
+    // Full match
     let res = harness.search_dataset("customer_id").await;
-    assert_eq!(res.total_hits(), Some(1));
-    assert_eq!(res.ids(), vec![dataset_ids_by_name["theta"].to_string()]);
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![
+            // Score is not the same:
+            //   customer_id is a migh higher score than customer_email
+            // That is why tie-breaker by title field does not apply
+            dataset_ids_by_name["theta"].to_string(),
+            dataset_ids_by_name["kappa"].to_string(),
+        ]
+    );
 
     let res = harness.search_dataset("user_name").await;
     assert_eq!(res.total_hits(), Some(1));
@@ -577,6 +592,8 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
     assert_eq!(
         res.ids(),
         vec![
+            // Score is the same: customer_id vs customer_email
+            // Tie-breaker by title field
             dataset_ids_by_name["kappa"].to_string(),
             dataset_ids_by_name["theta"].to_string(),
         ]
@@ -587,6 +604,8 @@ async fn test_find_dataset_by_schema_field_name(ctx: Arc<ElasticsearchTestContex
     assert_eq!(
         res.ids(),
         vec![
+            // Score is the same: customer_id vs customer_email
+            // Tie-breaker by title field
             dataset_ids_by_name["kappa"].to_string(),
             dataset_ids_by_name["theta"].to_string(),
         ]

@@ -8499,6 +8499,7 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
+ "mockall",
  "serde",
  "serde_json",
  "strum",

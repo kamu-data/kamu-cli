@@ -23,7 +23,7 @@ doctest = false
 
 [features]
 default = []
-
+testing = ["dep:mockall"]
 
 [dependencies]
 database-common = { workspace = true }
@@ -36,5 +36,8 @@ serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
+
+mockall = { version = "0.14", optional = true }
+
 
 [dev-dependencies]
