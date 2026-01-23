@@ -11,24 +11,53 @@ use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_run_api_server_e2e_test!(
+kamu_cli_run_api_server_e2e_test_elasticsearch!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_data_room_quota_exceeded,
-    options = Options::default()
-        .with_multi_tenant()
-        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_MOLECULE_CONFIG),
-    extra_test_groups = "containerized, quota, molecule"
+    elasticsearch_config =
+        kamu_cli_e2e_repo_tests::rest_api::get_multitenant_molecule_config_with_elasticsearch_and_prefix(),
+    options = {
+        let kamu_config = es_config.kamu_config.as_str();
+
+        Options::default()
+            .with_multi_tenant()
+            .with_kamu_config(kamu_config)
+    },
+    extra_test_groups = "containerized, molecule"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_run_api_server_e2e_test!(
+kamu_cli_run_api_server_e2e_test_elasticsearch!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_announcements_quota_exceeded,
-    options = Options::default()
-        .with_multi_tenant()
-        .with_kamu_config(kamu_cli_e2e_repo_tests::rest_api::MULTITENANT_MOLECULE_CONFIG),
-    extra_test_groups = "containerized, quota, molecule"
+    elasticsearch_config =
+        kamu_cli_e2e_repo_tests::rest_api::get_multitenant_molecule_config_with_elasticsearch_and_prefix(),
+    options = {
+        let kamu_config = es_config.kamu_config.as_str();
+
+        Options::default()
+            .with_multi_tenant()
+            .with_kamu_config(kamu_config)
+    },
+    extra_test_groups = "containerized, molecule"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test_elasticsearch!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_molecule_v2_activity_change_by_for_remove,
+    elasticsearch_config =
+        kamu_cli_e2e_repo_tests::rest_api::get_multitenant_molecule_config_with_elasticsearch_and_prefix(),
+    options = {
+        let kamu_config = es_config.kamu_config.as_str();
+
+        Options::default()
+            .with_multi_tenant()
+            .with_kamu_config(kamu_config)
+    },
+    extra_test_groups = "containerized, molecule"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

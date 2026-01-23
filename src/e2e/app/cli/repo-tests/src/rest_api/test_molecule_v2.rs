@@ -54,7 +54,16 @@ pub const ELASTICSEARCH_CONFIG_EXTENSION: &str = indoc::indoc!(
     "#
 );
 
+pub struct ElasticsearchTestConfig {
+    pub kamu_config: String,
+    pub index_prefix: String,
+}
+
 pub fn get_multitenant_molecule_config_with_elasticsearch() -> String {
+    get_multitenant_molecule_config_with_elasticsearch_and_prefix().kamu_config
+}
+
+pub fn get_multitenant_molecule_config_with_elasticsearch_and_prefix() -> ElasticsearchTestConfig {
     let random_prefix = random_strings::get_random_name(Some("kamu-test-e2e-"), 10).to_lowercase();
 
     let elasticsearch_config =
@@ -77,7 +86,10 @@ pub fn get_multitenant_molecule_config_with_elasticsearch() -> String {
         }
     }
 
-    serde_yaml::to_string(&base_config).unwrap()
+    ElasticsearchTestConfig {
+        kamu_config: serde_yaml::to_string(&base_config).unwrap(),
+        index_prefix: random_prefix,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

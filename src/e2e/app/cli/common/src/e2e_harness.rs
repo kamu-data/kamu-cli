@@ -14,7 +14,7 @@ use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
 use sqlx::{MySqlPool, PgPool};
 
-use crate::{KamuApiServerClient, api_server_e2e_test};
+use crate::{ElasticsearchTestCleanup, KamuApiServerClient, api_server_e2e_test};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +69,7 @@ pub struct KamuCliApiServerHarnessOptions {
     env_vars: Vec<(String, String)>,
     frozen_system_time: Option<DateTime<Utc>>,
     kamu_config: Option<String>,
+    elasticsearch_test_cleanup: Option<ElasticsearchTestCleanup>,
 }
 
 impl KamuCliApiServerHarnessOptions {
@@ -114,6 +115,16 @@ impl KamuCliApiServerHarnessOptions {
 
     pub fn with_kamu_config(mut self, content: &str) -> Self {
         self.kamu_config = Some(content.into());
+
+        self
+    }
+
+    pub fn with_elasticsearch_test_cleanup(mut self, index_prefix: impl Into<String>) -> Self {
+        // Used by `kamu_cli_run_api_server_e2e_test_elasticsearch!` macro to clean ES
+        // indices on success while keeping data on failures for inspection.
+        self.elasticsearch_test_cleanup = Some(ElasticsearchTestCleanup {
+            index_prefix: index_prefix.into(),
+        });
 
         self
     }
@@ -205,13 +216,21 @@ impl KamuCliApiServerHarness {
         Fixture: FnOnce(KamuApiServerClient) -> FixtureResult,
         FixtureResult: Future<Output = ()> + Send + 'static,
     {
+        let elasticsearch_cleanup = self.options.elasticsearch_test_cleanup.clone();
         let kamu = self.into_kamu().await;
 
         let workspace_path = kamu.workspace_path().to_path_buf();
         let e2e_data_file_path = kamu.get_e2e_output_data_path();
         let server_run_fut = kamu.start_api_server(e2e_data_file_path.clone());
 
-        api_server_e2e_test(e2e_data_file_path, workspace_path, server_run_fut, fixture).await;
+        api_server_e2e_test(
+            e2e_data_file_path,
+            workspace_path,
+            server_run_fut,
+            fixture,
+            elasticsearch_cleanup,
+        )
+        .await;
     }
 
     pub async fn execute_command<Fixture, FixtureResult>(self, fixture: Fixture)
@@ -230,6 +249,7 @@ impl KamuCliApiServerHarness {
             env_vars,
             frozen_system_time,
             kamu_config,
+            elasticsearch_test_cleanup: _,
         } = self.options;
 
         let mut kamu = match potential_workspace {
