@@ -242,8 +242,10 @@ jobs:
           exit 1
 
       - name: Elasticsearch tests
-        if: matrix.elasticsearch
+        if: matrix.elasticsearch && matrix.database
         env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: postgres://root:root@127.0.0.1:5432/kamu-test
           ELASTICSEARCH_URL: http://127.0.0.1:9200
         run: |
           # Show actual disk headroom ES sees
