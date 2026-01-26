@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use internal_error::*;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,60 +21,100 @@ pub struct SearchServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl SearchServiceImpl {
+    fn ensure_unrestricted_context<'a>(
+        &self,
+        ctx: SearchContext<'a>,
+    ) -> Result<SearchContext<'a>, SearchError> {
+        match ctx.security {
+            SearchSecurityContext::Unrestricted => Ok(ctx),
+            _ => Err(SearchError::Unauthorized(odf::AccessError::Unauthorized(
+                "Unrestricted security context required".into(),
+            ))),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl SearchService for SearchServiceImpl {
-    async fn health(&self, _: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
-        self.search_repo.health().await
-    }
+    async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, SearchError> {
+        self.ensure_unrestricted_context(ctx)?;
 
-    async fn listing_search(
-        &self,
-        _: SearchContext<'_>,
-        req: ListingSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.search_repo.listing_search(req).await
-    }
-
-    async fn text_search(
-        &self,
-        _: SearchContext<'_>,
-        req: TextSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.search_repo.text_search(req).await
-    }
-
-    async fn vector_search(
-        &self,
-        _: SearchContext<'_>,
-        req: VectorSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.search_repo.vector_search(req).await
-    }
-
-    async fn hybrid_search(
-        &self,
-        _: SearchContext<'_>,
-        req: HybridSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.search_repo.hybrid_search(req).await
+        self.search_repo.health().await.map_err(Into::into)
     }
 
     async fn find_document_by_id(
         &self,
-        _: SearchContext<'_>,
+        ctx: SearchContext<'_>,
         schema_name: SearchEntitySchemaName,
         id: &SearchEntityId,
-    ) -> Result<Option<serde_json::Value>, InternalError> {
-        self.search_repo.find_document_by_id(schema_name, id).await
+    ) -> Result<Option<serde_json::Value>, SearchError> {
+        self.ensure_unrestricted_context(ctx)?;
+
+        self.search_repo
+            .find_document_by_id(schema_name, id)
+            .await
+            .map_err(Into::into)
     }
 
     async fn bulk_update(
         &self,
-        _: SearchContext<'_>,
+        ctx: SearchContext<'_>,
         schema_name: SearchEntitySchemaName,
         operations: Vec<SearchIndexUpdateOperation>,
-    ) -> Result<(), InternalError> {
-        self.search_repo.bulk_update(schema_name, operations).await
+    ) -> Result<(), SearchError> {
+        self.ensure_unrestricted_context(ctx)?;
+
+        self.search_repo
+            .bulk_update(schema_name, operations)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn listing_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.search_repo
+            .listing_search(ctx.security, req)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn text_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.search_repo
+            .text_search(ctx.security, req)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn vector_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.search_repo
+            .vector_search(ctx.security, req)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.search_repo
+            .hybrid_search(ctx.security, req)
+            .await
+            .map_err(Into::into)
     }
 }
 

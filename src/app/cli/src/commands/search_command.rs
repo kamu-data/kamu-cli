@@ -13,6 +13,8 @@ use datafusion::arrow::array::{Float64Array, RecordBatch, StringArray, UInt64Arr
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use internal_error::*;
 use kamu::domain::*;
+use kamu_accounts::{CurrentAccountSubject, make_search_security_context};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::DatasetSearchService;
 
 use super::{CLIError, Command};
@@ -27,6 +29,8 @@ pub struct SearchCommand {
     search_svc_remote: Arc<dyn SearchServiceRemote>,
     dataset_search_svc: Arc<dyn DatasetSearchService>,
     output_config: Arc<OutputConfig>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+    rebac_svc: Arc<dyn RebacService>,
 
     #[dill::component(explicit)]
     query: Option<String>,
@@ -64,8 +68,18 @@ impl SearchCommand {
             return Err(CLIError::usage_error("Please provide a search prompt"));
         }
 
+        let is_admin = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(a) => self
+                .rebac_svc
+                .is_account_admin(&a.account_id)
+                .await
+                .int_err()?,
+            _ => false,
+        };
+
         let context = kamu_search::SearchContext {
             catalog: &self.catalog,
+            security: make_search_security_context(self.current_account_subject.as_ref(), is_admin),
         };
 
         let response = self

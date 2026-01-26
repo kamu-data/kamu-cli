@@ -76,6 +76,14 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         role: SearchSchemaFieldRole::Keyword,
     },
     SearchSchemaField {
+        path: kamu_search::fields::VISIBILITY,
+        role: SearchSchemaFieldRole::Keyword,
+    },
+    SearchSchemaField {
+        path: kamu_search::fields::PRINCIPAL_IDS,
+        role: SearchSchemaFieldRole::Keyword,
+    },
+    SearchSchemaField {
         path: fields::CREATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
@@ -108,7 +116,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         role: SearchSchemaFieldRole::Prose,
     },
     SearchSchemaField {
-        path: kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS,
+        path: kamu_search::fields::SEMANTIC_EMBEDDINGS,
         role: SearchSchemaFieldRole::EmbeddingChunks,
     },
 ];

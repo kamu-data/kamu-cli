@@ -10,6 +10,7 @@
 use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
+use kamu_auth_rebac::RebacServiceExt;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
@@ -109,10 +110,7 @@ impl Search {
         ))
     }
 
-    // TODO: restrict to admin only for now, until it's fully ready for public use
-    // (final API, ReBAC)
     #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
-    #[graphql(guard = "AdminGuard::new()")]
     async fn query_full_text(
         &self,
         ctx: &Context<'_>,
@@ -129,8 +127,7 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::SearchContext { catalog };
+        let context = self.make_search_context(ctx).await?;
 
         // Run actual search request
         let search_results = {
@@ -140,7 +137,12 @@ impl Search {
 
             let source_spec = SearchRequestSourceSpec::Complex {
                 include_patterns: vec![],
-                exclude_patterns: vec![kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string()],
+                exclude_patterns: vec![
+                    kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                    kamu_search::fields::VISIBILITY.to_string(),
+                    kamu_search::fields::PRINCIPAL_IDS.to_string(),
+                    kamu_search::fields::IS_BANNED.to_string(),
+                ],
             };
 
             let page_spec = SearchPaginationSpec {
@@ -156,7 +158,7 @@ impl Search {
                             source: source_spec,
                             entity_schemas,
                             filter: None,
-                            sort: sort!(SEARCH_ALIAS_TITLE),
+                            sort: sort!(kamu_search::fields::TITLE),
                             page: page_spec,
                         },
                     )
@@ -180,7 +182,11 @@ impl Search {
                     )
                     .await
             }
-        }?;
+        }
+        .map_err(|e| match e {
+            kamu_search::SearchError::Internal(e) => e.into(),
+            kamu_search::SearchError::Unauthorized(e) => GqlError::Access(e),
+        })?;
 
         // Convert into GQL response
         Ok(FullTextSearchResponse {
@@ -212,6 +218,7 @@ impl Search {
     /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
     #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?limit))]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,
@@ -223,8 +230,7 @@ impl Search {
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
         let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::SearchContext { catalog };
+        let context = self.make_search_context(ctx).await?;
 
         // Run vector search request
         let search_results = {
@@ -265,6 +271,7 @@ impl Search {
     /// current node using a prompt, mixing full-text and natural language
     /// methods
     #[tracing::instrument(level = "info", name = Search_query_hybrid, skip_all, fields(?limit))]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn query_hybrid(
         &self,
         ctx: &Context<'_>,
@@ -276,8 +283,7 @@ impl Search {
         // TODO: max limit is 10,000 in ES, otherwise we need cursors
         let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::SearchContext { catalog };
+        let context = self.make_search_context(ctx).await?;
 
         // Run vector search request
         let search_results = {
@@ -369,6 +375,37 @@ impl Search {
         Ok(NameLookupResultConnection::new(
             page_nodes, page, per_page, total,
         ))
+    }
+
+    #[graphql(skip)]
+    async fn make_search_context<'a>(
+        &self,
+        ctx: &Context<'a>,
+    ) -> Result<kamu_search::SearchContext<'a>> {
+        use kamu_accounts::CurrentAccountSubject;
+        let (current_account_subject, rebac_service) = from_catalog_n!(
+            ctx,
+            CurrentAccountSubject,
+            dyn kamu_auth_rebac::RebacService
+        );
+
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+
+        let is_admin = match current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(a) => rebac_service
+                .is_account_admin(&a.account_id)
+                .await
+                .int_err()?,
+            _ => false,
+        };
+
+        Ok(kamu_search::SearchContext {
+            catalog,
+            security: kamu_accounts::make_search_security_context(
+                current_account_subject.as_ref(),
+                is_admin,
+            ),
+        })
     }
 }
 

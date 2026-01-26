@@ -773,17 +773,20 @@ impl DatasetSearchHarness {
 
         let seach_response = self
             .search_repo()
-            .text_search(TextSearchRequest {
-                intent: TextSearchIntent::make_full_text(query),
-                entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
-                source: SearchRequestSourceSpec::None,
-                filter: None,
-                page: SearchPaginationSpec {
-                    limit: 100,
-                    offset: 0,
+            .text_search(
+                SearchSecurityContext::Unrestricted,
+                TextSearchRequest {
+                    intent: TextSearchIntent::make_full_text(query),
+                    entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
+                    source: SearchRequestSourceSpec::None,
+                    filter: None,
+                    page: SearchPaginationSpec {
+                        limit: 100,
+                        offset: 0,
+                    },
+                    options: TextSearchOptions::default(),
                 },
-                options: TextSearchOptions::default(),
-            })
+            )
             .await
             .unwrap();
 

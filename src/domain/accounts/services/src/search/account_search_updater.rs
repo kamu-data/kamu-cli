@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use kamu_search::*;
 use messaging_outbox::*;
@@ -38,7 +38,7 @@ pub struct AccountSearchUpdater {
 impl AccountSearchUpdater {
     async fn handle_new_account(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         new_account_message: &AccountLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
         let doc = index_from_parts(
@@ -49,7 +49,7 @@ impl AccountSearchUpdater {
 
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 account_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
                     id: new_account_message.account_id.to_string(),
@@ -57,11 +57,12 @@ impl AccountSearchUpdater {
                 }],
             )
             .await
+            .int_err()
     }
 
     async fn handle_updated_account(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         updated_account_message: &AccountLifecycleMessageUpdated,
     ) -> Result<(), InternalError> {
         // Only update search index if account_name or display_name changed
@@ -84,7 +85,7 @@ impl AccountSearchUpdater {
 
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 account_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
                     id: updated_account_message.account_id.to_string(),
@@ -92,22 +93,24 @@ impl AccountSearchUpdater {
                 }],
             )
             .await
+            .int_err()
     }
 
     async fn handle_deleted_account(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         account_id: &odf::AccountID,
     ) -> Result<(), InternalError> {
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 account_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Delete {
                     id: account_id.to_string(),
                 }],
             )
             .await
+            .int_err()
     }
 }
 
@@ -131,20 +134,17 @@ impl MessageConsumerT<AccountLifecycleMessage> for AccountSearchUpdater {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
-
         match message {
             AccountLifecycleMessage::Created(new_account_message) => {
-                self.handle_new_account(ctx, new_account_message).await?;
+                self.handle_new_account(target_catalog, new_account_message)
+                    .await?;
             }
             AccountLifecycleMessage::Updated(updated_account_message) => {
-                self.handle_updated_account(ctx, updated_account_message)
+                self.handle_updated_account(target_catalog, updated_account_message)
                     .await?;
             }
             AccountLifecycleMessage::Deleted(deleted_account_message) => {
-                self.handle_deleted_account(ctx, &deleted_account_message.account_id)
+                self.handle_deleted_account(target_catalog, &deleted_account_message.account_id)
                     .await?;
             }
 

@@ -13,9 +13,22 @@ pub type SearchEntityId = String;
 pub type SearchEntitySchemaName = &'static str;
 pub type SearchFieldPath = &'static str;
 
-pub const SEARCH_ALIAS_TITLE: &str = "title";
-pub const SEARCH_FIELD_IS_BANNED: &str = "is_banned";
-pub const SEARCH_FIELD_SEMANTIC_EMBEDDINGS: &str = "semantic_embeddings";
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub mod fields {
+    pub const TITLE: &str = "title";
+    pub const IS_BANNED: &str = "is_banned";
+    pub const SEMANTIC_EMBEDDINGS: &str = "semantic_embeddings";
+
+    pub const VISIBILITY: &str = "visibility";
+    pub const PRINCIPAL_IDS: &str = "principal_ids";
+
+    pub mod values {
+        pub const VISIBILITY_PUBLIC_GUEST: &str = "public-guest";
+        pub const VISIBILITY_PUBLIC_AUTHENTICATED: &str = "public-authenticated";
+        pub const VISIBILITY_PRIVATE: &str = "private";
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

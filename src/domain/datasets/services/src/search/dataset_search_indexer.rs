@@ -9,6 +9,7 @@
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+use kamu_auth_rebac::RebacService;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
 use odf::dataset::MetadataChainExt;
@@ -20,6 +21,7 @@ use odf::dataset::MetadataChainExt;
 pub(crate) struct DatasetIndexingHelper<'a> {
     pub embeddings_chunker: &'a dyn EmbeddingsChunker,
     pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
+    pub rebac_service: &'a dyn RebacService,
 }
 
 impl DatasetIndexingHelper<'_> {
@@ -33,6 +35,9 @@ impl DatasetIndexingHelper<'_> {
         owner_id: &odf::AccountID,
         head: &odf::Multihash,
     ) -> Result<serde_json::Value, InternalError> {
+        // Extract visibility data
+        let visibility_data = self.dataset_visibility(&dataset, owner_id).await?;
+
         // Find key blocks that contribute to search
         let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
         let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
@@ -97,6 +102,8 @@ impl DatasetIndexingHelper<'_> {
                         odf::DatasetKind::Root => fields::values::KIND_ROOT.to_string(),
                         odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
                     },
+                    kamu_search::fields::VISIBILITY: visibility_data.visibility,
+                    kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
                     fields::CREATED_AT: seed_event_time.to_rfc3339(),
                     fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
                 });
@@ -117,7 +124,7 @@ impl DatasetIndexingHelper<'_> {
                 }
                 if let SearchFieldUpdate::Present(v) = embeddings_document {
                     index_doc_mut.insert(
-                        kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS.to_string(),
+                        kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
                         serde_json::json!(v),
                     );
                 }
@@ -287,11 +294,66 @@ impl DatasetIndexingHelper<'_> {
         // Finally, insert updated embeddings
         insert_search_incremental_update_field(
             &mut update,
-            kamu_search::SEARCH_FIELD_SEMANTIC_EMBEDDINGS,
+            kamu_search::fields::SEMANTIC_EMBEDDINGS,
             embeddings_document,
         );
 
         Ok(serde_json::Value::Object(update))
+    }
+
+    async fn dataset_visibility(
+        &self,
+        dataset: &ResolvedDataset,
+        owner_id: &odf::AccountID,
+    ) -> Result<DatasetVisibilityData, InternalError> {
+        // Fetch main visibility properties
+        let dataset_properties = self
+            .rebac_service
+            .get_dataset_properties(dataset.get_id())
+            .await
+            .int_err()?;
+
+        // Public?
+        if dataset_properties.allows_public_read {
+            // Determine if anonymous read is allowed
+            let visibility = if dataset_properties.allows_anonymous_read {
+                kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST
+            } else {
+                kamu_search::fields::values::VISIBILITY_PUBLIC_AUTHENTICATED
+            };
+
+            // No principal IDs needed for public datasets
+            Ok(DatasetVisibilityData {
+                visibility: visibility.to_string(),
+                principal_ids: vec![],
+            })
+        } else {
+            // Unexpected combination: private dataset with anonymous read allowed
+            assert!(!dataset_properties.allows_anonymous_read);
+
+            // Fetch authorized accounts
+            let authorized_accounts = self
+                .rebac_service
+                .get_authorized_accounts(dataset.get_id())
+                .await
+                .int_err()?;
+
+            // Collect principal IDs:
+            // - for now, just account IDs
+            // - in future - maybe organizations, ...
+            let mut principal_ids: Vec<String> = authorized_accounts
+                .into_iter()
+                .map(|aa| aa.account_id.to_string())
+                .collect();
+
+            // Owner also needs access
+            principal_ids.push(owner_id.to_string());
+
+            Ok(DatasetVisibilityData {
+                visibility: kamu_search::fields::values::VISIBILITY_PRIVATE.to_string(),
+                principal_ids,
+            })
+        }
     }
 }
 
@@ -391,6 +453,13 @@ fn extract_attachment_contents(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DatasetVisibilityData {
+    pub visibility: String,
+    pub principal_ids: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Indexing function
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -400,6 +469,7 @@ pub(crate) async fn index_datasets(
     search_repo: &dyn SearchRepository,
     embeddings_chunker: &dyn EmbeddingsChunker,
     embeddings_encoder: &dyn EmbeddingsEncoder,
+    rebac_service: &dyn RebacService,
 ) -> Result<usize, InternalError> {
     const BULK_SIZE: usize = 500;
 
@@ -411,6 +481,7 @@ pub(crate) async fn index_datasets(
     let indexing_helper = DatasetIndexingHelper {
         embeddings_chunker,
         embeddings_encoder,
+        rebac_service,
     };
 
     use futures::TryStreamExt;

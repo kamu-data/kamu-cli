@@ -113,31 +113,6 @@ impl SearchRepository for ElasticsearchContainerRepository {
         self.inner().await?.health().await
     }
 
-    async fn listing_search(
-        &self,
-        req: ListingSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.inner().await?.listing_search(req).await
-    }
-
-    async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
-        self.inner().await?.text_search(req).await
-    }
-
-    async fn vector_search(
-        &self,
-        req: VectorSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.inner().await?.vector_search(req).await
-    }
-
-    async fn hybrid_search(
-        &self,
-        req: HybridSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        self.inner().await?.hybrid_search(req).await
-    }
-
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
@@ -180,6 +155,38 @@ impl SearchRepository for ElasticsearchContainerRepository {
 
     async fn drop_all_schemas(&self) -> Result<(), InternalError> {
         self.inner().await?.drop_all_schemas().await
+    }
+
+    async fn listing_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.listing_search(security_ctx, req).await
+    }
+
+    async fn text_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.text_search(security_ctx, req).await
+    }
+
+    async fn vector_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.vector_search(security_ctx, req).await
+    }
+
+    async fn hybrid_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        self.inner().await?.hybrid_search(security_ctx, req).await
     }
 }
 

@@ -78,6 +78,12 @@ impl ElasticsearchDatasetBaseHarness {
             b.add::<DatasetAccountLifecycleHandler>();
             b.add::<DeleteDatasetUseCaseImpl>();
 
+            // ReBAC
+            b.add::<RebacServiceImpl>();
+            b.add::<InMemoryRebacRepository>();
+            b.add_value(DefaultAccountProperties::default());
+            b.add_value(DefaultDatasetProperties::default());
+
             // Embedding mocks
             let mut embeddings_chunker = MockEmbeddingsChunker::new();
             embeddings_chunker.expect_chunk().returning(Ok);
@@ -125,12 +131,8 @@ impl ElasticsearchDatasetBaseHarness {
                 b.add_value(predefined_accounts_config);
                 b.add::<PredefinedAccountsRegistrator>();
                 b.add::<LoginPasswordAuthProvider>();
-                b.add::<RebacServiceImpl>();
-                b.add::<InMemoryRebacRepository>();
                 b.add::<CreateAccountUseCaseImpl>();
                 b.add::<UpdateAccountUseCaseImpl>();
-                b.add_value(DefaultAccountProperties::default());
-                b.add_value(DefaultDatasetProperties::default());
                 b.build()
             };
 

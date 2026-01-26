@@ -15,6 +15,7 @@ use kamu_accounts::{
     AccountLifecycleMessageUpdated,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
+use kamu_auth_rebac::RebacService;
 use kamu_datasets::*;
 use kamu_search::*;
 use messaging_outbox::*;
@@ -42,6 +43,7 @@ pub struct DatasetSearchUpdater {
     search_service: Arc<dyn SearchService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    rebac_service: Arc<dyn RebacService>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
@@ -51,13 +53,14 @@ pub struct DatasetSearchUpdater {
 impl DatasetSearchUpdater {
     async fn handle_dataset_ref_updated(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         // Pprepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
             embeddings_chunker: self.embeddings_chunker.as_ref(),
             embeddings_encoder: self.embeddings_encoder.as_ref(),
+            rebac_service: self.rebac_service.as_ref(),
         };
 
         // Resolve entry
@@ -80,11 +83,12 @@ impl DatasetSearchUpdater {
             let maybe_existing_document = self
                 .search_service
                 .find_document_by_id(
-                    ctx,
+                    SearchContext::unrestricted(catalog),
                     dataset_search_schema::SCHEMA_NAME,
                     &updated_message.dataset_id.to_string(),
                 )
-                .await?;
+                .await
+                .int_err()?;
 
             // Is document present?
             // Note, even if we had previous updates, the document may be missing,
@@ -105,14 +109,15 @@ impl DatasetSearchUpdater {
                 // Send it to the full text search service for updating
                 self.search_service
                     .bulk_update(
-                        ctx,
+                        SearchContext::unrestricted(catalog),
                         dataset_search_schema::SCHEMA_NAME,
                         vec![SearchIndexUpdateOperation::Update {
                             id: updated_message.dataset_id.to_string(),
                             doc: partial_update,
                         }],
                     )
-                    .await?;
+                    .await
+                    .int_err()?;
 
                 return Ok(());
             }
@@ -131,21 +136,22 @@ impl DatasetSearchUpdater {
         // Send it to the full text search service for indexing
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 dataset_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
                     id: updated_message.dataset_id.to_string(),
                     doc: dataset_document,
                 }],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
 
     async fn handle_renamed_dataset(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         renamed_message: &DatasetLifecycleMessageRenamed,
     ) -> Result<(), InternalError> {
         // Prepare partial update to dataset search document
@@ -154,7 +160,7 @@ impl DatasetSearchUpdater {
         // Send it to the full text search service for updating
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 dataset_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
                     id: renamed_message.dataset_id.to_string(),
@@ -162,27 +168,29 @@ impl DatasetSearchUpdater {
                 }],
             )
             .await
+            .int_err()
     }
 
     async fn handle_deleted_dataset(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
         self.search_service
             .bulk_update(
-                ctx,
+                SearchContext::unrestricted(catalog),
                 dataset_search_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Delete {
                     id: dataset_id.to_string(),
                 }],
             )
             .await
+            .int_err()
     }
 
     async fn handle_renamed_account(
         &self,
-        ctx: SearchContext<'_>,
+        catalog: &dill::Catalog,
         updated_account_message: &AccountLifecycleMessageUpdated,
     ) -> Result<(), InternalError> {
         // Find all datasets owned by this account
@@ -210,8 +218,13 @@ impl DatasetSearchUpdater {
 
         // Send them to the full text search service for updating
         self.search_service
-            .bulk_update(ctx, dataset_search_schema::SCHEMA_NAME, updates)
-            .await?;
+            .bulk_update(
+                SearchContext::unrestricted(catalog),
+                dataset_search_schema::SCHEMA_NAME,
+                updates,
+            )
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -237,19 +250,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
-
         match message {
             DatasetLifecycleMessage::Created(_) => {
                 // Skip, we will use "set_ref" messages for indexing
             }
             DatasetLifecycleMessage::Renamed(renamed_message) => {
-                self.handle_renamed_dataset(ctx, renamed_message).await?;
+                self.handle_renamed_dataset(target_catalog, renamed_message)
+                    .await?;
             }
             DatasetLifecycleMessage::Deleted(deleted_message) => {
-                self.handle_deleted_dataset(ctx, &deleted_message.dataset_id)
+                self.handle_deleted_dataset(target_catalog, &deleted_message.dataset_id)
                     .await?;
             }
         }
@@ -274,10 +284,6 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
-
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
                 // We only care about head updates for full text search.
@@ -285,7 +291,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetSearchUpdater {
                     return Ok(());
                 }
 
-                self.handle_dataset_ref_updated(ctx, updated_message)
+                self.handle_dataset_ref_updated(target_catalog, updated_message)
                     .await?;
             }
         }
@@ -310,17 +316,13 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
-
         match message {
             AccountLifecycleMessage::Updated(updated_account_message) => {
                 // Only account names are interesting for datasets search
                 if updated_account_message.old_account_name
                     != updated_account_message.new_account_name
                 {
-                    self.handle_renamed_account(ctx, updated_account_message)
+                    self.handle_renamed_account(target_catalog, updated_account_message)
                         .await?;
                 }
             }

@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
+use database_common_macros::transactional_method3;
 use internal_error::InternalError;
+use kamu_auth_rebac::RebacService;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, dataset_search_schema};
 use kamu_search::*;
 
@@ -29,9 +30,10 @@ pub struct DatasetSearchSchemaProvider {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetSearchSchemaProvider {
-    #[transactional_method2(
+    #[transactional_method3(
         dataset_entry_service: Arc<dyn DatasetEntryService>,
-        dataset_registry: Arc<dyn DatasetRegistry>
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        rebac_service: Arc<dyn RebacService>
     )]
     async fn index_datasets(
         &self,
@@ -43,6 +45,7 @@ impl DatasetSearchSchemaProvider {
             search_repo.as_ref(),
             self.embeddings_chunker.as_ref(),
             self.embeddings_encoder.as_ref(),
+            rebac_service.as_ref(),
         )
         .await
     }

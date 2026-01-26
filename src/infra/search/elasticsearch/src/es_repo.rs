@@ -258,6 +258,46 @@ impl ElasticsearchRepository {
 
         Ok(embedding_field_path.unwrap())
     }
+
+    #[allow(dead_code)]
+    fn make_security_filter(
+        &self,
+        security_ctx: SearchSecurityContext,
+    ) -> Option<SearchFilterExpr> {
+        match security_ctx {
+            // For unrestricted context, no additional filtering
+            SearchSecurityContext::Unrestricted => None,
+
+            // For anonymous users, only allow public guest content
+            SearchSecurityContext::Anonymous => Some(field_eq_str(
+                kamu_search::fields::VISIBILITY,
+                kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
+            )),
+
+            // For authenticated users, allow public guest, public authenticated content, and
+            // private that match principal IDs
+            SearchSecurityContext::Restricted {
+                current_principal_ids,
+            } => {
+                let mut clauses = vec![field_in_str(
+                    kamu_search::fields::VISIBILITY,
+                    vec![
+                        kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
+                        kamu_search::fields::values::VISIBILITY_PUBLIC_AUTHENTICATED,
+                    ],
+                )];
+
+                if !current_principal_ids.is_empty() {
+                    clauses.push(field_in_str(
+                        kamu_search::fields::PRINCIPAL_IDS,
+                        &current_principal_ids,
+                    ));
+                }
+
+                Some(SearchFilterExpr::or_clauses(clauses))
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -377,14 +417,19 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_listing_search, skip_all)]
     async fn listing_search(
         &self,
+        security_ctx: SearchSecurityContext,
         req: ListingSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
         // Build Elasticsearch full-text search request body
         let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_listing_query(
-            req.filter.as_ref(),
+            maybe_filter.as_ref(),
             &req.source,
             &req.sort,
             &req.page,
@@ -395,9 +440,17 @@ impl SearchRepository for ElasticsearchRepository {
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_text_search, skip_all)]
-    async fn text_search(&self, req: TextSearchRequest) -> Result<SearchResponse, InternalError> {
+    async fn text_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
         // Build Elasticsearch full-text search request body, depending on intent
         let es_query_body = match req.intent {
@@ -421,7 +474,7 @@ impl SearchRepository for ElasticsearchRepository {
                 let sort_spec = vec![
                     SearchSortSpec::Relevance,
                     SearchSortSpec::ByField {
-                        field: SEARCH_ALIAS_TITLE,
+                        field: kamu_search::fields::TITLE,
                         direction: SearchSortDirection::Ascending,
                         nulls_first: false,
                     },
@@ -434,7 +487,7 @@ impl SearchRepository for ElasticsearchRepository {
                             term_operator,
                             MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
                             &multi_match_policy,
-                            req.filter.as_ref(),
+                            maybe_filter.as_ref(),
                             &req.source,
                             &sort_spec,
                             &req.page,
@@ -446,7 +499,7 @@ impl SearchRepository for ElasticsearchRepository {
                             &prompt,
                             term_operator,
                             &multi_match_policy,
-                            req.filter.as_ref(),
+                            maybe_filter.as_ref(),
                             &req.source,
                             &sort_spec,
                             &req.page,
@@ -473,10 +526,10 @@ impl SearchRepository for ElasticsearchRepository {
                     &prompt,
                     FullTextSearchTermOperator::Or,
                     &multi_match_policy,
-                    req.filter.as_ref(),
+                    maybe_filter.as_ref(),
                     &req.source,
                     &[SearchSortSpec::ByField {
-                        field: SEARCH_ALIAS_TITLE,
+                        field: kamu_search::fields::TITLE,
                         direction: SearchSortDirection::Ascending,
                         nulls_first: false,
                     }],
@@ -502,7 +555,7 @@ impl SearchRepository for ElasticsearchRepository {
                 es_helpers::ElasticsearchQueryBuilder::build_phrase_search_query(
                     &prompt,
                     &phrase_search_policy,
-                    req.filter.as_ref(),
+                    maybe_filter.as_ref(),
                     &req.source,
                     &req.page,
                     &req.options,
@@ -517,6 +570,7 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_vector_search, skip_all)]
     async fn vector_search(
         &self,
+        security_ctx: SearchSecurityContext,
         req: VectorSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
@@ -525,11 +579,15 @@ impl SearchRepository for ElasticsearchRepository {
         // Determine embedding field
         let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
 
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
         // Build Elasticsearch vector request body
         let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
             embedding_field,
             &req.prompt_embedding,
-            req.filter.as_ref(),
+            maybe_filter.as_ref(),
             &req.source,
             req.limit,
             &req.options,
@@ -542,6 +600,7 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_hybrid_search, skip_all)]
     async fn hybrid_search(
         &self,
+        security_ctx: SearchSecurityContext,
         req: HybridSearchRequest,
     ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
@@ -549,6 +608,10 @@ impl SearchRepository for ElasticsearchRepository {
 
         // Determine embedding field
         let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
         // Build multi-match policy for textual part
         let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
@@ -570,12 +633,12 @@ impl SearchRepository for ElasticsearchRepository {
                 FullTextSearchTermOperator::Or,
                 MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
                 &multi_match_policy,
-                req.filter.as_ref(),
+                maybe_filter.as_ref(),
                 &req.source,
                 &[
                     SearchSortSpec::Relevance,
                     SearchSortSpec::ByField {
-                        field: SEARCH_ALIAS_TITLE,
+                        field: kamu_search::fields::TITLE,
                         direction: SearchSortDirection::Ascending,
                         nulls_first: false,
                     },
@@ -595,7 +658,7 @@ impl SearchRepository for ElasticsearchRepository {
         let vector_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
             embedding_field,
             &req.prompt_embedding,
-            req.filter.as_ref(),
+            maybe_filter.as_ref(),
             &req.source,
             req.options.rrf.rank_window_size,
             &VectorSearchOptions {

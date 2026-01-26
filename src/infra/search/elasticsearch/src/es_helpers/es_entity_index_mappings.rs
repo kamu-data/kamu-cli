@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    SEARCH_ALIAS_TITLE,
-    SEARCH_FIELD_IS_BANNED,
-    SearchEntitySchema,
-    SearchSchemaFieldRole,
-};
+use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -190,7 +185,7 @@ impl ElasticsearchIndexMappings {
         }
 
         mappings.insert(
-            SEARCH_ALIAS_TITLE.to_string(),
+            kamu_search::fields::TITLE.to_string(),
             serde_json::json!({
                 "type": "alias",
                 "path": entity_schema.title_field
@@ -199,7 +194,7 @@ impl ElasticsearchIndexMappings {
 
         if entity_schema.enable_banning {
             mappings.insert(
-                SEARCH_FIELD_IS_BANNED.to_string(),
+                kamu_search::fields::IS_BANNED.to_string(),
                 serde_json::json!({
                     "type": "boolean"
                 }),

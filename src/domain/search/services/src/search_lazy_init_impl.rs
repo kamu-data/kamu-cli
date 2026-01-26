@@ -72,45 +72,9 @@ impl SearchImplLazyInit {
 
 #[async_trait::async_trait]
 impl SearchService for SearchImplLazyInit {
-    async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
+    async fn health(&self, ctx: SearchContext<'_>) -> Result<serde_json::Value, SearchError> {
         let inner = self.inner().await?;
         inner.health(ctx).await
-    }
-
-    async fn listing_search(
-        &self,
-        ctx: SearchContext<'_>,
-        req: ListingSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        let inner = self.inner().await?;
-        inner.listing_search(ctx, req).await
-    }
-
-    async fn text_search(
-        &self,
-        ctx: SearchContext<'_>,
-        req: TextSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        let inner = self.inner().await?;
-        inner.text_search(ctx, req).await
-    }
-
-    async fn vector_search(
-        &self,
-        ctx: SearchContext<'_>,
-        req: VectorSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        let inner = self.inner().await?;
-        inner.vector_search(ctx, req).await
-    }
-
-    async fn hybrid_search(
-        &self,
-        ctx: SearchContext<'_>,
-        req: HybridSearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        let inner = self.inner().await?;
-        inner.hybrid_search(ctx, req).await
     }
 
     async fn find_document_by_id(
@@ -118,7 +82,7 @@ impl SearchService for SearchImplLazyInit {
         ctx: SearchContext<'_>,
         schema_name: SearchEntitySchemaName,
         id: &SearchEntityId,
-    ) -> Result<Option<serde_json::Value>, InternalError> {
+    ) -> Result<Option<serde_json::Value>, SearchError> {
         let inner = self.inner().await?;
         inner.find_document_by_id(ctx, schema_name, id).await
     }
@@ -128,9 +92,45 @@ impl SearchService for SearchImplLazyInit {
         ctx: SearchContext<'_>,
         schema_name: SearchEntitySchemaName,
         operations: Vec<SearchIndexUpdateOperation>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), SearchError> {
         let inner = self.inner().await?;
         inner.bulk_update(ctx, schema_name, operations).await
+    }
+
+    async fn listing_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        let inner = self.inner().await?;
+        inner.listing_search(ctx, req).await
+    }
+
+    async fn text_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        let inner: Arc<dyn SearchService> = self.inner().await?;
+        inner.text_search(ctx, req).await
+    }
+
+    async fn vector_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        let inner = self.inner().await?;
+        inner.vector_search(ctx, req).await
+    }
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        let inner = self.inner().await?;
+        inner.hybrid_search(ctx, req).await
     }
 }
 

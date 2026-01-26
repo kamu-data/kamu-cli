@@ -138,7 +138,8 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                     },
                 )
                 .await
-        }?;
+        }
+        .int_err()?;
 
         // Convert results into dataset handles
         self.convert_search_response(search_response).await
@@ -188,7 +189,8 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                     },
                 )
                 .await
-        }?;
+        }
+        .int_err()?;
 
         // Convert results into dataset handles
         self.convert_search_response(search_response).await
