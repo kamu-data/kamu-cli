@@ -1,0 +1,10 @@
+# nextest configuration for this workspace.
+
+[profile.default]
+
+# Elasticsearch-backed E2E tests are heavy and contend on a single-node ES
+# instance; running them in parallel often causes timeouts. Keep this group
+# serial while allowing the rest of the suite to run concurrently.
+[[profile.default.overrides]]
+filter = "test(::elasticsearch::)"
+threads = 4
