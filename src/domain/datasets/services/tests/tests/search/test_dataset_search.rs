@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bon::bon;
-use kamu_accounts::PredefinedAccountsConfig;
+use kamu_accounts::{AccountConfig, PredefinedAccountsConfig};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
@@ -741,6 +741,170 @@ async fn test_find_dataset_by_keyword(ctx: Arc<ElasticsearchTestContext>) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_dataset_search_visibility(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetSearchHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .maybe_predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: ["alice", "bob", "charlie"]
+                .into_iter()
+                .map(odf::AccountName::new_unchecked)
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .build()
+        .await;
+
+    let dataset_ids = harness
+        .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta")])
+        .await;
+
+    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let charlie_id = odf::AccountID::new_seeded_ed25519("charlie".as_bytes());
+
+    ////////////////////////////////////////////////////////////////////////
+    // 1) Initial searching - only owners can see their datasets
+    ////////////////////////////////////////////////////////////////////////
+
+    // Alice searches
+    let res = harness.view_datasets_index_as(&alice_id).await;
+    assert_eq!(res.total_hits(), Some(1));
+    assert_eq!(res.ids(), vec![dataset_ids[0].to_string()]);
+
+    // Bob searches
+    let res = harness.view_datasets_index_as(&bob_id).await;
+    assert_eq!(res.total_hits(), Some(1));
+    assert_eq!(res.ids(), vec![dataset_ids[1].to_string()]);
+
+    // Charlie searches
+    let res = harness.view_datasets_index_as(&charlie_id).await;
+    assert_eq!(res.total_hits(), Some(0));
+
+    // Admin searches
+    let res = harness.view_datasets_index_as_admin().await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    ////////////////////////////////////////////////////////////////////////
+    // 2) Make "beta" public and verify visibility changes
+    ////////////////////////////////////////////////////////////////////////
+
+    harness
+        .set_dataset_visibility(&dataset_ids[1], odf::DatasetVisibility::Public)
+        .await;
+
+    // Alice searches
+    let res = harness.view_datasets_index_as(&alice_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Bob searches
+    let res = harness.view_datasets_index_as(&bob_id).await;
+    assert_eq!(res.total_hits(), Some(1));
+    assert_eq!(res.ids(), vec![dataset_ids[1].to_string()]);
+
+    // Charlie searches
+    let res = harness.view_datasets_index_as(&charlie_id).await;
+    assert_eq!(res.total_hits(), Some(1));
+    assert_eq!(res.ids(), vec![dataset_ids[1].to_string()]);
+
+    // Admin searches
+    let res = harness.view_datasets_index_as_admin().await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    ////////////////////////////////////////////////////////////////////////
+    // 3) Add Bob & Charlie to "alpha" as a collaborator and verify visibility
+    ////////////////////////////////////////////////////////////////////////
+
+    harness
+        .add_dataset_collaborators(&dataset_ids[0], &[&bob_id, &charlie_id])
+        .await;
+
+    // Alice searches
+    let res = harness.view_datasets_index_as(&alice_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Bob searches
+    let res = harness.view_datasets_index_as(&bob_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Charlie searches
+    let res = harness.view_datasets_index_as(&charlie_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Admin searches
+    let res = harness.view_datasets_index_as_admin().await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    ////////////////////////////////////////////////////////////////////////
+    // 4) Drop Charlie from "alpha" collaborators and verify visibility
+    ////////////////////////////////////////////////////////////////////////
+
+    harness
+        .remove_dataset_collaborators(&dataset_ids[0], &[&charlie_id])
+        .await;
+
+    // Alice searches
+    let res = harness.view_datasets_index_as(&alice_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Bob searches
+    let res = harness.view_datasets_index_as(&bob_id).await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+
+    // Charlie searches
+    let res = harness.view_datasets_index_as(&charlie_id).await;
+    assert_eq!(res.total_hits(), Some(1));
+    assert_eq!(res.ids(), vec![dataset_ids[1].to_string()]);
+
+    // Admin searches
+    let res = harness.view_datasets_index_as_admin().await;
+    assert_eq!(res.total_hits(), Some(2));
+    assert_eq!(
+        res.ids(),
+        vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(ElasticsearchDatasetBaseHarness, es_dataset_base_use_case_harness)]
 struct DatasetSearchHarness {
     es_dataset_base_use_case_harness: ElasticsearchDatasetBaseHarness,
@@ -785,6 +949,32 @@ impl DatasetSearchHarness {
                         offset: 0,
                     },
                     options: TextSearchOptions::default(),
+                },
+            )
+            .await
+            .unwrap();
+
+        SearchTestResponse(seach_response)
+    }
+
+    pub async fn view_datasets_index_as(&self, account_id: &odf::AccountID) -> SearchTestResponse {
+        self.synchronize().await;
+
+        let seach_response = self
+            .search_repo()
+            .listing_search(
+                SearchSecurityContext::Restricted {
+                    current_principal_ids: vec![account_id.to_string()],
+                },
+                ListingSearchRequest {
+                    entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
+                    source: SearchRequestSourceSpec::All,
+                    filter: None,
+                    sort: sort!(dataset_search_schema::fields::DATASET_NAME),
+                    page: SearchPaginationSpec {
+                        limit: 100,
+                        offset: 0,
+                    },
                 },
             )
             .await

@@ -640,7 +640,7 @@ pub fn configure_base_catalog(
         kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
     );
 
-    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetAccountRelationsMessage>(
+    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetRelationsMessage>(
         &mut b,
         kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     );

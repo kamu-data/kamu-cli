@@ -18,8 +18,8 @@ use kamu_accounts::{
 use kamu_auth_rebac::{
     MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
     MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-    RebacDatasetAccountRelationsMessage,
     RebacDatasetPropertiesMessage,
+    RebacDatasetRelationsMessage,
     RebacService,
 };
 use kamu_datasets::*;
@@ -36,7 +36,7 @@ use crate::search::dataset_search_indexer::*;
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<DatasetReferenceMessage>)]
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<AccountLifecycleMessage>)]
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<RebacDatasetPropertiesMessage>)]
-#[dill::interface(dyn messaging_outbox::MessageConsumerT<RebacDatasetAccountRelationsMessage>)]
+#[dill::interface(dyn messaging_outbox::MessageConsumerT<RebacDatasetRelationsMessage>)]
 #[dill::meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASETS_SEARCH_UPDATER,
     feeding_producers: &[
@@ -490,7 +490,7 @@ impl MessageConsumerT<RebacDatasetPropertiesMessage> for DatasetSearchUpdater {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<RebacDatasetAccountRelationsMessage> for DatasetSearchUpdater {
+impl MessageConsumerT<RebacDatasetRelationsMessage> for DatasetSearchUpdater {
     #[tracing::instrument(
         level = "debug",
         skip_all,
@@ -499,12 +499,12 @@ impl MessageConsumerT<RebacDatasetAccountRelationsMessage> for DatasetSearchUpda
     async fn consume_message(
         &self,
         target_catalog: &dill::Catalog,
-        message: &RebacDatasetAccountRelationsMessage,
+        message: &RebacDatasetRelationsMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received ReBAC dataset account relations message");
 
         match message {
-            RebacDatasetAccountRelationsMessage::Modified(message) => {
+            RebacDatasetRelationsMessage::Modified(message) => {
                 self.handle_rebac_dataset_account_relations_properties_modified(
                     target_catalog,
                     &message.dataset_id,
@@ -513,7 +513,7 @@ impl MessageConsumerT<RebacDatasetAccountRelationsMessage> for DatasetSearchUpda
                 .await?;
             }
 
-            RebacDatasetAccountRelationsMessage::Deleted(_) => {
+            RebacDatasetRelationsMessage::Deleted(_) => {
                 // No-op for search
                 // Note: deletion of datasets will trigger Rebac deletion,
                 // which we handle via DatasetLifecycleMessage

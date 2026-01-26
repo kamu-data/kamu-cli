@@ -20,37 +20,37 @@ const REBAC_DATASET_ACCOUNT_RELATIONS_MESSAGE_VERSION: u32 = 1;
 
 /// Represents messages related to the lifecycle of an access token
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RebacDatasetAccountRelationsMessage {
+pub enum RebacDatasetRelationsMessage {
     /// Message indicating dataset `ReBAC` relations with accounts
     ///   have been created or updated
-    Modified(RebacDatasetAccountRelationsMessageModified),
+    Modified(RebacDatasetRelationsMessageModified),
 
     /// Message indicating dataset `ReBAC` relations with accounts
     ///  have been deleted
-    Deleted(RebacDatasetAccountRelationsMessageDeleted),
+    Deleted(RebacDatasetRelationsMessageDeleted),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl RebacDatasetAccountRelationsMessage {
+impl RebacDatasetRelationsMessage {
     pub fn modified(
         dataset_id: odf::DatasetID,
         authorized_accounts: Vec<AuthorizedAccount>,
     ) -> Self {
-        Self::Modified(RebacDatasetAccountRelationsMessageModified {
+        Self::Modified(RebacDatasetRelationsMessageModified {
             dataset_id,
             authorized_accounts,
         })
     }
 
     pub fn deleted(dataset_id: odf::DatasetID) -> Self {
-        Self::Deleted(RebacDatasetAccountRelationsMessageDeleted { dataset_id })
+        Self::Deleted(RebacDatasetRelationsMessageDeleted { dataset_id })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Message for RebacDatasetAccountRelationsMessage {
+impl Message for RebacDatasetRelationsMessage {
     fn version() -> u32 {
         REBAC_DATASET_ACCOUNT_RELATIONS_MESSAGE_VERSION
     }
@@ -60,7 +60,7 @@ impl Message for RebacDatasetAccountRelationsMessage {
 
 /// Contains details about a modified dataset `ReBAC` properties
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RebacDatasetAccountRelationsMessageModified {
+pub struct RebacDatasetRelationsMessageModified {
     pub dataset_id: odf::DatasetID,
     pub authorized_accounts: Vec<AuthorizedAccount>,
 }
@@ -69,7 +69,7 @@ pub struct RebacDatasetAccountRelationsMessageModified {
 
 /// Contains details about a deleted dataset `ReBAC` properties
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RebacDatasetAccountRelationsMessageDeleted {
+pub struct RebacDatasetRelationsMessageDeleted {
     pub dataset_id: odf::DatasetID,
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use bon::bon;
@@ -16,6 +17,7 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_accounts::*;
 use kamu_accounts_services::*;
+use kamu_auth_rebac::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
 use kamu_core::TenancyConfig;
@@ -27,7 +29,11 @@ use kamu_messaging_outbox_inmem::{
     InMemoryOutboxMessageRepository,
 };
 use kamu_search::*;
-use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
+use kamu_search_elasticsearch::testing::{
+    ElasticsearchBaseHarness,
+    ElasticsearchTestContext,
+    SearchTestResponse,
+};
 use kamu_search_services::SearchIndexerImpl;
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
@@ -83,6 +89,8 @@ impl ElasticsearchDatasetBaseHarness {
             b.add::<InMemoryRebacRepository>();
             b.add_value(DefaultAccountProperties::default());
             b.add_value(DefaultDatasetProperties::default());
+            b.add::<SetDatasetRebacPropertiesUseCaseImpl>();
+            b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
 
             // Embedding mocks
             let mut embeddings_chunker = MockEmbeddingsChunker::new();
@@ -99,6 +107,16 @@ impl ElasticsearchDatasetBaseHarness {
             register_message_dispatcher::<AccountLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+            );
+
+            register_message_dispatcher::<RebacDatasetPropertiesMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+            );
+
+            register_message_dispatcher::<RebacDatasetRelationsMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
             );
 
             NoOpDatabasePlugin::init_database_components(&mut b);
@@ -225,6 +243,96 @@ impl ElasticsearchDatasetBaseHarness {
         }
 
         dataset_ids
+    }
+
+    pub async fn set_dataset_visibility(
+        &self,
+        dataset_id: &odf::DatasetID,
+        visibility: odf::dataset::DatasetVisibility,
+    ) {
+        let set_dataset_rebac_properties_uc = self
+            .no_subject_catalog()
+            .get_one::<dyn SetDatasetRebacPropertiesUseCase>()
+            .unwrap();
+
+        set_dataset_rebac_properties_uc
+            .execute(
+                dataset_id,
+                DatasetProperties {
+                    allows_anonymous_read: visibility == odf::dataset::DatasetVisibility::Public,
+                    allows_public_read: visibility == odf::dataset::DatasetVisibility::Public,
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    pub async fn add_dataset_collaborators(
+        &self,
+        dataset_id: &odf::DatasetID,
+        collaborator_account_ids: &[&odf::AccountID],
+    ) {
+        let apply_relations_uc = self
+            .no_subject_catalog()
+            .get_one::<dyn ApplyAccountDatasetRelationsUseCase>()
+            .unwrap();
+
+        let operations = collaborator_account_ids
+            .iter()
+            .map(|account_id| AccountDatasetRelationOperation {
+                operation: DatasetRoleOperation::Set(AccountToDatasetRelation::Reader),
+                dataset_id: Cow::Borrowed(dataset_id),
+                account_id: Cow::Borrowed(account_id),
+            })
+            .collect::<Vec<_>>();
+
+        apply_relations_uc.execute_bulk(&operations).await.unwrap();
+    }
+
+    pub async fn remove_dataset_collaborators(
+        &self,
+        dataset_id: &odf::DatasetID,
+        collaborator_account_ids: &[&odf::AccountID],
+    ) {
+        let apply_relations_uc = self
+            .no_subject_catalog()
+            .get_one::<dyn ApplyAccountDatasetRelationsUseCase>()
+            .unwrap();
+
+        let operations = collaborator_account_ids
+            .iter()
+            .map(|account_id| AccountDatasetRelationOperation {
+                operation: DatasetRoleOperation::Unset,
+                dataset_id: Cow::Borrowed(dataset_id),
+                account_id: Cow::Borrowed(account_id),
+            })
+            .collect::<Vec<_>>();
+
+        apply_relations_uc.execute_bulk(&operations).await.unwrap();
+    }
+
+    pub async fn view_datasets_index_as_admin(&self) -> SearchTestResponse {
+        self.synchronize().await;
+
+        let seach_response = self
+            .search_repo()
+            .listing_search(
+                SearchSecurityContext::Unrestricted,
+                ListingSearchRequest {
+                    entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
+                    source: SearchRequestSourceSpec::All,
+                    filter: None,
+                    sort: sort!(dataset_search_schema::fields::DATASET_NAME),
+                    page: SearchPaginationSpec {
+                        limit: 100,
+                        offset: 0,
+                    },
+                },
+            )
+            .await
+            .unwrap();
+
+        SearchTestResponse(seach_response)
     }
 
     pub async fn process_outbox_messages(&self) {

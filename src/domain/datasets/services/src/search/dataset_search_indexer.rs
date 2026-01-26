@@ -120,7 +120,11 @@ impl DatasetIndexingHelper<'_> {
                         odf::DatasetKind::Derivative => fields::values::KIND_DERIVATIVE.to_string(),
                     },
                     kamu_search::fields::VISIBILITY: visibility_data.visibility,
-                    kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
+                    kamu_search::fields::PRINCIPAL_IDS: if visibility_data.principal_ids.is_empty() {
+                        serde_json::Value::Null
+                    } else {
+                        serde_json::json!(visibility_data.principal_ids)
+                    },
                     fields::CREATED_AT: seed_event_time.to_rfc3339(),
                     fields::REF_CHANGED_AT: head_event_time.to_rfc3339(),
                 });
@@ -342,7 +346,11 @@ impl DatasetIndexingHelper<'_> {
 
         let partial_update_document = serde_json::json!({
             kamu_search::fields::VISIBILITY: visibility_data.visibility,
-            kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
+            kamu_search::fields::PRINCIPAL_IDS: if visibility_data.principal_ids.is_empty() {
+                serde_json::Value::Null
+            } else {
+                serde_json::json!(visibility_data.principal_ids)
+            },
         });
 
         Ok(partial_update_document)
@@ -374,7 +382,11 @@ impl DatasetIndexingHelper<'_> {
 
         let partial_update_document = serde_json::json!({
             kamu_search::fields::VISIBILITY: visibility_data.visibility,
-            kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
+            kamu_search::fields::PRINCIPAL_IDS: if visibility_data.principal_ids.is_empty() {
+                serde_json::Value::Null
+            } else {
+                serde_json::json!(visibility_data.principal_ids)
+            },
         });
 
         Ok(partial_update_document)

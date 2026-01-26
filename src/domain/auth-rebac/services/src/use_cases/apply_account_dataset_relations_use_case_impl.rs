@@ -19,8 +19,8 @@ use kamu_auth_rebac::{
     ApplyRelationMatrixError,
     DatasetRoleOperation,
     MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-    RebacDatasetAccountRelationsMessage,
     RebacDatasetPropertiesMessage,
+    RebacDatasetRelationsMessage,
     RebacService,
     SetAccountDatasetRelationsOperation,
     UnsetAccountDatasetRelationsOperation,
@@ -106,7 +106,7 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
                 self.outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                        RebacDatasetAccountRelationsMessage::modified(
+                        RebacDatasetRelationsMessage::modified(
                             operation.dataset_id.as_ref().clone(),
                             self.rebac_service
                                 .get_authorized_accounts(&operation.dataset_id)
@@ -163,8 +163,7 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
         let mut upsert_operations = Vec::with_capacity(operations.len());
         let mut delete_operations = Vec::with_capacity(operations.len());
 
-        let mut upserted_dataset_ids = HashSet::new();
-        let mut deleted_dataset_ids = HashSet::new();
+        let mut touched_dataset_ids = HashSet::new();
 
         for AccountDatasetRelationOperation {
             account_id,
@@ -179,14 +178,14 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
                         relationship: *role,
                         dataset_id: Cow::Borrowed(dataset_id.as_ref()),
                     });
-                    upserted_dataset_ids.insert(dataset_id.as_ref().clone());
+                    touched_dataset_ids.insert(dataset_id.as_ref().clone());
                 }
                 DatasetRoleOperation::Unset => {
                     delete_operations.push(UnsetAccountDatasetRelationsOperation {
                         account_id: Cow::Borrowed(account_id.as_ref()),
                         dataset_id: Cow::Borrowed(dataset_id.as_ref()),
                     });
-                    deleted_dataset_ids.insert(dataset_id.as_ref().clone());
+                    touched_dataset_ids.insert(dataset_id.as_ref().clone());
                 }
             }
         }
@@ -205,40 +204,32 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
                 .int_err()?;
         }
 
-        // If we had upserts, we need to notify about the changes
-        if !upserted_dataset_ids.is_empty() {
-            let upserted_dataset_ids: Vec<odf::DatasetID> =
-                upserted_dataset_ids.into_iter().collect();
+        // If we had changes, we need to notify about them
+        if !touched_dataset_ids.is_empty() {
+            let touched_dataset_ids: Vec<odf::DatasetID> =
+                touched_dataset_ids.into_iter().collect();
 
             // Bulk load authorized accounts for all upserted datasets
             let mut authorized_accounts_by_dataset = self
                 .rebac_service
-                .get_authorized_accounts_by_ids(&upserted_dataset_ids)
+                .get_authorized_accounts_by_ids(&touched_dataset_ids)
                 .await
                 .int_err()?;
 
             // Send messages per dataset
-            for dataset_id in upserted_dataset_ids {
+            for dataset_id in touched_dataset_ids {
+                let maybe_remaning_accounts = authorized_accounts_by_dataset.remove(&dataset_id);
+
                 self.outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                        RebacDatasetAccountRelationsMessage::modified(
+                        RebacDatasetRelationsMessage::modified(
                             dataset_id.clone(),
-                            authorized_accounts_by_dataset.remove(&dataset_id).unwrap(),
+                            maybe_remaning_accounts.unwrap_or_default(),
                         ),
                     )
                     .await?;
             }
-        }
-
-        // If we had deletions, we need to notify about the changes
-        for dataset_id in deleted_dataset_ids {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                    RebacDatasetPropertiesMessage::deleted(dataset_id),
-                )
-                .await?;
         }
 
         Ok(())

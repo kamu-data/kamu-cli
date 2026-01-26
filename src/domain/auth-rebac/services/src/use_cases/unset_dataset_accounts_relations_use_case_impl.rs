@@ -39,7 +39,7 @@ impl UnsetDatasetAccountsRelationsUseCase for UnsetDatasetAccountsRelationsUseCa
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                RebacDatasetAccountRelationsMessage::modified(
+                RebacDatasetRelationsMessage::modified(
                     dataset_id.clone(),
                     self.rebac_service
                         .get_authorized_accounts(dataset_id)
