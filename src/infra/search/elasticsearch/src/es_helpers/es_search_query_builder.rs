@@ -158,48 +158,6 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
-    // Unfortunately, paid feature
-    /*pub fn build_hybrid_search_query(
-        embedding_field: SearchFieldPath,
-        textual_prompt: &str,
-        prompt_embedding: &[f32],
-        filter: Option<&SearchFilterExpr>,
-        source: &SearchRequestSourceSpec,
-        limit: usize,
-        options: &HybridSearchOptions,
-    ) -> serde_json::Value {
-        let mut query_json = serde_json::json!({
-             "track_total_hits": false,
-            "_source": Self::source_argument(source),
-            "size": limit,
-            "retriever": {
-                "rrf": {
-                    "retrievers": [
-                        {
-                            "standard": Self::query_argument(Some(textual_prompt), filter)
-                        },
-                        {
-                            "knn": Self::knn_argument(
-                                embedding_field,
-                                prompt_embedding,
-                                filter,
-                                options.knn,
-                            )
-                        }
-                    ],
-                    "rank_window_size": options.rrf.rank_window_size,
-                    "rank_constant": options.rrf.rank_constant,
-                }
-            }
-        });
-
-        if options.enable_explain {
-            query_json["explain"] = serde_json::json!(true);
-        }
-
-        query_json
-    }*/
-
     fn maybe_filter_argument(
         filter: Option<&SearchFilterExpr>,
         inner_query: serde_json::Value,

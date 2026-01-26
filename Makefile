@@ -112,7 +112,7 @@ sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb sqlx-local-
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
-#	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
@@ -123,7 +123,7 @@ sqlx-local-setup-postgres:
 
 .PHONY: sqlx-local-setup-mariadb
 sqlx-local-setup-mariadb:
-##	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
 	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
 	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
@@ -212,7 +212,7 @@ ES_CERT_PASS ?= root
 elasticsearch-setup-https:
 	$(MAKE) elasticsearch-certs
 	$(MAKE) elasticsearch-net
-#	$(MAKE) elasticsearch-pull
+	$(MAKE) elasticsearch-pull
 	$(MAKE) elasticsearch-stop-containers
 	$(MAKE) elasticsearch-start-https
 	$(MAKE) elasticsearch-wait \
@@ -229,7 +229,7 @@ elasticsearch-setup-https:
 .PHONY: elasticsearch-setup-http
 elasticsearch-setup-http:
 	$(MAKE) elasticsearch-net
-#	$(MAKE) elasticsearch-pull
+	$(MAKE) elasticsearch-pull
 	$(MAKE) elasticsearch-stop-containers
 	$(MAKE) elasticsearch-start-http
 	$(MAKE) elasticsearch-wait \
