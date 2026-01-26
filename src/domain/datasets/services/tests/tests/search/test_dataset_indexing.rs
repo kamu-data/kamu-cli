@@ -1084,7 +1084,7 @@ async fn test_visibility_updates_reflected_in_index(ctx: Arc<ElasticsearchTestCo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(elasticsearch)]
+#[test_group::group(elasticsearch)]
 #[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_collaboration_updates_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
     let harness = DatasetIndexingHarness::builder()
