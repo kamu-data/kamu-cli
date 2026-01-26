@@ -9,7 +9,7 @@
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac::{AuthorizedAccount, DatasetProperties, RebacService};
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, ResolvedDataset, dataset_search_schema};
 use kamu_search::*;
 use odf::dataset::MetadataChainExt;
@@ -35,8 +35,25 @@ impl DatasetIndexingHelper<'_> {
         owner_id: &odf::AccountID,
         head: &odf::Multihash,
     ) -> Result<serde_json::Value, InternalError> {
+        // Fetch main visibility properties
+        let dataset_properties = self
+            .rebac_service
+            .get_dataset_properties(dataset.get_id())
+            .await
+            .int_err()?;
+
         // Extract visibility data
-        let visibility_data = self.dataset_visibility(&dataset, owner_id).await?;
+        let visibility_data = self
+            .dataset_visibility(owner_id, &dataset_properties, || {
+                let dataset_id = dataset.get_id();
+                Box::pin(async {
+                    self.rebac_service
+                        .get_authorized_accounts(dataset_id)
+                        .await
+                        .int_err()
+                })
+            })
+            .await?;
 
         // Find key blocks that contribute to search
         let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
@@ -203,7 +220,7 @@ impl DatasetIndexingHelper<'_> {
 
         use dataset_search_schema::*;
 
-        // Prepare partial update to full text search document
+        // Prepare partial update to search document
         // Only include fields that were actually touched in the interval
         let mut update = serde_json::Map::from_iter([(
             fields::REF_CHANGED_AT.to_string(),
@@ -301,11 +318,45 @@ impl DatasetIndexingHelper<'_> {
         Ok(serde_json::Value::Object(update))
     }
 
-    async fn dataset_visibility(
+    #[tracing::instrument(level = "debug", skip_all, fields(
+        dataset_id = %dataset.get_id(),
+    ))]
+    pub(crate) async fn partial_update_for_rebac_properties_change(
         &self,
-        dataset: &ResolvedDataset,
+        dataset: ResolvedDataset,
         owner_id: &odf::AccountID,
-    ) -> Result<DatasetVisibilityData, InternalError> {
+        dataset_properties: &DatasetProperties,
+    ) -> Result<serde_json::Value, InternalError> {
+        // Extract visibility data
+        let visibility_data = self
+            .dataset_visibility(owner_id, dataset_properties, || {
+                let dataset_id = dataset.get_id();
+                Box::pin(async {
+                    self.rebac_service
+                        .get_authorized_accounts(dataset_id)
+                        .await
+                        .int_err()
+                })
+            })
+            .await?;
+
+        let partial_update_document = serde_json::json!({
+            kamu_search::fields::VISIBILITY: visibility_data.visibility,
+            kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
+        });
+
+        Ok(partial_update_document)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(
+        dataset_id = %dataset.get_id(),
+    ))]
+    pub(crate) async fn partial_update_for_rebac_account_relations_change(
+        &self,
+        dataset: ResolvedDataset,
+        owner_id: &odf::AccountID,
+        authorized_accounts: &[AuthorizedAccount],
+    ) -> Result<serde_json::Value, InternalError> {
         // Fetch main visibility properties
         let dataset_properties = self
             .rebac_service
@@ -313,6 +364,31 @@ impl DatasetIndexingHelper<'_> {
             .await
             .int_err()?;
 
+        // Extract visibility data using predefined authorized_accounts
+        let visibility_data = self
+            .dataset_visibility(owner_id, &dataset_properties, || {
+                let accounts = authorized_accounts.to_vec();
+                Box::pin(async move { Ok(accounts) })
+            })
+            .await?;
+
+        let partial_update_document = serde_json::json!({
+            kamu_search::fields::VISIBILITY: visibility_data.visibility,
+            kamu_search::fields::PRINCIPAL_IDS: visibility_data.principal_ids,
+        });
+
+        Ok(partial_update_document)
+    }
+
+    async fn dataset_visibility<'a, F>(
+        &self,
+        owner_id: &odf::AccountID,
+        dataset_properties: &DatasetProperties,
+        mut get_authorized_accounts: F,
+    ) -> Result<DatasetVisibilityData, InternalError>
+    where
+        F: FnMut() -> futures::future::BoxFuture<'a, Result<Vec<AuthorizedAccount>, InternalError>>,
+    {
         // Public?
         if dataset_properties.allows_public_read {
             // Determine if anonymous read is allowed
@@ -331,12 +407,8 @@ impl DatasetIndexingHelper<'_> {
             // Unexpected combination: private dataset with anonymous read allowed
             assert!(!dataset_properties.allows_anonymous_read);
 
-            // Fetch authorized accounts
-            let authorized_accounts = self
-                .rebac_service
-                .get_authorized_accounts(dataset.get_id())
-                .await
-                .int_err()?;
+            // Fetch authorized accounts via callback
+            let authorized_accounts = get_authorized_accounts().await?;
 
             // Collect principal IDs:
             // - for now, just account IDs
@@ -356,6 +428,8 @@ impl DatasetIndexingHelper<'_> {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

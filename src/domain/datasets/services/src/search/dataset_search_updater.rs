@@ -15,7 +15,13 @@ use kamu_accounts::{
     AccountLifecycleMessageUpdated,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
-use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac::{
+    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
+    RebacDatasetAccountRelationsMessage,
+    RebacDatasetPropertiesMessage,
+    RebacService,
+};
 use kamu_datasets::*;
 use kamu_search::*;
 use messaging_outbox::*;
@@ -29,12 +35,16 @@ use crate::search::dataset_search_indexer::*;
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<DatasetLifecycleMessage>)]
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<DatasetReferenceMessage>)]
 #[dill::interface(dyn messaging_outbox::MessageConsumerT<AccountLifecycleMessage>)]
+#[dill::interface(dyn messaging_outbox::MessageConsumerT<RebacDatasetPropertiesMessage>)]
+#[dill::interface(dyn messaging_outbox::MessageConsumerT<RebacDatasetAccountRelationsMessage>)]
 #[dill::meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASETS_SEARCH_UPDATER,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+        MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+        MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
@@ -56,7 +66,7 @@ impl DatasetSearchUpdater {
         catalog: &dill::Catalog,
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
-        // Pprepare indexing helper
+        // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
             embeddings_chunker: self.embeddings_chunker.as_ref(),
             embeddings_encoder: self.embeddings_encoder.as_ref(),
@@ -106,7 +116,7 @@ impl DatasetSearchUpdater {
                     )
                     .await?;
 
-                // Send it to the full text search service for updating
+                // Send to search engine
                 self.search_service
                     .bulk_update(
                         SearchContext::unrestricted(catalog),
@@ -133,7 +143,7 @@ impl DatasetSearchUpdater {
             .index_dataset_from_scratch(dataset, &entry.owner_id, &updated_message.new_block_hash)
             .await?;
 
-        // Send it to the full text search service for indexing
+        // Send to search engine
         self.search_service
             .bulk_update(
                 SearchContext::unrestricted(catalog),
@@ -157,7 +167,7 @@ impl DatasetSearchUpdater {
         // Prepare partial update to dataset search document
         let partial_update = partial_update_for_rename(&renamed_message.new_dataset_alias);
 
-        // Send it to the full text search service for updating
+        // Send to search engine
         self.search_service
             .bulk_update(
                 SearchContext::unrestricted(catalog),
@@ -216,12 +226,112 @@ impl DatasetSearchUpdater {
             });
         }
 
-        // Send them to the full text search service for updating
+        // Send to search engine
         self.search_service
             .bulk_update(
                 SearchContext::unrestricted(catalog),
                 dataset_search_schema::SCHEMA_NAME,
                 updates,
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn handle_rebac_dataset_properties_modified(
+        &self,
+        catalog: &dill::Catalog,
+        dataset_id: &odf::DatasetID,
+        properties: &kamu_auth_rebac::DatasetProperties,
+    ) -> Result<(), InternalError> {
+        // Prepare indexing helper
+        let indexing_helper = DatasetIndexingHelper {
+            embeddings_chunker: self.embeddings_chunker.as_ref(),
+            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            rebac_service: self.rebac_service.as_ref(),
+        };
+
+        // Resolve entry
+        let entry = self
+            .dataset_entry_service
+            .get_entry(dataset_id)
+            .await
+            .int_err()?;
+
+        // Resolve dataset
+        let dataset = self
+            .dataset_registry
+            .get_dataset_by_id(dataset_id)
+            .await
+            .int_err()?;
+
+        // Prepare partial update to dataset search document
+        let partial_update = indexing_helper
+            .partial_update_for_rebac_properties_change(dataset, &entry.owner_id, properties)
+            .await?;
+
+        // Send to search engine
+        self.search_service
+            .bulk_update(
+                SearchContext::unrestricted(catalog),
+                dataset_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Update {
+                    id: dataset_id.to_string(),
+                    doc: partial_update,
+                }],
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn handle_rebac_dataset_account_relations_properties_modified(
+        &self,
+        catalog: &dill::Catalog,
+        dataset_id: &odf::DatasetID,
+        authorized_accounts: &[kamu_auth_rebac::AuthorizedAccount],
+    ) -> Result<(), InternalError> {
+        // Prepare indexing helper
+        let indexing_helper = DatasetIndexingHelper {
+            embeddings_chunker: self.embeddings_chunker.as_ref(),
+            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            rebac_service: self.rebac_service.as_ref(),
+        };
+
+        // Resolve entry
+        let entry = self
+            .dataset_entry_service
+            .get_entry(dataset_id)
+            .await
+            .int_err()?;
+
+        // Resolve dataset
+        let dataset = self
+            .dataset_registry
+            .get_dataset_by_id(dataset_id)
+            .await
+            .int_err()?;
+
+        // Prepare partial update to dataset search document
+        let partial_update = indexing_helper
+            .partial_update_for_rebac_account_relations_change(
+                dataset,
+                &entry.owner_id,
+                authorized_accounts,
+            )
+            .await?;
+
+        // Send to search engine
+        self.search_service
+            .bulk_update(
+                SearchContext::unrestricted(catalog),
+                dataset_search_schema::SCHEMA_NAME,
+                vec![SearchIndexUpdateOperation::Update {
+                    id: dataset_id.to_string(),
+                    doc: partial_update,
+                }],
             )
             .await
             .int_err()?;
@@ -286,7 +396,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetSearchUpdater {
 
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
-                // We only care about head updates for full text search.
+                // We only care about head updates for search engine.
                 if updated_message.block_ref != odf::BlockRef::Head {
                     return Ok(());
                 }
@@ -332,6 +442,80 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetSearchUpdater {
             | AccountLifecycleMessage::PasswordChanged(_) => {
                 // No-op for search
                 // Note: deletion of accounts will trigger deletion of datasets,
+                // which we handle via DatasetLifecycleMessage
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<RebacDatasetPropertiesMessage> for DatasetSearchUpdater {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetSearchUpdater[RebacDatasetPropertiesMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &dill::Catalog,
+        message: &RebacDatasetPropertiesMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received ReBAC dataset properties message");
+
+        match message {
+            RebacDatasetPropertiesMessage::Modified(message) => {
+                self.handle_rebac_dataset_properties_modified(
+                    target_catalog,
+                    &message.dataset_id,
+                    &message.dataset_properties,
+                )
+                .await?;
+            }
+
+            RebacDatasetPropertiesMessage::Deleted(_) => {
+                // No-op for search
+                // Note: deletion of datasets will trigger Rebac deletion,
+                // which we handle via DatasetLifecycleMessage
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<RebacDatasetAccountRelationsMessage> for DatasetSearchUpdater {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetSearchUpdater[RebacDatasetAccountRelationsMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &dill::Catalog,
+        message: &RebacDatasetAccountRelationsMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received ReBAC dataset account relations message");
+
+        match message {
+            RebacDatasetAccountRelationsMessage::Modified(message) => {
+                self.handle_rebac_dataset_account_relations_properties_modified(
+                    target_catalog,
+                    &message.dataset_id,
+                    &message.authorized_accounts,
+                )
+                .await?;
+            }
+
+            RebacDatasetAccountRelationsMessage::Deleted(_) => {
+                // No-op for search
+                // Note: deletion of datasets will trigger Rebac deletion,
                 // which we handle via DatasetLifecycleMessage
             }
         }
