@@ -7,4 +7,4 @@
 # serial while allowing the rest of the suite to run concurrently.
 [[profile.default.overrides]]
 filter = "test(::elasticsearch::)"
-threads = 1
+threads = 4
