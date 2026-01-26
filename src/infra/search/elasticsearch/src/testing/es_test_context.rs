@@ -108,6 +108,7 @@ impl ElasticsearchTestContext {
         let index_prefix = get_random_name(Some(INDEX_PREFIX_TEMPLATE), 10).to_ascii_lowercase();
         let repo_config = ElasticsearchRepositoryConfig {
             index_prefix: index_prefix.clone(),
+            embedding_dimensions: 1536,
         };
 
         // Manually build repository with predefined client and config
@@ -201,7 +202,7 @@ where
 pub struct SearchTestResponse(pub kamu_search::SearchResponse);
 
 impl SearchTestResponse {
-    pub fn total_hits(&self) -> u64 {
+    pub fn total_hits(&self) -> Option<u64> {
         self.0.total_hits
     }
 

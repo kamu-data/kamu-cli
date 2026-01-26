@@ -13,8 +13,22 @@ pub type SearchEntityId = String;
 pub type SearchEntitySchemaName = &'static str;
 pub type SearchFieldPath = &'static str;
 
-pub const SEARCH_ALIAS_TITLE: &str = "title";
-pub const SEARCH_FIELD_IS_BANNED: &str = "is_banned";
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub mod fields {
+    pub const TITLE: &str = "title";
+    pub const IS_BANNED: &str = "is_banned";
+    pub const SEMANTIC_EMBEDDINGS: &str = "semantic_embeddings";
+
+    pub const VISIBILITY: &str = "visibility";
+    pub const PRINCIPAL_IDS: &str = "principal_ids";
+
+    pub mod values {
+        pub const VISIBILITY_PUBLIC_GUEST: &str = "public-guest";
+        pub const VISIBILITY_PUBLIC_AUTHENTICATED: &str = "public-authenticated";
+        pub const VISIBILITY_PRIVATE: &str = "private";
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +40,16 @@ pub struct SearchEntitySchema {
     pub fields: &'static [SearchSchemaField],
     pub title_field: SearchFieldPath,
     pub enable_banning: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl SearchEntitySchema {
+    pub fn find_embedding_chunks_field(&self) -> Option<&SearchSchemaField> {
+        self.fields
+            .iter()
+            .find(|f| matches!(f.role, SearchSchemaFieldRole::EmbeddingChunks))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,13 +68,13 @@ pub enum SearchSchemaFieldRole {
         enable_inner_ngrams: bool,
     },
     Name,
-    Prose {
-        enable_positions: bool,
-    },
+    Description,
+    Prose,
     Keyword,
     DateTime,
     Boolean,
     Integer,
+    EmbeddingChunks,
     UnprocessedObject,
     // TODO: Add more field roles as needed
 }

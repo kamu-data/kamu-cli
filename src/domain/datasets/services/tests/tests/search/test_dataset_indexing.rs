@@ -13,16 +13,9 @@ use bon::bon;
 use kamu_accounts::*;
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{DeleteAccountUseCaseImpl, UpdateAccountUseCaseImpl};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-    RebacServiceImpl,
-};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
-use kamu_search::*;
-use kamu_search_elasticsearch::testing::{ElasticsearchTestContext, SearchTestResponse};
+use kamu_search_elasticsearch::testing::ElasticsearchTestContext;
 use odf::metadata::testing::MetadataFactory;
 
 use super::es_dataset_base_harness::{ElasticsearchDatasetBaseHarness, PredefinedDatasetsConfig};
@@ -38,8 +31,8 @@ async fn test_dataset_index_initially_empty(ctx: Arc<ElasticsearchTestContext>) 
         .build()
         .await;
 
-    let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 0);
+    let dataset_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(dataset_index_response.total_hits(), Some(0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,8 +56,8 @@ async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         .build()
         .await;
 
-    let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 2);
+    let dataset_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(dataset_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         dataset_index_response.ids(),
@@ -88,6 +81,8 @@ async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "foo",
@@ -97,6 +92,8 @@ async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             })
         ]
     );
@@ -111,6 +108,9 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         odf::AccountName::new_unchecked("alice"),
         odf::AccountName::new_unchecked("bob"),
     ];
+
+    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
 
     let aliases = vec![
         odf::DatasetAlias::new(
@@ -138,8 +138,8 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         .build()
         .await;
 
-    let dataset_index_response = harness.view_datasets_index().await;
-    assert_eq!(dataset_index_response.total_hits(), 2);
+    let dataset_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(dataset_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         dataset_index_response.ids(),
@@ -160,18 +160,22 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "bar",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "alice",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "bob/foo",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "foo",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "bob",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![bob_id.to_string()],
             })
         ]
     );
@@ -201,9 +205,9 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         );
     }
 
-    let datasets_index_response = harness.view_datasets_index().await;
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -224,6 +228,8 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "beta",
@@ -233,6 +239,8 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
@@ -242,6 +250,8 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -269,8 +279,11 @@ async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -288,27 +301,33 @@ async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "alice",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "bob/beta",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "bob",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![bob_id.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "alice/gamma",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "alice",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string()],
             }),
         ]
     );
@@ -352,9 +371,9 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         .rename_dataset(harness.system_user_catalog(), &dataset_ids[0], "test-alpha")
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -377,6 +396,8 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
@@ -386,6 +407,8 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "test-alpha",
@@ -395,6 +418,8 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -432,9 +457,9 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
         .delete_dataset(harness.system_user_catalog(), &dataset_ids[1])
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
 
-    assert_eq!(datasets_index_response.total_hits(), 2);
+    assert_eq!(datasets_index_response.total_hits(), Some(2));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -452,6 +477,8 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
@@ -461,6 +488,8 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -488,13 +517,16 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
+    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+
     // Force outbox processing to ensure search index is up to date
     harness.process_outbox_messages().await;
 
     harness.rename_account("alice", "alicia").await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 3);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(3));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -513,18 +545,22 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 // ID remains the same
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "alicia",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "bob/beta",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "bob",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![bob_id.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "alicia/gamma",
@@ -532,9 +568,11 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
                 // ID remains the same
-                dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("alice".as_bytes()).to_string(),
+                dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: "alicia",
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+                kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+                kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string()],
             }),
         ]
     );
@@ -562,13 +600,15 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+
     // Force outbox processing to ensure search index is up to date
     harness.process_outbox_messages().await;
 
     harness.delete_account("alice").await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -582,9 +622,11 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "beta",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: odf::AccountID::new_seeded_ed25519("bob".as_bytes()).to_string(),
+            dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
             dataset_search_schema::fields::OWNER_NAME: "bob",
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![bob_id.to_string()],
         }),]
     );
 }
@@ -654,8 +696,8 @@ async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTes
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -679,6 +721,8 @@ async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTes
                 "city",
                 "population",
             ],
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
 }
@@ -720,8 +764,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.ids(),
@@ -740,6 +784,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
             dataset_search_schema::fields::KEYWORDS: vec!["test", "nice"],
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -774,8 +820,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -794,6 +840,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
                 "city",
                 "population",
             ],
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -825,8 +873,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -846,6 +894,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
                 "population",
             ],
             dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -865,8 +915,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -886,6 +936,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
                 "population",
             ],
             dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -928,8 +980,8 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
         )
         .await;
 
-    let datasets_index_response = harness.view_datasets_index().await;
-    assert_eq!(datasets_index_response.total_hits(), 1);
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
 
     pretty_assertions::assert_eq!(
         datasets_index_response.entities(),
@@ -950,8 +1002,203 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
                 "country",
             ],
             dataset_search_schema::fields::ATTACHMENTS: serde_json::Value::Null,
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
         }),]
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_visibility_updates_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let foo_created = harness
+        .create_root_dataset(harness.system_user_catalog(), &foo_alias)
+        .await;
+
+    // Ensure initial indexing is done
+    harness.synchronize().await;
+
+    // Switch to public visibility
+    harness
+        .set_dataset_visibility(
+            &foo_created.dataset_handle.id,
+            odf::dataset::DatasetVisibility::Public,
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
+            kamu_search::fields::PRINCIPAL_IDS: serde_json::Value::Null,
+        })]
+    );
+
+    // Back to private visibility
+
+    harness
+        .set_dataset_visibility(
+            &foo_created.dataset_handle.id,
+            odf::dataset::DatasetVisibility::Private,
+        )
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(1));
+
+    pretty_assertions::assert_eq!(
+        datasets_index_response.entities(),
+        [serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "foo",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "foo",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+        })]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_collaboration_updates_reflected_in_index(ctx: Arc<ElasticsearchTestContext>) {
+    let harness = DatasetIndexingHarness::builder()
+        .ctx(ctx)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .predefined_accounts_config(PredefinedAccountsConfig {
+            predefined: ["alice", "bob", "charlie"]
+                .into_iter()
+                .map(odf::AccountName::new_unchecked)
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .build()
+        .await;
+
+    let dataset_ids = harness
+        .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta")])
+        .await;
+
+    let alpha_id = dataset_ids.first().unwrap();
+    let beta_id = dataset_ids.get(1).unwrap();
+
+    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
+    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let charlie_id = odf::AccountID::new_seeded_ed25519("charlie".as_bytes());
+
+    // Ensure initial indexing is done
+    harness.synchronize().await;
+
+    // Add collaborators
+
+    harness
+        .add_dataset_collaborators(alpha_id, &[&bob_id, &charlie_id])
+        .await;
+
+    harness
+        .add_dataset_collaborators(beta_id, &[&alice_id])
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(2));
+
+    let mut actual_entities = datasets_index_response.entities();
+    DatasetIndexingHarness::sort_principal_ids_in_entities(&mut actual_entities);
+
+    let mut expected_entities = vec![
+        serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "alice/alpha",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "alpha",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: "alice",
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string(), bob_id.to_string(), charlie_id.to_string()],
+        }),
+        serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "bob/beta",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "beta",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: "bob",
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string(), bob_id.to_string()],
+        }),
+    ];
+    DatasetIndexingHarness::sort_principal_ids_in_entities(&mut expected_entities);
+    pretty_assertions::assert_eq!(actual_entities, expected_entities);
+
+    // Let's remove Bob from Alice's dataset collaborators
+    harness
+        .remove_dataset_collaborators(alpha_id, &[&bob_id])
+        .await;
+
+    // Let's remove Alice from Bob's dataset collaborators
+    harness
+        .remove_dataset_collaborators(beta_id, &[&alice_id])
+        .await;
+
+    let datasets_index_response = harness.view_datasets_index_as_admin().await;
+    assert_eq!(datasets_index_response.total_hits(), Some(2));
+
+    let mut actual_entities = datasets_index_response.entities();
+    DatasetIndexingHarness::sort_principal_ids_in_entities(&mut actual_entities);
+
+    let mut expected_entities = vec![
+        serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "alice/alpha",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "alpha",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: alice_id.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: "alice",
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![alice_id.to_string(), charlie_id.to_string()],
+        }),
+        serde_json::json!({
+            dataset_search_schema::fields::ALIAS: "bob/beta",
+            dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
+            dataset_search_schema::fields::DATASET_NAME: "beta",
+            dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
+            dataset_search_schema::fields::OWNER_ID: bob_id.to_string(),
+            dataset_search_schema::fields::OWNER_NAME: "bob",
+            dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![bob_id.to_string()],
+        }),
+    ];
+    DatasetIndexingHarness::sort_principal_ids_in_entities(&mut expected_entities);
+    pretty_assertions::assert_eq!(actual_entities, expected_entities);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1010,12 +1257,6 @@ impl DatasetIndexingHarness {
                 b.add_value(CurrentAccountSubject::new_test_with(&old_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<UpdateAccountUseCaseImpl>();
-
-                b.add::<RebacServiceImpl>();
-                b.add::<InMemoryRebacRepository>();
-                b.add_value(DefaultAccountProperties::default());
-                b.add_value(DefaultDatasetProperties::default());
-
                 b.build()
             };
 
@@ -1047,12 +1288,6 @@ impl DatasetIndexingHarness {
                 b.add_value(CurrentAccountSubject::new_test_with(&account_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<DeleteAccountUseCaseImpl>();
-
-                b.add::<RebacServiceImpl>();
-                b.add::<InMemoryRebacRepository>();
-                b.add_value(DefaultAccountProperties::default());
-                b.add_value(DefaultDatasetProperties::default());
-
                 b.build()
             };
 
@@ -1063,27 +1298,15 @@ impl DatasetIndexingHarness {
         };
     }
 
-    pub async fn view_datasets_index(&self) -> SearchTestResponse {
-        self.synchronize().await;
-
-        let seach_response = self
-            .search_repo()
-            .search(SearchRequest {
-                query: None,
-                entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
-                source: SearchRequestSourceSpec::All,
-                filter: None,
-                sort: sort!(dataset_search_schema::fields::DATASET_NAME),
-                page: SearchPaginationSpec {
-                    limit: 100,
-                    offset: 0,
-                },
-                options: SearchOptions::default(),
-            })
-            .await
-            .unwrap();
-
-        SearchTestResponse(seach_response)
+    fn sort_principal_ids_in_entities(entities: &mut [serde_json::Value]) {
+        for entity in entities {
+            if let Some(arr) = entity
+                .get_mut(kamu_search::fields::PRINCIPAL_IDS)
+                .and_then(|v| v.as_array_mut())
+            {
+                arr.sort_by(|a, b| a.as_str().unwrap_or("").cmp(b.as_str().unwrap_or("")));
+            }
+        }
     }
 }
 

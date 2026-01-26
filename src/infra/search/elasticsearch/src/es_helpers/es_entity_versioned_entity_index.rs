@@ -10,12 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_search::{
-    SEARCH_FIELD_IS_BANNED,
-    SearchEntitySchema,
-    SearchEntitySchemaName,
-    SearchEntitySchemaUpgradeMode,
-};
+use kamu_search::{SearchEntitySchema, SearchEntitySchemaName, SearchEntitySchemaUpgradeMode};
 
 use super::ElasticsearchIndexMappings;
 use crate::ElasticsearchRepositoryConfig;
@@ -230,7 +225,7 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
                     "must_not": [
                         {
                             "term": {
-                                SEARCH_FIELD_IS_BANNED: true
+                                kamu_search::fields::IS_BANNED: true
                             }
                         }
                     ]

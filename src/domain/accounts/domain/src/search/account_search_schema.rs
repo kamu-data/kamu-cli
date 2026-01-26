@@ -17,7 +17,7 @@ use kamu_search::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "kamu-accounts";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,6 +51,10 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::UPDATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
+    SearchSchemaField {
+        path: kamu_search::fields::VISIBILITY,
+        role: SearchSchemaFieldRole::Keyword,
+    },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +65,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     fields: SCHEMA_FIELDS,
     title_field: fields::ACCOUNT_NAME,
     enable_banning: true,
-    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

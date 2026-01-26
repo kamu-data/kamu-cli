@@ -118,7 +118,6 @@ kamu-webhooks-sqlite = { workspace = true }
 kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
-kamu-search-qdrant = { workspace = true }
 kamu-search-elasticsearch = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
@@ -226,7 +225,7 @@ secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = ["std"] }
-tokio = { version = "1", default-features = false, features = ["io-util"] }
+tokio = { version = "1", default-features = false, features = ["io-util", "io-std"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"

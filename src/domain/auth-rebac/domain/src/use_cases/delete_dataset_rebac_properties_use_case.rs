@@ -7,32 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    NaturalLanguageSearchService,
-    SearchContext,
-    SearchNatLangError,
-    SearchNatLangOpts,
-    SearchNatLangResult,
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[dill::component]
-#[dill::interface(dyn NaturalLanguageSearchService)]
-pub struct DummyNaturalLanguageSearchService {}
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl NaturalLanguageSearchService for DummyNaturalLanguageSearchService {
-    async fn search_natural_language(
+pub trait DeleteDatasetRebacPropertiesUseCase: Send + Sync {
+    async fn execute(
         &self,
-        _ctx: SearchContext<'_>,
-        _prompt: &str,
-        _options: SearchNatLangOpts,
-    ) -> Result<SearchNatLangResult, SearchNatLangError> {
-        Ok(SearchNatLangResult { datasets: vec![] })
-    }
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), DeleteDatasetRebacPropertiesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum DeleteDatasetRebacPropertiesError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

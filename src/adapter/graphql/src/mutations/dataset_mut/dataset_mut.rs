@@ -193,7 +193,8 @@ impl DatasetMut {
     ) -> Result<SetDatasetVisibilityResult> {
         utils::check_dataset_maintain_access(ctx, &self.dataset_request_state).await?;
 
-        let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
+        let set_dataset_properties_uc =
+            from_catalog_n!(ctx, dyn kamu_auth_rebac::SetDatasetRebacPropertiesUseCase);
 
         let (allows_public_read, allows_anonymous_read) = match visibility {
             DatasetVisibilityInput::Private(_) => (false, false),
@@ -202,19 +203,15 @@ impl DatasetMut {
             }) => (true, anonymous_available),
         };
 
-        use kamu_auth_rebac::DatasetPropertyName;
-
         let dataset_id = self.dataset_request_state.dataset_id();
-
-        for (name, value) in [
-            DatasetPropertyName::allows_public_read(allows_public_read),
-            DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
-        ] {
-            rebac_svc
-                .set_dataset_property(dataset_id, name, &value)
-                .await
-                .int_err()?;
-        }
+        let dataset_properties = kamu_auth_rebac::DatasetProperties {
+            allows_public_read,
+            allows_anonymous_read,
+        };
+        set_dataset_properties_uc
+            .execute(dataset_id, dataset_properties)
+            .await
+            .int_err()?;
 
         Ok(SetDatasetVisibilityResultSuccess::default().into())
     }

@@ -20,7 +20,7 @@ pub struct SearchResponse {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct SearchHitsResponse {
-    pub total: SearchHitsTotalResponse,
+    pub total: Option<SearchHitsTotalResponse>,
     pub hits: Vec<SearchHitResponse>,
 }
 

@@ -29,6 +29,8 @@ pub fn register_dependencies(
         b.add::<DatasetSearchUpdater>();
     }
 
+    b.add::<DatasetSearchServiceImpl>();
+
     if options.needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();

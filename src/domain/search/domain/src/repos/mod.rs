@@ -8,7 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod search_repository;
-mod vector_repository;
 
 pub use search_repository::*;
-pub use vector_repository::*;

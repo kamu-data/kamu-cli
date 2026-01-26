@@ -18,6 +18,10 @@ use crate::{ElasticsearchClientConfig, ElasticsearchRepositoryConfig, es_client,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const MULTI_MATCH_BEST_FIELDS_TIE_BREAKER: f32 = 0.2;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ElasticsearchRepository {
     client_config: Arc<ElasticsearchClientConfig>,
     repo_config: Arc<ElasticsearchRepositoryConfig>,
@@ -168,6 +172,132 @@ impl ElasticsearchRepository {
             })
             .collect()
     }
+
+    async fn search_common(
+        &self,
+        entity_schemas: &[Arc<SearchEntitySchema>],
+        es_query_body: serde_json::Value,
+    ) -> Result<SearchResponse, InternalError> {
+        let client = self.es_client().await?;
+
+        // Resolve read aliases
+        let read_index_aliases = self.resolve_read_index_aliases(client, entity_schemas)?;
+        let read_index_alias_refs = read_index_aliases
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+
+        // Resolve write index names to schemas
+        let schema_names_by_write_index = self.map_write_index_names(client, entity_schemas)?;
+
+        // Execute request
+        let es_response: es_client::SearchResponse = client
+            .search(es_query_body, &read_index_alias_refs)
+            .await
+            .int_err()?;
+
+        // Translate parsed Elasticsearch response to domain model
+        Ok(SearchResponse {
+            took_ms: es_response.took,
+            timeout: es_response.timed_out,
+            total_hits: es_response.hits.total.map(|total| total.value),
+            hits: es_response
+                .hits
+                .hits
+                .into_iter()
+                .map(|hit| SearchHit {
+                    id: hit.id.unwrap_or_default(),
+                    schema_name: schema_names_by_write_index
+                        .get(&hit.index)
+                        .copied()
+                        .unwrap_or("<unknown>"),
+                    score: hit.score,
+                    source: hit.source.unwrap_or_default(),
+                    highlights: if let Some(highlight_json) = hit.highlight {
+                        ElasticsearchHighlightExtractor::extract_highlights(&highlight_json)
+                    } else {
+                        None
+                    },
+                    explanation: hit.explanation,
+                })
+                .collect(),
+        })
+    }
+
+    fn resolve_embedding_field(
+        &self,
+        entity_schemas: &[Arc<SearchEntitySchema>],
+    ) -> Result<SearchFieldPath, InternalError> {
+        assert!(!entity_schemas.is_empty());
+
+        let mut embedding_field_path: Option<SearchFieldPath> = None;
+
+        for schema in entity_schemas {
+            let Some(embedding_field) = schema.find_embedding_chunks_field() else {
+                return Err(InternalError::new(format!(
+                    "Entity schema '{}' does not have an embedding chunks field",
+                    schema.schema_name
+                )));
+            };
+
+            match embedding_field_path {
+                None => {
+                    embedding_field_path = Some(embedding_field.path);
+                }
+                Some(expected_path) => {
+                    if embedding_field.path != expected_path {
+                        return Err(InternalError::new(format!(
+                            "Entity schema '{}' has embedding field '{}', but expected '{}' to \
+                             match other schemas",
+                            schema.schema_name, embedding_field.path, expected_path
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(embedding_field_path.unwrap())
+    }
+
+    #[allow(dead_code)]
+    fn make_security_filter(
+        &self,
+        security_ctx: SearchSecurityContext,
+    ) -> Option<SearchFilterExpr> {
+        match security_ctx {
+            // For unrestricted context, no additional filtering
+            SearchSecurityContext::Unrestricted => None,
+
+            // For anonymous users, only allow public guest content
+            SearchSecurityContext::Anonymous => Some(field_eq_str(
+                kamu_search::fields::VISIBILITY,
+                kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
+            )),
+
+            // For authenticated users, allow public guest, public authenticated content, and
+            // private that match principal IDs
+            SearchSecurityContext::Restricted {
+                current_principal_ids,
+            } => {
+                let mut clauses = vec![field_in_str(
+                    kamu_search::fields::VISIBILITY,
+                    vec![
+                        kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
+                        kamu_search::fields::values::VISIBILITY_PUBLIC_AUTHENTICATED,
+                    ],
+                )];
+
+                if !current_principal_ids.is_empty() {
+                    clauses.push(field_in_str(
+                        kamu_search::fields::PRINCIPAL_IDS,
+                        &current_principal_ids,
+                    ));
+                }
+
+                Some(SearchFilterExpr::or_clauses(clauses))
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +343,10 @@ impl SearchRepository for ElasticsearchRepository {
             schema.version,
         );
 
-        let mappings = es_helpers::ElasticsearchIndexMappings::from_entity_schema(schema);
+        let mappings = es_helpers::ElasticsearchIndexMappings::from_entity_schema(
+            schema,
+            self.repo_config.embedding_dimensions,
+        );
 
         let outcome = index.ensure_version_existence(mappings, schema).await?;
 
@@ -281,58 +414,276 @@ impl SearchRepository for ElasticsearchRepository {
         client.documents_in_index(&index_name).await.int_err()
     }
 
-    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_search, skip_all)]
-    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError> {
-        let client = self.es_client().await?;
-
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_listing_search, skip_all)]
+    async fn listing_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Resolve read aliases
-        let read_index_aliases = self.resolve_read_index_aliases(client, &entity_schemas)?;
-        let read_index_alias_refs = read_index_aliases
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>();
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
-        // Resolve write index names to schemas
-        let schema_names_by_write_index = self.map_write_index_names(client, &entity_schemas)?;
+        // Build Elasticsearch full-text search request body
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_listing_query(
+            maybe_filter.as_ref(),
+            &req.source,
+            &req.sort,
+            &req.page,
+        );
 
-        // Build Elasticsearch request body
-        let req_body = es_helpers::ElasticsearchQueryBuilder::build_search_query(&req);
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
+    }
 
-        // Execute request
-        let es_response: es_client::SearchResponse = client
-            .search(req_body, &read_index_alias_refs)
-            .await
-            .int_err()?;
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_text_search, skip_all)]
+    async fn text_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Translate parsed Elasticsearch response to domain model
-        Ok(SearchResponse {
-            took_ms: es_response.took,
-            timeout: es_response.timed_out,
-            total_hits: es_response.hits.total.value,
-            hits: es_response
-                .hits
-                .hits
-                .into_iter()
-                .map(|hit| SearchHit {
-                    id: hit.id.unwrap_or_default(),
-                    schema_name: schema_names_by_write_index
-                        .get(&hit.index)
-                        .copied()
-                        .unwrap_or("<unknown>"),
-                    score: hit.score,
-                    source: hit.source.unwrap_or_default(),
-                    highlights: if let Some(highlight_json) = hit.highlight {
-                        ElasticsearchHighlightExtractor::extract_highlights(&highlight_json)
-                    } else {
-                        None
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
+        // Build Elasticsearch full-text search request body, depending on intent
+        let es_query_body = match req.intent {
+            TextSearchIntent::FullText {
+                prompt,
+                term_operator,
+                field_relation,
+            } => {
+                let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(
+                                schema.as_ref(),
+                                req.options.boosting_overrides,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                let sort_spec = vec![
+                    SearchSortSpec::Relevance,
+                    SearchSortSpec::ByField {
+                        field: kamu_search::fields::TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
                     },
-                    explanation: hit.explanation,
+                ];
+
+                match field_relation {
+                    FullTextSearchFieldRelation::BestFields => {
+                        es_helpers::ElasticsearchQueryBuilder::build_best_fields_search_query(
+                            &prompt,
+                            term_operator,
+                            MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
+                            &multi_match_policy,
+                            maybe_filter.as_ref(),
+                            &req.source,
+                            &sort_spec,
+                            &req.page,
+                            &req.options,
+                        )
+                    }
+                    FullTextSearchFieldRelation::MostFields => {
+                        es_helpers::ElasticsearchQueryBuilder::build_most_fields_search_query(
+                            &prompt,
+                            term_operator,
+                            &multi_match_policy,
+                            maybe_filter.as_ref(),
+                            &req.source,
+                            &sort_spec,
+                            &req.page,
+                            &req.options,
+                        )
+                    }
+                }
+            }
+
+            TextSearchIntent::Prefix { prompt } => {
+                let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::MultiMatchPolicyBuilder::build_autocomplete_policy(
+                                schema.as_ref(),
+                                req.options.boosting_overrides,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                es_helpers::ElasticsearchQueryBuilder::build_most_fields_search_query(
+                    &prompt,
+                    FullTextSearchTermOperator::Or,
+                    &multi_match_policy,
+                    maybe_filter.as_ref(),
+                    &req.source,
+                    &[SearchSortSpec::ByField {
+                        field: kamu_search::fields::TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
+                    }],
+                    &req.page,
+                    &req.options,
+                )
+            }
+
+            TextSearchIntent::Phrase { prompt, user_slop } => {
+                let phrase_search_policy = es_helpers::PhraseSearchPolicy::merge(
+                    &entity_schemas
+                        .iter()
+                        .map(|schema| {
+                            es_helpers::PhraseSearchPolicyBuilder::build_policy(
+                                schema.as_ref(),
+                                user_slop,
+                                req.options.boosting_overrides,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                es_helpers::ElasticsearchQueryBuilder::build_phrase_search_query(
+                    &prompt,
+                    &phrase_search_policy,
+                    maybe_filter.as_ref(),
+                    &req.source,
+                    &req.page,
+                    &req.options,
+                )
+            }
+        };
+
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_vector_search, skip_all)]
+    async fn vector_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Determine embedding field
+        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
+        // Build Elasticsearch vector request body
+        let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
+            embedding_field,
+            &req.prompt_embedding,
+            maybe_filter.as_ref(),
+            &req.source,
+            req.limit,
+            &req.options,
+        );
+
+        // Run common search procedure
+        self.search_common(&entity_schemas, es_query_body).await
+    }
+
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_hybrid_search, skip_all)]
+    async fn hybrid_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError> {
+        // Resolve entity schemas
+        let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
+
+        // Determine embedding field
+        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
+
+        // Build filter with security context
+        let maybe_filter =
+            SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
+        // Build multi-match policy for textual part
+        let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
+            &entity_schemas
+                .iter()
+                .map(|schema| {
+                    es_helpers::MultiMatchPolicyBuilder::build_full_text_policy(
+                        schema.as_ref(),
+                        req.options.text_boosting_overrides,
+                    )
                 })
-                .collect(),
-        })
+                .collect::<Vec<_>>(),
+        );
+
+        // Textual query part
+        let text_es_query_body =
+            es_helpers::ElasticsearchQueryBuilder::build_best_fields_search_query(
+                &req.prompt,
+                FullTextSearchTermOperator::Or,
+                MULTI_MATCH_BEST_FIELDS_TIE_BREAKER,
+                &multi_match_policy,
+                maybe_filter.as_ref(),
+                &req.source,
+                &[
+                    SearchSortSpec::Relevance,
+                    SearchSortSpec::ByField {
+                        field: kamu_search::fields::TITLE,
+                        direction: SearchSortDirection::Ascending,
+                        nulls_first: false,
+                    },
+                ],
+                &SearchPaginationSpec {
+                    limit: req.options.rrf.rank_window_size,
+                    offset: 0,
+                },
+                &TextSearchOptions {
+                    enable_explain: req.options.enable_explain,
+                    enable_highlighting: false,
+                    boosting_overrides: req.options.text_boosting_overrides,
+                },
+            );
+
+        // Vector query part
+        let vector_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
+            embedding_field,
+            &req.prompt_embedding,
+            maybe_filter.as_ref(),
+            &req.source,
+            req.options.rrf.rank_window_size,
+            &VectorSearchOptions {
+                enable_explain: req.options.enable_explain,
+                knn: req.options.knn,
+            },
+        );
+
+        // Run both vector and text searches in parallel
+        let (text_search_response, vector_search_response) = tokio::join!(
+            self.search_common(&entity_schemas, text_es_query_body),
+            self.search_common(&entity_schemas, vector_es_query_body),
+        );
+        let text_search_response = text_search_response?;
+        let vector_search_response = vector_search_response?;
+
+        // Combine results using RRF
+        let combined_response = es_helpers::ElasticsearchRRFCombiner::combine_search_responses(
+            text_search_response,
+            vector_search_response,
+            req.options.rrf,
+            req.limit,
+        );
+
+        Ok(combined_response)
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_find_document_by_id, skip_all, fields(schema_name, id))]

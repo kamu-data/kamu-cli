@@ -23,6 +23,7 @@ pub struct ElasticsearchClientConfig {
 #[derive(Debug, Clone)]
 pub struct ElasticsearchRepositoryConfig {
     pub index_prefix: String,
+    pub embedding_dimensions: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,6 +32,7 @@ pub struct ElasticsearchRepositoryConfig {
 pub struct ElasticsearchContainerConfig {
     pub image: String,
     pub start_timeout: std::time::Duration,
+    pub embedding_dimensions: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

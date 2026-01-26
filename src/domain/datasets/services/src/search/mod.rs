@@ -9,7 +9,9 @@
 
 mod dataset_search_indexer;
 mod dataset_search_schema_provider;
+mod dataset_search_service_impl;
 mod dataset_search_updater;
 
 pub use dataset_search_schema_provider::*;
+pub use dataset_search_service_impl::*;
 pub use dataset_search_updater::*;

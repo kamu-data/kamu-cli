@@ -1,0 +1,29 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use crate::SearchFieldPath;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default, Clone)]
+pub enum SearchRequestSourceSpec {
+    None,
+
+    #[default]
+    All,
+
+    Particular(Vec<SearchFieldPath>),
+
+    Complex {
+        include_patterns: Vec<String>,
+        exclude_patterns: Vec<String>,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -22,6 +22,7 @@ pub(crate) fn index_from_account(account: &kamu_accounts::Account) -> serde_json
         account_search_schema::fields::DISPLAY_NAME: account.display_name,
         account_search_schema::fields::CREATED_AT: account.registered_at.to_rfc3339(),
         account_search_schema::fields::UPDATED_AT: account.registered_at.to_rfc3339(), // Note: we have no marker in DB
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
     })
 }
 
@@ -37,6 +38,7 @@ pub(crate) fn index_from_parts(
         account_search_schema::fields::DISPLAY_NAME: display_name,
         account_search_schema::fields::CREATED_AT: registered_at.to_rfc3339(),
         account_search_schema::fields::UPDATED_AT: registered_at.to_rfc3339(), // Starting value
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
     })
 }
 

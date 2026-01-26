@@ -12,6 +12,23 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Elasticsearch solution supports security aspects:
+   - every indexed entity registers "visibility" and "principal_ids" fields, 
+     and current subject's principals are propagated to queries
+   - security filter is automatically attached to any user-defined filter
+   - supporting full and incremental indexing of datasets with ReBAC data projected to Elasticsearch
+- Elasticsearch solution now supports vector (semantic) and hybrid search:
+   - pure vector search replaces QDrant use cases
+   - hybrid search issues both textual and vector queries, and fuses the results via
+       Reciprocal Rank Fusion (RRF) algorithm
+   - the weights of textual and vector parts are customizable, but default to 1:1
+### Changed   
+- Enchancements to textual search:
+   - clearly modeling search intent: full text over 1..N terms, autocomplete/prefix, phrase search
+   - choosing proper multi-matching fields and customizing boosting coefficients for text fields,
+      depending on their role and search intent
+   - API for custom field role boosting
 ### Fixed
 - Hotfix: do not put empty dataset documents into Elasticsearch during full reindexing.
 - Hotfix: improved handling of `skipDatasetsWithNoDescription` and `skipDatasetsWithNoData` options when 

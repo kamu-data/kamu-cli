@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    SEARCH_ALIAS_TITLE,
-    SEARCH_FIELD_IS_BANNED,
-    SearchEntitySchema,
-    SearchSchemaFieldRole,
-};
+use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +135,10 @@ impl ElasticsearchIndexMappings {
         })
     }
 
-    pub fn from_entity_schema(entity_schema: &SearchEntitySchema) -> Self {
+    pub fn from_entity_schema(
+        entity_schema: &SearchEntitySchema,
+        embedding_dimensions: usize,
+    ) -> Self {
         let mut mappings = serde_json::Map::new();
         for field in entity_schema.fields {
             let field_mapping = match field.role {
@@ -156,9 +154,9 @@ impl ElasticsearchIndexMappings {
 
                 SearchSchemaFieldRole::Name => Self::map_name_field(),
 
-                SearchSchemaFieldRole::Prose { enable_positions } => {
-                    Self::map_prose_field(enable_positions)
-                }
+                SearchSchemaFieldRole::Description => Self::map_description_field(),
+
+                SearchSchemaFieldRole::Prose => Self::map_prose_field(),
 
                 SearchSchemaFieldRole::Keyword => Self::map_keyword_field(),
 
@@ -174,6 +172,10 @@ impl ElasticsearchIndexMappings {
                     "type": "integer"
                 }),
 
+                SearchSchemaFieldRole::EmbeddingChunks => {
+                    Self::map_embedding_chunks_field(embedding_dimensions)
+                }
+
                 SearchSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
                     "enabled": false
@@ -183,7 +185,7 @@ impl ElasticsearchIndexMappings {
         }
 
         mappings.insert(
-            SEARCH_ALIAS_TITLE.to_string(),
+            kamu_search::fields::TITLE.to_string(),
             serde_json::json!({
                 "type": "alias",
                 "path": entity_schema.title_field
@@ -192,7 +194,7 @@ impl ElasticsearchIndexMappings {
 
         if entity_schema.enable_banning {
             mappings.insert(
-                SEARCH_FIELD_IS_BANNED.to_string(),
+                kamu_search::fields::IS_BANNED.to_string(),
                 serde_json::json!({
                     "type": "boolean"
                 }),
@@ -261,19 +263,21 @@ impl ElasticsearchIndexMappings {
         base_mapping
     }
 
-    fn map_prose_field(enable_positions: bool) -> serde_json::Value {
-        let mut mapping = serde_json::json!({
+    fn map_description_field() -> serde_json::Value {
+        serde_json::json!({
             "type": "text",
             "analyzer": "kamu_english_html",
             "search_analyzer": "kamu_english_html",
-        });
+        })
+    }
 
-        if enable_positions {
-            mapping["term_vector"] =
-                serde_json::Value::String("with_positions_offsets".to_string());
-        }
-
-        mapping
+    fn map_prose_field() -> serde_json::Value {
+        serde_json::json!({
+            "type": "text",
+            "analyzer": "kamu_english_html",
+            "search_analyzer": "kamu_english_html",
+            "term_vector": "with_positions_offsets"
+        })
     }
 
     fn map_name_field() -> serde_json::Value {
@@ -301,6 +305,33 @@ impl ElasticsearchIndexMappings {
             "type": "keyword",
             "normalizer": "kamu_keyword_norm",
             "ignore_above": 256
+        })
+    }
+
+    fn map_embedding_chunks_field(embedding_dimensions: usize) -> serde_json::Value {
+        serde_json::json!({
+            "type": "nested",
+            "properties": {
+                "chunk_id": {
+                    "type": "keyword"
+                },
+                "embedding": {
+                    "type": "dense_vector",
+                    "dims": embedding_dimensions,
+                    // Elastic’s documentation explicitly recommends cosine for transformer-based text embeddings
+                    "similarity": "cosine",
+                    "index_options": {
+                        // Index for approximate nearest neighbor search (ANN)
+                        "type": "hnsw",
+                        // Maximum number of outgoing connections per node in the HNSW graph.
+                        // Higher values lead to better accuracy, but slow down  indexing and enlarge memory usage.
+                        "m": 16,
+                        // Size of the candidate pool / beam used while selecting those neighbors
+                        "ef_construction": 128
+                    }
+                }
+            },
+
         })
     }
 

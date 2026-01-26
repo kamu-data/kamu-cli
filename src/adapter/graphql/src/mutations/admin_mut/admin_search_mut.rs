@@ -15,7 +15,7 @@ pub struct AdminSearchMut;
 
 #[Object]
 impl AdminSearchMut {
-    async fn reset_full_text_indices(&self, ctx: &Context<'_>) -> Result<String> {
+    async fn reset_search_indices(&self, ctx: &Context<'_>) -> Result<String> {
         let search_indexer = from_catalog_n!(ctx, dyn kamu_search::SearchIndexer);
         search_indexer.reset_search_indices().await?;
         Ok("Ok".to_string())
