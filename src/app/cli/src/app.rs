@@ -635,6 +635,16 @@ pub fn configure_base_catalog(
         kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     );
 
+    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetPropertiesMessage>(
+        &mut b,
+        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetAccountRelationsMessage>(
+        &mut b,
+        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
+    );
+
     b
 }
 

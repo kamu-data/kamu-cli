@@ -14,9 +14,14 @@ use chrono::Utc;
 use dill::{Catalog, CatalogBuilder};
 use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
+use kamu_auth_rebac_services::{
+    DeleteDatasetRebacPropertiesUseCaseImpl,
+    RebacDatasetLifecycleMessageConsumer,
+    RebacServiceImpl,
+    SetDatasetRebacPropertiesUseCaseImpl,
+};
 use kamu_datasets::DatasetLifecycleMessage;
-use messaging_outbox::{ConsumerFilter, Message, consume_deserialized_message};
+use messaging_outbox::{ConsumerFilter, DummyOutboxImpl, Message, consume_deserialized_message};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,8 +203,11 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
         let mut catalog_builder = CatalogBuilder::new();
 
         catalog_builder
+            .add::<DummyOutboxImpl>()
             .add::<RebacDatasetLifecycleMessageConsumer>()
             .add::<RebacServiceImpl>()
+            .add::<SetDatasetRebacPropertiesUseCaseImpl>()
+            .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
             .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
             .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
             .add::<InMemoryRebacRepository>();

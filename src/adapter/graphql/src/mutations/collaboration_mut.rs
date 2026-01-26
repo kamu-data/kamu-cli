@@ -31,7 +31,7 @@ impl CollaborationMut {
 
         let operations = operations.iter().map(Into::into).collect::<Vec<_>>();
 
-        use_case.execute(&operations).await.int_err()?;
+        use_case.execute_bulk(&operations).await.int_err()?;
 
         Ok(ApplyRolesMatrixResult::default())
     }

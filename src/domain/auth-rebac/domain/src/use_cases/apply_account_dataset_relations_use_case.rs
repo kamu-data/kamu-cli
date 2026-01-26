@@ -20,6 +20,11 @@ use crate::AccountToDatasetRelation;
 pub trait ApplyAccountDatasetRelationsUseCase: Send + Sync {
     async fn execute(
         &self,
+        operation: AccountDatasetRelationOperation<'_>,
+    ) -> Result<(), ApplyRelationMatrixError>;
+
+    async fn execute_bulk(
+        &self,
         operations: &[AccountDatasetRelationOperation],
     ) -> Result<(), ApplyRelationMatrixError>;
 }

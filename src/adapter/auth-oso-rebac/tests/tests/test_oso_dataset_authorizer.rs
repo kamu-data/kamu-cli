@@ -30,6 +30,10 @@ use kamu_accounts_services::{
     UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DeleteDatasetRebacPropertiesUseCaseImpl,
+    SetDatasetRebacPropertiesUseCaseImpl,
+};
 use kamu_core::TenancyConfig;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::testing::ClassifyByAllowanceIdsResponseTestHelper;
@@ -681,6 +685,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
                 .add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>()
+                .add::<SetDatasetRebacPropertiesUseCaseImpl>()
+                .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryRebacRepository>()

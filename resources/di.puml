@@ -56,6 +56,7 @@ interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
 interface "DeleteAccountUseCase" <<i>>
+interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
 interface "DependencyGraphService" <<i>>
 interface "DidGenerator" <<i>>
@@ -120,6 +121,7 @@ interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
+interface "SetDatasetRebacPropertiesUseCase" <<i>>
 interface "SetWatermarkExecutor" <<i>>
 interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
@@ -130,6 +132,7 @@ interface "TaskEventStore" <<i>>
 interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
 interface "TransformRequestPlanner" <<i>>
+interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionFileUseCase" <<i>>
@@ -194,6 +197,7 @@ class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
 class "DeleteAccountUseCaseImpl"
+class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
 class "DependencyGraphImmediateListener"
 class "DependencyGraphIndexer"
@@ -233,6 +237,8 @@ class "KamuAuthOso"
 class "KamuFlightSqlService"
 class "LoginPasswordAuthProvider"
 class "LoginService"
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
@@ -300,6 +306,7 @@ class "SessionContextBuilder"
 class "SessionId" <<singleton>>
 class "SessionManagerCaching"
 class "SessionManagerCachingState" <<singleton>>
+class "SetDatasetRebacPropertiesUseCaseImpl"
 class "SetWatermarkExecutorImpl"
 class "SetWatermarkPlannerImpl"
 class "SetWatermarkUseCaseImpl"
@@ -343,6 +350,7 @@ class "TransactionRefT" <<singleton>>
 class "TransformElaborationServiceImpl"
 class "TransformExecutorImpl"
 class "TransformRequestPlannerImpl"
+class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionFileUseCaseImpl"
@@ -601,7 +609,8 @@ class "WsSmartTransferProtocolClient"
 "OAuthGithub"  --> "GithubAuthenticationConfig"
 "MessageConsumer" <|-- "RebacDatasetLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "RebacDatasetLifecycleMessageConsumer"
-"RebacDatasetLifecycleMessageConsumer"  --> "RebacService"
+"RebacDatasetLifecycleMessageConsumer"  --> "DeleteDatasetRebacPropertiesUseCase"
+"RebacDatasetLifecycleMessageConsumer"  --> "SetDatasetRebacPropertiesUseCase"
 "RebacDatasetLifecycleMessageConsumer"  --> "DatasetProperties"
 "RebacDatasetRegistryFacade" <|-- "RebacDatasetRegistryFacadeImpl"
 "RebacDatasetRegistryFacadeImpl"  --> "DatasetActionAuthorizer"
@@ -609,6 +618,7 @@ class "WsSmartTransferProtocolClient"
 "InitOnStartup" <|-- "RebacIndexer"
 "RebacIndexer"  --> "ExpensiveAccountRepository"
 "RebacIndexer"  --> "RebacService"
+"RebacIndexer"  --> "SetDatasetRebacPropertiesUseCase"
 "RebacIndexer"  --> "DatasetEntryService"
 "RebacIndexer"  --> "PredefinedAccountsConfig"
 "RebacService" <|-- "RebacServiceImpl"
@@ -618,6 +628,16 @@ class "WsSmartTransferProtocolClient"
 "ApplyAccountDatasetRelationsUseCase" <|-- "ApplyAccountDatasetRelationsUseCaseImpl"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "RebacService"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "DatasetActionAuthorizer"
+"ApplyAccountDatasetRelationsUseCaseImpl"  --> "Outbox"
+"DeleteDatasetRebacPropertiesUseCase" <|-- "DeleteDatasetRebacPropertiesUseCaseImpl"
+"DeleteDatasetRebacPropertiesUseCaseImpl"  --> "RebacService"
+"DeleteDatasetRebacPropertiesUseCaseImpl"  --> "Outbox"
+"SetDatasetRebacPropertiesUseCase" <|-- "SetDatasetRebacPropertiesUseCaseImpl"
+"SetDatasetRebacPropertiesUseCaseImpl"  --> "RebacService"
+"SetDatasetRebacPropertiesUseCaseImpl"  --> "Outbox"
+"UnsetDatasetAccountsRelationsUseCase" <|-- "UnsetDatasetAccountsRelationsUseCaseImpl"
+"UnsetDatasetAccountsRelationsUseCaseImpl"  --> "RebacService"
+"UnsetDatasetAccountsRelationsUseCaseImpl"  --> "Outbox"
 "RebacRepository" <|-- "SqliteRebacRepository"
 "SqliteRebacRepository"  --> "TransactionRefT"
 "InitOnStartup" <|-- "Web3AuthEip4361NonceServiceImpl"

@@ -22,13 +22,9 @@ use kamu_auth_rebac::{
     RebacService,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    ApplyAccountDatasetRelationsUseCaseImpl,
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-    RebacServiceImpl,
-};
+use kamu_auth_rebac_services::*;
 use kamu_core::auth::DatasetActionAuthorizer;
+use messaging_outbox::DummyOutboxImpl;
 use pretty_assertions::{assert_eq, assert_matches};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +60,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
                     SET_MAINTAINER_OPERATION,
@@ -107,7 +103,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account2
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_2),
@@ -173,7 +169,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account2
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_2),
@@ -239,7 +235,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
                     UNSET_ROLE_OPERATION,
@@ -285,7 +281,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account1
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
@@ -343,7 +339,7 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account1
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
@@ -435,7 +431,7 @@ async fn test_apply_roles_matrix_not_authorized() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account1
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
@@ -518,7 +514,7 @@ async fn test_apply_roles_matrix_not_found() {
     assert_matches!(
         harness
             .use_case
-            .execute(&[
+            .execute_bulk(&[
                 // Account1
                 AccountDatasetRelationOperation::new(
                     Cow::Borrowed(&account_id_1),
@@ -592,7 +588,10 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
+            b.add::<DummyOutboxImpl>();
             b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
+            b.add::<SetDatasetRebacPropertiesUseCaseImpl>();
+            b.add::<DeleteDatasetRebacPropertiesUseCaseImpl>();
             b.add::<RebacServiceImpl>();
             b.add_value(DefaultAccountProperties::default());
             b.add_value(DefaultDatasetProperties::default());
