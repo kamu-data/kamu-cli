@@ -231,6 +231,19 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
             .unwrap_or_default())
     }
 
+    async fn list_all_subscription_ids(
+        &self,
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        Ok(g.webhook_subscription_data
+            .iter()
+            .filter_map(|(id, data)| {
+                (data.status() != WebhookSubscriptionStatus::Removed).then_some(*id)
+            })
+            .collect())
+    }
+
     async fn find_subscription_id_by_dataset_and_label(
         &self,
         dataset_id: &odf::DatasetID,
