@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.257.0] - 2026-01-26
 ### Added
 - Elasticsearch solution supports security aspects:
    - every indexed entity registers "visibility" and "principal_ids" fields, 

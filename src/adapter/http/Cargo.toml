@@ -48,7 +48,7 @@ time-source = { workspace = true }
 aws-sdk-s3 = { workspace = true }
 
 axum = { version = "0.8", features = ["ws", "multipart"] }
-axum-extra = { version = "0.10", features = [
+axum-extra = { version = "0.12", features = [
     "async-read-body",
     "typed-header",
 ] }
