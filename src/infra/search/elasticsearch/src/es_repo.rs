@@ -721,6 +721,10 @@ impl SearchRepository for ElasticsearchRepository {
             .list_indices_by_prefix(&self.repo_config.index_prefix)
             .await
             .int_err()?;
+        if index_names.is_empty() {
+            tracing::info!("No indices to delete");
+            return Ok(());
+        }
 
         // Convert to refs
         let refs: Vec<&str> = index_names.iter().map(String::as_str).collect();
