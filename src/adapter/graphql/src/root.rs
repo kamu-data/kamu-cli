@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::extensions::*;
+use crate::molecule::Molecule;
+use crate::mutations::molecule_mut::MoleculeMut;
 use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;
@@ -76,7 +78,7 @@ impl Query {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> Molecule {
-        Molecule
+        Molecule::default()
     }
 }
 
@@ -111,7 +113,7 @@ impl Mutation {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> MoleculeMut {
-        MoleculeMut
+        MoleculeMut::default()
     }
 
     /// Collaboration-related functionality group

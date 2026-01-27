@@ -13,6 +13,7 @@ members = [
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/file-utils",
+    "src/utils/format-utils",
     "src/utils/graphql-http",
     "src/utils/http-common",
     "src/utils/init-on-startup",
@@ -118,6 +119,9 @@ members = [
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
+    # SKU modules
+    "src/sku/molecule/domain",
+    "src/sku/molecule/services",
     # Apps
     "src/app/cli",
     # E2E
@@ -151,6 +155,7 @@ enum-variants = { version = "0.256.0", path = "src/utils/enum-variants", default
 event-sourcing = { version = "0.256.0", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.256.0", path = "src/utils/event-sourcing-macros", default-features = false }
 file-utils = { version = "0.256.0", path = "src/utils/file-utils", default-features = false }
+format-utils = { version = "0.256.0", path = "src/utils/format-utils", default-features = false }
 graphql-http = { version = "0.256.0", path = "src/utils/graphql-http", default-features = false }
 http-common = { version = "0.256.0", path = "src/utils/http-common", default-features = false }
 init-on-startup = { version = "0.256.0", path = "src/utils/init-on-startup", default-features = false }
@@ -263,6 +268,10 @@ kamu-adapter-graphql = { version = "0.256.0", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.256.0", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.256.0", path = "src/adapter/odata", default-features = false }
 kamu-adapter-oauth = { version = "0.256.0", path = "src/adapter/oauth", default-features = false }
+
+# SKU modules
+kamu-molecule-domain = { version = "0.256.0", path = "src/sku/molecule/domain", default-features = false }
+kamu-molecule-services = { version = "0.256.0", path = "src/sku/molecule/services", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.256.0", path = "src/e2e/app/cli/common", default-features = false }

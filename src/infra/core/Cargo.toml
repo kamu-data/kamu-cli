@@ -28,6 +28,7 @@ ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
+query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
@@ -53,9 +54,13 @@ file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["lfs", "s3"] }
@@ -160,6 +165,8 @@ kamu-datasets-inmem = { workspace = true, default-features = false }
 kamu-datasets-services = { workspace = true, default-features = false, features = [
     "testing",
 ] }
+kamu-accounts-inmem = { workspace = true, default-features = false }
+kamu-accounts-services = { workspace = true, default-features = false }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 test-utils = { workspace = true, default-features = false }
 

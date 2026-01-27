@@ -824,7 +824,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -835,7 +835,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4580,7 +4580,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4946,7 +4946,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5220,6 +5220,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "format-utils"
+version = "0.256.0"
+dependencies = [
+ "pretty_assertions",
 ]
 
 [[package]]
@@ -6460,7 +6467,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6842,6 +6849,8 @@ dependencies = [
  "itertools 0.14.0",
  "kamu",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
@@ -6895,6 +6904,7 @@ dependencies = [
  "crypto-utils",
  "database-common",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "jsonwebtoken",
@@ -6909,6 +6919,7 @@ dependencies = [
  "reusable",
  "secrecy",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.27.2",
@@ -6926,6 +6937,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -6971,11 +6983,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -6992,6 +7006,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "kamu-accounts",
  "kamu-accounts-services",
@@ -7015,6 +7030,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "init-on-startup",
  "internal-error",
@@ -7058,11 +7074,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -7210,6 +7228,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "futures",
+ "init-on-startup",
  "internal-error",
  "kamu-accounts",
  "kamu-adapter-flow-dataset",
@@ -7218,6 +7237,7 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-services",
  "kamu-task-system",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
@@ -7284,7 +7304,12 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-messaging-outbox-inmem",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -7303,6 +7328,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3",
+ "strum 0.27.2",
  "tempfile",
  "test-group",
  "test-log",
@@ -7762,6 +7788,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-elasticsearch",
  "kamu-search-openai",
@@ -7902,6 +7929,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.256.0"
 dependencies = [
  "async-graphql",
+ "base64",
  "chrono",
  "database-common",
  "datafusion",
@@ -7918,12 +7946,15 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "random-strings",
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "test-utils",
  "tokio",
+ "tokio-retry",
  "url",
 ]
 
@@ -7977,6 +8008,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "mockall",
  "object_store",
  "opendatafabric",
@@ -8025,13 +8057,17 @@ dependencies = [
  "chrono",
  "crypto-utils",
  "database-common",
+ "derive_more",
  "file-utils",
+ "format-utils",
  "futures",
  "internal-error",
+ "kamu-accounts",
  "kamu-search",
  "merge",
  "messaging-outbox",
  "mockall",
+ "nonempty",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -8042,6 +8078,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "urlencoding",
  "uuid",
 ]
 
@@ -8152,21 +8189,26 @@ dependencies = [
  "nutype",
  "oop",
  "opendatafabric",
+ "paste",
  "petgraph 0.8.3",
  "pretty_assertions",
+ "rstest",
  "s3-utils",
  "secrecy",
  "serde",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "thiserror 2.0.17",
  "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
  "url",
+ "urlencoding",
  "uuid",
 ]
 
@@ -8463,6 +8505,69 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-molecule-domain"
+version = "0.256.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "file-utils",
+ "format-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.256.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "file-utils",
+ "format-utils",
+ "futures",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-molecule-domain",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.17",
+ "time-source",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -9648,12 +9753,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nonempty"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11726,6 +11837,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "replace_with"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11953,6 +12070,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.114",
+ "unicode-ident",
+]
+
+[[package]]
 name = "ruint"
 version = "1.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12083,7 +12226,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -13487,7 +13630,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -14827,7 +14970,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

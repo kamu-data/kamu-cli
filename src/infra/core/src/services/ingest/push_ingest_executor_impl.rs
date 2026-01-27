@@ -13,6 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::{AccountQuotaStorageChecker, AccountService};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -32,11 +33,43 @@ pub struct PushIngestExecutorImpl {
     data_format_registry: Arc<dyn DataFormatRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
+    account_quota_storage_checker: Arc<dyn AccountQuotaStorageChecker>,
+    account_service: Arc<dyn AccountService>,
+    tenancy_config: TenancyConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PushIngestExecutorImpl {
+    async fn ensure_quota(
+        &self,
+        target: &ResolvedDataset,
+        incoming_size: u64,
+    ) -> Result<(), kamu_accounts::QuotaError> {
+        // In single-tenant mode aliases does not carry account names; skip quota check
+        // in that case
+        let Some(account_name) = target.get_alias().account_name.as_ref() else {
+            assert!(
+                self.tenancy_config != TenancyConfig::MultiTenant,
+                "Dataset alias is missing account name in multi-tenant mode: {}",
+                target.get_alias()
+            );
+            return Ok(());
+        };
+
+        let account = self
+            .account_service
+            .get_account_by_name(account_name)
+            .await
+            .int_err()?;
+
+        self.account_quota_storage_checker
+            .ensure_within_quota(&account.id, incoming_size)
+            .await?;
+
+        Ok(())
+    }
+
     async fn do_ingest(
         &self,
         target: ResolvedDataset,
@@ -58,7 +91,14 @@ impl PushIngestExecutorImpl {
         listener.begin();
 
         match self
-            .do_ingest_inner(plan.args, source, data_writer, ctx, listener.clone())
+            .do_ingest_inner(
+                target,
+                plan.args,
+                source,
+                data_writer,
+                ctx,
+                listener.clone(),
+            )
             .await
         {
             Ok(res) => {
@@ -83,6 +123,7 @@ impl PushIngestExecutorImpl {
     )]
     async fn do_ingest_inner(
         &self,
+        target: ResolvedDataset,
         args: PushIngestArgs,
         source: DataSource,
         mut data_writer: DataWriterDataFusion,
@@ -146,7 +187,11 @@ impl PushIngestExecutorImpl {
 
         match stage_result {
             Ok(staged) => {
+                let estimated_size = Self::estimate_staged_size(&staged)?;
+                self.ensure_quota(&target, estimated_size).await?;
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
+
+                let system_time = staged.system_time;
 
                 let res = data_writer.commit(staged).await?;
 
@@ -154,6 +199,7 @@ impl PushIngestExecutorImpl {
                     old_head: res.old_head,
                     new_head: res.new_head,
                     num_blocks: 1,
+                    system_time,
                 })
             }
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
@@ -228,7 +274,14 @@ impl PushIngestExecutorImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    fn estimate_staged_size(staged: &StageDataResult) -> Result<u64, PushIngestError> {
+        if let Some(data_file) = &staged.data_file {
+            let meta = std::fs::metadata(data_file.as_path()).int_err()?;
+            Ok(meta.len())
+        } else {
+            Ok(0)
+        }
+    }
     async fn read(
         &self,
         input_data_path: &Path,

@@ -53,7 +53,7 @@ observability = { workspace = true, features = ["dill", "prometheus"] }
 time-source = { workspace = true }
 server-console = { workspace = true }
 
-kamu = { workspace = true }
+kamu = { workspace = true, features = ["query-extensions-nested-functions"] }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
@@ -125,6 +125,8 @@ kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }
 kamu-auth-web3-services = { workspace = true }
 kamu-auth-web3-sqlite = { workspace = true }
+
+kamu-molecule-services = { workspace = true }
 
 # Top-level TLS configuration
 # TODO: Include alloy, aws-smithy

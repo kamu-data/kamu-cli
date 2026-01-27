@@ -28,7 +28,6 @@ pub(crate) use build_info::*;
 pub(crate) use data::*;
 pub(crate) use datasets::*;
 pub(crate) use flows::*;
-pub(crate) use molecule::*;
 pub(crate) use search::*;
 pub(crate) use tasks::*;
 pub(crate) use webhooks::*;

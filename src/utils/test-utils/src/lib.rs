@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod http_file_server;
+// macro_rules' macros are always exported to the crate root
+pub mod macros;
 mod minio_server;
 pub mod test_docker_images;
 

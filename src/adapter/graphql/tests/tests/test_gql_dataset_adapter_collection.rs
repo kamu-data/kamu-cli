@@ -865,7 +865,9 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<FindCollectionEntriesUseCaseImpl>()
             .add::<UpdateCollectionEntriesUseCaseImpl>()
+            .add::<ViewCollectionEntriesUseCaseImpl>()
             .build();
 
         let (_catalog_anonymous, catalog_authorized) =

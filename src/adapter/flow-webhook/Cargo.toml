@@ -36,6 +36,7 @@ kamu-webhooks = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
+init-on-startup = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
@@ -56,6 +57,7 @@ uuid = { version = "1", default-features = false }
 kamu-accounts = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
+kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-services = { workspace = true }

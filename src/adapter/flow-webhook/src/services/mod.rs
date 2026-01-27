@@ -9,3 +9,6 @@
 
 mod flow_webhooks_event_bridge;
 pub use flow_webhooks_event_bridge::*;
+
+mod webhook_recovery_job;
+pub use webhook_recovery_job::*;

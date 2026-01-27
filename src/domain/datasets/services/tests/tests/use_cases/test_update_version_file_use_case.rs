@@ -25,16 +25,23 @@ use kamu::{
     QueryServiceImpl,
     SessionContextBuilder,
 };
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{
     ContentArgs,
     DatasetRegistry,
     ResolvedDataset,
-    UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
+    UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
-use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    UpdateVersionedFileUseCaseImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};
@@ -62,7 +69,8 @@ async fn test_update_versioned_file_use_case() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
+            None,
             Some(content_args),
             None,
             None,
@@ -78,7 +86,8 @@ async fn test_update_versioned_file_use_case() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
+            None,
             Some(content_args),
             None,
             None,
@@ -109,7 +118,8 @@ async fn test_update_versioned_file_use_case_errors() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
+            None,
             Some(content_args),
             Some(seed_bloch_hash),
             None,
@@ -125,7 +135,8 @@ async fn test_update_versioned_file_use_case_errors() {
     let res = harness
         .use_case
         .execute(
-            WriteCheckedDataset(&file_dataset),
+            WriteCheckedDataset::from_ref(&file_dataset),
+            None,
             Some(content_args),
             Some(old_head),
             None,
@@ -140,7 +151,7 @@ async fn test_update_versioned_file_use_case_errors() {
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateVersionFileCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
-    use_case: Arc<dyn UpdateVersionFileUseCase>,
+    use_case: Arc<dyn UpdateVersionedFileUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     did_generator: Arc<dyn DidGenerator>,
@@ -159,7 +170,7 @@ impl UpdateVersionFileCaseHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
         let catalog = b
-            .add::<UpdateVersionFileUseCaseImpl>()
+            .add::<UpdateVersionedFileUseCaseImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
@@ -169,6 +180,14 @@ impl UpdateVersionFileCaseHarness {
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))
