@@ -12,7 +12,8 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult, auth};
+use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
+use kamu_datasets::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +43,7 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         // Resolve dataset
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Maintain)
+            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Maintain)
             .await
             .map_err(|e| {
                 use RebacDatasetIdUnresolvedError as E;

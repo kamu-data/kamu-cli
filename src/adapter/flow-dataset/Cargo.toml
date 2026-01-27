@@ -54,11 +54,9 @@ mockall = { version = "0.14", optional = true }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
-kamu-adapter-flow-dataset = { workspace = true, features = ["testing"] }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
-
 
 mockall = { version = "0.14" }
 pretty_assertions = { version = "1" }

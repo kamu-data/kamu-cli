@@ -653,7 +653,7 @@ impl DependencyGraphHarness {
             messaging_outbox::ConsumerFilter::AllConsumers,
         ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()
         .add_value(DidSecretEncryptionConfig::sample())

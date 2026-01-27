@@ -544,8 +544,6 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
-    b.add::<DidSecretService>();
-
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
@@ -645,6 +643,16 @@ pub fn configure_base_catalog(
     register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+    );
+
+    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetPropertiesMessage>(
+        &mut b,
+        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetRelationsMessage>(
+        &mut b,
+        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     );
 
     b
@@ -1123,31 +1131,12 @@ pub fn register_config_in_catalog(
         indexer,
         embeddings_chunker,
         embeddings_encoder,
-        vector_repo,
-        overfetch_factor,
-        overfetch_amount,
         repo,
     } = config.search.clone().unwrap();
-
-    // Note: this is specific to CLI:
-    // - we are not registering NaturalLanguageSearchIndexer startup job here to
-    //   avoid heavyweight load in CLI commands
-    // - lazy init wrapper encapsulates the indexing launch on first search API use
-    //   (could be quite a long startup time, indexing itself + container start, if
-    //   containers are used)
-    // - lazy init wrapper is unnecessary in server mode
-
-    catalog_builder.add_value(kamu_search_services::NaturalLanguageSearchConfig {
-        overfetch_factor: overfetch_factor.unwrap(),
-        overfetch_amount: overfetch_amount.unwrap(),
-    });
 
     let indexer = indexer.unwrap_or_default();
     catalog_builder.add_value(kamu_search::SearchIndexerConfig {
         clear_on_start: indexer.clear_on_start,
-        skip_datasets_with_no_description: indexer.skip_datasets_with_no_description,
-        skip_datasets_with_no_data: indexer.skip_datasets_with_no_data,
-        payload_include_content: indexer.payload_include_content,
     });
 
     match embeddings_chunker.unwrap_or_default() {
@@ -1172,39 +1161,11 @@ pub fn register_config_in_catalog(
                 dimensions: cfg.dimensions.unwrap(),
             });
         }
-    }
 
-    match vector_repo.unwrap_or_default() {
-        config::VectorRepoConfig::Dummy => {
-            catalog_builder.add::<kamu_search_services::DummyNaturalLanguageSearchService>();
-        }
-
-        config::VectorRepoConfig::Qdrant(mut cfg) => {
-            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
-
-            cfg.merge(config::VectorRepoConfigQdrant::default());
-
-            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
-            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrant {
-                url: cfg.url,
-                collection_name: cfg.collection_name.unwrap(),
-                dimensions: cfg.dimensions.unwrap(),
-            });
-        }
-        config::VectorRepoConfig::QdrantContainer(mut cfg) => {
-            catalog_builder.add::<kamu_search_services::NaturalLanguageSearchImplLazyInit>();
-
-            cfg.merge(config::VectorRepoConfigQdrantContainer::default());
-
-            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();
-            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrantContainer {
-                image: cfg.image.unwrap(),
-                dimensions: cfg.dimensions.unwrap(),
-                start_timeout: cfg.start_timeout.unwrap().into(),
-            });
+        config::EmbeddingsEncoderConfig::Dummy => {
+            catalog_builder.add::<kamu_search_services::DummyEmbeddingsEncoder>();
         }
     }
-    //
 
     // Note: this is specific to CLI:
     // - we are not registering SearchIndexer startup job here to avoid heavyweight
@@ -1240,6 +1201,7 @@ pub fn register_config_in_catalog(
             });
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
                 index_prefix: cfg.index_prefix.unwrap(),
+                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
             });
         }
         config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
@@ -1248,6 +1210,7 @@ pub fn register_config_in_catalog(
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
                 image: cfg.image.unwrap(),
                 start_timeout: cfg.start_timeout.unwrap().into(),
+                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
             });
         }
     }

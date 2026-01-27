@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
     EngineConfigDatafusionEmbeddedBatchQuery,
@@ -37,6 +37,7 @@ use kamu_datasets::{
     WriteCheckedDataset,
 };
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,

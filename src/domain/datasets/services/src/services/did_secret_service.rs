@@ -86,6 +86,8 @@ impl DidSecretService {
 
 impl MessageConsumer for DidSecretService {}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
     #[tracing::instrument(
@@ -98,6 +100,8 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
         _: &dill::Catalog,
         message: &AccountLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received account lifecycle message");
+
         match message {
             AccountLifecycleMessage::Deleted(message) => {
                 self.handle_account_lifecycle_deleted_message(message)
@@ -127,6 +131,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
         _: &dill::Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message)

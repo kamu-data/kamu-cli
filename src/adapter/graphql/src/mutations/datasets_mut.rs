@@ -7,9 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth;
-use kamu_core::auth::DatasetActionAccess;
-use kamu_datasets::CreateDatasetFromSnapshotError;
+use kamu_datasets::{CreateDatasetFromSnapshotError, DatasetAction, DatasetActionAccess};
 
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
@@ -89,9 +87,9 @@ impl DatasetsMut {
 
         let dataset_request_state = DatasetRequestState::new(dataset_handle);
         let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
-        let current_dataset_action = auth::DatasetAction::Write;
+        let current_dataset_action = DatasetAction::Write;
 
-        match auth::DatasetAction::resolve_access(allowed_actions, current_dataset_action) {
+        match DatasetAction::resolve_access(allowed_actions, current_dataset_action) {
             DatasetActionAccess::Allowed => {
                 Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
             }
@@ -130,7 +128,7 @@ impl DatasetsMut {
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
 
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_access(&dataset_refs_refs, auth::DatasetAction::Write)
+            .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetAction::Write)
             .await?;
 
         if let Some(error_msg) = resolution.try_get_error_message(skip_missing) {

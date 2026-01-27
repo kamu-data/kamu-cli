@@ -10,7 +10,6 @@
 use async_graphql::value;
 use indoc::indoc;
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::{Account, DeviceCode, GetAccountInfoError, LoginError, LoginResponse};
 use pretty_assertions::assert_eq;
 use thiserror::Error;
 
@@ -75,15 +74,15 @@ async fn test_internal_error() {
             &self,
             _login_method: &str,
             _login_credentials_json: String,
-            _device_code: Option<DeviceCode>,
-        ) -> Result<LoginResponse, LoginError> {
+            _device_code: Option<kamu_accounts::DeviceCode>,
+        ) -> Result<kamu_accounts::LoginResponse, kamu_accounts::LoginError> {
             unimplemented!()
         }
 
         async fn account_by_token(
             &self,
             _access_token: String,
-        ) -> Result<Account, GetAccountInfoError> {
+        ) -> Result<kamu_accounts::Account, kamu_accounts::GetAccountInfoError> {
             #[derive(Debug, Error)]
             #[error("I'm a dummy error that should not propagate through")]
             struct DummyError;

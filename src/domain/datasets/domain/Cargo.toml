@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+oso = ["dep:oso"]
 sqlx = ["dep:sqlx"]
 testing = ["dep:mockall"]
 
@@ -38,6 +39,7 @@ odf = { workspace = true, features = ["datafusion"] }
 kamu-accounts = { workspace = true }
 kamu-search = { workspace = true }
 
+async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 derive_more = { version = "2", default-features = false, features = [
     "display",
@@ -48,6 +50,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
+dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 merge = "0.2"
 nonempty = { version = "0.12", default-features = false }
@@ -67,6 +70,6 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
     "macros",
 ] }
 mockall = { optional = true, version = "0.14", default-features = false }
-
+oso = { optional = true, version = "0.27", default-features = false }
 
 [dev-dependencies]

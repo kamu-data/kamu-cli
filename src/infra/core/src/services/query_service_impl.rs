@@ -16,9 +16,14 @@ use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt as _};
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{
+    DatasetAction,
+    DatasetActionAuthorizer,
+    DatasetActionAuthorizerExt as _,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 use odf::utils::data::DataFrameExt;
 
 use crate::SessionContextBuilder;
@@ -742,7 +747,8 @@ fn extract_table_refs_rec_set_expr(
         | SetExpr::Values(_)
         | SetExpr::Insert(_)
         | SetExpr::Update(_)
-        | SetExpr::Delete(_) => Ok(()),
+        | SetExpr::Delete(_)
+        | SetExpr::Merge(_) => Ok(()),
     }
 }
 

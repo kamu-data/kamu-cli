@@ -11,7 +11,12 @@ use std::sync::Arc;
 
 use dill::{Catalog, component, interface, meta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_auth_rebac::{DatasetPropertyName, RebacService};
+use kamu_auth_rebac::{
+    DatasetProperties,
+    DeleteDatasetRebacPropertiesUseCase,
+    MESSAGE_CONSUMER_KAMU_REBAC_SERVICE,
+    SetDatasetRebacPropertiesUseCase,
+};
 use kamu_datasets::{
     DatasetLifecycleMessage,
     DatasetLifecycleMessageCreated,
@@ -26,14 +31,9 @@ use messaging_outbox::{
     MessageDeliveryMechanism,
 };
 
-use crate::{DefaultDatasetProperties, MESSAGE_CONSUMER_KAMU_REBAC_SERVICE};
+use crate::DefaultDatasetProperties;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct RebacDatasetLifecycleMessageConsumer {
-    rebac_service: Arc<dyn RebacService>,
-    default_dataset_properties: Arc<DefaultDatasetProperties>,
-}
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
@@ -46,33 +46,26 @@ pub struct RebacDatasetLifecycleMessageConsumer {
     delivery: MessageDeliveryMechanism::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-impl RebacDatasetLifecycleMessageConsumer {
-    pub fn new(
-        rebac_service: Arc<dyn RebacService>,
-        default_dataset_properties: Arc<DefaultDatasetProperties>,
-    ) -> Self {
-        Self {
-            rebac_service,
-            default_dataset_properties,
-        }
-    }
+pub struct RebacDatasetLifecycleMessageConsumer {
+    set_dataset_properties_uc: Arc<dyn SetDatasetRebacPropertiesUseCase>,
+    delete_dataset_properties_uc: Arc<dyn DeleteDatasetRebacPropertiesUseCase>,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
+}
 
+impl RebacDatasetLifecycleMessageConsumer {
     async fn handle_dataset_lifecycle_created_message(
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        // TODO: Private Datasets: batch setting of properties?
-        for (name, value) in [
-            DatasetPropertyName::allows_public_read(message.dataset_visibility.is_public()),
-            DatasetPropertyName::allows_anonymous_read(
-                self.default_dataset_properties.allows_anonymous_read,
-            ),
-        ] {
-            self.rebac_service
-                .set_dataset_property(&message.dataset_id, name, &value)
-                .await
-                .int_err()?;
-        }
+        let dataset_properties = DatasetProperties {
+            allows_public_read: message.dataset_visibility.is_public(),
+            allows_anonymous_read: self.default_dataset_properties.allows_anonymous_read,
+        };
+
+        self.set_dataset_properties_uc
+            .execute(&message.dataset_id, dataset_properties)
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -81,8 +74,8 @@ impl RebacDatasetLifecycleMessageConsumer {
         &self,
         message: &DatasetLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
-        self.rebac_service
-            .delete_dataset_properties(&message.dataset_id)
+        self.delete_dataset_properties_uc
+            .execute(&message.dataset_id)
             .await
             .int_err()
     }

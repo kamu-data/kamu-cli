@@ -16,6 +16,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use datafusion::arrow::array::{Array, AsArray};
 use datafusion::arrow::datatypes::{DataType, Field, Fields, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
+use datafusion::common::parquet_config::DFParquetWriterVersion;
 use datafusion::config::{ParquetColumnOptions, ParquetOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::functions_aggregate::min_max::{max, min};
@@ -126,7 +127,7 @@ impl DataWriterDataFusion {
                          should either rename the data column or configure the dataset vocabulary \
                          to use a different name: {system_column}"
                     ),
-                    SchemaRef::new(df.schema().into()),
+                    df.schema().inner().clone(),
                 ));
             }
         }
@@ -148,7 +149,7 @@ impl DataWriterDataFusion {
                              found: {}",
                             self.meta.vocab.event_time_column, typ
                         ),
-                        SchemaRef::new(df.schema().into()),
+                        df.schema().inner().clone(),
                     ));
                 }
             }
@@ -260,6 +261,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -518,7 +520,7 @@ impl DataWriterDataFusion {
         // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
         TableParquetOptions {
             global: ParquetOptions {
-                writer_version: "1.0".into(),
+                writer_version: DFParquetWriterVersion::V1_0,
                 compression: Some("snappy".into()),
                 ..self.ctx.state().default_table_options().parquet.global
             },
@@ -626,6 +628,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -736,6 +739,7 @@ impl DataWriterDataFusion {
                     parquet_pruning: None,
                     skip_metadata: None,
                     file_decryption_properties: None,
+                    metadata_size_hint: None,
                 },
             )
             .await
@@ -1023,7 +1027,7 @@ impl DataWriter for DataWriterDataFusion {
             let df = self.coerce_schema(df, dataset_schema_arrow.as_ref())?;
 
             // Validate schema matches the declared one
-            let new_slice_schema_arrow = SchemaRef::new(df.schema().into());
+            let new_slice_schema_arrow = df.schema().inner().clone();
             tracing::info!(?new_slice_schema_arrow, "Final output schema");
 
             if let Some(dataset_schema_arrow) = &dataset_schema_arrow {

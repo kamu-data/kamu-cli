@@ -10,6 +10,7 @@
 use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -87,7 +88,18 @@ impl FromStr for Relation {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    strum::EnumString,
+    strum::Display,
+    Serialize,
+    Deserialize,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum AccountToDatasetRelation {

@@ -8,5 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod apply_account_dataset_relations_use_case_impl;
+mod delete_dataset_rebac_properties_use_case_impl;
+mod set_dataset_rebac_properties_use_case_impl;
+mod unset_dataset_accounts_relations_use_case_impl;
 
 pub use apply_account_dataset_relations_use_case_impl::*;
+pub use delete_dataset_rebac_properties_use_case_impl::*;
+pub use set_dataset_rebac_properties_use_case_impl::*;
+pub use unset_dataset_accounts_relations_use_case_impl::*;

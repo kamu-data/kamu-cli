@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
@@ -86,9 +86,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
-        let ctx = SearchContext {
-            catalog: &self.catalog,
-        };
+        let ctx = SearchContext::unrestricted(&self.catalog);
 
         let filter = Self::prepare_full_text_search_filter(
             &molecule_project.ipnft_uid,
@@ -99,22 +97,21 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
 
         let search_results = self
             .search_service
-            .search(
+            .listing_search(
                 ctx,
-                SearchRequest {
-                    query: None, // no textual query, just filtering
+                ListingSearchRequest {
                     entity_schemas: vec![data_room_entry_schema::SCHEMA_NAME],
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::PATH),
                     page: pagination.into(),
-                    options: SearchOptions::default(),
                 },
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(MoleculeDataRoomEntriesListing {
-            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
             list: search_results
                 .hits
                 .into_iter()

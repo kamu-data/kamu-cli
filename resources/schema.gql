@@ -476,7 +476,7 @@ type AdminMut {
 }
 
 type AdminSearchMut {
-	resetFullTextIndices: String!
+	resetSearchIndices: String!
 }
 
 type ApplyRolesMatrixResult {
@@ -4553,7 +4553,13 @@ type Search {
 	Searches for datasets and other objects managed by the
 	current node using a prompt in natural language
 	"""
-	queryNaturalLanguage(prompt: String!, perPage: Int): SearchResultExConnection!
+	queryNaturalLanguage(prompt: String!, limit: Int): SearchResultExConnection!
+	"""
+	Searches for datasets and other objects managed by the
+	current node using a prompt, mixing full-text and natural language
+	methods
+	"""
+	queryHybrid(prompt: String!, limit: Int): SearchResultExConnection!
 	"""
 	Perform lightweight search among resource names.
 	Useful for autocomplete.

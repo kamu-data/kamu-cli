@@ -7,12 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+use kamu_search::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod classify_by_allowance_ids_response_test_helper;
-mod owner_by_alias_dataset_action_authorizer;
+#[dill::component]
+#[dill::interface(dyn EmbeddingsEncoder)]
+pub struct DummyEmbeddingsEncoder {}
 
-pub use classify_by_allowance_ids_response_test_helper::*;
-pub use owner_by_alias_dataset_action_authorizer::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl EmbeddingsEncoder for DummyEmbeddingsEncoder {
+    async fn encode(&self, _input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
+        Ok(vec![])
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

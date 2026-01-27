@@ -17,7 +17,7 @@ use kamu_search::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "kamu-datasets";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,6 +76,14 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         role: SearchSchemaFieldRole::Keyword,
     },
     SearchSchemaField {
+        path: kamu_search::fields::VISIBILITY,
+        role: SearchSchemaFieldRole::Keyword,
+    },
+    SearchSchemaField {
+        path: kamu_search::fields::PRINCIPAL_IDS,
+        role: SearchSchemaFieldRole::Keyword,
+    },
+    SearchSchemaField {
         path: fields::CREATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
@@ -93,9 +101,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: false, // short prose
-        },
+        role: SearchSchemaFieldRole::Description,
     },
     SearchSchemaField {
         path: fields::KEYWORDS,
@@ -107,9 +113,11 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::ATTACHMENTS,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: true, // long prose
-        },
+        role: SearchSchemaFieldRole::Prose,
+    },
+    SearchSchemaField {
+        path: kamu_search::fields::SEMANTIC_EMBEDDINGS,
+        role: SearchSchemaFieldRole::EmbeddingChunks,
     },
 ];
 
@@ -119,7 +127,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     fields: SCHEMA_FIELDS,
     title_field: fields::ALIAS,
     enable_banning: false, // Potentially might be useful for datasets
-    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,3 +8,6 @@
 // by the Apache License, Version 2.0.
 
 pub mod dataset_search_schema;
+
+mod dataset_search_service;
+pub use dataset_search_service::*;

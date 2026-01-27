@@ -19,7 +19,7 @@ use crate::search::schemas::molecule_search_schema_common as molecule_schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "molecule-data-room-entries";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,9 +55,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::CONTENT_LENGTH,
     SearchSchemaField {
         path: fields::CONTENT_TEXT,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: true,
-        },
+        role: SearchSchemaFieldRole::Prose,
     },
     molecule_schema::field_definitions::ACCESS_LEVEL,
     molecule_schema::field_definitions::CHANGE_BY,

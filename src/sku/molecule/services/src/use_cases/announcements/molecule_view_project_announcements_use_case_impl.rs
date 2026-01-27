@@ -105,9 +105,7 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
         filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
-        let ctx = SearchContext {
-            catalog: &self.catalog,
-        };
+        let ctx = SearchContext::unrestricted(&self.catalog);
 
         let filter = {
             let mut and_clauses = vec![];
@@ -128,22 +126,21 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
 
         let search_results = self
             .search_service
-            .search(
+            .listing_search(
                 ctx,
-                SearchRequest {
-                    query: None, // no textual query, just filtering
+                ListingSearchRequest {
                     entity_schemas: vec![announcement_schema::SCHEMA_NAME],
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
-                    options: SearchOptions::default(),
                 },
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(MoleculeProjectAnnouncementListing {
-            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
             list: search_results
                 .hits
                 .into_iter()

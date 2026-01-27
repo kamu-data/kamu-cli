@@ -10,7 +10,7 @@
 use dill::Catalog;
 use http_common::{ApiError, IntoApiError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_core::auth;
+use kamu_datasets::DatasetAction;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +47,6 @@ pub(crate) fn not_found_response() -> axum::response::Response {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(dead_code)]
 pub(crate) fn unauthorized_access_response<B>(body_maybe: Option<B>) -> axum::response::Response
 where
     B: Into<axum::body::Body>,
@@ -100,11 +99,11 @@ pub(crate) fn body_into_async_read(body: axum::body::Body) -> impl tokio::io::As
 
 pub(crate) fn get_dataset_action_for_request(
     request: &http::Request<axum::body::Body>,
-) -> auth::DatasetAction {
+) -> DatasetAction {
     if !request.method().is_safe() || request.uri().path() == "/push" {
-        auth::DatasetAction::Write
+        DatasetAction::Write
     } else {
-        auth::DatasetAction::Read
+        DatasetAction::Read
     }
 }
 

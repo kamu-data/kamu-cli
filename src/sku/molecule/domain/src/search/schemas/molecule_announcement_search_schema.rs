@@ -19,7 +19,7 @@ use crate::search::schemas::molecule_search_schema_common as molecule_schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "molecule-announcements";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,15 +38,11 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::IPNFT_UID,
     SearchSchemaField {
         path: fields::HEADLINE,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: false,
-        },
+        role: SearchSchemaFieldRole::Description,
     },
     SearchSchemaField {
         path: fields::BODY,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: true,
-        },
+        role: SearchSchemaFieldRole::Prose,
     },
     SearchSchemaField {
         path: fields::ATTACHMENTS,
@@ -65,7 +61,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
-    title_field: fields::HEADLINE,
+    title_field: kamu_search::fields::ID, // No specific title field
     enable_banning: false,
 };
 

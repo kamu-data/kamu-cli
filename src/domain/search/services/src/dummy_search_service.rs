@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,42 +19,81 @@ pub struct DummySearchService {}
 
 #[async_trait::async_trait]
 impl SearchService for DummySearchService {
-    async fn health(&self, _: SearchContext<'_>) -> Result<serde_json::Value, InternalError> {
+    async fn health(&self, _: SearchContext<'_>) -> Result<serde_json::Value, SearchError> {
         Ok(serde_json::json!({
             "status": "ok",
             "details": "This is a dummy search service"
         }))
     }
 
-    async fn search(
-        &self,
-        _: SearchContext<'_>,
-        _req: SearchRequest,
-    ) -> Result<SearchResponse, InternalError> {
-        Ok(SearchResponse {
-            took_ms: 0,
-            timeout: false,
-            total_hits: 0,
-            hits: vec![],
-        })
-    }
-
     async fn find_document_by_id(
         &self,
-        _ctx: SearchContext<'_>,
+        _: SearchContext<'_>,
         _schema_name: SearchEntitySchemaName,
         _id: &SearchEntityId,
-    ) -> Result<Option<serde_json::Value>, InternalError> {
+    ) -> Result<Option<serde_json::Value>, SearchError> {
         Ok(None)
     }
 
     async fn bulk_update(
         &self,
-        _ctx: SearchContext<'_>,
+        _: SearchContext<'_>,
         _schema_name: SearchEntitySchemaName,
         _operations: Vec<SearchIndexUpdateOperation>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<(), SearchError> {
         Ok(())
+    }
+
+    async fn listing_search(
+        &self,
+        _: SearchContext<'_>,
+        _req: ListingSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: Some(0),
+            hits: vec![],
+        })
+    }
+
+    async fn text_search(
+        &self,
+        _: SearchContext<'_>,
+        _req: TextSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: Some(0),
+            hits: vec![],
+        })
+    }
+
+    async fn vector_search(
+        &self,
+        _: SearchContext<'_>,
+        _req: VectorSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: None,
+            hits: vec![],
+        })
+    }
+
+    async fn hybrid_search(
+        &self,
+        _ctx: SearchContext<'_>,
+        _req: HybridSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        Ok(SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: None,
+            hits: vec![],
+        })
     }
 }
 

@@ -13,16 +13,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
-
-use crate::auth::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
-    ClassifyByAllowanceIdsResponse,
-    ClassifyByAllowanceResponse,
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
-};
+use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

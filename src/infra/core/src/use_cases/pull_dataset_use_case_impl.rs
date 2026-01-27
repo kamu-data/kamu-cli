@@ -17,14 +17,14 @@ use database_common_macros::{
 };
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::auth::{
+use kamu_core::*;
+use kamu_datasets::{
     ClassifyByAllowanceDatasetActionUnauthorizedError,
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
+    DatasetRegistry,
 };
-use kamu_core::*;
-use kamu_datasets::DatasetRegistry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_datasets::DatasetActionUnauthorizedError;
 use thiserror::Error;
-
-use crate::auth;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -106,11 +105,11 @@ impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for GetLineageError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+impl From<DatasetActionUnauthorizedError> for GetLineageError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
         match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }

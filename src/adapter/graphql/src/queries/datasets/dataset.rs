@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{ServerUrlConfig, auth};
+use kamu_core::ServerUrlConfig;
+use kamu_datasets::DatasetAction;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -206,10 +207,10 @@ impl Dataset {
             .dataset_request_state
             .allowed_dataset_actions(ctx)
             .await?;
-        let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
-        let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
-        let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
-        let is_owner = allowed_actions.contains(&auth::DatasetAction::Own);
+        let can_read = allowed_actions.contains(&DatasetAction::Read);
+        let can_write = allowed_actions.contains(&DatasetAction::Write);
+        let can_maintain = allowed_actions.contains(&DatasetAction::Maintain);
+        let is_owner = allowed_actions.contains(&DatasetAction::Own);
 
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {

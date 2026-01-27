@@ -11,7 +11,7 @@ use crate::SearchFieldPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SearchFilterExpr {
     Field {
         field: SearchFieldPath,
@@ -43,6 +43,17 @@ impl SearchFilterExpr {
             clauses.into_iter().next().unwrap()
         } else {
             SearchFilterExpr::Or(clauses)
+        }
+    }
+
+    pub fn merge_and(
+        filter1: Option<SearchFilterExpr>,
+        filter2: Option<SearchFilterExpr>,
+    ) -> Option<SearchFilterExpr> {
+        match (filter1, filter2) {
+            (Some(f1), Some(f2)) => Some(SearchFilterExpr::and_clauses(vec![f1, f2])),
+            (Some(f), None) | (None, Some(f)) => Some(f),
+            (None, None) => None,
         }
     }
 }
@@ -98,7 +109,7 @@ macro_rules! filter_not {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SearchFilterOp {
     Eq(serde_json::Value),
     Ne(serde_json::Value),

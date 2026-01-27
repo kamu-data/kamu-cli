@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_molecule_domain::{
     MESSAGE_CONSUMER_MOLECULE_ANNOUNCEMENT_SEARCH_UPDATER,
     MESSAGE_PRODUCER_MOLECULE_ANNOUNCEMENT_SERVICE,
@@ -67,7 +67,8 @@ impl MoleculeAnnouncementSearchUpdater {
                     doc: announcement_document,
                 }],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -93,9 +94,7 @@ impl MessageConsumerT<MoleculeAnnouncementMessage> for MoleculeAnnouncementSearc
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received Molecule announcement message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
+        let ctx = SearchContext::unrestricted(target_catalog);
 
         match message {
             MoleculeAnnouncementMessage::Published(published_message) => {

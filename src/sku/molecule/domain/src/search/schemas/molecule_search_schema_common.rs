@@ -102,9 +102,7 @@ pub mod field_definitions {
 
     pub const DESCRIPTION: SearchSchemaField = SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: SearchSchemaFieldRole::Prose {
-            enable_positions: true,
-        },
+        role: SearchSchemaFieldRole::Description,
     };
 
     pub const CATEGORIES: SearchSchemaField = SearchSchemaField {

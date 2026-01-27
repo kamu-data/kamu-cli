@@ -11,10 +11,11 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -208,7 +209,7 @@ impl AccountProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DatasetProperties {
     pub allows_anonymous_read: bool,
     pub allows_public_read: bool,
@@ -229,7 +230,7 @@ impl DatasetProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorizedAccount {
     pub account_id: odf::AccountID,
     pub role: AccountToDatasetRelation,

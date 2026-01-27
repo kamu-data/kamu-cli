@@ -15,9 +15,8 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use console::style;
 use futures::{StreamExt, TryStreamExt};
-use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{DatasetAction, DatasetRegistry};
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
@@ -113,7 +112,7 @@ impl Command for LogCommand {
 
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
+            .resolve_dataset_by_ref(&self.dataset_ref, DatasetAction::Read)
             .await?;
 
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};

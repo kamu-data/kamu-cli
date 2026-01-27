@@ -29,8 +29,6 @@ pub trait SearchRepository: Send + Sync {
         schema_name: SearchEntitySchemaName,
     ) -> Result<u64, InternalError>;
 
-    async fn search(&self, req: SearchRequest) -> Result<SearchResponse, InternalError>;
-
     async fn find_document_by_id(
         &self,
         schema_name: SearchEntitySchemaName,
@@ -44,6 +42,30 @@ pub trait SearchRepository: Send + Sync {
     ) -> Result<(), InternalError>;
 
     async fn drop_all_schemas(&self) -> Result<(), InternalError>;
+
+    async fn listing_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: ListingSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
+    async fn text_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: TextSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
+    async fn vector_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: VectorSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
+
+    async fn hybrid_search(
+        &self,
+        security_ctx: SearchSecurityContext,
+        req: HybridSearchRequest,
+    ) -> Result<SearchResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

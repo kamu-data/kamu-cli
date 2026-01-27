@@ -13,11 +13,9 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use internal_error::*;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
-
-use crate::auth::DatasetActionUnauthorizedError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,6 +312,7 @@ impl QueryError {
             DFError::Shared(inner) => Self::classify_shared_error(top_level, inner.as_ref()),
             // TODO: Handle Shared and Collection errors
             DFError::ArrowError(_, _)
+            | DFError::Ffi(_)
             | DFError::ParquetError(_)
             | DFError::ObjectStore(_)
             | DFError::IoError(_)
@@ -348,6 +347,7 @@ impl From<datafusion::error::DataFusionError> for QueryError {
             }
             // TODO: Handle Shared and Collection errors
             DFError::ArrowError(_, _)
+            | DFError::Ffi(_)
             | DFError::ParquetError(_)
             | DFError::ObjectStore(_)
             | DFError::IoError(_)
@@ -410,6 +410,7 @@ impl BadQueryError {
             DFError::SQL(e, _) => write!(f, "{e}"),
             DFError::Plan(msg) => write!(f, "{msg}"),
             DFError::ArrowError(_, _)
+            | DFError::Ffi(_)
             | DFError::ParquetError(_)
             | DFError::ObjectStore(_)
             | DFError::IoError(_)

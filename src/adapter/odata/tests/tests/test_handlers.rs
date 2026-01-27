@@ -14,7 +14,6 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{
@@ -39,6 +38,7 @@ use kamu_auth_rebac_services::{
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -369,10 +369,10 @@ struct TestHarness {
 
 impl TestHarness {
     async fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new()).await
+        Self::new_with_authorizer(AlwaysHappyDatasetActionAuthorizer::new()).await
     }
 
-    async fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+    async fn new_with_authorizer<TDatasetAuthorizer: DatasetActionAuthorizer + 'static>(
         dataset_action_authorizer: TDatasetAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -398,7 +398,7 @@ impl TestHarness {
                 .add::<DataFormatRegistryImpl>()
                 .add_value(CurrentAccountSubject::new_test())
                 .add_value(dataset_action_authorizer)
-                .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+                .bind::<dyn DatasetActionAuthorizer, TDatasetAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,

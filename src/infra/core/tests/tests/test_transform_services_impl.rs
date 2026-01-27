@@ -19,7 +19,12 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets::{
+    AlwaysHappyDatasetActionAuthorizer,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    ResolvedDataset,
+};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
@@ -70,7 +75,7 @@ impl TransformTestHarness {
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()

@@ -228,9 +228,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
-        let ctx = SearchContext {
-            catalog: &self.catalog,
-        };
+        let ctx = SearchContext::unrestricted(&self.catalog);
 
         let entity_schemas = {
             if let Some(by_kinds) = filters.as_ref().and_then(|f| f.by_kinds.as_deref())
@@ -271,22 +269,21 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
         let search_results = self
             .search_service
-            .search(
+            .listing_search(
                 ctx,
-                SearchRequest {
-                    query: None, // no textual query, just filtering
+                ListingSearchRequest {
                     entity_schemas,
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
-                    options: SearchOptions::default(),
                 },
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(MoleculeGlobalActivityListing {
-            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
             list: search_results
                 .hits
                 .into_iter()

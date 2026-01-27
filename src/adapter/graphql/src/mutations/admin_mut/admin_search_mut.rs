@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::KamuBackgroundCatalog;
+use kamu_search::SearchIndexer;
+
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,8 +18,12 @@ pub struct AdminSearchMut;
 
 #[Object]
 impl AdminSearchMut {
-    async fn reset_full_text_indices(&self, ctx: &Context<'_>) -> Result<String> {
-        let search_indexer = from_catalog_n!(ctx, dyn kamu_search::SearchIndexer);
+    async fn reset_search_indices(&self, ctx: &Context<'_>) -> Result<String> {
+        let background_catalog = from_catalog_n!(ctx, KamuBackgroundCatalog);
+        let system_user_catalog = background_catalog.system_user_catalog();
+
+        let search_indexer = system_user_catalog.get_one::<dyn SearchIndexer>().unwrap();
+
         search_indexer.reset_search_indices().await?;
         Ok("Ok".to_string())
     }

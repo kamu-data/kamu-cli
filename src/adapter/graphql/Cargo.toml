@@ -72,7 +72,7 @@ bytes = { version = "1", default-features = false }
 num-bigint = { version = "0.4", default-features = false }
 chrono = "0.4"
 # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-datafusion = { version = "50", default-features = false, features = ["serde"] }
+datafusion = { version = "52", default-features = false, features = ["serde"] }
 dill = { version = "0.15", default-features = false }
 fallible_map = { version = "0.1.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
@@ -80,7 +80,7 @@ http = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 indoc = "2"
 itertools = { version = "0.14", default-features = false }
-jsonschema = { version = "0.37", default-features = false }
+jsonschema = { version = "0.40", default-features = false }
 nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
@@ -103,7 +103,6 @@ kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-http = { workspace = true }
-kamu-adapter-graphql = { workspace = true, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }

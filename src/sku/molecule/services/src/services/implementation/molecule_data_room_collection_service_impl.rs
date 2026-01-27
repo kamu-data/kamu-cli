@@ -43,10 +43,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
     ) -> Result<ResolvedDataset, MoleculeDataRoomCollectionReadError> {
         let readable_dataset = self
             .rebac_registry_facade
-            .resolve_dataset_by_ref(
-                &data_room_dataset_id.as_local_ref(),
-                kamu_core::auth::DatasetAction::Read,
-            )
+            .resolve_dataset_by_ref(&data_room_dataset_id.as_local_ref(), DatasetAction::Read)
             .await
             .map_err(|e| match e {
                 RebacDatasetRefUnresolvedError::NotFound(e) => {
@@ -67,10 +64,7 @@ impl MoleculeDataRoomCollectionServiceImpl {
     ) -> Result<ResolvedDataset, MoleculeDataRoomCollectionWriteError> {
         let writable_dataset = self
             .rebac_registry_facade
-            .resolve_dataset_by_ref(
-                &data_room_dataset_id.as_local_ref(),
-                kamu_core::auth::DatasetAction::Write,
-            )
+            .resolve_dataset_by_ref(&data_room_dataset_id.as_local_ref(), DatasetAction::Write)
             .await
             .map_err(|e| match e {
                 RebacDatasetRefUnresolvedError::NotFound(e) => {

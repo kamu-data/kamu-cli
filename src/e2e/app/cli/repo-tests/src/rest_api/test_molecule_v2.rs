@@ -51,6 +51,9 @@ pub const ELASTICSEARCH_CONFIG_EXTENSION: &str = indoc::indoc!(
 
           # Bind absolute path for HTTPS with self-signed certs
           # caCertPemPath: .local/elasticsearch/certs/ca/ca.crt
+
+        embeddingsEncoder:
+          kind: dummy
     "#
 );
 

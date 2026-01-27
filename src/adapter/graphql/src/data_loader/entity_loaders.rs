@@ -14,8 +14,7 @@ use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::auth;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,7 +126,7 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
 
         let resolution = self
             .rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&dataset_refs, auth::DatasetAction::Read)
+            .classify_dataset_refs_by_allowance(&dataset_refs, DatasetAction::Read)
             .await
             .int_err()?;
 

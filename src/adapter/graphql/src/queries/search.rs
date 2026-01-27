@@ -10,8 +10,8 @@
 use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
-use kamu_search::SearchNatLangError;
+use kamu_auth_rebac::RebacServiceExt;
+use kamu_datasets::{DatasetAction, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -44,7 +44,7 @@ impl Search {
         let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_core::auth::DatasetActionAuthorizer
+            dyn kamu_datasets::DatasetActionAuthorizer
         );
 
         let page = page.unwrap_or(0);
@@ -110,10 +110,7 @@ impl Search {
         ))
     }
 
-    // TODO: restrict to admin only for now, until it's fully ready for public use
-    // (final API, ReBAC)
     #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
-    #[graphql(guard = "AdminGuard::new()")]
     async fn query_full_text(
         &self,
         ctx: &Context<'_>,
@@ -130,48 +127,73 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::SearchContext { catalog };
+        let context = self.make_search_context(ctx).await?;
 
         // Run actual search request
         let search_results = {
             use kamu_search::*;
 
-            search_service
-                .search(
-                    context,
-                    SearchRequest {
-                        query: if prompt.is_empty() {
-                            None
-                        } else {
-                            Some(prompt)
+            let entity_schemas = vec![account_schema::SCHEMA_NAME, dataset_schema::SCHEMA_NAME];
+
+            let source_spec = SearchRequestSourceSpec::Complex {
+                include_patterns: vec![],
+                exclude_patterns: vec![
+                    kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                    kamu_search::fields::VISIBILITY.to_string(),
+                    kamu_search::fields::PRINCIPAL_IDS.to_string(),
+                    kamu_search::fields::IS_BANNED.to_string(),
+                ],
+            };
+
+            let page_spec = SearchPaginationSpec {
+                limit: per_page,
+                offset: page * per_page,
+            };
+
+            if prompt.trim().is_empty() {
+                search_service
+                    .listing_search(
+                        context,
+                        ListingSearchRequest {
+                            source: source_spec,
+                            entity_schemas,
+                            filter: None,
+                            sort: sort!(kamu_search::fields::TITLE),
+                            page: page_spec,
                         },
-                        source: SearchRequestSourceSpec::All,
-                        entity_schemas: vec![
-                            account_schema::SCHEMA_NAME,
-                            dataset_schema::SCHEMA_NAME,
-                        ],
-                        filter: None,
-                        // sort: sort!(FULL_TEXT_SEARCH_ALIAS_TITLE),
-                        sort: vec![],
-                        page: SearchPaginationSpec {
-                            limit: per_page,
-                            offset: page * per_page,
+                    )
+                    .await
+            } else {
+                search_service
+                    .text_search(
+                        context,
+                        TextSearchRequest {
+                            intent: TextSearchIntent::make_full_text(prompt),
+                            source: source_spec,
+                            entity_schemas,
+                            filter: None,
+                            secondary_sort: sort!(kamu_search::fields::TITLE),
+                            page: page_spec,
+                            options: TextSearchOptions {
+                                enable_explain: false,
+                                enable_highlighting: true,
+                                boosting_overrides: TextBoostingOverrides::default(),
+                            },
                         },
-                        options: SearchOptions {
-                            enable_explain: false,
-                            enable_highlighting: true,
-                        },
-                    },
-                )
-                .await
-        }?;
+                    )
+                    .await
+            }
+        }
+        .map_err(|e| match e {
+            kamu_search::SearchError::Internal(e) => e.into(),
+            kamu_search::SearchError::Unauthorized(e) => GqlError::Access(e),
+        })?;
 
         // Convert into GQL response
         Ok(FullTextSearchResponse {
             took_ms: search_results.took_ms,
             timeout: search_results.timeout,
-            total_hits: search_results.total_hits,
+            total_hits: search_results.total_hits.unwrap_or_default(),
             hits: search_results
                 .hits
                 .into_iter()
@@ -196,59 +218,106 @@ impl Search {
 
     /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
-    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query_natural_language, skip_all, fields(?limit))]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,
         prompt: String,
-        // page: Option<usize>,
-        per_page: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let natural_language_search_service =
-            from_catalog_n!(ctx, dyn kamu_search::NaturalLanguageSearchService);
+        let datasets_search_service = from_catalog_n!(ctx, dyn kamu_datasets::DatasetSearchService);
 
-        let catalog = ctx.data::<dill::Catalog>().unwrap();
-        let context = kamu_search::SearchContext { catalog };
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
+        let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        // TODO: Support "next page token" style pagination
-        let page = 0;
-        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+        let context = self.make_search_context(ctx).await?;
 
-        let limit = per_page;
+        // Run vector search request
+        let search_results = {
+            datasets_search_service
+                .vector_search(context, prompt, limit)
+                .await
+                .int_err()
+        }?;
 
-        let res = natural_language_search_service
-            .search_natural_language(context, &prompt, kamu_search::SearchNatLangOpts { limit })
-            .await
-            .map_err(|e| match e {
-                SearchNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
-                SearchNatLangError::Internal(e) => GqlError::Internal(e),
-            })?;
+        let total_count = search_results.total_hits.unwrap_or_default();
 
-        let total_count = res.datasets.len();
-
-        // TODO: PERF: Avoid expensive resolution of one account at a time by including
-        // account information into dataset handles
+        // Build final result with GQL dataset objects
         let mut nodes: Vec<SearchResultEx> = Vec::new();
-        for hit in res.datasets {
-            let Some(account) = Account::from_dataset_alias(ctx, &hit.handle.alias).await? else {
-                tracing::warn!(
-                    "Skipped dataset '{}' with unresolved account",
-                    hit.handle.alias
-                );
+        for hit in search_results.hits {
+            let hdl = hit.handle;
+
+            let Some(owner) = Account::from_dataset_alias(ctx, &hdl.alias).await? else {
+                tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
                 continue;
             };
 
+            // Note: we assume search will encapsulate ReBAC filtering in nearest future
             nodes.push(SearchResultEx {
-                item: SearchResult::Dataset(Dataset::new_access_checked(account, hit.handle)),
+                item: SearchResult::Dataset(Dataset::new_access_checked(owner, hdl)),
                 score: hit.score,
             });
         }
 
         Ok(SearchResultExConnection::new(
             nodes,
-            page,
-            per_page,
-            total_count,
+            0, /* page */
+            limit,
+            usize::try_from(total_count).unwrap(),
+        ))
+    }
+
+    /// Searches for datasets and other objects managed by the
+    /// current node using a prompt, mixing full-text and natural language
+    /// methods
+    #[tracing::instrument(level = "info", name = Search_query_hybrid, skip_all, fields(?limit))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn query_hybrid(
+        &self,
+        ctx: &Context<'_>,
+        prompt: String,
+        limit: Option<usize>,
+    ) -> Result<SearchResultExConnection> {
+        let datasets_search_service = from_catalog_n!(ctx, dyn kamu_datasets::DatasetSearchService);
+
+        // TODO: max limit is 10,000 in ES, otherwise we need cursors
+        let limit = limit.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
+        let context = self.make_search_context(ctx).await?;
+
+        // Run vector search request
+        let search_results = {
+            datasets_search_service
+                .hybrid_search(context, prompt, limit)
+                .await
+                .int_err()
+        }?;
+
+        let total_count = search_results.total_hits.unwrap_or_default();
+
+        // Build final result with GQL dataset objects
+        let mut nodes: Vec<SearchResultEx> = Vec::new();
+        for hit in search_results.hits {
+            let hdl = hit.handle;
+
+            let Some(owner) = Account::from_dataset_alias(ctx, &hdl.alias).await? else {
+                tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
+                continue;
+            };
+
+            // Note: we assume search will encapsulate ReBAC filtering in nearest future
+            nodes.push(SearchResultEx {
+                item: SearchResult::Dataset(Dataset::new_access_checked(owner, hdl)),
+                score: hit.score,
+            });
+        }
+
+        Ok(SearchResultExConnection::new(
+            nodes,
+            0, /* page */
+            limit,
+            usize::try_from(total_count).unwrap(),
         ))
     }
 
@@ -308,6 +377,37 @@ impl Search {
             page_nodes, page, per_page, total,
         ))
     }
+
+    #[graphql(skip)]
+    async fn make_search_context<'a>(
+        &self,
+        ctx: &Context<'a>,
+    ) -> Result<kamu_search::SearchContext<'a>> {
+        use kamu_accounts::CurrentAccountSubject;
+        let (current_account_subject, rebac_service) = from_catalog_n!(
+            ctx,
+            CurrentAccountSubject,
+            dyn kamu_auth_rebac::RebacService
+        );
+
+        let catalog = ctx.data::<dill::Catalog>().unwrap();
+
+        let is_admin = match current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(a) => rebac_service
+                .is_account_admin(&a.account_id)
+                .await
+                .int_err()?,
+            _ => false,
+        };
+
+        Ok(kamu_search::SearchContext {
+            catalog,
+            security: kamu_accounts::make_search_security_context(
+                current_account_subject.as_ref(),
+                is_admin,
+            ),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -352,7 +452,7 @@ page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
 #[derive(SimpleObject, Debug)]
 pub struct SearchResultEx {
     pub item: SearchResult,
-    pub score: f32,
+    pub score: f64,
 }
 
 page_based_connection!(SearchResultEx, SearchResultExConnection, SearchResultExEdge);

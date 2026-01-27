@@ -29,6 +29,8 @@ pub fn register_dependencies(
         b.add::<DatasetSearchUpdater>();
     }
 
+    b.add::<DatasetSearchServiceImpl>();
+
     if options.needs_indexing {
         b.add::<DatasetEntryIndexer>();
         b.add::<DatasetReferenceIndexer>();
@@ -69,6 +71,7 @@ pub fn register_dependencies(
     b.add::<DependencyGraphImmediateListener>();
 
     b.add::<DatasetAccountLifecycleHandler>();
+    b.add::<DidSecretService>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

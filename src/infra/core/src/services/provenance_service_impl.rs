@@ -16,7 +16,7 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DependencyGraphService};
+use kamu_datasets::{DatasetAction, DatasetRegistry, DependencyGraphService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +49,7 @@ impl ProvenanceServiceImpl {
     ) -> Result<(), GetLineageError> {
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Read)
+            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Read)
             .await
             .map_err(|e| match e {
                 RebacDatasetIdUnresolvedError::Access(e) => GetLineageError::Access(e),

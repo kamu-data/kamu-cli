@@ -24,6 +24,9 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add_value(DefaultDatasetProperties::default());
 
     b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
+    b.add::<DeleteDatasetRebacPropertiesUseCaseImpl>();
+    b.add::<SetDatasetRebacPropertiesUseCaseImpl>();
+    b.add::<UnsetDatasetAccountsRelationsUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,11 +10,11 @@
 use base64::Engine as _;
 use bon::bon;
 use indoc::indoc;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use messaging_outbox::OutboxProvider;
 use serde_json::json;
 

@@ -11,11 +11,10 @@ use std::collections::HashSet;
 
 use bon::bon;
 use indoc::indoc;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
-use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::*;
 use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;

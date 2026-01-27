@@ -446,8 +446,7 @@ impl KamuFlightSqlService {
     }
 
     fn df_schema_to_arrow(&self, schema: &DFSchema) -> Result<Vec<u8>, Status> {
-        let arrow_schema: Schema = schema.clone().into();
-        let schema_bytes = self.schema_to_arrow(&arrow_schema)?;
+        let schema_bytes = self.schema_to_arrow(schema.inner())?;
         Ok(schema_bytes)
     }
 
@@ -588,7 +587,7 @@ impl KamuFlightSqlService {
         &self,
         df: DataFrame,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        let schema: Schema = df.schema().clone().into();
+        let schema = df.schema().inner().clone();
 
         let mut batches = df
             .collect()

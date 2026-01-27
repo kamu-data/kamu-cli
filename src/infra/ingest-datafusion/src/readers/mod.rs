@@ -26,7 +26,7 @@ pub use shapefile::*;
 pub(crate) async fn from_ddl_schema(
     ctx: &datafusion::prelude::SessionContext,
     ddl_schema: Option<&Vec<String>>,
-) -> Result<Option<datafusion::arrow::datatypes::Schema>, kamu_core::ingest::ReadError> {
+) -> Result<Option<datafusion::arrow::datatypes::SchemaRef>, kamu_core::ingest::ReadError> {
     let Some(ddl_schema) = ddl_schema else {
         return Ok(None);
     };

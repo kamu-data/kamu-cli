@@ -23,7 +23,7 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
@@ -255,7 +255,7 @@ impl TestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add::<ContainerRuntime>()
-            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
@@ -911,7 +911,7 @@ async fn test_transform_empty_inputs() {
 
     deriv_helper
         .assert_latest_schema_in_meta_eq(&odf::schema::DataSchema::new(vec![
-            odf::schema::DataField::i64("offset").optional(),
+            odf::schema::DataField::i64("offset"),
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time"),
@@ -955,7 +955,7 @@ async fn test_transform_empty_inputs() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));

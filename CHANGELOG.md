@@ -14,11 +14,50 @@ Recommendation: for ease of reading, use the following order:
 ## [Molecule-specific]
 ### Added
 - GQL: `BigInt` scalar
-- GQL: Added new methods to remove/restore project: `MoleculeMut:disable_project()` and `MoleculeMut:enable_project()`
+- GQL: Added new methods to remove/restore project: `MoleculeMut:disable_project()` and `MoleculeMut:enable_project()
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
+## [0.257.1] - 2026-01-27
+### Fixed
+- Eliminated several dependency loops
+- Hotfix: Elasticsearch badly reacting on reset when there are no indices already
+- Hotfix: Elasticsearch reset indices GQL API should use background catalog
+
+## [0.257.0] - 2026-01-26
+### Added
+- Elasticsearch solution supports security aspects:
+   - every indexed entity registers "visibility" and "principal_ids" fields, 
+     and current subject's principals are propagated to queries
+   - security filter is automatically attached to any user-defined filter
+   - supporting full and incremental indexing of datasets with ReBAC data projected to Elasticsearch
+- Elasticsearch solution now supports vector (semantic) and hybrid search:
+   - pure vector search replaces QDrant use cases
+   - hybrid search issues both textual and vector queries, and fuses the results via
+       Reciprocal Rank Fusion (RRF) algorithm
+   - the weights of textual and vector parts are customizable, but default to 1:1
+### Changed   
+- Enchancements to textual search:
+   - clearly modeling search intent: full text over 1..N terms, autocomplete/prefix, phrase search
+   - choosing proper multi-matching fields and customizing boosting coefficients for text fields,
+      depending on their role and search intent
+   - API for custom field role boosting
+### Fixed
+- Hotfix: do not put empty dataset documents into Elasticsearch during full reindexing.
+- Hotfix: improved handling of `skipDatasetsWithNoDescription` and `skipDatasetsWithNoData` options when 
+   processing incremental updates to datasets search indices
+- Hotfix: handling 404 error from Elasticsearch when requesting non-existing document by ID
+- Requests with invalid/expired tokens now returns unauthorized response
+
+## [0.256.1] - 2026-01-17
+### Added
+- `SearchIndexerConfig` is respected both by natural and full-text search engine
+- Ability to disable incremental full-text search indexing via config option
+### Changed
+- Upgraded core to `datafusion v52`
+- Upgraded to `kamu-engine-datafusion v0.9.0` based on latest `datafusion`
 
 ## [0.256.0] - 2026-01-08
 ### Added

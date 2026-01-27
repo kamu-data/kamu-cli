@@ -122,7 +122,7 @@ impl ClientSideHarness {
         }
         b.add_value(AuthConfig::sample());
 
-        b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+        b.add::<AlwaysHappyDatasetActionAuthorizer>();
 
         if options.authenticated_remotely {
             b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();

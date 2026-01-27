@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_accounts::{
     AccountConfig,
     DEFAULT_ACCOUNT_NAME_STR,
@@ -30,11 +30,10 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetActionAuthorizer};
 use kamu_datasets_services::*;
 use messaging_outbox::{
     ConsumerFilter,

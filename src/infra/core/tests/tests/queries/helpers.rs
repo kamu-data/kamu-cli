@@ -13,7 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use file_utils::OwnedFile;
-use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
+use kamu::testing::ParquetWriterHelper;
 use kamu::{
     DatasetRegistrySoloUnitBridge,
     EngineConfigDatafusionEmbeddedBatchQuery,
@@ -23,8 +23,9 @@ use kamu::{
     SessionContextBuilder,
 };
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig, auth};
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
+use kamu_datasets::{DatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
@@ -155,7 +156,7 @@ fn create_base_catalog(dataset_action_authorizer: MockDatasetActionAuthorizer) -
         .add::<ObjectStoreRegistryImpl>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
-        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .build()
 }
 

@@ -19,7 +19,7 @@ use kamu_accounts::{
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     PredefinedAccountsConfig,
 };
-use kamu_auth_rebac::{DatasetPropertyName, RebacService};
+use kamu_auth_rebac::{DatasetProperties, RebacService, SetDatasetRebacPropertiesUseCase};
 use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};
 
 use crate::JOB_KAMU_REBAC_INDEXER;
@@ -29,13 +29,6 @@ use crate::JOB_KAMU_REBAC_INDEXER;
 type PredefinedAccountIdDatasetVisibilityMapping = HashMap<odf::AccountID, odf::DatasetVisibility>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct RebacIndexer {
-    rebac_service: Arc<dyn RebacService>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
-    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-}
 
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
@@ -47,21 +40,15 @@ pub struct RebacIndexer {
     ],
     requires_transaction: true,
 })]
-impl RebacIndexer {
-    pub fn new(
-        rebac_service: Arc<dyn RebacService>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-    ) -> Self {
-        Self {
-            rebac_service,
-            dataset_entry_service,
-            expensive_account_repo,
-            predefined_accounts_config,
-        }
-    }
+pub struct RebacIndexer {
+    rebac_service: Arc<dyn RebacService>,
+    set_dataset_properties_uc: Arc<dyn SetDatasetRebacPropertiesUseCase>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
+    expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
+    predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+}
 
+impl RebacIndexer {
     async fn has_entities_indexed(&self) -> Result<bool, InternalError> {
         let properties_count = self.rebac_service.properties_count().await.int_err()?;
 
@@ -92,15 +79,15 @@ impl RebacIndexer {
                     false
                 };
 
-            for (name, value) in [
-                DatasetPropertyName::allows_public_read(is_public_dataset),
-                DatasetPropertyName::allows_anonymous_read(is_public_dataset),
-            ] {
-                self.rebac_service
-                    .set_dataset_property(&dataset_entry.id, name, &value)
-                    .await
-                    .int_err()?;
-            }
+            let dataset_properties = DatasetProperties {
+                allows_public_read: is_public_dataset,
+                allows_anonymous_read: is_public_dataset,
+            };
+
+            self.set_dataset_properties_uc
+                .execute(&dataset_entry.id, dataset_properties)
+                .await
+                .int_err()?;
         }
 
         Ok(())

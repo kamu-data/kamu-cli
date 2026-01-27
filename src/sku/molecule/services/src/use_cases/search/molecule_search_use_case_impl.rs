@@ -282,9 +282,7 @@ impl MoleculeSearchUseCaseImpl {
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let prompt = prompt.trim();
 
-        let ctx = SearchContext {
-            catalog: &self.catalog,
-        };
+        let ctx = SearchContext::unrestricted(&self.catalog);
 
         let entity_schemas = {
             let mut entity_schemas = vec![];
@@ -320,37 +318,49 @@ impl MoleculeSearchUseCaseImpl {
             SearchFilterExpr::and_clauses(and_clauses)
         };
 
-        let search_results = self
-            .search_service
-            .search(
-                ctx,
-                SearchRequest {
-                    // TODO: consider eating empty prompt at engine level
-                    query: if prompt.is_empty() {
-                        None
-                    } else {
-                        Some(prompt.to_string())
-                    },
-                    entity_schemas,
-                    source: SearchRequestSourceSpec::All,
-                    filter: Some(filter),
-                    sort: vec![
-                        // Consider enabling!
-                        // SearchSortSpec::Relevance,
-                        SearchSortSpec::ByField {
+        let search_results = if prompt.is_empty() {
+            self.search_service
+                .listing_search(
+                    ctx,
+                    ListingSearchRequest {
+                        entity_schemas,
+                        source: SearchRequestSourceSpec::All,
+                        filter: Some(filter),
+                        sort: vec![SearchSortSpec::ByField {
                             field: molecule_schema::fields::EVENT_TIME,
                             direction: SearchSortDirection::Descending,
                             nulls_first: false,
-                        },
-                    ],
-                    page: pagination.into(),
-                    options: SearchOptions::default(),
-                },
-            )
-            .await?;
+                        }],
+                        page: pagination.into(),
+                    },
+                )
+                .await
+                .int_err()?
+        } else {
+            // TODO: hybrid search
+            self.search_service
+                .text_search(
+                    ctx,
+                    TextSearchRequest {
+                        intent: TextSearchIntent::make_full_text(prompt),
+                        entity_schemas,
+                        source: SearchRequestSourceSpec::All,
+                        filter: Some(filter),
+                        secondary_sort: vec![SearchSortSpec::ByField {
+                            field: molecule_schema::fields::EVENT_TIME,
+                            direction: SearchSortDirection::Descending,
+                            nulls_first: false,
+                        }],
+                        page: pagination.into(),
+                        options: TextSearchOptions::default(),
+                    },
+                )
+                .await
+                .int_err()?
+        };
 
         Ok(MoleculeSearchHitsListing {
-            total_count: usize::try_from(search_results.total_hits).unwrap(),
+            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
             list: search_results
                 .hits
                 .into_iter()

@@ -13,6 +13,7 @@ use internal_error::InternalError;
 
 /// Chunkers are responsible for splitting large text into optimal sets of
 /// tokens to generate embeddings from.
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait EmbeddingsChunker: Send + Sync {
     /// Given sections of a single document splits them into chinks of optimal

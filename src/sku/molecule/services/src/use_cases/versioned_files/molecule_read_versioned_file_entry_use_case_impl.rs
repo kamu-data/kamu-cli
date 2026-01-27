@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{FindVersionedFileVersionUseCase, ReadCheckedDataset};
+use kamu_datasets::{DatasetAction, FindVersionedFileVersionUseCase, ReadCheckedDataset};
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
@@ -36,7 +36,7 @@ impl MoleculeReadVersionedFileEntryUseCaseImpl {
             .rebac_registry_facade
             .resolve_dataset_by_ref(
                 &versioned_file_dataset_id.as_local_ref(),
-                kamu_core::auth::DatasetAction::Read,
+                DatasetAction::Read,
             )
             .await
             .map_err(|e| match e {

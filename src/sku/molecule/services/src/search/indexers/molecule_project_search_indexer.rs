@@ -37,7 +37,7 @@ pub(crate) fn index_project_from_entity(
         project_schema::fields::IPNFT_SYMBOL: project.ipnft_symbol,
         molecule_schema::fields::IPNFT_UID: project.ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
-        kamu_search::SEARCH_FIELD_IS_BANNED: false,
+        kamu_search::fields::IS_BANNED: false,
     })
 }
 
@@ -58,7 +58,7 @@ pub(crate) fn index_project_from_parts(
         project_schema::fields::IPNFT_SYMBOL: ipnft_symbol,
         molecule_schema::fields::IPNFT_UID: ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
-        kamu_search::SEARCH_FIELD_IS_BANNED: false,
+        kamu_search::fields::IS_BANNED: false,
     })
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn partial_update_project_when_ban_status_changed(
     serde_json::json!({
         molecule_schema::fields::EVENT_TIME: event_time,
         molecule_schema::fields::SYSTEM_TIME: system_time,
-        kamu_search::SEARCH_FIELD_IS_BANNED: is_banned,
+        kamu_search::fields::IS_BANNED: is_banned,
     })
 }
 

@@ -12,11 +12,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::MockDidGenerator;
-use kamu_core::auth::DatasetAction;
-use kamu_datasets::CommitDatasetEventUseCase;
+use kamu_datasets::{CommitDatasetEventUseCase, DatasetAction};
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};

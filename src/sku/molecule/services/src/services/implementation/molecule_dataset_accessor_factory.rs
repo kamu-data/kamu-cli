@@ -20,10 +20,10 @@ use kamu_core::{
     PushIngestResult,
     QueryError,
     QueryService,
-    auth,
 };
 use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
+    DatasetAction,
     ReadCheckedDataset,
     ResolvedDataset,
     WriteCheckedDataset,
@@ -51,7 +51,7 @@ impl MoleculeDatasetAccessorFactory {
     ) -> Result<MoleculeDatasetReader, RebacDatasetRefUnresolvedError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .resolve_dataset_by_ref(dataset_ref, DatasetAction::Read)
             .await?;
 
         Ok(MoleculeDatasetReader {
@@ -68,7 +68,7 @@ impl MoleculeDatasetAccessorFactory {
     ) -> Result<MoleculeDatasetWriter, RebacDatasetRefUnresolvedError> {
         let resolved_dataset = match self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Write)
+            .resolve_dataset_by_ref(dataset_ref, DatasetAction::Write)
             .await
         {
             Ok(ds) => Ok(ds),

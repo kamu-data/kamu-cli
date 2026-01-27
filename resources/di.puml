@@ -53,11 +53,13 @@ interface "DatasetLfsBuilder" <<i>>
 interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
+interface "DatasetSearchService" <<i>>
 interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
 interface "DeleteAccountUseCase" <<i>>
+interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
 interface "DependencyGraphService" <<i>>
 interface "DidGenerator" <<i>>
@@ -113,7 +115,6 @@ interface "MoleculeViewGlobalAnnouncementsUseCase" <<i>>
 interface "MoleculeViewProjectActivitiesUseCase" <<i>>
 interface "MoleculeViewProjectAnnouncementsUseCase" <<i>>
 interface "MoleculeViewProjectsUseCase" <<i>>
-interface "NaturalLanguageSearchService" <<i>>
 interface "OAuthDeviceCodeGenerator" <<i>>
 interface "OAuthDeviceCodeRepository" <<i>>
 interface "OAuthDeviceCodeService" <<i>>
@@ -153,6 +154,7 @@ interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
+interface "SetDatasetRebacPropertiesUseCase" <<i>>
 interface "SetWatermarkExecutor" <<i>>
 interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
@@ -163,10 +165,10 @@ interface "TaskEventStore" <<i>>
 interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
 interface "TransformRequestPlanner" <<i>>
+interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionedFileUseCase" <<i>>
-interface "VectorRepository" <<i>>
 interface "VerificationService" <<i>>
 interface "VerifyDatasetUseCase" <<i>>
 interface "ViewCollectionEntriesUseCase" <<i>>
@@ -225,12 +227,14 @@ class "DatasetProperties" <<singleton>>
 class "DatasetReferenceIndexer"
 class "DatasetReferenceServiceImpl"
 class "DatasetSearchSchemaProvider"
+class "DatasetSearchServiceImpl"
 class "DatasetSearchUpdater"
 class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
 class "DeleteAccountUseCaseImpl"
+class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
 class "DependencyGraphImmediateListener"
 class "DependencyGraphIndexer"
@@ -282,6 +286,8 @@ class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
+class "MessageDispatcherT" <<singleton>>
 class "MetadataChainDbBackedConfig" <<singleton>>
 class "MetadataQueryServiceImpl"
 class "ModifyAccountPasswordUseCaseImpl"
@@ -321,8 +327,6 @@ class "MoleculeViewProjectActivitiesUseCaseImpl"
 class "MoleculeViewProjectAnnouncementsUseCaseImpl"
 class "MoleculeViewProjectsUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
-class "NaturalLanguageSearchConfig" <<singleton>>
-class "NaturalLanguageSearchImplLazyInit" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
 class "OAuthDeviceCodeServiceImpl"
@@ -381,6 +385,7 @@ class "SessionContextBuilder"
 class "SessionId" <<singleton>>
 class "SessionManagerCaching"
 class "SessionManagerCachingState" <<singleton>>
+class "SetDatasetRebacPropertiesUseCaseImpl"
 class "SetWatermarkExecutorImpl"
 class "SetWatermarkPlannerImpl"
 class "SetWatermarkUseCaseImpl"
@@ -425,11 +430,10 @@ class "TransactionRefT" <<singleton>>
 class "TransformElaborationServiceImpl"
 class "TransformExecutorImpl"
 class "TransformRequestPlannerImpl"
+class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
-class "VectorRepositoryConfigQdrantContainer" <<singleton>>
-class "VectorRepositoryQdrantContainer" <<singleton>>
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
@@ -691,7 +695,8 @@ class "WsSmartTransferProtocolClient"
 "OAuthGithub"  --> "GithubAuthenticationConfig"
 "MessageConsumer" <|-- "RebacDatasetLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "RebacDatasetLifecycleMessageConsumer"
-"RebacDatasetLifecycleMessageConsumer"  --> "RebacService"
+"RebacDatasetLifecycleMessageConsumer"  --> "DeleteDatasetRebacPropertiesUseCase"
+"RebacDatasetLifecycleMessageConsumer"  --> "SetDatasetRebacPropertiesUseCase"
 "RebacDatasetLifecycleMessageConsumer"  --> "DatasetProperties"
 "RebacDatasetRegistryFacade" <|-- "RebacDatasetRegistryFacadeImpl"
 "RebacDatasetRegistryFacadeImpl"  --> "DatasetActionAuthorizer"
@@ -699,6 +704,7 @@ class "WsSmartTransferProtocolClient"
 "InitOnStartup" <|-- "RebacIndexer"
 "RebacIndexer"  --> "ExpensiveAccountRepository"
 "RebacIndexer"  --> "RebacService"
+"RebacIndexer"  --> "SetDatasetRebacPropertiesUseCase"
 "RebacIndexer"  --> "DatasetEntryService"
 "RebacIndexer"  --> "PredefinedAccountsConfig"
 "RebacService" <|-- "RebacServiceImpl"
@@ -708,6 +714,16 @@ class "WsSmartTransferProtocolClient"
 "ApplyAccountDatasetRelationsUseCase" <|-- "ApplyAccountDatasetRelationsUseCaseImpl"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "RebacService"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "DatasetActionAuthorizer"
+"ApplyAccountDatasetRelationsUseCaseImpl"  --> "Outbox"
+"DeleteDatasetRebacPropertiesUseCase" <|-- "DeleteDatasetRebacPropertiesUseCaseImpl"
+"DeleteDatasetRebacPropertiesUseCaseImpl"  --> "RebacService"
+"DeleteDatasetRebacPropertiesUseCaseImpl"  --> "Outbox"
+"SetDatasetRebacPropertiesUseCase" <|-- "SetDatasetRebacPropertiesUseCaseImpl"
+"SetDatasetRebacPropertiesUseCaseImpl"  --> "RebacService"
+"SetDatasetRebacPropertiesUseCaseImpl"  --> "Outbox"
+"UnsetDatasetAccountsRelationsUseCase" <|-- "UnsetDatasetAccountsRelationsUseCaseImpl"
+"UnsetDatasetAccountsRelationsUseCaseImpl"  --> "RebacService"
+"UnsetDatasetAccountsRelationsUseCaseImpl"  --> "Outbox"
 "RebacRepository" <|-- "SqliteRebacRepository"
 "SqliteRebacRepository"  --> "TransactionRefT"
 "InitOnStartup" <|-- "Web3AuthEip4361NonceServiceImpl"
@@ -736,21 +752,26 @@ class "WsSmartTransferProtocolClient"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
 "DidGenerator" <|-- "DidGeneratorDefault"
-"MessageConsumer" <|-- "DidSecretService"
-"MessageConsumerT" <|-- "DidSecretService"
-"MessageConsumerT" <|-- "DidSecretService"
-"DidSecretService"  --> "DidSecretKeyRepository"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"
-"DatasetSearchSchemaProvider"  --> "SearchIndexerConfig"
+"DatasetSearchSchemaProvider"  --> "EmbeddingsChunker"
+"DatasetSearchSchemaProvider"  --> "EmbeddingsEncoder"
+"DatasetSearchService" <|-- "DatasetSearchServiceImpl"
+"DatasetSearchServiceImpl"  --> "DatasetRegistry"
+"DatasetSearchServiceImpl"  --> "EmbeddingsEncoder"
+"DatasetSearchServiceImpl"  --> "SearchService"
 "MessageConsumer" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"MessageConsumerT" <|-- "DatasetSearchUpdater"
+"DatasetSearchUpdater"  --> "RebacService"
 "DatasetSearchUpdater"  --> "DatasetEntryService"
 "DatasetSearchUpdater"  --> "DatasetRegistry"
+"DatasetSearchUpdater"  --> "EmbeddingsChunker"
+"DatasetSearchUpdater"  --> "EmbeddingsEncoder"
 "DatasetSearchUpdater"  --> "SearchService"
-"DatasetSearchUpdater"  --> "SearchIndexerConfig"
 "AccountQuotaStorageChecker" <|-- "AccountQuotaCheckerStorageImpl"
 "AccountQuotaCheckerStorageImpl"  --> "AccountQuotaEventStore"
 "AccountQuotaCheckerStorageImpl"  --> "DatasetStatisticsService"
@@ -774,6 +795,10 @@ class "WsSmartTransferProtocolClient"
 "DatasetAliasUpdateHandler"  --> "DatasetRegistry"
 "DatasetIncrementQueryService" <|-- "DatasetIncrementQueryServiceImpl"
 "DatasetIncrementQueryServiceImpl"  --> "DatasetRegistry"
+"MessageConsumer" <|-- "DidSecretService"
+"MessageConsumerT" <|-- "DidSecretService"
+"MessageConsumerT" <|-- "DidSecretService"
+"DidSecretService"  --> "DidSecretKeyRepository"
 "InitOnStartup" <|-- "DatasetEntryIndexer"
 "DatasetEntryIndexer"  --> "AccountService"
 "DatasetEntryIndexer" "lazy" --> "DatasetEntryRepository"
@@ -1033,14 +1058,9 @@ class "WsSmartTransferProtocolClient"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
 "EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
 "EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
-"VectorRepository" <|-- "VectorRepositoryQdrantContainer"
-"VectorRepositoryQdrantContainer"  --> "ContainerRuntime"
-"VectorRepositoryQdrantContainer"  --> "VectorRepositoryConfigQdrantContainer"
 "SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
-"NaturalLanguageSearchService" <|-- "NaturalLanguageSearchImplLazyInit"
-"NaturalLanguageSearchImplLazyInit"  --> "KamuBackgroundCatalog"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

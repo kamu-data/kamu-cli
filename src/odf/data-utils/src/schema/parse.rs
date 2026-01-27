@@ -9,10 +9,12 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use arrow_schema::SchemaRef;
+use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
+use datafusion::sql::sqlparser::ast::ArrayElemTypeDef;
 use datafusion::sql::sqlparser::dialect::GenericDialect;
 use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 
@@ -73,7 +75,7 @@ pub fn parse_ddl_to_odf_schema(
 fn convert_sql_to_odf_data_type(
     data_type: &datafusion::sql::sqlparser::ast::DataType,
 ) -> Result<odf_metadata::schema::DataType, odf_metadata::UnsupportedSchema> {
-    use datafusion::sql::sqlparser::ast::{ArrayElemTypeDef, DataType as SqlDataType};
+    use datafusion::sql::sqlparser::ast::DataType as SqlDataType;
     use odf_metadata::schema::*;
 
     let res = match data_type {
@@ -122,6 +124,12 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::Char(_)
         | SqlDataType::CharacterVarying(_)
         | SqlDataType::CharVarying(_)
+        | SqlDataType::DecimalUnsigned(_)
+        | SqlDataType::DecUnsigned(_)
+        | SqlDataType::FloatUnsigned(_)
+        | SqlDataType::RealUnsigned
+        | SqlDataType::DoubleUnsigned(_)
+        | SqlDataType::DoublePrecisionUnsigned
         | SqlDataType::Nvarchar(_)
         | SqlDataType::Uuid
         | SqlDataType::CharacterLargeObject(_)
@@ -171,7 +179,7 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::Time(_, _)
         | SqlDataType::Datetime(_)
         | SqlDataType::Datetime64(_, _)
-        | SqlDataType::Interval
+        | SqlDataType::Interval { .. }
         | SqlDataType::JSON
         | SqlDataType::JSONB
         | SqlDataType::Regclass
@@ -273,9 +281,9 @@ pub async fn parse_ddl_to_arrow_schema(
     ctx: &SessionContext,
     ddl: &str,
     force_utc_time: bool,
-) -> Result<Schema, DataFusionError> {
+) -> Result<SchemaRef, DataFusionError> {
     let df_schema = parse_ddl_to_datafusion_schema(ctx, ddl, force_utc_time).await?;
-    Ok(df_schema.into())
+    Ok(df_schema.inner().clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

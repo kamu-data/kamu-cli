@@ -11,16 +11,15 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder, InjectionError};
-use kamu::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
+use kamu::testing::BaseRepoHarness;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
-use kamu_datasets_services::testing::TestDatasetOutboxListener;
+use kamu_datasets_services::testing::{MockDatasetActionAuthorizer, TestDatasetOutboxListener};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;

@@ -32,6 +32,7 @@ query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
+    "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
     "dep:mockall",
@@ -60,7 +61,6 @@ kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["lfs", "s3"] }
@@ -84,13 +84,17 @@ reqwest = { version = "0.12", default-features = false, features = [
     "gzip",
     "brotli",
     "deflate",
-    "json"
 ] }
 ringbuf = "0.4"
-zip = "3"
+zip = { version = "3", default-features = false, features = [
+    "deflate",
+    "bzip2",
+    "zstd",
+] }
+
 
 # Data
-datafusion = { version = "50", default-features = false }
+datafusion = { version = "52", default-features = false }
 object_store = { version = "0.12", features = ["aws"] }
 sha3 = "0.10"
 
@@ -125,8 +129,9 @@ url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
 kamu-auth-rebac-services = { optional = true, workspace = true }
+kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
-alloy = { optional = true, version = "1.1", default-features = false, features = [
+alloy = { optional = true, version = "1.5", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -141,8 +146,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "50" }
-datafusion-functions-json = { optional = true, version = "0.50" }
+datafusion-ethers = { optional = true, version = "52" }
+datafusion-functions-json = { optional = true, version = "0.52" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
 mockall = { optional = true, version = "0.14", default-features = false }
@@ -154,7 +159,6 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-kamu = { workspace = true, default-features = false, features = ["testing"] }
 kamu-accounts = { workspace = true, default-features = false, features = [
     "testing",
 ] }
@@ -172,7 +176,7 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.8", features = ["async_tokio"] }
-datafusion = { version = "50", default-features = false, features = [
+datafusion = { version = "52", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

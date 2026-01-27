@@ -20,8 +20,8 @@ use kamu_core::{
     VerificationResult,
     VerificationService,
     VerifyDatasetUseCase,
-    auth,
 };
+use kamu_datasets::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +52,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         // Resolve dataset
         let resolve_result = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(&request.target, auth::DatasetAction::Read)
+            .resolve_dataset_by_handle(&request.target, DatasetAction::Read)
             .await
             .map_err(map_unresolved_error);
         let target = match resolve_result {
@@ -91,7 +91,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         for request in requests {
             let res = self
                 .rebac_dataset_registry_facade
-                .resolve_dataset_by_handle(&request.target, auth::DatasetAction::Read)
+                .resolve_dataset_by_handle(&request.target, DatasetAction::Read)
                 .await
                 .map_err(map_unresolved_error);
             match res {

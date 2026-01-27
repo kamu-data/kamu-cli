@@ -13,14 +13,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::TenancyConfig;
-use kamu_core::auth::{ClassifyByAllowanceIdsResponse, DatasetAction, DatasetActionAuthorizer};
-use kamu_datasets::{
-    DatasetDependency,
-    DatasetEntryService,
-    DependencyGraphService,
-    GetDatasetUpstreamDependenciesError,
-    GetDatasetUpstreamDependenciesUseCase,
-};
+use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

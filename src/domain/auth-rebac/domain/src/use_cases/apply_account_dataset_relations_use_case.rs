@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::InternalError;
-use kamu_core::auth::DatasetAction;
+use kamu_datasets::DatasetAction;
 
 use crate::AccountToDatasetRelation;
 
@@ -19,6 +19,11 @@ use crate::AccountToDatasetRelation;
 #[async_trait::async_trait]
 pub trait ApplyAccountDatasetRelationsUseCase: Send + Sync {
     async fn execute(
+        &self,
+        operation: AccountDatasetRelationOperation<'_>,
+    ) -> Result<(), ApplyRelationMatrixError>;
+
+    async fn execute_bulk(
         &self,
         operations: &[AccountDatasetRelationOperation],
     ) -> Result<(), ApplyRelationMatrixError>;

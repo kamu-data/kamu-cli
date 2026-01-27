@@ -15,7 +15,7 @@ use crate::SearchEntitySchemaName;
 pub struct SearchResponse {
     pub took_ms: u64,
     pub timeout: bool,
-    pub total_hits: u64,
+    pub total_hits: Option<u64>,
     pub hits: Vec<SearchHit>,
 }
 

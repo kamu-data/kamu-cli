@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::{
+    DatasetAction,
     UpdateVersionFileUseCaseError,
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
@@ -47,7 +48,7 @@ impl MoleculeUpdateVersionedFileMetadataUseCaseImpl {
             .rebac_registry_facade
             .resolve_dataset_by_ref(
                 &versioned_file_dataset_id.as_local_ref(),
-                kamu_core::auth::DatasetAction::Write,
+                DatasetAction::Write,
             )
             .await
             .map_err(|e| match e {

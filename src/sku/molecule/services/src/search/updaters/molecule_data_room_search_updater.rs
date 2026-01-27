@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_molecule_domain::{
     MESSAGE_CONSUMER_MOLECULE_DATA_ROOM_SEARCH_UPDATER,
     MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
@@ -70,7 +70,8 @@ impl MoleculeDataRoomSearchUpdater {
                     doc: data_room_entry_document,
                 }],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -99,7 +100,8 @@ impl MoleculeDataRoomSearchUpdater {
                     doc: data_room_entry_document,
                 }],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -116,8 +118,9 @@ impl MoleculeDataRoomSearchUpdater {
 
         let maybe_existing_document = self
             .search_service
-            .find_document_by_id(ctx, data_room_entry_schema::SCHEMA_NAME, &old_id)
-            .await?;
+            .find_document_by_id(ctx.clone(), data_room_entry_schema::SCHEMA_NAME, &old_id)
+            .await
+            .int_err()?;
 
         let Some(existing_document) = maybe_existing_document else {
             tracing::warn!(
@@ -185,7 +188,8 @@ impl MoleculeDataRoomSearchUpdater {
                     },
                 ],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -206,7 +210,8 @@ impl MoleculeDataRoomSearchUpdater {
                     ),
                 }],
             )
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -232,9 +237,7 @@ impl MessageConsumerT<MoleculeDataRoomMessage> for MoleculeDataRoomSearchUpdater
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received Molecule data room message");
 
-        let ctx = SearchContext {
-            catalog: target_catalog,
-        };
+        let ctx = SearchContext::unrestricted(target_catalog);
 
         match message {
             MoleculeDataRoomMessage::EntryCreated(created_message) => {

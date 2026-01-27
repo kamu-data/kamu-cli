@@ -14,7 +14,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME,
 };
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
+use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;

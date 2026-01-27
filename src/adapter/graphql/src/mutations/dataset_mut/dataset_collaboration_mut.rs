@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::RebacService;
+use std::borrow::Cow;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -42,14 +42,17 @@ impl<'a> DatasetCollaborationMut<'a> {
         account_id: AccountID<'_>,
         role: DatasetAccessRole,
     ) -> Result<SetRoleResult> {
-        let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+        let apply_account_dataset_relations_uc = from_catalog_n!(
+            ctx,
+            dyn kamu_auth_rebac::ApplyAccountDatasetRelationsUseCase
+        );
 
-        rebac_service
-            .set_account_dataset_relation(
-                &account_id,
-                role.into(),
-                &self.dataset_request_state.dataset_handle().id,
-            )
+        apply_account_dataset_relations_uc
+            .execute(kamu_auth_rebac::AccountDatasetRelationOperation {
+                account_id: Cow::Owned(account_id.into()),
+                operation: kamu_auth_rebac::DatasetRoleOperation::Set(role.into()),
+                dataset_id: Cow::Borrowed(&self.dataset_request_state.dataset_handle().id),
+            })
             .await
             .int_err()?;
 
@@ -63,7 +66,10 @@ impl<'a> DatasetCollaborationMut<'a> {
         ctx: &Context<'_>,
         account_ids: Vec<AccountID<'_>>,
     ) -> Result<UnsetRoleResult> {
-        let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+        let unset_dataset_accounts_relations_uc = from_catalog_n!(
+            ctx,
+            dyn kamu_auth_rebac::UnsetDatasetAccountsRelationsUseCase
+        );
 
         let odf_account_ids = account_ids
             .into_iter()
@@ -71,10 +77,10 @@ impl<'a> DatasetCollaborationMut<'a> {
             .collect::<Vec<odf::AccountID>>();
         let odf_account_ids_refs = odf_account_ids.iter().collect::<Vec<_>>();
 
-        rebac_service
-            .unset_accounts_dataset_relations(
-                &odf_account_ids_refs[..],
+        unset_dataset_accounts_relations_uc
+            .execute(
                 &self.dataset_request_state.dataset_handle().id,
+                &odf_account_ids_refs[..],
             )
             .await
             .int_err()?;

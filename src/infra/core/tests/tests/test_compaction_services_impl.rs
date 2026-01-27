@@ -22,7 +22,6 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
-use kamu_core::auth;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
@@ -1397,7 +1396,7 @@ impl CompactTestHarness {
             ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<ObjectStoreRegistryImpl>()
@@ -1461,7 +1460,7 @@ impl CompactTestHarness {
             ))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()

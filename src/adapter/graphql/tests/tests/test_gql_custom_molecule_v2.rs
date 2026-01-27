@@ -14,7 +14,6 @@ use base64::Engine as _;
 use bon::bon;
 use chrono::Utc;
 use indoc::indoc;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_core::*;
@@ -24,6 +23,7 @@ use kamu_datasets::{
     DatasetRegistry,
     DatasetRegistryExt,
 };
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
 use messaging_outbox::{OutboxAgent, OutboxProvider};
@@ -10276,9 +10276,9 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         json!({
             "nodes": [
                 // project_2_file_1_dataset_search_hit_node,
+                project_1_file_1_dataset_search_hit_node, // earlier, but higher score
                 project_2_announcement_1_search_hit_node,
                 project_1_announcement_1_search_hit_node,
-                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 3
         })
@@ -10317,10 +10317,10 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
         harness.execute_search_query("plain", None).await,
         json!({
             "nodes": [
+                project_1_file_1_dataset_search_hit_node,
                 project_2_file_1_dataset_search_hit_node,
                 // project_2_announcement_1_search_hit_node,
                 // project_1_announcement_1_search_hit_node,
-                project_1_file_1_dataset_search_hit_node,
             ],
             "totalCount": 2
         })

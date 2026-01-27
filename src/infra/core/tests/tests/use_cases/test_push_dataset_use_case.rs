@@ -15,14 +15,13 @@ use kamu::testing::{
     BaseUseCaseHarness,
     BaseUseCaseHarnessOptions,
     DummySmartTransferProtocolClient,
-    MockDatasetActionAuthorizer,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetResult;
+use kamu_datasets::{CreateDatasetResult, DatasetAction};
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DependencyGraphServiceImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;

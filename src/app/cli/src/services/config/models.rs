@@ -1096,19 +1096,6 @@ pub struct SearchConfig {
     /// Embeddings encoder configuration
     pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
 
-    /// Vector repository configuration
-    pub vector_repo: Option<VectorRepoConfig>,
-
-    /// The multiplication factor that determines how many more points will be
-    /// requested from vector store to compensate for filtering out results that
-    /// may be inaccessible to user.
-    pub overfetch_factor: Option<f32>,
-
-    /// The additive value that determines how many more points will be
-    /// requested from vector store to compensate for filtering out results that
-    /// may be inaccessible to user.
-    pub overfetch_amount: Option<usize>,
-
     /// Search repository configuration
     pub repo: Option<SearchRepositoryConfig>,
 }
@@ -1131,14 +1118,6 @@ impl SearchConfig {
                     dimensions: Some(Self::DEFAULT_DIMENSIONS),
                 },
             )),
-            vector_repo: Some(VectorRepoConfig::Qdrant(VectorRepoConfigQdrant {
-                url: "http://localhost:6333".to_string(),
-                api_key: None,
-                collection_name: Some("kamu-datasets".to_string()),
-                dimensions: Some(Self::DEFAULT_DIMENSIONS),
-            })),
-            overfetch_factor: Some(2.0),
-            overfetch_amount: Some(10),
             repo: Some(SearchRepositoryConfig::Elasticsearch(
                 SearchRepositoryConfigElasticsearch {
                     url: "http://localhost:9200".to_string(),
@@ -1147,6 +1126,7 @@ impl SearchConfig {
                     index_prefix: Some(String::new()),
                     timeout_secs: Some(30),
                     enable_compression: Some(false),
+                    embedding_dimensions: Some(Self::DEFAULT_DIMENSIONS),
                 },
             )),
         }
@@ -1163,11 +1143,6 @@ impl Default for SearchConfig {
             embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
                 EmbeddingsEncoderConfigOpenAi::default(),
             )),
-            vector_repo: Some(VectorRepoConfig::QdrantContainer(
-                VectorRepoConfigQdrantContainer::default(),
-            )),
-            overfetch_factor: Some(2.0),
-            overfetch_amount: Some(10),
             repo: Some(SearchRepositoryConfig::default()),
         }
     }
@@ -1185,17 +1160,6 @@ pub struct SearchIndexerConfig {
 
     /// Whether to clear and re-index on start or use existing vectors if any
     pub clear_on_start: bool,
-
-    /// Whether to skip indexing datasets that have no readme or description
-    pub skip_datasets_with_no_description: bool,
-
-    /// Whether to skip indexing datasets that have no data
-    pub skip_datasets_with_no_data: bool,
-
-    /// Whether to include the original text as payload of the vectors when
-    /// storing them. It is not needed for normal service operations but can
-    /// help debug issues.
-    pub payload_include_content: bool,
 }
 
 impl Default for SearchIndexerConfig {
@@ -1203,9 +1167,6 @@ impl Default for SearchIndexerConfig {
         Self {
             incremental_indexing: true,
             clear_on_start: false,
-            skip_datasets_with_no_description: true,
-            skip_datasets_with_no_data: true,
-            payload_include_content: false,
         }
     }
 }
@@ -1258,6 +1219,7 @@ impl Default for EmbeddingsChunkerConfigSimple {
 #[serde(tag = "kind")]
 pub enum EmbeddingsEncoderConfig {
     OpenAi(EmbeddingsEncoderConfigOpenAi),
+    Dummy,
 }
 
 impl Default for EmbeddingsEncoderConfig {
@@ -1292,68 +1254,6 @@ impl Default for EmbeddingsEncoderConfigOpenAi {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
-pub enum VectorRepoConfig {
-    Dummy,
-    Qdrant(VectorRepoConfigQdrant),
-    QdrantContainer(VectorRepoConfigQdrantContainer),
-}
-
-impl Default for VectorRepoConfig {
-    fn default() -> Self {
-        Self::QdrantContainer(VectorRepoConfigQdrantContainer::default())
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
-pub struct VectorRepoConfigQdrant {
-    #[merge(skip)]
-    pub url: String,
-    pub api_key: Option<String>,
-    pub collection_name: Option<String>,
-    pub dimensions: Option<usize>,
-}
-
-impl Default for VectorRepoConfigQdrant {
-    fn default() -> Self {
-        Self {
-            url: String::new(),
-            api_key: None,
-            collection_name: Some("kamu-datasets".to_string()),
-            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
-pub struct VectorRepoConfigQdrantContainer {
-    pub image: Option<String>,
-    pub dimensions: Option<usize>,
-    pub start_timeout: Option<DurationString>,
-}
-
-impl Default for VectorRepoConfigQdrantContainer {
-    fn default() -> Self {
-        Self {
-            image: Some(kamu::utils::docker_images::QDRANT.to_string()),
-            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
-            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
-        }
-    }
-}
-
-#[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
@@ -1378,6 +1278,7 @@ pub struct SearchRepositoryConfigElasticsearch {
     pub index_prefix: Option<String>,
     pub timeout_secs: Option<u64>,
     pub enable_compression: Option<bool>,
+    pub embedding_dimensions: Option<usize>,
 }
 
 impl Default for SearchRepositoryConfigElasticsearch {
@@ -1389,6 +1290,7 @@ impl Default for SearchRepositoryConfigElasticsearch {
             index_prefix: Some(String::new()),
             timeout_secs: Some(30),
             enable_compression: Some(false),
+            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
         }
     }
 }
@@ -1401,6 +1303,7 @@ impl Default for SearchRepositoryConfigElasticsearch {
 pub struct SearchRepositoryConfigElasticsearchContainer {
     pub image: Option<String>,
     pub start_timeout: Option<DurationString>,
+    pub embedding_dimensions: Option<usize>,
 }
 
 impl Default for SearchRepositoryConfigElasticsearchContainer {
@@ -1408,6 +1311,7 @@ impl Default for SearchRepositoryConfigElasticsearchContainer {
         Self {
             image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
         }
     }
 }
