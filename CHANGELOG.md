@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.257.1] - 2026-01-27
+### Fixed
+- Eliminated several dependency loops
+- Hotfix: Elasticsearch badly reacting on reset when there are no indices already
+- Hotfix: Elasticsearch reset indices GQL API should use background catalog
+
 ## [0.257.0] - 2026-01-26
 ### Added
 - Elasticsearch solution supports security aspects:
