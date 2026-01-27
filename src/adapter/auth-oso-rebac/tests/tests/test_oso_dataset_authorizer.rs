@@ -35,10 +35,15 @@ use kamu_auth_rebac_services::{
     SetDatasetRebacPropertiesUseCaseImpl,
 };
 use kamu_core::TenancyConfig;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::testing::ClassifyByAllowanceIdsResponseTestHelper;
-use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
+use kamu_datasets::{
+    DatasetAction,
+    DatasetActionAuthorizer,
+    DatasetActionUnauthorizedError,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
+use kamu_datasets_services::testing::ClassifyByAllowanceIdsResponseTestHelper;
 use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
 use messaging_outbox::{
     ConsumerFilter,

@@ -13,7 +13,8 @@ use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::{auth, *};
+use kamu_core::*;
+use kamu_datasets::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +43,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         // Resolve dataset
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Write)
+            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Write)
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetIdUnresolvedError as E;

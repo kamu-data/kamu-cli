@@ -1235,7 +1235,7 @@ impl IngestTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add_value(CurrentAccountSubject::new_test())
-            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,

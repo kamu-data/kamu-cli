@@ -12,10 +12,11 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use file_utils::MediaType;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

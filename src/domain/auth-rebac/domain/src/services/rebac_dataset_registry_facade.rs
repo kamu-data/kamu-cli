@@ -10,8 +10,7 @@
 use std::collections::HashMap;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_core::auth;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{DatasetAction, DatasetActionNotEnoughPermissionsError, ResolvedDataset};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,31 +20,31 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: auth::DatasetAction,
+        action: DatasetAction,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: auth::DatasetAction,
+        action: DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        action: auth::DatasetAction,
+        action: DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
 
     async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: auth::DatasetAction,
+        action: DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 
     async fn classify_dataset_refs_by_access(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: auth::DatasetAction,
+        action: DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError>;
 }
 
@@ -139,12 +138,9 @@ pub enum RebacDatasetRefUnresolvedError {
 }
 
 impl RebacDatasetRefUnresolvedError {
-    pub fn not_enough_permissions(
-        dataset_ref: odf::DatasetRef,
-        action: auth::DatasetAction,
-    ) -> Self {
+    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
         Self::Access(odf::AccessError::Unauthorized(
-            auth::DatasetActionNotEnoughPermissionsError {
+            DatasetActionNotEnoughPermissionsError {
                 action,
                 dataset_ref,
             }

@@ -9,9 +9,9 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
+use kamu_datasets::DatasetActionUnauthorizedError;
 use thiserror::Error;
 
-use crate::auth::DatasetActionUnauthorizedError;
 use crate::{SetWatermarkExecutionError, SetWatermarkPlanningError, SetWatermarkResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

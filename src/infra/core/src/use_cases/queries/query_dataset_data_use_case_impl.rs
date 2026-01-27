@@ -17,9 +17,8 @@ use kamu_core::{
     QueryDatasetDataUseCase,
     QueryError,
     QueryService,
-    auth,
 };
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
 
 use super::helpers;
 
@@ -44,7 +43,7 @@ impl QueryDatasetDataUseCaseImpl {
         let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
         let classified = self
             .rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&refs, auth::DatasetAction::Read)
+            .classify_dataset_refs_by_allowance(&refs, DatasetAction::Read)
             .await?;
 
         if !skip_if_missing_or_inaccessible

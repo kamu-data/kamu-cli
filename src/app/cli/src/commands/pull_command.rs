@@ -15,11 +15,10 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use database_common_macros::transactional_method2;
 use futures::TryStreamExt;
-use kamu::domain::auth::DatasetActionNotEnoughPermissionsError;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{DatasetActionNotEnoughPermissionsError, DatasetRegistry};
 use odf::{DatasetRefAny, DatasetRefUnresolvedError};
 
 use super::{BatchError, CLIError, Command};

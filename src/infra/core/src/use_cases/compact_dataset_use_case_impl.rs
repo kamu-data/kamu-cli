@@ -23,8 +23,8 @@ use kamu_core::{
     CompactionResponse,
     CompactionResult,
     NullCompactionMultiListener,
-    auth,
 };
+use kamu_datasets::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +53,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
     ) -> Result<CompactionResult, CompactionError> {
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Maintain)
+            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Maintain)
             .await
             .map_err(|e| {
                 use RebacDatasetIdUnresolvedError as E;

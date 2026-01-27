@@ -25,8 +25,11 @@ use kamu_auth_rebac::{
     SetAccountDatasetRelationsOperation,
     UnsetAccountDatasetRelationsOperation,
 };
-use kamu_core::auth;
-use kamu_core::auth::DatasetAction;
+use kamu_datasets::{
+    ClassifyByAllowanceDatasetActionUnauthorizedError,
+    DatasetAction,
+    DatasetActionAuthorizer,
+};
 use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +38,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[dill::interface(dyn ApplyAccountDatasetRelationsUseCase)]
 pub struct ApplyAccountDatasetRelationsUseCaseImpl {
     rebac_service: Arc<dyn RebacService>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -59,7 +62,7 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
         let mut not_found_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         let mut unauthorized_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         for (dataset_id, e) in unauthorized_ids_with_errors {
-            use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+            use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
 
             match e {
                 E::NotFound(_) => {

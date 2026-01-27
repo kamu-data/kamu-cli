@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::InternalError;
-use kamu_core::auth::DatasetAction;
+use kamu_datasets::DatasetAction;
 
 use crate::AccountToDatasetRelation;
 

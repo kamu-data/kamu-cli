@@ -12,7 +12,6 @@ use std::sync::Arc;
 use database_common_macros::transactional_method1;
 use dill::{component, interface};
 use internal_error::InternalError;
-use kamu_core::auth::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{
     PushDatasetUseCase,
     PushError,
@@ -28,6 +27,7 @@ use kamu_core::{
     SyncRequest,
     SyncService,
 };
+use kamu_datasets::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
 
 use crate::SyncRequestBuilder;
 
@@ -61,7 +61,7 @@ impl PushDatasetUseCaseImpl {
                 local_handle: Some(hdl),
                 target: push_target.cloned(),
                 result: Err(PushError::SyncError({
-                    use kamu_core::auth::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+                    use kamu_datasets::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
 
                     match error {
                         E::NotFound(e) => SyncError::DatasetNotFound(e.into()),

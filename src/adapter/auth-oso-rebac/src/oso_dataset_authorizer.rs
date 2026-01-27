@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::auth::*;
+use kamu_datasets::*;
 use rayon::prelude::*;
 use tokio::try_join;
 

@@ -13,10 +13,10 @@ use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, *};
 use kamu::*;
-use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetResult;
+use kamu_datasets::{CreateDatasetResult, DatasetAction};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;

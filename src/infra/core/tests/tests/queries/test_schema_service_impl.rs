@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu::SchemaServiceImpl;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::SchemaService;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
 

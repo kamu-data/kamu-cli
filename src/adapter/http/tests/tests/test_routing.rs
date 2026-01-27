@@ -79,7 +79,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
         .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
         .add_value(CurrentAccountSubject::new_test())
-        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()

@@ -17,7 +17,12 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets::{
+    AlwaysHappyDatasetActionAuthorizer,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    ResolvedDataset,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -62,7 +67,7 @@ impl TransformTestHarness {
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()

@@ -13,8 +13,6 @@ use std::sync::Arc;
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu::domain::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{
     Account,
     AccountProvider,
@@ -25,13 +23,16 @@ use kamu_accounts::{
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
+    AlwaysHappyDatasetActionAuthorizer,
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
+    DatasetActionAuthorizer,
     DatasetReferenceService,
     DatasetRegistry,
 };
 use kamu_datasets_services::DatasetEntryWriter;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;

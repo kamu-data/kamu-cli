@@ -22,6 +22,7 @@ use kamu_core::services::upload_service::{
     UploadTokenIntoStreamError,
 };
 use kamu_core::*;
+use kamu_datasets::DatasetAction;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -126,7 +127,7 @@ pub async fn dataset_ingest_handler(
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
     let target_dataset = rebac_dataset_registry_facade
-        .resolve_dataset_by_ref(&dataset_ref, auth::DatasetAction::Write)
+        .resolve_dataset_by_ref(&dataset_ref, DatasetAction::Write)
         .await
         .map_err(|e| {
             use RebacDatasetRefUnresolvedError as E;

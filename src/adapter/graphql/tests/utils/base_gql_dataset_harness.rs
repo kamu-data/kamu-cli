@@ -9,16 +9,15 @@
 
 use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_accounts_services::{CreateAccountUseCaseImpl, UpdateAccountUseCaseImpl};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;

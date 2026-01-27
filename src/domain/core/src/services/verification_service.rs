@@ -11,7 +11,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
 use thiserror::Error;
 
 use crate::*;
@@ -275,11 +275,11 @@ impl From<odf::IterBlocksError> for VerificationError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+impl From<DatasetActionUnauthorizedError> for VerificationError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
         match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }

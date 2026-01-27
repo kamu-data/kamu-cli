@@ -9,7 +9,7 @@
 
 use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_auth_rebac::AccountToDatasetRelation as Role;
-use kamu_core::auth::DatasetAction;
+use kamu_datasets::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

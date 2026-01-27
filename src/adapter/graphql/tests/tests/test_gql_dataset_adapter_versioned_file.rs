@@ -10,9 +10,9 @@
 use base64::Engine;
 use bon::bon;
 use indoc::indoc;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::*;
 use messaging_outbox::OutboxProvider;
 use serde_json::json;

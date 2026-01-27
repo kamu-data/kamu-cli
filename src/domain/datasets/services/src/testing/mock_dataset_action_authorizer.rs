@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::InternalError;
-use kamu_core::auth::{
+use kamu_datasets::{
     ClassifyByAllowanceDatasetActionUnauthorizedError,
     ClassifyByAllowanceIdsResponse,
     ClassifyByAllowanceResponse,

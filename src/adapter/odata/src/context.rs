@@ -18,7 +18,6 @@
 
 use std::sync::Arc;
 
-use auth::{DatasetAction, DatasetActionAuthorizer};
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
@@ -26,9 +25,14 @@ use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use datafusion_odata::error::{CollectionNotFound, ODataError};
 use internal_error::ResultIntoInternal;
-use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{
+    DatasetAction,
+    DatasetActionAuthorizer,
+    DatasetActionAuthorizerExt,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

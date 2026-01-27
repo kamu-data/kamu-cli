@@ -29,7 +29,6 @@ sqlx = ["dep:sqlx"]
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 odf = { workspace = true }
 

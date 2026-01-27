@@ -12,8 +12,7 @@ use std::ops::Deref;
 
 use fallible_map::FallibleMapExt as _;
 use kamu_auth_rebac::AuthorizedAccount;
-use kamu_core::auth;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
 use odf::dataset::MetadataChainExt as _;
 use tokio::sync::OnceCell;
 
@@ -27,7 +26,7 @@ pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
     dataset_statistics: OnceCell<Box<kamu_datasets::DatasetStatistics>>,
-    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
+    allowed_dataset_actions: OnceCell<HashSet<DatasetAction>>,
     authorized_accounts: OnceCell<Vec<AuthorizedAccount>>,
     archetype: OnceCell<Option<odf::schema::ext::DatasetArchetype>>,
 }
@@ -125,11 +124,11 @@ impl DatasetRequestState {
     pub(crate) async fn allowed_dataset_actions(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<&HashSet<auth::DatasetAction>> {
+    ) -> Result<&HashSet<DatasetAction>> {
         self.allowed_dataset_actions
             .get_or_try_init(|| async {
                 let dataset_action_authorizer =
-                    from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
+                    from_catalog_n!(ctx, dyn kamu_datasets::DatasetActionAuthorizer);
 
                 let allowed_actions = dataset_action_authorizer
                     .get_allowed_actions(&self.dataset_handle.id)

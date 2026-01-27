@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_datasets::DatasetActionUnauthorizedError;
 use thiserror::Error;
 
-use crate::auth::DatasetActionUnauthorizedError;
 use crate::{
     CompactionExecutionError,
     CompactionListener,

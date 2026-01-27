@@ -31,6 +31,7 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
+    "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
     "dep:mockall",
@@ -124,6 +125,7 @@ url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
 kamu-auth-rebac-services = { optional = true, workspace = true }
+kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
 alloy = { optional = true, version = "1.5", default-features = false, features = [
     "std",

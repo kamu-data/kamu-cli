@@ -16,9 +16,7 @@ use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_core::auth;
-use kamu_core::auth::DatasetActionAccess;
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{DatasetAction, DatasetActionAccess, DatasetActionAuthorizer, DatasetRegistry};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -32,7 +30,7 @@ pub struct DatasetAuthorizationLayer<DatasetActionQuery> {
 
 impl<DatasetActionQuery> DatasetAuthorizationLayer<DatasetActionQuery>
 where
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_core::auth::DatasetAction,
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetAction,
 {
     pub fn new(dataset_action_query: DatasetActionQuery) -> Self {
         Self {
@@ -57,7 +55,7 @@ where
 
 impl Default
     for DatasetAuthorizationLayer<
-        for<'a> fn(&'a http::Request<Body>) -> kamu_core::auth::DatasetAction,
+        for<'a> fn(&'a http::Request<Body>) -> kamu_datasets::DatasetAction,
     >
 {
     fn default() -> Self {
@@ -79,7 +77,7 @@ where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
     DatasetActionQuery: Send + Copy + 'static,
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_core::auth::DatasetAction,
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetAction,
 {
     type Response = Svc::Response;
     type Error = Svc::Error;
@@ -139,7 +137,7 @@ where
                             .get_one::<dyn DatasetRegistry>()
                             .unwrap();
                         let dataset_action_authorizer = transaction_catalog
-                            .get_one::<dyn auth::DatasetActionAuthorizer>()
+                            .get_one::<dyn DatasetActionAuthorizer>()
                             .unwrap();
 
                         let dataset_handle = {
@@ -165,7 +163,7 @@ where
                             .get_allowed_actions(&dataset_handle.id)
                             .await?;
 
-                        match auth::DatasetAction::resolve_access(
+                        match DatasetAction::resolve_access(
                             &allowed_actions,
                             current_dataset_action,
                         ) {

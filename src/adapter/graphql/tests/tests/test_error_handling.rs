@@ -20,8 +20,7 @@ use kamu_auth_rebac::{
     RebacDatasetRegistryFacade,
 };
 use kamu_core::TenancyConfig;
-use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetAction, ResolvedDataset};
 use pretty_assertions::assert_eq;
 use thiserror::Error;
 use time_source::SystemTimeSourceDefault;

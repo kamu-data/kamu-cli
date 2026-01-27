@@ -14,15 +14,14 @@ use std::str::FromStr;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::auth::DatasetAction;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
-use kamu_datasets::CreateDatasetUseCase;
+use kamu_datasets::{CreateDatasetUseCase, DatasetAction};
 use kamu_datasets_inmem::*;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
@@ -376,7 +375,7 @@ impl ServerHarness {
 
             b.add::<SystemTimeSourceDefault>()
                 .add_value(MockDidGenerator::predefined_dataset_ids(vec![
-                    dataset_id.clone()
+                    dataset_id.clone(),
                 ]))
                 .bind::<dyn DidGenerator, MockDidGenerator>()
                 .add::<DummyOutboxImpl>()
@@ -389,11 +388,11 @@ impl ServerHarness {
                 ))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(dataset_action_authorizer)
-                .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+                .bind::<dyn kamu_datasets::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder(datasets_dir)
-                )
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetUseCaseImpl>()

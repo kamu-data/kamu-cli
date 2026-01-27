@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
     EngineConfigDatafusionEmbeddedBatchQuery,
@@ -35,6 +35,7 @@ use kamu_datasets::{
     WriteCheckedDataset,
 };
 use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};

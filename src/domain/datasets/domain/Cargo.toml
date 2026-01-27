@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+oso = ["dep:oso"]
 sqlx = ["dep:sqlx"]
 testing = ["dep:mockall"]
 
@@ -36,6 +37,7 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true }
 kamu-search = { workspace = true }
 
+async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
@@ -58,6 +60,6 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
     "macros",
 ] }
 mockall = { optional = true, version = "0.14", default-features = false }
-
+oso = { optional = true, version = "0.27", default-features = false }
 
 [dev-dependencies]

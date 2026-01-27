@@ -10,8 +10,8 @@
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
-use kamu_core::{TenancyConfig, auth};
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_core::TenancyConfig;
+use kamu_datasets::{DatasetAction, DatasetEnvVarsConfig};
 use kamu_task_system as ts;
 
 use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
@@ -87,7 +87,7 @@ pub(crate) async fn check_dataset_read_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Read).await
+    check_dataset_access(ctx, dataset_request_state, DatasetAction::Read).await
 }
 
 #[expect(dead_code)]
@@ -95,14 +95,14 @@ pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Write).await
+    check_dataset_access(ctx, dataset_request_state, DatasetAction::Write).await
 }
 
 pub(crate) async fn check_dataset_maintain_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Maintain).await
+    check_dataset_access(ctx, dataset_request_state, DatasetAction::Maintain).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +110,7 @@ pub(crate) async fn check_dataset_maintain_access(
 async fn check_dataset_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
-    action: auth::DatasetAction,
+    action: DatasetAction,
 ) -> Result<(), GqlError> {
     let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
 

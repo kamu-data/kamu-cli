@@ -12,16 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::auth;
-use kamu_datasets::{
-    DanglingReferenceError,
-    DatasetLifecycleMessage,
-    DatasetRegistry,
-    DeleteDatasetError,
-    DeleteDatasetUseCase,
-    DependencyGraphService,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_datasets::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
@@ -134,7 +125,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Resolve handle
         let dataset_handle = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Own)
+            .resolve_dataset_handle_by_ref(dataset_ref, DatasetAction::Own)
             .await
             .map_err(|e| {
                 use RebacDatasetRefUnresolvedError as E;

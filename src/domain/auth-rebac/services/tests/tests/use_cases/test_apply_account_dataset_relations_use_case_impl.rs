@@ -12,7 +12,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
-use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_auth_rebac::{
     AccountDatasetRelationOperation,
     AccountToDatasetRelation as Role,
@@ -23,7 +22,8 @@ use kamu_auth_rebac::{
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
-use kamu_core::auth::DatasetActionAuthorizer;
+use kamu_datasets::DatasetActionAuthorizer;
+use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use messaging_outbox::DummyOutboxImpl;
 use pretty_assertions::{assert_eq, assert_matches};
 

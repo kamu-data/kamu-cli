@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_auth_rebac::RebacServiceExt;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
+use kamu_datasets::{DatasetAction, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -44,7 +44,7 @@ impl Search {
         let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_core::auth::DatasetActionAuthorizer
+            dyn kamu_datasets::DatasetActionAuthorizer
         );
 
         let page = page.unwrap_or(0);

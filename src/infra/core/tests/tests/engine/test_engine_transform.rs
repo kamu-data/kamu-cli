@@ -21,7 +21,7 @@ use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -247,7 +247,7 @@ impl TestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add::<ContainerRuntime>()
-            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
