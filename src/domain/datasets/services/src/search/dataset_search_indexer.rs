@@ -555,7 +555,7 @@ pub(crate) async fn index_datasets(
     embeddings_encoder: &dyn EmbeddingsEncoder,
     rebac_service: &dyn RebacService,
 ) -> Result<usize, InternalError> {
-    const BULK_SIZE: usize = 500;
+    const BULK_SIZE: usize = 100;
 
     let mut entries_stream = dataset_entry_service.all_entries();
 

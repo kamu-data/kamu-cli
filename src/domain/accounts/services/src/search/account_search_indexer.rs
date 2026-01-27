@@ -66,7 +66,7 @@ pub(crate) async fn index_accounts(
 ) -> Result<usize, InternalError> {
     use kamu_accounts::ExpensiveAccountRepositoryExt;
 
-    const BULK_SIZE: usize = 500;
+    const BULK_SIZE: usize = 100;
 
     let mut accounts_stream = expensive_account_repo.all_accounts();
 
