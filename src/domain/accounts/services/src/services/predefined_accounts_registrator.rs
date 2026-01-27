@@ -15,8 +15,12 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
-use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
-use kamu_auth_rebac_services::DefaultAccountProperties;
+use kamu_auth_rebac::{
+    AccountProperties,
+    AccountPropertyName,
+    RebacService,
+    boolean_property_value,
+};
 use odf::AccountID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +31,7 @@ pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
-    default_account_properties: Arc<DefaultAccountProperties>,
+    default_account_properties: Arc<AccountProperties>,
     update_account_use_case: Arc<dyn UpdateAccountUseCase>,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
@@ -44,7 +48,7 @@ impl PredefinedAccountsRegistrator {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
-        default_account_properties: Arc<DefaultAccountProperties>,
+        default_account_properties: Arc<AccountProperties>,
         update_account_use_case: Arc<dyn UpdateAccountUseCase>,
         create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
