@@ -41,8 +41,6 @@ pub fn register_dependencies(b: &mut CatalogBuilder, options: AccountDomainDepen
 
     b.add::<utils::AccountAuthorizationHelperImpl>();
 
-    b.add::<DidSecretService>();
-
     if options.needs_indexing {
         b.add::<OAuthDeviceCodeServiceImpl>();
 

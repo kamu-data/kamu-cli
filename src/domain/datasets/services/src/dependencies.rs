@@ -64,6 +64,7 @@ pub fn register_dependencies(
     b.add::<DependencyGraphImmediateListener>();
 
     b.add::<DatasetAccountLifecycleHandler>();
+    b.add::<DidSecretService>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

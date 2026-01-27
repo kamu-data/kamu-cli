@@ -7023,7 +7023,6 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
- "kamu-datasets",
  "kamu-search",
  "kamu-search-elasticsearch",
  "kamu-search-services",
