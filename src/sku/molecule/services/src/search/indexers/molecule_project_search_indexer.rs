@@ -38,6 +38,8 @@ pub(crate) fn index_project_from_entity(
         molecule_schema::fields::IPNFT_UID: project.ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
         kamu_search::fields::IS_BANNED: false,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 
@@ -59,6 +61,8 @@ pub(crate) fn index_project_from_parts(
         molecule_schema::fields::IPNFT_UID: ipnft_uid,
         project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
         kamu_search::fields::IS_BANNED: false,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 

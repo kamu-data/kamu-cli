@@ -45,6 +45,8 @@ pub(crate) fn index_announcement_from_global_entity(
         molecule_schema::fields::CHANGE_BY: global_announcement.announcement.change_by,
         molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
         molecule_schema::fields::TAGS: global_announcement.announcement.tags,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 
@@ -69,6 +71,8 @@ pub(crate) fn index_announcement_from_publication_record(
         molecule_schema::fields::CHANGE_BY: announcement_record.change_by,
         molecule_schema::fields::CATEGORIES: announcement_record.categories,
         molecule_schema::fields::TAGS: announcement_record.tags,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 

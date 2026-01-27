@@ -9,6 +9,7 @@
 
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 
 use crate::{MoleculeAnnouncement, MoleculeAnnouncementsFilters, MoleculeProject};
 
@@ -18,6 +19,7 @@ use crate::{MoleculeAnnouncement, MoleculeAnnouncementsFilters, MoleculeProject}
 pub trait MoleculeViewProjectAnnouncementsUseCase: Send + Sync {
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewProjectAnnouncementsMode,
         filters: Option<MoleculeAnnouncementsFilters>,

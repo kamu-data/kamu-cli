@@ -59,6 +59,8 @@ pub(crate) fn index_data_room_entry_from_entity(
         molecule_schema::fields::DESCRIPTION: entry.denormalized_latest_file_info.description,
         molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
         molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 
@@ -87,7 +89,7 @@ pub(crate) async fn index_data_room_entries(
         .int_err()?;
 
     let total_documents_count = process_projects_in_batches(
-        &organization_account.account_id,
+        organization_account,
         &projects_listing.list,
         &dependencies,
         repo,
@@ -132,7 +134,7 @@ impl IndexingDependencies {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ProjectIndexingData {
-    molecule_account_id: odf::AccountID,
+    molecule_subject: kamu_accounts::LoggedAccount,
     project: MoleculeProject,
     entries_result: Result<MoleculeDataRoomEntriesListing, InternalError>,
     versioned_files_map: HashMap<odf::DatasetID, MoleculeVersionedFileEntry>,
@@ -141,7 +143,7 @@ struct ProjectIndexingData {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn process_projects_in_batches(
-    molecule_account_id: &odf::AccountID,
+    molecule_subject: &LoggedAccount,
     projects: &[MoleculeProject],
     dependencies: &IndexingDependencies,
     repo: &dyn SearchRepository,
@@ -157,7 +159,7 @@ async fn process_projects_in_batches(
         let mut futures = FuturesUnordered::new();
         for project in project_chunk {
             futures.push(load_project_indexing_data(
-                molecule_account_id.clone(),
+                molecule_subject.clone(),
                 project.clone(),
                 dependencies.clone(),
             ));
@@ -202,7 +204,7 @@ async fn process_projects_in_batches(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn load_project_indexing_data(
-    molecule_account_id: odf::AccountID,
+    molecule_subject: kamu_accounts::LoggedAccount,
     project: MoleculeProject,
     dependencies: IndexingDependencies,
 ) -> ProjectIndexingData {
@@ -210,6 +212,7 @@ async fn load_project_indexing_data(
     let result = dependencies
         .molecule_view_data_room_entries_uc
         .execute(
+            &molecule_subject,
             &project,
             MoleculeViewDataRoomEntriesMode::LatestSource,
             None, /* all prefixes */
@@ -235,7 +238,7 @@ async fn load_project_indexing_data(
     };
 
     ProjectIndexingData {
-        molecule_account_id,
+        molecule_subject,
         project,
         entries_result: result,
         versioned_files_map,
@@ -321,7 +324,7 @@ fn index_project_data(
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
         let document = index_data_room_entry_from_entity(
-            &project_data.molecule_account_id,
+            &project_data.molecule_subject.account_id,
             &project_data.project.ipnft_uid,
             &entry,
             content_text,

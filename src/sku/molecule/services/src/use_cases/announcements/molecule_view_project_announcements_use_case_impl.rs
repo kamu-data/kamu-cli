@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     molecule_announcement_search_schema as announcement_schema,
     molecule_search_schema_common as molecule_schema,
@@ -101,11 +102,17 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
 
     async fn project_announcements_from_search(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
-        filters: Option<MoleculeAnnouncementsFilters>,
+        maybe_announcements_filters: Option<MoleculeAnnouncementsFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectAnnouncementListing, MoleculeViewProjectAnnouncementsError> {
-        let ctx = SearchContext::unrestricted(&self.catalog);
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
 
         let filter = {
             let mut and_clauses = vec![];
@@ -117,8 +124,10 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
             ));
 
             // filters by categories, tags, access levels
-            if let Some(filters) = filters {
-                and_clauses.extend(map_molecule_announcements_filters_to_search(filters));
+            if let Some(announcements_filters) = maybe_announcements_filters {
+                and_clauses.extend(map_molecule_announcements_filters_to_search(
+                    announcements_filters,
+                ));
             }
 
             SearchFilterExpr::and_clauses(and_clauses)
@@ -162,6 +171,7 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
     )]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewProjectAnnouncementsMode,
         filters: Option<MoleculeAnnouncementsFilters>,
@@ -174,8 +184,13 @@ impl MoleculeViewProjectAnnouncementsUseCase for MoleculeViewProjectAnnouncement
             }
 
             MoleculeViewProjectAnnouncementsMode::LatestProjection => {
-                self.project_announcements_from_search(molecule_project, filters, pagination)
-                    .await
+                self.project_announcements_from_search(
+                    molecule_subject,
+                    molecule_project,
+                    filters,
+                    pagination,
+                )
+                .await
             }
         }
     }

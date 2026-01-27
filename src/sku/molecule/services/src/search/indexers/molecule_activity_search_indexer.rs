@@ -52,6 +52,8 @@ pub(crate) fn index_data_room_activity(
         molecule_schema::fields::DESCRIPTION: activity.description,
         molecule_schema::fields::TAGS: activity.tags,
         molecule_schema::fields::CATEGORIES: activity.categories,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 
@@ -81,6 +83,8 @@ pub(crate) fn index_activity_from_data_room_publication_record(
         molecule_schema::fields::DESCRIPTION: activity_record.description,
         molecule_schema::fields::TAGS: activity_record.tags,
         molecule_schema::fields::CATEGORIES: activity_record.categories,
+        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
     })
 }
 

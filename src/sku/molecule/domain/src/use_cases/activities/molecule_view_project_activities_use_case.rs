@@ -10,6 +10,7 @@
 use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 
 use crate::{
     MoleculeActivitiesFilters,
@@ -24,6 +25,7 @@ use crate::{
 pub trait MoleculeViewProjectActivitiesUseCase: Send + Sync {
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewProjectActivitiesMode,
         filters: Option<MoleculeActivitiesFilters>,

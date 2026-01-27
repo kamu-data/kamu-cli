@@ -75,14 +75,8 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::KIND,
         role: SearchSchemaFieldRole::Keyword,
     },
-    SearchSchemaField {
-        path: kamu_search::fields::VISIBILITY,
-        role: SearchSchemaFieldRole::Keyword,
-    },
-    SearchSchemaField {
-        path: kamu_search::fields::PRINCIPAL_IDS,
-        role: SearchSchemaFieldRole::Keyword,
-    },
+    kamu_search::field_definitions::VISIBILITY,
+    kamu_search::field_definitions::PRINCIPAL_IDS,
     SearchSchemaField {
         path: fields::CREATED_AT,
         role: SearchSchemaFieldRole::DateTime,

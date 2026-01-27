@@ -9,6 +9,7 @@
 
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
 
 use crate::{MoleculeDataRoomEntriesFilters, MoleculeDataRoomEntry, MoleculeProject};
@@ -19,6 +20,7 @@ use crate::{MoleculeDataRoomEntriesFilters, MoleculeDataRoomEntry, MoleculeProje
 pub trait MoleculeViewDataRoomEntriesUseCase: Send + Sync {
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewDataRoomEntriesMode,
         path_prefix: Option<CollectionPath>,

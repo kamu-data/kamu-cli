@@ -19,6 +19,7 @@ use kamu_molecule_domain::{
     MoleculeViewProjectActivitiesUseCase,
 };
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::molecule::v2::{
     MoleculeAccessLevelRuleInput,
@@ -146,9 +147,11 @@ impl MoleculeProjectV2 {
             from_catalog_n!(ctx, dyn MoleculeViewProjectActivitiesUseCase);
 
         let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+        let molecule_subject = molecule_subject(ctx)?;
 
         let listing = view_project_activities_uc
             .execute(
+                &molecule_subject,
                 &self.entity,
                 molecule_config.view_project_activities_mode(),
                 filters.map(Into::into),

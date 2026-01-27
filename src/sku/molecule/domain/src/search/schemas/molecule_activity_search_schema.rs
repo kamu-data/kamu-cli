@@ -57,6 +57,8 @@ const SCHEMA_FIELDS: &[kamu_search::SearchSchemaField] = &[
     molecule_schema::field_definitions::DESCRIPTION,
     molecule_schema::field_definitions::CATEGORIES,
     molecule_schema::field_definitions::TAGS,
+    kamu_search::field_definitions::VISIBILITY,
+    kamu_search::field_definitions::PRINCIPAL_IDS,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

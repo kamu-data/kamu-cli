@@ -51,10 +51,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::UPDATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
-    SearchSchemaField {
-        path: kamu_search::fields::VISIBILITY,
-        role: SearchSchemaFieldRole::Keyword,
-    },
+    kamu_search::field_definitions::VISIBILITY,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

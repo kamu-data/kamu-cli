@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(iterator_try_collect)]
+#![recursion_limit = "256"]
 
 pub use kamu_molecule_domain as domain;
 

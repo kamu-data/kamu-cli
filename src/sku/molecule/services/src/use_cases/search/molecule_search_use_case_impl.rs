@@ -277,17 +277,22 @@ impl MoleculeSearchUseCaseImpl {
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
-        filters: Option<MoleculeSearchFilters>,
+        maybe_search_filters: Option<MoleculeSearchFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let prompt = prompt.trim();
 
-        let ctx = SearchContext::unrestricted(&self.catalog);
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
 
         let entity_schemas = {
             let mut entity_schemas = vec![];
 
-            let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
+            let search_entity_kinds = utils::get_search_entity_kinds(maybe_search_filters.as_ref());
 
             if search_entity_kinds.contains(&MoleculeSearchEntityKind::DataRoomActivity) {
                 entity_schemas.push(dataroom_entry_schema::SCHEMA_NAME);
@@ -300,23 +305,14 @@ impl MoleculeSearchUseCaseImpl {
             entity_schemas
         };
 
-        let filter = {
-            let mut and_clauses = vec![];
-
-            // molecule_account_id equality
-            and_clauses.push(field_eq_str(
-                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
-                molecule_subject.account_id.to_string().as_str(),
-            ));
-
-            // filters by ipnft_uids, categories, tags, access levels
-            // Note: kinds are schema choice, not filter
-            if let Some(filters) = filters {
-                and_clauses.extend(map_molecule_search_filters(filters));
+        let maybe_filter = maybe_search_filters.and_then(|filters| {
+            let and_clauses = map_molecule_search_filters(filters);
+            if and_clauses.is_empty() {
+                None
+            } else {
+                Some(SearchFilterExpr::and_clauses(and_clauses))
             }
-
-            SearchFilterExpr::and_clauses(and_clauses)
-        };
+        });
 
         let search_results = if prompt.is_empty() {
             self.search_service
@@ -325,7 +321,7 @@ impl MoleculeSearchUseCaseImpl {
                     ListingSearchRequest {
                         entity_schemas,
                         source: SearchRequestSourceSpec::All,
-                        filter: Some(filter),
+                        filter: maybe_filter,
                         sort: vec![SearchSortSpec::ByField {
                             field: molecule_schema::fields::EVENT_TIME,
                             direction: SearchSortDirection::Descending,
@@ -345,7 +341,7 @@ impl MoleculeSearchUseCaseImpl {
                         intent: TextSearchIntent::make_full_text(prompt),
                         entity_schemas,
                         source: SearchRequestSourceSpec::All,
-                        filter: Some(filter),
+                        filter: maybe_filter,
                         secondary_sort: vec![SearchSortSpec::ByField {
                             field: molecule_schema::fields::EVENT_TIME,
                             direction: SearchSortDirection::Descending,

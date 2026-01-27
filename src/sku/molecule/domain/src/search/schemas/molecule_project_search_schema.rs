@@ -47,6 +47,8 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::PROJECT_ACCOUNT_ID,
         role: SearchSchemaFieldRole::Keyword,
     },
+    kamu_search::field_definitions::VISIBILITY,
+    kamu_search::field_definitions::PRINCIPAL_IDS,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

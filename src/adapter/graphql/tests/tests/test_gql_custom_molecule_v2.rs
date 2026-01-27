@@ -4704,6 +4704,7 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
             ]
         }
     });
+
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(
             LIST_GLOBAL_ACTIVITY_QUERY,

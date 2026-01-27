@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     molecule_activity_search_schema as activity_schema,
     molecule_announcement_search_schema as announcement_schema,
@@ -35,6 +36,7 @@ pub struct MoleculeViewProjectActivitiesUseCaseImpl {
 impl MoleculeViewProjectActivitiesUseCaseImpl {
     async fn project_activities_from_source(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
@@ -80,7 +82,11 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
         let announcements_fut = fetch_or_empty(
             fetch_announcements,
-            self.announcement_activities_listing_from_source(molecule_project, filters.clone()),
+            self.announcement_activities_listing_from_source(
+                molecule_subject,
+                molecule_project,
+                filters.clone(),
+            ),
         );
 
         let (mut data_room_listing, mut announcement_activities_listing) =
@@ -263,12 +269,14 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
     async fn announcement_activities_listing_from_source(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
         let announcements_listing = self
             .view_project_announcements_uc
             .execute(
+                molecule_subject,
                 molecule_project,
                 MoleculeViewProjectAnnouncementsMode::LatestSource,
                 filters.map(|filters| MoleculeAnnouncementsFilters {
@@ -302,14 +310,22 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
     async fn project_activities_from_search(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
-        filters: Option<MoleculeActivitiesFilters>,
+        maybe_activities_filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        let ctx = SearchContext::unrestricted(&self.catalog);
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
 
         let entity_schemas = {
-            if let Some(by_kinds) = filters.as_ref().and_then(|f| f.by_kinds.as_deref())
+            if let Some(by_kinds) = maybe_activities_filters
+                .as_ref()
+                .and_then(|f| f.by_kinds.as_deref())
                 && !by_kinds.is_empty()
             {
                 let mut schemas = vec![];
@@ -338,8 +354,10 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             ));
 
             // filters by categories, tags, access levels
-            if let Some(filters) = filters {
-                and_clauses.extend(map_molecule_activities_filters_to_search(filters));
+            if let Some(activities_filters) = maybe_activities_filters {
+                and_clauses.extend(map_molecule_activities_filters_to_search(
+                    activities_filters,
+                ));
             }
 
             SearchFilterExpr::and_clauses(and_clauses)
@@ -392,6 +410,7 @@ impl MoleculeViewProjectActivitiesUseCase for MoleculeViewProjectActivitiesUseCa
     #[tracing::instrument(level = "debug", name = MoleculeViewProjectActivitiesUseCaseImpl_execute, skip_all, fields(?pagination))]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewProjectActivitiesMode,
         filters: Option<MoleculeActivitiesFilters>,
@@ -399,13 +418,23 @@ impl MoleculeViewProjectActivitiesUseCase for MoleculeViewProjectActivitiesUseCa
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
         match mode {
             MoleculeViewProjectActivitiesMode::LatestSource => {
-                self.project_activities_from_source(molecule_project, filters, pagination)
-                    .await
+                self.project_activities_from_source(
+                    molecule_subject,
+                    molecule_project,
+                    filters,
+                    pagination,
+                )
+                .await
             }
 
             MoleculeViewProjectActivitiesMode::LatestProjection => {
-                self.project_activities_from_search(molecule_project, filters, pagination)
-                    .await
+                self.project_activities_from_search(
+                    molecule_subject,
+                    molecule_project,
+                    filters,
+                    pagination,
+                )
+                .await
             }
         }
     }

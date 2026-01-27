@@ -225,13 +225,20 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
     async fn global_activities_from_search(
         &self,
         molecule_subject: &LoggedAccount,
-        filters: Option<MoleculeActivitiesFilters>,
+        maybe_activities_filters: Option<MoleculeActivitiesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
-        let ctx = SearchContext::unrestricted(&self.catalog);
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
 
         let entity_schemas = {
-            if let Some(by_kinds) = filters.as_ref().and_then(|f| f.by_kinds.as_deref())
+            if let Some(by_kinds) = maybe_activities_filters
+                .as_ref()
+                .and_then(|f| f.by_kinds.as_deref())
                 && !by_kinds.is_empty()
             {
                 let mut schemas = vec![];
@@ -250,23 +257,14 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             }
         };
 
-        let filter = {
-            let mut and_clauses = vec![];
-
-            // molecule_account_id equality
-            and_clauses.push(field_eq_str(
-                molecule_schema::fields::MOLECULE_ACCOUNT_ID,
-                molecule_subject.account_id.to_string().as_str(),
-            ));
-
-            // filters by categories, tags, access levels
-            if let Some(filters) = filters {
-                and_clauses.extend(map_molecule_activities_filters_to_search(filters));
+        let maybe_filter = maybe_activities_filters.and_then(|filters| {
+            let and_clauses = map_molecule_activities_filters_to_search(filters);
+            if and_clauses.is_empty() {
+                None
+            } else {
+                Some(SearchFilterExpr::and_clauses(and_clauses))
             }
-
-            SearchFilterExpr::and_clauses(and_clauses)
-        };
-
+        });
         let search_results = self
             .search_service
             .listing_search(
@@ -274,7 +272,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                 ListingSearchRequest {
                     entity_schemas,
                     source: SearchRequestSourceSpec::All,
-                    filter: Some(filter),
+                    filter: maybe_filter,
                     sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
                     page: pagination.into(),
                 },

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
 use kamu_datasets::CollectionPath;
 use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
@@ -80,13 +81,19 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
 
     async fn list_latest_entries_via_search(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeDataRoomEntriesListing, MoleculeViewDataRoomEntriesError> {
-        let ctx = SearchContext::unrestricted(&self.catalog);
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
 
         let filter = Self::prepare_full_text_search_filter(
             &molecule_project.ipnft_uid,
@@ -175,6 +182,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
     )]
     async fn execute(
         &self,
+        molecule_subject: &LoggedAccount,
         molecule_project: &MoleculeProject,
         mode: MoleculeViewDataRoomEntriesMode,
         path_prefix: Option<CollectionPath>,
@@ -212,6 +220,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
             // As for the latest projection, use faster search-based method
             MoleculeViewDataRoomEntriesMode::LatestProjection => {
                 self.list_latest_entries_via_search(
+                    molecule_subject,
                     molecule_project,
                     path_prefix,
                     max_depth,

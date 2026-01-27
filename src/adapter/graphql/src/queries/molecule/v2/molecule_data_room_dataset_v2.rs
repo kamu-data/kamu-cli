@@ -24,6 +24,7 @@ use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesUseCase,
 };
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
@@ -102,9 +103,11 @@ impl MoleculeDataRoomProjection<'_> {
             from_catalog_n!(ctx, dyn MoleculeViewDataRoomEntriesUseCase);
 
         let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+        let molecule_subject = molecule_subject(ctx)?;
 
         let molecule_entries_listing = view_data_room_entries_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 match self.as_of {
                     Some(ref hash) => MoleculeViewDataRoomEntriesMode::Historical(hash.clone()),

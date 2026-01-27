@@ -20,6 +20,7 @@ use kamu_molecule_domain::{
     MoleculeViewProjectAnnouncementsUseCase,
 };
 
+use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::Dataset;
 use crate::queries::molecule::v2::{
@@ -65,9 +66,11 @@ impl MoleculeAnnouncements {
             from_catalog_n!(ctx, dyn MoleculeViewProjectAnnouncementsUseCase);
 
         let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+        let molecule_subject = molecule_subject(ctx)?;
 
         let listing = view_project_announcements_uc
             .execute(
+                &molecule_subject,
                 &self.project.entity,
                 molecule_config.view_project_announcements_mode(),
                 filters.map(Into::into),
