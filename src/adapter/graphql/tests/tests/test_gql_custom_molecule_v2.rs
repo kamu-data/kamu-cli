@@ -25,6 +25,7 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use kamu_search::*;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
 use messaging_outbox::{OutboxAgent, OutboxProvider};
 use num_bigint::BigInt;
@@ -10950,6 +10951,18 @@ impl GraphQLMoleculeV2Harness {
         );
 
         base_builder.add_value(kamu_molecule_domain::MoleculeConfig::default());
+
+        // Embedding mocks
+        let mut embeddings_chunker = MockEmbeddingsChunker::new();
+        embeddings_chunker.expect_chunk().returning(Ok);
+
+        let mut embeddings_encoder = MockEmbeddingsEncoder::new();
+        embeddings_encoder.expect_encode().returning(|_| Ok(vec![]));
+
+        base_builder.add_value(embeddings_chunker);
+        base_builder.bind::<dyn EmbeddingsChunker, MockEmbeddingsChunker>();
+        base_builder.add_value(embeddings_encoder);
+        base_builder.bind::<dyn EmbeddingsEncoder, MockEmbeddingsEncoder>();
 
         let base_catalog = base_builder.build();
 

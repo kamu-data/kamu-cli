@@ -104,6 +104,7 @@ impl ElasticsearchDatasetBaseHarness {
             b.add_value(embeddings_encoder);
             b.bind::<dyn EmbeddingsEncoder, MockEmbeddingsEncoder>();
 
+            // Outbox messages
             register_message_dispatcher::<AccountLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,

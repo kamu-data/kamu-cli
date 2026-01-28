@@ -81,8 +81,7 @@ impl MultiMatchPolicyBuilder {
                     });
                 }
 
-                SearchSchemaFieldRole::EmbeddingChunks
-                | SearchSchemaFieldRole::Boolean
+                SearchSchemaFieldRole::Boolean
                 | SearchSchemaFieldRole::Integer
                 | SearchSchemaFieldRole::DateTime
                 | SearchSchemaFieldRole::Keyword
@@ -141,7 +140,6 @@ impl MultiMatchPolicyBuilder {
                 // Note: no autocomplete on prose and description
                 SearchSchemaFieldRole::Description
                 | SearchSchemaFieldRole::Prose
-                | SearchSchemaFieldRole::EmbeddingChunks
                 | SearchSchemaFieldRole::Boolean
                 | SearchSchemaFieldRole::Integer
                 | SearchSchemaFieldRole::DateTime

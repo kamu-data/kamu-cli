@@ -17,10 +17,16 @@ use kamu_molecule_domain::{
     MoleculeAnnouncementMessagePublished,
     molecule_announcement_search_schema as announcement_schema,
 };
-use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
+use kamu_search::{
+    EmbeddingsChunker,
+    EmbeddingsEncoder,
+    SearchContext,
+    SearchIndexUpdateOperation,
+    SearchService,
+};
 use messaging_outbox::*;
 
-use crate::search::indexers::index_announcement_from_publication_record;
+use crate::search::indexers::MoleculeAnnouncementIndexingHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +43,8 @@ use crate::search::indexers::index_announcement_from_publication_record;
 })]
 pub struct MoleculeAnnouncementSearchUpdater {
     search_service: Arc<dyn SearchService>,
+    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
+    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,13 +55,20 @@ impl MoleculeAnnouncementSearchUpdater {
         ctx: SearchContext<'_>,
         published_message: &MoleculeAnnouncementMessagePublished,
     ) -> Result<(), InternalError> {
-        let announcement_document = index_announcement_from_publication_record(
-            published_message.event_time,
-            published_message.system_time,
-            &published_message.molecule_account_id,
-            &published_message.ipnft_uid,
-            &published_message.announcement_record,
-        );
+        let indexing_helper = MoleculeAnnouncementIndexingHelper {
+            embeddings_chunker: self.embeddings_chunker.as_ref(),
+            embeddings_encoder: self.embeddings_encoder.as_ref(),
+        };
+
+        let announcement_document = indexing_helper
+            .index_announcement_from_publication_record(
+                published_message.event_time,
+                published_message.system_time,
+                &published_message.molecule_account_id,
+                &published_message.ipnft_uid,
+                &published_message.announcement_record,
+            )
+            .await?;
 
         self.search_service
             .bulk_update(

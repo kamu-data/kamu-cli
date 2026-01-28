@@ -224,41 +224,6 @@ impl ElasticsearchRepository {
         })
     }
 
-    fn resolve_embedding_field(
-        &self,
-        entity_schemas: &[Arc<SearchEntitySchema>],
-    ) -> Result<SearchFieldPath, InternalError> {
-        assert!(!entity_schemas.is_empty());
-
-        let mut embedding_field_path: Option<SearchFieldPath> = None;
-
-        for schema in entity_schemas {
-            let Some(embedding_field) = schema.find_embedding_chunks_field() else {
-                return Err(InternalError::new(format!(
-                    "Entity schema '{}' does not have an embedding chunks field",
-                    schema.schema_name
-                )));
-            };
-
-            match embedding_field_path {
-                None => {
-                    embedding_field_path = Some(embedding_field.path);
-                }
-                Some(expected_path) => {
-                    if embedding_field.path != expected_path {
-                        return Err(InternalError::new(format!(
-                            "Entity schema '{}' has embedding field '{}', but expected '{}' to \
-                             match other schemas",
-                            schema.schema_name, embedding_field.path, expected_path
-                        )));
-                    }
-                }
-            }
-        }
-
-        Ok(embedding_field_path.unwrap())
-    }
-
     #[allow(dead_code)]
     fn make_security_filter(
         &self,
@@ -572,16 +537,13 @@ impl SearchRepository for ElasticsearchRepository {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Determine embedding field
-        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
-
         // Build filter with security context
         let maybe_filter =
             SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
         // Build Elasticsearch vector request body
         let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
-            embedding_field,
+            kamu_search::fields::SEMANTIC_EMBEDDINGS,
             &req.prompt_embedding,
             maybe_filter.as_ref(),
             &req.source,
@@ -601,9 +563,6 @@ impl SearchRepository for ElasticsearchRepository {
     ) -> Result<SearchResponse, InternalError> {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
-
-        // Determine embedding field
-        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
 
         // Build filter with security context
         let maybe_filter =
@@ -652,7 +611,7 @@ impl SearchRepository for ElasticsearchRepository {
 
         // Vector query part
         let vector_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
-            embedding_field,
+            kamu_search::fields::SEMANTIC_EMBEDDINGS,
             &req.prompt_embedding,
             maybe_filter.as_ref(),
             &req.source,

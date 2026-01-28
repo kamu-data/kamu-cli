@@ -24,7 +24,14 @@ use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
+use kamu_search::{
+    EmbeddingsChunker,
+    EmbeddingsEncoder,
+    SearchFieldUpdate,
+    SearchIndexUpdateOperation,
+    SearchRepository,
+    prepare_semantic_embeddings_document,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,36 +39,87 @@ const BULK_SIZE: usize = 100;
 const PARALLEL_PROJECTS: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper function
+// Indexing helper
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn index_data_room_entry_from_entity(
-    molecule_account_id: &odf::AccountID,
-    ipnft_uid: &str,
-    entry: &MoleculeDataRoomEntry,
-    content_text: Option<&String>,
-) -> serde_json::Value {
-    serde_json::json!({
-        molecule_schema::fields::EVENT_TIME: entry.event_time,
-        molecule_schema::fields::SYSTEM_TIME: entry.system_time,
-        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        molecule_schema::fields::IPNFT_UID: ipnft_uid,
-        molecule_schema::fields::REF: entry.reference,
-        molecule_schema::fields::PATH: entry.path,
-        data_room_entry_schema::fields::DEPTH: entry.path.depth(),
-        molecule_schema::fields::VERSION: entry.denormalized_latest_file_info.version,
-        molecule_schema::fields::CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
-        molecule_schema::fields::CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
-        molecule_schema::fields::CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
-        data_room_entry_schema::fields::CONTENT_TEXT: content_text,
-        molecule_schema::fields::ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
-        molecule_schema::fields::CHANGE_BY: entry.denormalized_latest_file_info.change_by,
-        molecule_schema::fields::DESCRIPTION: entry.denormalized_latest_file_info.description,
-        molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
-        molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
-        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
-    })
+pub(crate) struct MoleculeDataRoomEntryIndexingHelper<'a> {
+    pub molecule_account_id: &'a odf::AccountID,
+    pub embeddings_chunker: &'a dyn EmbeddingsChunker,
+    pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
+}
+
+impl MoleculeDataRoomEntryIndexingHelper<'_> {
+    pub(crate) async fn index_data_room_entry_from_entity(
+        &self,
+        ipnft_uid: &str,
+        entry: &MoleculeDataRoomEntry,
+        content_text: Option<&String>,
+    ) -> Result<serde_json::Value, InternalError> {
+        let mut index_doc = serde_json::json!({
+            molecule_schema::fields::EVENT_TIME: entry.event_time,
+            molecule_schema::fields::SYSTEM_TIME: entry.system_time,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id.to_string(),
+            molecule_schema::fields::IPNFT_UID: ipnft_uid,
+            molecule_schema::fields::REF: entry.reference,
+            molecule_schema::fields::PATH: entry.path,
+            data_room_entry_schema::fields::DEPTH: entry.path.depth(),
+            molecule_schema::fields::VERSION: entry.denormalized_latest_file_info.version,
+            molecule_schema::fields::CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
+            molecule_schema::fields::CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
+            molecule_schema::fields::CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
+            data_room_entry_schema::fields::CONTENT_TEXT: content_text,
+            molecule_schema::fields::ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
+            molecule_schema::fields::CHANGE_BY: entry.denormalized_latest_file_info.change_by,
+            molecule_schema::fields::DESCRIPTION: entry.denormalized_latest_file_info.description,
+            molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
+            molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![ self.molecule_account_id.to_string() ],
+        });
+
+        self.attach_embeddings(
+            &mut index_doc,
+            entry.denormalized_latest_file_info.description.as_ref(),
+            content_text,
+        )
+        .await?;
+
+        Ok(index_doc)
+    }
+
+    async fn attach_embeddings(
+        &self,
+        index_doc: &mut serde_json::Value,
+        description: Option<&String>,
+        content_text: Option<&String>,
+    ) -> Result<(), InternalError> {
+        let index_doc_mut = index_doc.as_object_mut().unwrap();
+
+        let description_update = match description {
+            Some(desc) => SearchFieldUpdate::Present(desc.as_str()),
+            None => SearchFieldUpdate::Absent,
+        };
+
+        let content_text_update = match content_text {
+            Some(text) => SearchFieldUpdate::Present(text.as_str()),
+            None => SearchFieldUpdate::Absent,
+        };
+
+        let embeddings_document = prepare_semantic_embeddings_document(
+            self.embeddings_chunker,
+            self.embeddings_encoder,
+            &[&description_update, &content_text_update],
+        )
+        .await?;
+
+        if let SearchFieldUpdate::Present(v) = embeddings_document {
+            index_doc_mut.insert(
+                kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                serde_json::json!(v),
+            );
+        }
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,6 +171,8 @@ struct IndexingDependencies {
     molecule_view_projects_uc: Arc<dyn MoleculeViewProjectsUseCase>,
     molecule_view_data_room_entries_uc: Arc<dyn MoleculeViewDataRoomEntriesUseCase>,
     molecule_read_versioned_file_entry_uc: Arc<dyn MoleculeReadVersionedFileEntryUseCase>,
+    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
+    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 impl IndexingDependencies {
@@ -127,6 +187,8 @@ impl IndexingDependencies {
             molecule_read_versioned_file_entry_uc: catalog
                 .get_one::<dyn MoleculeReadVersionedFileEntryUseCase>()
                 .unwrap(),
+            embeddings_chunker: catalog.get_one::<dyn EmbeddingsChunker>().unwrap(),
+            embeddings_encoder: catalog.get_one::<dyn EmbeddingsEncoder>().unwrap(),
         }
     }
 }
@@ -167,7 +229,7 @@ async fn process_projects_in_batches(
 
         // Process results as they complete
         while let Some(project_data) = futures.next().await {
-            index_project_data(project_data, &mut operations)?;
+            index_project_data(project_data, dependencies, &mut operations).await?;
 
             // Bulk index when we reach or exceed BULK_SIZE
             if operations.len() >= BULK_SIZE {
@@ -305,8 +367,9 @@ async fn load_versioned_files_for_entries(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn index_project_data(
+async fn index_project_data(
     project_data: ProjectIndexingData,
+    dependencies: &IndexingDependencies,
     operations: &mut Vec<SearchIndexUpdateOperation>,
 ) -> Result<(), InternalError> {
     let data_room_entries = project_data.entries_result?;
@@ -316,6 +379,13 @@ fn index_project_data(
         return Ok(());
     }
 
+    // Create indexing helper
+    let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
+        molecule_account_id: &project_data.molecule_subject.account_id,
+        embeddings_chunker: dependencies.embeddings_chunker.as_ref(),
+        embeddings_encoder: dependencies.embeddings_encoder.as_ref(),
+    };
+
     // Prepare documents for indexing
     for entry in data_room_entries.list {
         let content_text = project_data
@@ -323,12 +393,13 @@ fn index_project_data(
             .get(&entry.reference)
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
-        let document = index_data_room_entry_from_entity(
-            &project_data.molecule_subject.account_id,
-            &project_data.project.ipnft_uid,
-            &entry,
-            content_text,
-        );
+        let document = indexing_helper
+            .index_data_room_entry_from_entity(
+                &project_data.project.ipnft_uid,
+                &entry,
+                content_text,
+            )
+            .await?;
 
         operations.push(SearchIndexUpdateOperation::Index {
             id: data_room_entry_schema::unique_id_for_data_room_entry(

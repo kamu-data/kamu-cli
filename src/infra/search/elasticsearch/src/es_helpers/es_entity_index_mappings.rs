@@ -172,10 +172,6 @@ impl ElasticsearchIndexMappings {
                     "type": "integer"
                 }),
 
-                SearchSchemaFieldRole::EmbeddingChunks => {
-                    Self::map_embedding_chunks_field(embedding_dimensions)
-                }
-
                 SearchSchemaFieldRole::UnprocessedObject => serde_json::json!({
                     "type": "object",
                     "enabled": false
@@ -192,12 +188,31 @@ impl ElasticsearchIndexMappings {
             }),
         );
 
-        if entity_schema.enable_banning {
+        if entity_schema.flags.enable_banning {
             mappings.insert(
                 kamu_search::fields::IS_BANNED.to_string(),
                 serde_json::json!({
                     "type": "boolean"
                 }),
+            );
+        }
+
+        if entity_schema.flags.enable_security {
+            mappings.insert(
+                kamu_search::fields::VISIBILITY.to_string(),
+                Self::map_keyword_field(),
+            );
+
+            mappings.insert(
+                kamu_search::fields::PRINCIPAL_IDS.to_string(),
+                Self::map_keyword_field(),
+            );
+        }
+
+        if entity_schema.flags.enable_embeddings {
+            mappings.insert(
+                kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                Self::map_embedding_chunks_field(embedding_dimensions),
             );
         }
 

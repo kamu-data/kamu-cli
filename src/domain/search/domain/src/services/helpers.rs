@@ -137,6 +137,22 @@ pub trait TextFieldEmbeddingsContributor: Send + Sync {
     fn contribute_texts(&self, texts: &mut Vec<String>);
 }
 
+impl TextFieldEmbeddingsContributor for SearchFieldUpdate<&str> {
+    fn is_present(&self) -> bool {
+        matches!(self, SearchFieldUpdate::Present(_))
+    }
+
+    fn is_cleared(&self) -> bool {
+        matches!(self, SearchFieldUpdate::Cleared)
+    }
+
+    fn contribute_texts(&self, texts: &mut Vec<String>) {
+        if let SearchFieldUpdate::Present(s) = self {
+            texts.push(s.to_string());
+        }
+    }
+}
+
 impl TextFieldEmbeddingsContributor for SearchFieldUpdate<String> {
     fn is_present(&self) -> bool {
         matches!(self, SearchFieldUpdate::Present(_))

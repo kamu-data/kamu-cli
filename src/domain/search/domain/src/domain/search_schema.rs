@@ -31,20 +31,6 @@ pub mod fields {
     }
 }
 
-pub mod field_definitions {
-    use crate::*;
-
-    pub const VISIBILITY: SearchSchemaField = SearchSchemaField {
-        path: fields::VISIBILITY,
-        role: SearchSchemaFieldRole::Keyword,
-    };
-
-    pub const PRINCIPAL_IDS: SearchSchemaField = SearchSchemaField {
-        path: fields::PRINCIPAL_IDS,
-        role: SearchSchemaFieldRole::Keyword,
-    };
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
@@ -54,17 +40,16 @@ pub struct SearchEntitySchema {
     pub upgrade_mode: SearchEntitySchemaUpgradeMode,
     pub fields: &'static [SearchSchemaField],
     pub title_field: SearchFieldPath,
-    pub enable_banning: bool,
+    pub flags: SearchEntitySchemaFlags,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SearchEntitySchema {
-    pub fn find_embedding_chunks_field(&self) -> Option<&SearchSchemaField> {
-        self.fields
-            .iter()
-            .find(|f| matches!(f.role, SearchSchemaFieldRole::EmbeddingChunks))
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct SearchEntitySchemaFlags {
+    pub enable_banning: bool,
+    pub enable_security: bool,
+    pub enable_embeddings: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,7 +74,6 @@ pub enum SearchSchemaFieldRole {
     DateTime,
     Boolean,
     Integer,
-    EmbeddingChunks,
     UnprocessedObject,
     // TODO: Add more field roles as needed
 }

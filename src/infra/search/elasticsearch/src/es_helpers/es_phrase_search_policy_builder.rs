@@ -52,8 +52,7 @@ impl PhraseSearchPolicyBuilder {
                 | SearchSchemaFieldRole::DateTime
                 | SearchSchemaFieldRole::Keyword
                 | SearchSchemaFieldRole::Identifier { .. }
-                | SearchSchemaFieldRole::UnprocessedObject
-                | SearchSchemaFieldRole::EmbeddingChunks => {
+                | SearchSchemaFieldRole::UnprocessedObject => {
                     // No phrase matching
                 }
             }
