@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO embedding_models (provider, name, revision, dims)\n                VALUES ($1, $2, $3, $4)\n                ON CONFLICT (provider, name, revision)\n                DO UPDATE\n                    SET dims = embedding_models.dims\n                    WHERE embedding_models.dims = EXCLUDED.dims\n                RETURNING id, provider, name, revision, dims, created_at;\n            ",
+  "query": "\n            INSERT INTO embedding_models (provider, name, revision, dims)\n                VALUES ($1, $2, $3, $4)\n                ON CONFLICT (provider, name, COALESCE(revision, ''))\n                DO UPDATE\n                    SET dims = embedding_models.dims\n                    WHERE embedding_models.dims = EXCLUDED.dims\n                RETURNING id, provider, name, revision, dims, created_at;\n            ",
   "describe": {
     "columns": [
       {
@@ -51,5 +51,5 @@
       false
     ]
   },
-  "hash": "20e7a5f073d035d399ab1da34ee2db202a8d2a87d183d012990ef3b25a01cd71"
+  "hash": "e06d2a7b913be679f9ea4700387f2be4994686af9be80b1c16a3938d484858ec"
 }

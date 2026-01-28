@@ -106,8 +106,10 @@ impl EmbeddingsProviderImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl EmbeddingsProvider for EmbeddingsProviderImpl {
+    #[tracing::instrument(level = "debug", name =EmbeddingsProviderImpl_provide_content_embeddings,  skip_all, fields(content))]
     async fn provide_content_embeddings(
         &self,
         content: Vec<String>,
@@ -218,7 +220,11 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
         Ok(out)
     }
 
-    async fn provide_prompt_embeddings(&self, prompt: String) -> Result<Vec<f32>, InternalError> {
+    #[tracing::instrument(level = "debug", name =EmbeddingsProviderImpl_provide_prompt_embeddings, skip_all, fields(prompt))]
+    async fn provide_prompt_embeddings(
+        &self,
+        prompt: String,
+    ) -> Result<Option<Vec<f32>>, InternalError> {
         // 1) Ensure model exists (so we have model_id).
         let model = self
             .cached_model
@@ -255,14 +261,17 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
             bytes
         } else {
             // Cache miss - encode
-            let prompt_vec = self
+            let Some(prompt_vec) = self
                 .embeddings_encoder
                 .encode(vec![normalized_prompt])
                 .await
                 .int_err()?
                 .into_iter()
                 .next()
-                .unwrap();
+            else {
+                // Encoder returned nothing
+                return Ok(None);
+            };
 
             let bytes = Self::pack_f32_le(&prompt_vec, model.dims)?;
 
@@ -282,7 +291,7 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
             .int_err()?;
 
         // 7) Unpack and return
-        Self::unpack_f32_le(&embedding_bytes, model.dims)
+        Self::unpack_f32_le(&embedding_bytes, model.dims).map(Some)
     }
 }
 

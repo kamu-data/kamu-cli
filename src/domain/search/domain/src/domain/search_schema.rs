@@ -68,7 +68,9 @@ pub enum SearchSchemaFieldRole {
         enable_inner_ngrams: bool,
     },
     Name,
-    Description,
+    Description {
+        add_keyword: bool,
+    },
     Prose,
     Keyword,
     DateTime,

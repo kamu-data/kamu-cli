@@ -18,7 +18,10 @@ pub trait EmbeddingsProvider: Send + Sync {
         content: Vec<String>,
     ) -> Result<Vec<Vec<f32>>, InternalError>;
 
-    async fn provide_prompt_embeddings(&self, prompt: String) -> Result<Vec<f32>, InternalError>;
+    async fn provide_prompt_embeddings(
+        &self,
+        prompt: String,
+    ) -> Result<Option<Vec<f32>>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

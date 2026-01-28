@@ -108,11 +108,18 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         }
 
         // Get embeddings for the prompt
-        let prompt_vec = self
+        let Some(prompt_vec) = self
             .embeddings_provider
             .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?;
+            .int_err()?
+        else {
+            // Encoder couldn't produce embeddings - cannot do vector search
+            return Ok(DatasetSearchResponse {
+                total_hits: None,
+                hits: vec![],
+            });
+        };
 
         // Run vector search request
         let search_response = {
@@ -158,31 +165,51 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         }
 
         // Get embeddings for the prompt
-        let prompt_vec = self
+        let maybe_prompt_vec = self
             .embeddings_provider
             .provide_prompt_embeddings(prompt.to_string())
             .await
             .int_err()?;
 
-        // Run vector search request
+        // Run search request
         let search_response = {
             use kamu_datasets::dataset_search_schema as dataset_schema;
             use kamu_search::*;
 
-            self.search_service
-                .hybrid_search(
-                    ctx,
-                    HybridSearchRequest {
-                        prompt: prompt.to_string(),
-                        prompt_embedding: prompt_vec,
-                        source: SearchRequestSourceSpec::None,
-                        entity_schemas: vec![dataset_schema::SCHEMA_NAME],
-                        filter: None,
-                        limit,
-                        options: HybridSearchOptions::default(),
-                    },
-                )
-                .await
+            if let Some(prompt_vec) = maybe_prompt_vec {
+                // Hybrid search with embeddings
+                self.search_service
+                    .hybrid_search(
+                        ctx,
+                        HybridSearchRequest {
+                            prompt: prompt.to_string(),
+                            prompt_embedding: prompt_vec,
+                            source: SearchRequestSourceSpec::None,
+                            entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                            filter: None,
+                            secondary_sort: vec![],
+                            limit,
+                            options: HybridSearchOptions::default(),
+                        },
+                    )
+                    .await
+            } else {
+                // Degrade to text search without embeddings
+                self.search_service
+                    .text_search(
+                        ctx,
+                        TextSearchRequest {
+                            intent: TextSearchIntent::make_full_text(prompt),
+                            entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                            source: SearchRequestSourceSpec::None,
+                            filter: None,
+                            secondary_sort: vec![],
+                            page: SearchPaginationSpec { offset: 0, limit },
+                            options: TextSearchOptions::default(),
+                        },
+                    )
+                    .await
+            }
         }
         .int_err()?;
 

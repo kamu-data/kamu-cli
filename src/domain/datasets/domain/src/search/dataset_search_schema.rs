@@ -88,7 +88,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: SearchSchemaFieldRole::Description,
+        role: SearchSchemaFieldRole::Description { add_keyword: false },
     },
     SearchSchemaField {
         path: fields::KEYWORDS,

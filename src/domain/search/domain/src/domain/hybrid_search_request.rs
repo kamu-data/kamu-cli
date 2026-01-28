@@ -28,6 +28,9 @@ pub struct HybridSearchRequest {
     /// Structured filter applied to all branches
     pub filter: Option<SearchFilterExpr>,
 
+    /// Secondary sort specification:  tie-breakers after relevance score
+    pub secondary_sort: Vec<SearchSortSpec>,
+
     /// How many recommendations to return
     pub limit: usize,
 

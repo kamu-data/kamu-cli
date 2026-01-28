@@ -154,7 +154,9 @@ impl ElasticsearchIndexMappings {
 
                 SearchSchemaFieldRole::Name => Self::map_name_field(),
 
-                SearchSchemaFieldRole::Description => Self::map_description_field(),
+                SearchSchemaFieldRole::Description { add_keyword } => {
+                    Self::map_description_field(add_keyword)
+                }
 
                 SearchSchemaFieldRole::Prose => Self::map_prose_field(),
 
@@ -278,12 +280,27 @@ impl ElasticsearchIndexMappings {
         base_mapping
     }
 
-    fn map_description_field() -> serde_json::Value {
-        serde_json::json!({
+    fn map_description_field(add_keyword: bool) -> serde_json::Value {
+        let mut base_mapping = serde_json::json!({
             "type": "text",
             "analyzer": "kamu_english_html",
             "search_analyzer": "kamu_english_html",
-        })
+        });
+
+        if add_keyword {
+            let mut fields = serde_json::Map::new();
+            fields.insert(
+                FIELD_SUFFIX_KEYWORD.to_string(),
+                serde_json::json!({
+                    "type": "keyword",
+                    "normalizer": "kamu_keyword_norm",
+                    "ignore_above": 1024
+                }),
+            );
+            base_mapping["fields"] = serde_json::Value::Object(fields);
+        }
+
+        base_mapping
     }
 
     fn map_prose_field() -> serde_json::Value {

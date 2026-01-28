@@ -568,6 +568,12 @@ impl SearchRepository for ElasticsearchRepository {
         let maybe_filter =
             SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
+        // Build sort spec
+        let mut sort_spec = vec![SearchSortSpec::Relevance];
+        for secondary_sort in req.secondary_sort {
+            sort_spec.push(secondary_sort);
+        }
+
         // Build multi-match policy for textual part
         let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
             &entity_schemas
@@ -590,14 +596,7 @@ impl SearchRepository for ElasticsearchRepository {
                 &multi_match_policy,
                 maybe_filter.as_ref(),
                 &req.source,
-                &[
-                    SearchSortSpec::Relevance,
-                    SearchSortSpec::ByField {
-                        field: kamu_search::fields::TITLE,
-                        direction: SearchSortDirection::Ascending,
-                        nulls_first: false,
-                    },
-                ],
+                &sort_spec,
                 &SearchPaginationSpec {
                     limit: req.options.rrf.rank_window_size,
                     offset: 0,

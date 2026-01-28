@@ -28,7 +28,7 @@ pub trait MoleculeSearchUseCase: Send + Sync {
         mode: MoleculeSearchMode,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-        pagination: Option<PaginationOpts>,
+        pagination: PaginationOpts,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError>;
 }
 

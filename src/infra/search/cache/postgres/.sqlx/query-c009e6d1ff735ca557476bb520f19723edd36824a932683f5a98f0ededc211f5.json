@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT model_id, input_hash, embedding\n                FROM embeddings_cache\n            WHERE (model_id, input_hash) IN (\n                SELECT * FROM UNNEST($1::BIGINT[], $2::BYTEA[])\n            )\n            ",
+  "query": "\n            SELECT model_id, input_hash, input_text, embedding\n                FROM embeddings_cache\n            WHERE (model_id, input_hash) IN (\n                SELECT * FROM UNNEST($1::BIGINT[], $2::BYTEA[])\n            )\n            ",
   "describe": {
     "columns": [
       {
@@ -15,6 +15,11 @@
       },
       {
         "ordinal": 2,
+        "name": "input_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
         "name": "embedding",
         "type_info": "Bytea"
       }
@@ -28,8 +33,9 @@
     "nullable": [
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "ef9d34f5dace36b4bf93f049fdf7c89133b74dffd77ba405dce7db3e40248db8"
+  "hash": "c009e6d1ff735ca557476bb520f19723edd36824a932683f5a98f0ededc211f5"
 }

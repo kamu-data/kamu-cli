@@ -284,7 +284,7 @@ impl MoleculeV2 {
                 molecule_config.search_mode(),
                 prompt.as_str(),
                 filters.map(Into::into),
-                Some(PaginationOpts::from_page(page, per_page)),
+                PaginationOpts::from_page(page, per_page),
             )
             .await
             .map_err(|e| -> GqlError {
