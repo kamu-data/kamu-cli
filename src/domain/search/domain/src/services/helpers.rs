@@ -73,8 +73,7 @@ pub fn insert_search_incremental_update_field<T: serde::Serialize>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_semantic_embeddings_document(
-    embeddings_chunker: &dyn EmbeddingsChunker,
-    embeddings_encoder: &dyn EmbeddingsEncoder,
+    embeddings_provider: &dyn EmbeddingsProvider,
     fields: &[&dyn TextFieldEmbeddingsContributor],
 ) -> Result<SearchFieldUpdate<Vec<serde_json::Value>>, InternalError> {
     // If all fields have been cleared, we need to clear embeddings as well
@@ -96,14 +95,10 @@ pub async fn prepare_semantic_embeddings_document(
         return Ok(SearchFieldUpdate::Absent);
     }
 
-    // Split parts into chunks
-    let chunks = embeddings_chunker.chunk(texts).await?;
-    if chunks.is_empty() {
-        return Ok(SearchFieldUpdate::Absent);
-    }
-
-    // Encode chunks into embedding vectors
-    let vectors = embeddings_encoder.encode(chunks).await?;
+    // Obtain embeddings for input texts
+    let vectors = embeddings_provider
+        .provide_content_embeddings(texts)
+        .await?;
     if vectors.is_empty() {
         return Ok(SearchFieldUpdate::Absent);
     }

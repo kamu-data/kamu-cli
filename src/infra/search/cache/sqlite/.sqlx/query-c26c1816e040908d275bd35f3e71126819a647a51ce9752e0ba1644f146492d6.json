@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM embeddings_cache\n            WHERE rowid IN (\n                SELECT rowid\n                FROM embeddings_cache\n                WHERE last_seen_at < $1\n                ORDER BY last_seen_at ASC\n                LIMIT $2\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c26c1816e040908d275bd35f3e71126819a647a51ce9752e0ba1644f146492d6"
+}

@@ -20,8 +20,7 @@ use kamu_molecule_domain::{
     molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{
-    EmbeddingsChunker,
-    EmbeddingsEncoder,
+    EmbeddingsProvider,
     SearchFieldUpdate,
     SearchIndexUpdateOperation,
     SearchRepository,
@@ -37,8 +36,7 @@ const BULK_SIZE: usize = 100;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct MoleculeAnnouncementIndexingHelper<'a> {
-    pub embeddings_chunker: &'a dyn EmbeddingsChunker,
-    pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
+    pub embeddings_provider: &'a dyn EmbeddingsProvider,
 }
 
 impl MoleculeAnnouncementIndexingHelper<'_> {
@@ -119,8 +117,7 @@ impl MoleculeAnnouncementIndexingHelper<'_> {
         let body_update = SearchFieldUpdate::Present(body);
 
         let embeddings_document = prepare_semantic_embeddings_document(
-            self.embeddings_chunker,
-            self.embeddings_encoder,
+            self.embeddings_provider,
             &[&headline_update, &body_update],
         )
         .await?;
@@ -158,12 +155,10 @@ pub(crate) async fn index_announcements(
         .get_one::<dyn MoleculeViewGlobalAnnouncementsUseCase>()
         .unwrap();
 
-    let embeddings_chunker = catalog.get_one::<dyn EmbeddingsChunker>().unwrap();
-    let embeddings_encoder = catalog.get_one::<dyn EmbeddingsEncoder>().unwrap();
+    let embeddings_provider = catalog.get_one::<dyn EmbeddingsProvider>().unwrap();
 
     let indexing_helper = MoleculeAnnouncementIndexingHelper {
-        embeddings_chunker: embeddings_chunker.as_ref(),
-        embeddings_encoder: embeddings_encoder.as_ref(),
+        embeddings_provider: embeddings_provider.as_ref(),
     };
 
     loop {

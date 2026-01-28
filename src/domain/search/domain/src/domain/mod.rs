@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod embeddings;
 mod hybrid_search_request;
 mod listing_search_request;
 mod search_filter;
@@ -18,6 +19,7 @@ mod search_sorting;
 mod text_search_request;
 mod vector_search_request;
 
+pub use embeddings::*;
 pub use hybrid_search_request::*;
 pub use listing_search_request::*;
 pub use search_filter::*;

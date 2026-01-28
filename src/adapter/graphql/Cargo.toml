@@ -114,6 +114,7 @@ kamu-molecule-services = { workspace = true }
 kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
     "testing",
 ] }
+kamu-search-cache-inmem = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }

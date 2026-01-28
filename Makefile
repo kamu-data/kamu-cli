@@ -11,6 +11,7 @@ POSTGRES_CRATES := \
 	./src/infra/datasets/postgres \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
+	./src/infra/search/cache/postgres \
 	./src/infra/task-system/postgres \
 	./src/infra/webhooks/postgres
 
@@ -26,6 +27,7 @@ SQLITE_CRATES := \
 	./src/infra/datasets/sqlite \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \
+	./src/infra/search/cache/sqlite \
 	./src/infra/task-system/sqlite \
 	./src/infra/webhooks/sqlite
 

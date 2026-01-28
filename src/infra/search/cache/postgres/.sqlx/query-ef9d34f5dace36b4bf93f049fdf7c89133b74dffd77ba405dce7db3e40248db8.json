@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT model_id, input_hash, embedding\n                FROM embeddings_cache\n            WHERE (model_id, input_hash) IN (\n                SELECT * FROM UNNEST($1::BIGINT[], $2::BYTEA[])\n            )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "input_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "embedding",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array",
+        "ByteaArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ef9d34f5dace36b4bf93f049fdf7c89133b74dffd77ba405dce7db3e40248db8"
+}

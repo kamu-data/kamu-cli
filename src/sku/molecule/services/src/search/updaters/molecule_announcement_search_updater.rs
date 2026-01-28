@@ -17,13 +17,7 @@ use kamu_molecule_domain::{
     MoleculeAnnouncementMessagePublished,
     molecule_announcement_search_schema as announcement_schema,
 };
-use kamu_search::{
-    EmbeddingsChunker,
-    EmbeddingsEncoder,
-    SearchContext,
-    SearchIndexUpdateOperation,
-    SearchService,
-};
+use kamu_search::{EmbeddingsProvider, SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
 use crate::search::indexers::MoleculeAnnouncementIndexingHelper;
@@ -43,8 +37,7 @@ use crate::search::indexers::MoleculeAnnouncementIndexingHelper;
 })]
 pub struct MoleculeAnnouncementSearchUpdater {
     search_service: Arc<dyn SearchService>,
-    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,8 +49,7 @@ impl MoleculeAnnouncementSearchUpdater {
         published_message: &MoleculeAnnouncementMessagePublished,
     ) -> Result<(), InternalError> {
         let indexing_helper = MoleculeAnnouncementIndexingHelper {
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
         };
 
         let announcement_document = indexing_helper

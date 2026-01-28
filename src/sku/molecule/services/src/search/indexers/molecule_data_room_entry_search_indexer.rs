@@ -25,8 +25,7 @@ use kamu_molecule_domain::{
     molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::{
-    EmbeddingsChunker,
-    EmbeddingsEncoder,
+    EmbeddingsProvider,
     SearchFieldUpdate,
     SearchIndexUpdateOperation,
     SearchRepository,
@@ -44,8 +43,7 @@ const PARALLEL_PROJECTS: usize = 10;
 
 pub(crate) struct MoleculeDataRoomEntryIndexingHelper<'a> {
     pub molecule_account_id: &'a odf::AccountID,
-    pub embeddings_chunker: &'a dyn EmbeddingsChunker,
-    pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
+    pub embeddings_provider: &'a dyn EmbeddingsProvider,
 }
 
 impl MoleculeDataRoomEntryIndexingHelper<'_> {
@@ -106,8 +104,7 @@ impl MoleculeDataRoomEntryIndexingHelper<'_> {
         };
 
         let embeddings_document = prepare_semantic_embeddings_document(
-            self.embeddings_chunker,
-            self.embeddings_encoder,
+            self.embeddings_provider,
             &[&description_update, &content_text_update],
         )
         .await?;
@@ -171,8 +168,7 @@ struct IndexingDependencies {
     molecule_view_projects_uc: Arc<dyn MoleculeViewProjectsUseCase>,
     molecule_view_data_room_entries_uc: Arc<dyn MoleculeViewDataRoomEntriesUseCase>,
     molecule_read_versioned_file_entry_uc: Arc<dyn MoleculeReadVersionedFileEntryUseCase>,
-    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 impl IndexingDependencies {
@@ -187,8 +183,7 @@ impl IndexingDependencies {
             molecule_read_versioned_file_entry_uc: catalog
                 .get_one::<dyn MoleculeReadVersionedFileEntryUseCase>()
                 .unwrap(),
-            embeddings_chunker: catalog.get_one::<dyn EmbeddingsChunker>().unwrap(),
-            embeddings_encoder: catalog.get_one::<dyn EmbeddingsEncoder>().unwrap(),
+            embeddings_provider: catalog.get_one::<dyn EmbeddingsProvider>().unwrap(),
         }
     }
 }
@@ -382,8 +377,7 @@ async fn index_project_data(
     // Create indexing helper
     let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
         molecule_account_id: &project_data.molecule_subject.account_id,
-        embeddings_chunker: dependencies.embeddings_chunker.as_ref(),
-        embeddings_encoder: dependencies.embeddings_encoder.as_ref(),
+        embeddings_provider: dependencies.embeddings_provider.as_ref(),
     };
 
     // Prepare documents for indexing

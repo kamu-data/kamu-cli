@@ -21,13 +21,7 @@ use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{
-    EmbeddingsChunker,
-    EmbeddingsEncoder,
-    SearchContext,
-    SearchIndexUpdateOperation,
-    SearchService,
-};
+use kamu_search::{EmbeddingsProvider, SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
 use crate::search::indexers::MoleculeDataRoomEntryIndexingHelper;
@@ -47,8 +41,7 @@ use crate::search::indexers::MoleculeDataRoomEntryIndexingHelper;
 })]
 pub struct MoleculeDataRoomSearchUpdater {
     search_service: Arc<dyn SearchService>,
-    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,8 +54,7 @@ impl MoleculeDataRoomSearchUpdater {
     ) -> Result<(), InternalError> {
         let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
             molecule_account_id: &created_message.molecule_account_id,
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
         };
 
         let data_room_entry_document = indexing_helper
@@ -98,8 +90,7 @@ impl MoleculeDataRoomSearchUpdater {
     ) -> Result<(), InternalError> {
         let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
             molecule_account_id: &updated_message.molecule_account_id,
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
         };
 
         let data_room_entry_document = indexing_helper

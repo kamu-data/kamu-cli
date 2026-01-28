@@ -22,7 +22,7 @@ use kamu_search::*;
 pub struct DatasetSearchServiceImpl {
     search_service: Arc<dyn SearchService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,15 +107,12 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
             });
         }
 
-        // Build embeddings for the prompt
+        // Get embeddings for the prompt
         let prompt_vec = self
-            .embeddings_encoder
-            .encode(vec![prompt.to_string()])
+            .embeddings_provider
+            .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?
-            .into_iter()
-            .next()
-            .unwrap();
+            .int_err()?;
 
         // Run vector search request
         let search_response = {
@@ -160,15 +157,12 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
             });
         }
 
-        // Build embeddings for the prompt
-        let prompt_embedding = self
-            .embeddings_encoder
-            .encode(vec![prompt.to_string()])
+        // Get embeddings for the prompt
+        let prompt_vec = self
+            .embeddings_provider
+            .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?
-            .into_iter()
-            .next()
-            .unwrap();
+            .int_err()?;
 
         // Run vector search request
         let search_response = {
@@ -180,7 +174,7 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
                     ctx,
                     HybridSearchRequest {
                         prompt: prompt.to_string(),
-                        prompt_embedding,
+                        prompt_embedding: prompt_vec,
                         source: SearchRequestSourceSpec::None,
                         entity_schemas: vec![dataset_schema::SCHEMA_NAME],
                         filter: None,

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT model_id as \"model_id: i64\", input_hash, embedding\n                    FROM embeddings_cache\n                    WHERE model_id = $1 AND input_hash = $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "model_id: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "input_hash",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "embedding",
+        "ordinal": 2,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fd005119c259c351722e27a92c81f55c22dc04c85c51b131cc40131c3c74c6c9"
+}

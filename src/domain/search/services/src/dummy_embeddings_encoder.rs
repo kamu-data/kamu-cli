@@ -20,6 +20,18 @@ pub struct DummyEmbeddingsEncoder {}
 
 #[async_trait::async_trait]
 impl EmbeddingsEncoder for DummyEmbeddingsEncoder {
+    fn model_key(&self) -> EmbeddingModelKey {
+        EmbeddingModelKey {
+            provider: "dummy-provider",
+            name: "dummy-model".to_string(),
+            revision: None,
+        }
+    }
+
+    fn dimensions(&self) -> usize {
+        0
+    }
+
     async fn encode(&self, _input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
         Ok(vec![])
     }

@@ -26,7 +26,9 @@ use kamu_datasets::{
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_molecule_domain::MoleculeCreateProjectUseCase;
 use kamu_search::*;
+use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
+use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider};
 use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
@@ -10956,14 +10958,13 @@ impl GraphQLMoleculeV2Harness {
         let mut embeddings_chunker = MockEmbeddingsChunker::new();
         embeddings_chunker.expect_chunk().returning(Ok);
 
-        let mut embeddings_encoder = MockEmbeddingsEncoder::new();
-        embeddings_encoder.expect_encode().returning(|_| Ok(vec![]));
-
         base_builder.add_value(embeddings_chunker);
         base_builder.bind::<dyn EmbeddingsChunker, MockEmbeddingsChunker>();
-        base_builder.add_value(embeddings_encoder);
-        base_builder.bind::<dyn EmbeddingsEncoder, MockEmbeddingsEncoder>();
+        base_builder.add::<DummyEmbeddingsEncoder>();
+        base_builder.add::<EmbeddingsProviderImpl>();
+        base_builder.add::<InMemoryEmbeddingsCacheRepository>();
 
+        // Finalize catalog
         let base_catalog = base_builder.build();
 
         let molecule_account_id = odf::AccountID::new_generated_ed25519().1;

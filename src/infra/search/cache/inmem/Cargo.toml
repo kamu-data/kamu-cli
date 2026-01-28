@@ -1,0 +1,40 @@
+[package]
+name = "kamu-search-cache-inmem"
+description = "In-memory implementation of search cache"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+kamu-search = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
+chrono = { version = "0.4", default-features = false }
+dill = "0.15"
+
+
+[dev-dependencies]
+database-common-macros = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

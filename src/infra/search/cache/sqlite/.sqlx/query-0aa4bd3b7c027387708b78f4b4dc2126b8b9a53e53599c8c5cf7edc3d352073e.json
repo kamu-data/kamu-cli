@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE embeddings_cache\n                    SET last_seen_at = $1, hit_count = hit_count + 1\n                    WHERE model_id = $2 AND input_hash = $3\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "0aa4bd3b7c027387708b78f4b4dc2126b8b9a53e53599c8c5cf7edc3d352073e"
+}
