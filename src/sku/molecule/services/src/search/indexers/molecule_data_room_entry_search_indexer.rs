@@ -35,7 +35,6 @@ use kamu_search::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const BULK_SIZE: usize = 100;
-const PARALLEL_PROJECTS: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Indexing helper
@@ -205,41 +204,33 @@ async fn process_projects_in_batches(
     dependencies: &IndexingDependencies,
     repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
-    use futures::stream::{FuturesUnordered, StreamExt};
-
     let mut total_documents_count = 0;
     let mut operations = Vec::new();
 
-    // Load data room entries for multiple projects in parallel
-    let project_chunks = projects.chunks(PARALLEL_PROJECTS);
-    for project_chunk in project_chunks {
-        let mut futures = FuturesUnordered::new();
-        for project in project_chunk {
-            futures.push(load_project_indexing_data(
-                molecule_subject.clone(),
-                project.clone(),
-                dependencies.clone(),
-            ));
-        }
+    // Process projects sequentially
+    for project in projects {
+        let project_data = load_project_indexing_data(
+            molecule_subject.clone(),
+            project.clone(),
+            dependencies.clone(),
+        )
+        .await;
 
-        // Process results as they complete
-        while let Some(project_data) = futures.next().await {
-            index_project_data(project_data, dependencies, &mut operations).await?;
+        index_project_data(project_data, dependencies, &mut operations).await?;
 
-            // Bulk index when we reach or exceed BULK_SIZE
-            if operations.len() >= BULK_SIZE {
-                let batch_size = operations.len();
-                tracing::debug!(
-                    documents_count = batch_size,
-                    "Bulk indexing data room entries batch",
-                );
-                repo.bulk_update(
-                    data_room_entry_schema::SCHEMA_NAME,
-                    std::mem::take(&mut operations),
-                )
-                .await?;
-                total_documents_count += batch_size;
-            }
+        // Bulk index when we reach or exceed BULK_SIZE
+        if operations.len() >= BULK_SIZE {
+            let batch_size = operations.len();
+            tracing::debug!(
+                documents_count = batch_size,
+                "Bulk indexing data room entries batch",
+            );
+            repo.bulk_update(
+                data_room_entry_schema::SCHEMA_NAME,
+                std::mem::take(&mut operations),
+            )
+            .await?;
+            total_documents_count += batch_size;
         }
     }
 
