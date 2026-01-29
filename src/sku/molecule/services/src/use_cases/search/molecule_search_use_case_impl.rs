@@ -13,7 +13,7 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
     molecule_announcement_search_schema as announcement_schema,
@@ -39,6 +39,7 @@ pub struct MoleculeSearchUseCaseImpl {
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
     announcements_service: Arc<dyn MoleculeAnnouncementsService>,
     search_service: Arc<dyn SearchService>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 impl MoleculeSearchUseCaseImpl {
@@ -47,7 +48,7 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-        pagination: Option<PaginationOpts>,
+        pagination: PaginationOpts,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let search_entity_kinds = utils::get_search_entity_kinds(filters.as_ref());
 
@@ -79,14 +80,12 @@ impl MoleculeSearchUseCaseImpl {
         };
 
         // Sort by event time descending
-        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.event_time()));
+        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.entity.event_time()));
 
         // Pagination
-        if let Some(pagination) = pagination {
-            let safe_offset = pagination.offset.min(total_count);
-            list.drain(..safe_offset);
-            list.truncate(pagination.limit);
-        }
+        let safe_offset = pagination.offset.min(total_count);
+        list.drain(..safe_offset);
+        list.truncate(pagination.limit);
 
         Ok(MoleculeSearchHitsListing { list, total_count })
     }
@@ -190,7 +189,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeDataRoomActivity::from_changelog_entry_json(record)?;
-                Ok(MoleculeSearchHit::DataRoomActivity(entity))
+                Ok(MoleculeSearchHit {
+                    entity: MoleculeSearchHitEntity::DataRoomActivity(entity),
+                    score: None,
+                    explanation: None,
+                })
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -266,7 +269,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeGlobalAnnouncement::from_changelog_entry_json(record)?;
-                Ok(MoleculeSearchHit::Announcement(entity))
+                Ok(MoleculeSearchHit {
+                    entity: MoleculeSearchHitEntity::Announcement(entity),
+                    score: None,
+                    explanation: None,
+                })
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -278,7 +285,8 @@ impl MoleculeSearchUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         prompt: &str,
         maybe_search_filters: Option<MoleculeSearchFilters>,
-        pagination: Option<PaginationOpts>,
+        pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let prompt = prompt.trim();
 
@@ -314,46 +322,42 @@ impl MoleculeSearchUseCaseImpl {
             }
         });
 
+        tracing::debug!(
+            empty_prompt = prompt.is_empty(),
+            non_zero_offset = pagination.offset > 0,
+            "Selecting search strategy"
+        );
+
         let search_results = if prompt.is_empty() {
-            self.search_service
-                .listing_search(
-                    ctx,
-                    ListingSearchRequest {
-                        entity_schemas,
-                        source: SearchRequestSourceSpec::All,
-                        filter: maybe_filter,
-                        sort: vec![SearchSortSpec::ByField {
-                            field: molecule_schema::fields::EVENT_TIME,
-                            direction: SearchSortDirection::Descending,
-                            nulls_first: false,
-                        }],
-                        page: pagination.into(),
-                    },
-                )
-                .await
-                .int_err()?
+            self.search_via_listing(ctx, entity_schemas, maybe_filter, pagination)
+                .await?
+        } else if pagination.offset > 0 {
+            self.search_via_text_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await?
         } else {
-            // TODO: hybrid search
-            self.search_service
-                .text_search(
-                    ctx,
-                    TextSearchRequest {
-                        intent: TextSearchIntent::make_full_text(prompt),
-                        entity_schemas,
-                        source: SearchRequestSourceSpec::All,
-                        filter: maybe_filter,
-                        secondary_sort: vec![SearchSortSpec::ByField {
-                            field: molecule_schema::fields::EVENT_TIME,
-                            direction: SearchSortDirection::Descending,
-                            nulls_first: false,
-                        }],
-                        page: pagination.into(),
-                        options: TextSearchOptions::default(),
-                    },
-                )
-                .await
-                .int_err()?
+            self.search_via_hybrid_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await?
         };
+
+        tracing::debug!(
+            total_hits = search_results.total_hits,
+            hits_count = search_results.hits.len(),
+            "Search completed"
+        );
 
         Ok(MoleculeSearchHitsListing {
             total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
@@ -389,11 +393,20 @@ impl MoleculeSearchUseCaseImpl {
                         );
 
                         // Finally wrap as search hit
-                        Ok(MoleculeSearchHit::DataRoomActivity(activity))
+                        Ok(MoleculeSearchHit {
+                            entity: MoleculeSearchHitEntity::DataRoomActivity(activity),
+                            score: hit.score,
+                            explanation: hit.explanation,
+                        })
                     }
                     announcement_schema::SCHEMA_NAME => {
-                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)
-                            .map(MoleculeSearchHit::Announcement)
+                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source).map(
+                            |announcement| MoleculeSearchHit {
+                                entity: MoleculeSearchHitEntity::Announcement(announcement),
+                                score: hit.score,
+                                explanation: hit.explanation,
+                            },
+                        )
                     }
                     _ => Err(InternalError::new(format!(
                         "Unexpected schema name: {schema_name}",
@@ -403,6 +416,128 @@ impl MoleculeSearchUseCaseImpl {
                 .collect::<Result<Vec<_>, InternalError>>()?,
         })
     }
+
+    async fn search_via_listing(
+        &self,
+        ctx: SearchContext<'_>,
+        entity_schemas: Vec<&'static str>,
+        maybe_filter: Option<SearchFilterExpr>,
+        pagination: PaginationOpts,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_service
+            .listing_search(
+                ctx,
+                ListingSearchRequest {
+                    entity_schemas,
+                    source: SearchRequestSourceSpec::All,
+                    filter: maybe_filter,
+                    sort: vec![SearchSortSpec::ByField {
+                        field: molecule_schema::fields::EVENT_TIME,
+                        direction: SearchSortDirection::Descending,
+                        nulls_first: false,
+                    }],
+                    page: Some(pagination).into(),
+                },
+            )
+            .await
+            .int_err()
+    }
+
+    async fn search_via_text_search(
+        &self,
+        ctx: SearchContext<'_>,
+        prompt: &str,
+        entity_schemas: Vec<&'static str>,
+        maybe_filter: Option<SearchFilterExpr>,
+        pagination: PaginationOpts,
+        enable_explain: bool,
+    ) -> Result<SearchResponse, InternalError> {
+        self.search_service
+            .text_search(
+                ctx,
+                TextSearchRequest {
+                    intent: TextSearchIntent::make_full_text(prompt),
+                    entity_schemas,
+                    source: SearchRequestSourceSpec::All,
+                    filter: maybe_filter,
+                    secondary_sort: vec![SearchSortSpec::ByField {
+                        field: molecule_schema::fields::EVENT_TIME,
+                        direction: SearchSortDirection::Descending,
+                        nulls_first: false,
+                    }],
+                    page: Some(pagination).into(),
+                    options: TextSearchOptions {
+                        enable_explain,
+                        ..TextSearchOptions::default()
+                    },
+                },
+            )
+            .await
+            .int_err()
+    }
+
+    async fn search_via_hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        prompt: &str,
+        entity_schemas: Vec<&'static str>,
+        maybe_filter: Option<SearchFilterExpr>,
+        pagination: PaginationOpts,
+        enable_explain: bool,
+    ) -> Result<SearchResponse, InternalError> {
+        // Try to get embeddings for the prompt
+        let maybe_prompt_vec = match self
+            .embeddings_provider
+            .provide_prompt_embeddings(prompt.to_string())
+            .await
+        {
+            // Got embeddings => do hybrid search
+            Ok(v) => Ok(Some(v)),
+
+            // Encoder couldn't produce embeddings - degrade to text search
+            Err(EmbeddingsProviderError::Unsupported) => Ok(None),
+
+            // Bad error
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
+
+        // Hybrid search or degrade to text search
+        if let Some(prompt_vec) = maybe_prompt_vec {
+            self.search_service
+                .hybrid_search(
+                    ctx,
+                    HybridSearchRequest {
+                        prompt: prompt.to_string(),
+                        prompt_embedding: prompt_vec,
+                        entity_schemas,
+                        source: SearchRequestSourceSpec::All,
+                        filter: maybe_filter,
+                        secondary_sort: vec![SearchSortSpec::ByField {
+                            field: molecule_schema::fields::EVENT_TIME,
+                            direction: SearchSortDirection::Descending,
+                            nulls_first: false,
+                        }],
+                        limit: pagination.limit,
+                        options: HybridSearchOptions {
+                            enable_explain,
+                            ..HybridSearchOptions::for_limit(pagination.limit)
+                        },
+                    },
+                )
+                .await
+                .int_err()
+        } else {
+            self.search_via_text_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,14 +545,20 @@ impl MoleculeSearchUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeSearchUseCaseImpl_execute, skip_all, fields(?pagination))]
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeSearchUseCaseImpl_execute,
+        skip_all,
+        fields(prompt, ?mode, ?filters, ?pagination ))
+    ]
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,
         mode: MoleculeSearchMode,
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
-        pagination: Option<PaginationOpts>,
+        pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         match mode {
             MoleculeSearchMode::ViaChangelog => {
@@ -425,8 +566,14 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
                     .await
             }
             MoleculeSearchMode::ViaSearchIndex => {
-                self.search_via_search_index(molecule_subject, prompt, filters, pagination)
-                    .await
+                self.search_via_search_index(
+                    molecule_subject,
+                    prompt,
+                    filters,
+                    pagination,
+                    enable_explain,
+                )
+                .await
             }
         }
     }

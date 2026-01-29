@@ -19,61 +19,117 @@ use kamu_molecule_domain::{
     molecule_announcement_search_schema as announcement_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{SearchIndexUpdateOperation, SearchRepository};
+use kamu_search::{
+    EmbeddingsProvider,
+    SearchFieldUpdate,
+    SearchIndexUpdateOperation,
+    SearchRepository,
+    prepare_semantic_embeddings_document,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const BULK_SIZE: usize = 100;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper functions
+// Indexing helper
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn index_announcement_from_global_entity(
-    molecule_account_id: &odf::AccountID,
-    global_announcement: &MoleculeGlobalAnnouncement,
-) -> serde_json::Value {
-    serde_json::json!({
-        molecule_schema::fields::EVENT_TIME: global_announcement.announcement.event_time,
-        molecule_schema::fields::SYSTEM_TIME: global_announcement.announcement.system_time,
-        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        molecule_schema::fields::IPNFT_UID: global_announcement.ipnft_uid,
-        announcement_schema::fields::HEADLINE: global_announcement.announcement.headline,
-        announcement_schema::fields::BODY: global_announcement.announcement.body,
-        announcement_schema::fields::ATTACHMENTS: global_announcement.announcement.attachments,
-        molecule_schema::fields::ACCESS_LEVEL: global_announcement.announcement.access_level,
-        molecule_schema::fields::CHANGE_BY: global_announcement.announcement.change_by,
-        molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
-        molecule_schema::fields::TAGS: global_announcement.announcement.tags,
-        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
-    })
+pub(crate) struct MoleculeAnnouncementIndexingHelper<'a> {
+    pub embeddings_provider: &'a dyn EmbeddingsProvider,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+impl MoleculeAnnouncementIndexingHelper<'_> {
+    pub(crate) async fn index_announcement_from_global_entity(
+        &self,
+        molecule_account_id: &odf::AccountID,
+        global_announcement: &MoleculeGlobalAnnouncement,
+    ) -> Result<serde_json::Value, InternalError> {
+        let mut index_doc = serde_json::json!({
+            molecule_schema::fields::EVENT_TIME: global_announcement.announcement.event_time,
+            molecule_schema::fields::SYSTEM_TIME: global_announcement.announcement.system_time,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+            molecule_schema::fields::IPNFT_UID: global_announcement.ipnft_uid,
+            announcement_schema::fields::HEADLINE: global_announcement.announcement.headline,
+            announcement_schema::fields::BODY: global_announcement.announcement.body,
+            announcement_schema::fields::ATTACHMENTS: global_announcement.announcement.attachments,
+            molecule_schema::fields::ACCESS_LEVEL: global_announcement.announcement.access_level,
+            molecule_schema::fields::CHANGE_BY: global_announcement.announcement.change_by,
+            molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
+            molecule_schema::fields::TAGS: global_announcement.announcement.tags,
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
+        });
 
-pub(crate) fn index_announcement_from_publication_record(
-    event_time: DateTime<Utc>,
-    system_time: DateTime<Utc>,
-    molecule_account_id: &odf::AccountID,
-    ipnft_uid: &str,
-    announcement_record: &MoleculeAnnouncementPayloadRecord,
-) -> serde_json::Value {
-    serde_json::json!({
-        molecule_schema::fields::EVENT_TIME: event_time,
-        molecule_schema::fields::SYSTEM_TIME: system_time,
-        molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        molecule_schema::fields::IPNFT_UID: ipnft_uid,
-        announcement_schema::fields::HEADLINE: announcement_record.headline,
-        announcement_schema::fields::BODY: announcement_record.body,
-        announcement_schema::fields::ATTACHMENTS: announcement_record.attachments,
-        molecule_schema::fields::ACCESS_LEVEL: announcement_record.access_level,
-        molecule_schema::fields::CHANGE_BY: announcement_record.change_by,
-        molecule_schema::fields::CATEGORIES: announcement_record.categories,
-        molecule_schema::fields::TAGS: announcement_record.tags,
-        kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-        kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
-    })
+        self.attach_embeddings(
+            &mut index_doc,
+            &global_announcement.announcement.headline,
+            &global_announcement.announcement.body,
+        )
+        .await?;
+
+        Ok(index_doc)
+    }
+
+    pub(crate) async fn index_announcement_from_publication_record(
+        &self,
+        event_time: DateTime<Utc>,
+        system_time: DateTime<Utc>,
+        molecule_account_id: &odf::AccountID,
+        ipnft_uid: &str,
+        announcement_record: &MoleculeAnnouncementPayloadRecord,
+    ) -> Result<serde_json::Value, InternalError> {
+        let mut index_doc = serde_json::json!({
+            molecule_schema::fields::EVENT_TIME: event_time,
+            molecule_schema::fields::SYSTEM_TIME: system_time,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
+            molecule_schema::fields::IPNFT_UID: ipnft_uid,
+            announcement_schema::fields::HEADLINE: announcement_record.headline,
+            announcement_schema::fields::BODY: announcement_record.body,
+            announcement_schema::fields::ATTACHMENTS: announcement_record.attachments,
+            molecule_schema::fields::ACCESS_LEVEL: announcement_record.access_level,
+            molecule_schema::fields::CHANGE_BY: announcement_record.change_by,
+            molecule_schema::fields::CATEGORIES: announcement_record.categories,
+            molecule_schema::fields::TAGS: announcement_record.tags,
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
+        });
+
+        self.attach_embeddings(
+            &mut index_doc,
+            &announcement_record.headline,
+            &announcement_record.body,
+        )
+        .await?;
+
+        Ok(index_doc)
+    }
+
+    async fn attach_embeddings(
+        &self,
+        index_doc: &mut serde_json::Value,
+        headline: &str,
+        body: &str,
+    ) -> Result<(), InternalError> {
+        let index_doc_mut = index_doc.as_object_mut().unwrap();
+
+        let headline_update = SearchFieldUpdate::Present(headline);
+        let body_update = SearchFieldUpdate::Present(body);
+
+        let embeddings_document = prepare_semantic_embeddings_document(
+            self.embeddings_provider,
+            &[&headline_update, &body_update],
+        )
+        .await?;
+
+        if let SearchFieldUpdate::Present(v) = embeddings_document {
+            index_doc_mut.insert(
+                kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                serde_json::json!(v),
+            );
+        }
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,6 +155,12 @@ pub(crate) async fn index_announcements(
         .get_one::<dyn MoleculeViewGlobalAnnouncementsUseCase>()
         .unwrap();
 
+    let embeddings_provider = catalog.get_one::<dyn EmbeddingsProvider>().unwrap();
+
+    let indexing_helper = MoleculeAnnouncementIndexingHelper {
+        embeddings_provider: embeddings_provider.as_ref(),
+    };
+
     loop {
         // Load announcements in pages aligned with bulk size
         let announcements_listing = molecule_view_global_announcements_uc
@@ -122,10 +184,12 @@ pub(crate) async fn index_announcements(
         // Index each announcement
         for announcement in announcements_listing.list {
             // Serialize announcement into search document
-            let document = index_announcement_from_global_entity(
-                &organization_account.account_id,
-                &announcement,
-            );
+            let document = indexing_helper
+                .index_announcement_from_global_entity(
+                    &organization_account.account_id,
+                    &announcement,
+                )
+                .await?;
 
             operations.push(SearchIndexUpdateOperation::Index {
                 id: announcement.announcement.announcement_id.to_string(),

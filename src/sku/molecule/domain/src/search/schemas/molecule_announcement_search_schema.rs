@@ -22,6 +22,8 @@ pub mod fields {
     pub const HEADLINE: &str = "headline";
     pub const BODY: &str = "body";
     pub const ATTACHMENTS: &str = "attachments";
+
+    pub const HEADLINE_KEYWORD: &str = "headline.keyword";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +35,10 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::IPNFT_UID,
     SearchSchemaField {
         path: fields::HEADLINE,
-        role: SearchSchemaFieldRole::Description { add_keyword: true },
+        role: SearchSchemaFieldRole::Description {
+            // Announcement headlines are used as titles, so we need a separate keyword field
+            add_keyword: true,
+        },
     },
     SearchSchemaField {
         path: fields::BODY,
@@ -56,11 +61,11 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
-    title_field: kamu_search::fields::ID, // No specific title field
+    title_field: fields::HEADLINE_KEYWORD,
     flags: SearchEntitySchemaFlags {
         enable_banning: false,
         enable_security: true,
-        enable_embeddings: false,
+        enable_embeddings: true,
     },
 };
 

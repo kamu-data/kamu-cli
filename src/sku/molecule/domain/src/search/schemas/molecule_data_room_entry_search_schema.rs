@@ -70,7 +70,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     flags: SearchEntitySchemaFlags {
         enable_banning: false,
         enable_security: true,
-        enable_embeddings: false,
+        enable_embeddings: true,
     },
 };
 

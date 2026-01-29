@@ -21,10 +21,10 @@ use kamu_molecule_domain::{
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
-use kamu_search::{SearchContext, SearchIndexUpdateOperation, SearchService};
+use kamu_search::{EmbeddingsProvider, SearchContext, SearchIndexUpdateOperation, SearchService};
 use messaging_outbox::*;
 
-use crate::search::indexers::index_data_room_entry_from_entity;
+use crate::search::indexers::MoleculeDataRoomEntryIndexingHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +41,7 @@ use crate::search::indexers::index_data_room_entry_from_entity;
 })]
 pub struct MoleculeDataRoomSearchUpdater {
     search_service: Arc<dyn SearchService>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,12 +52,18 @@ impl MoleculeDataRoomSearchUpdater {
         ctx: SearchContext<'_>,
         created_message: &MoleculeDataRoomMessageEntryCreated,
     ) -> Result<(), InternalError> {
-        let data_room_entry_document = index_data_room_entry_from_entity(
-            &created_message.molecule_account_id,
-            &created_message.ipnft_uid,
-            &created_message.data_room_entry,
-            created_message.content_text.as_ref(),
-        );
+        let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
+            molecule_account_id: &created_message.molecule_account_id,
+            embeddings_provider: self.embeddings_provider.as_ref(),
+        };
+
+        let data_room_entry_document = indexing_helper
+            .index_data_room_entry_from_entity(
+                &created_message.ipnft_uid,
+                &created_message.data_room_entry,
+                created_message.content_text.as_ref(),
+            )
+            .await?;
 
         self.search_service
             .bulk_update(
@@ -81,12 +88,18 @@ impl MoleculeDataRoomSearchUpdater {
         ctx: SearchContext<'_>,
         updated_message: &MoleculeDataRoomMessageEntryUpdated,
     ) -> Result<(), InternalError> {
-        let data_room_entry_document = index_data_room_entry_from_entity(
-            &updated_message.molecule_account_id,
-            &updated_message.ipnft_uid,
-            &updated_message.data_room_entry,
-            updated_message.content_text.as_ref(),
-        );
+        let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
+            molecule_account_id: &updated_message.molecule_account_id,
+            embeddings_provider: self.embeddings_provider.as_ref(),
+        };
+
+        let data_room_entry_document = indexing_helper
+            .index_data_room_entry_from_entity(
+                &updated_message.ipnft_uid,
+                &updated_message.data_room_entry,
+                updated_message.content_text.as_ref(),
+            )
+            .await?;
 
         self.search_service
             .bulk_update(
