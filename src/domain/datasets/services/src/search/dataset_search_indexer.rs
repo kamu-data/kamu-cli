@@ -19,8 +19,7 @@ use odf::dataset::MetadataChainExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct DatasetIndexingHelper<'a> {
-    pub embeddings_chunker: &'a dyn EmbeddingsChunker,
-    pub embeddings_encoder: &'a dyn EmbeddingsEncoder,
+    pub embeddings_provider: &'a dyn EmbeddingsProvider,
     pub rebac_service: &'a dyn RebacService,
 }
 
@@ -87,8 +86,7 @@ impl DatasetIndexingHelper<'_> {
 
                 // Prepare semantic embedding vectors
                 let embeddings_document = prepare_semantic_embeddings_document(
-                    self.embeddings_chunker,
-                    self.embeddings_encoder,
+                    self.embeddings_provider,
                     &[&description, &keywords, &attachments],
                 )
                 .await?;
@@ -277,8 +275,7 @@ impl DatasetIndexingHelper<'_> {
 
         // Recompute embeddings document
         let embeddings_document = prepare_semantic_embeddings_document(
-            self.embeddings_chunker,
-            self.embeddings_encoder,
+            self.embeddings_provider,
             &[
                 &relevant_description,
                 &relevant_keywords,
@@ -551,8 +548,7 @@ pub(crate) async fn index_datasets(
     dataset_entry_service: &dyn DatasetEntryService,
     dataset_registry: &dyn DatasetRegistry,
     search_repo: &dyn SearchRepository,
-    embeddings_chunker: &dyn EmbeddingsChunker,
-    embeddings_encoder: &dyn EmbeddingsEncoder,
+    embeddings_provider: &dyn EmbeddingsProvider,
     rebac_service: &dyn RebacService,
 ) -> Result<usize, InternalError> {
     const BULK_SIZE: usize = 100;
@@ -563,8 +559,7 @@ pub(crate) async fn index_datasets(
     let mut total_indexed = 0;
 
     let indexing_helper = DatasetIndexingHelper {
-        embeddings_chunker,
-        embeddings_encoder,
+        embeddings_provider,
         rebac_service,
     };
 

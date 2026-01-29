@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_datasets::*;
 use kamu_search::*;
 
@@ -22,7 +22,7 @@ use kamu_search::*;
 pub struct DatasetSearchServiceImpl {
     search_service: Arc<dyn SearchService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,15 +107,22 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
             });
         }
 
-        // Build embeddings for the prompt
-        let prompt_vec = self
-            .embeddings_encoder
-            .encode(vec![prompt.to_string()])
+        // Get embeddings for the prompt
+        let prompt_vec = match self
+            .embeddings_provider
+            .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?
-            .into_iter()
-            .next()
-            .unwrap();
+        {
+            Ok(v) => Ok(v),
+            Err(EmbeddingsProviderError::Unsupported) => {
+                // Encoder couldn't produce embeddings - cannot do vector search
+                return Ok(DatasetSearchResponse {
+                    total_hits: None,
+                    hits: vec![],
+                });
+            }
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
 
         // Run vector search request
         let search_response = {
@@ -160,35 +167,59 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
             });
         }
 
-        // Build embeddings for the prompt
-        let prompt_embedding = self
-            .embeddings_encoder
-            .encode(vec![prompt.to_string()])
+        // Get embeddings for the prompt
+        let maybe_prompt_vec = match self
+            .embeddings_provider
+            .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?
-            .into_iter()
-            .next()
-            .unwrap();
+        {
+            Ok(v) => Ok(Some(v)),
+            Err(EmbeddingsProviderError::Unsupported) => {
+                // Encoder couldn't produce embeddings - degrade to text search
+                Ok(None)
+            }
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
 
-        // Run vector search request
+        // Run search request
         let search_response = {
             use kamu_datasets::dataset_search_schema as dataset_schema;
             use kamu_search::*;
 
-            self.search_service
-                .hybrid_search(
-                    ctx,
-                    HybridSearchRequest {
-                        prompt: prompt.to_string(),
-                        prompt_embedding,
-                        source: SearchRequestSourceSpec::None,
-                        entity_schemas: vec![dataset_schema::SCHEMA_NAME],
-                        filter: None,
-                        limit,
-                        options: HybridSearchOptions::default(),
-                    },
-                )
-                .await
+            if let Some(prompt_vec) = maybe_prompt_vec {
+                // Hybrid search with embeddings
+                self.search_service
+                    .hybrid_search(
+                        ctx,
+                        HybridSearchRequest {
+                            prompt: prompt.to_string(),
+                            prompt_embedding: prompt_vec,
+                            source: SearchRequestSourceSpec::None,
+                            entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                            filter: None,
+                            secondary_sort: vec![],
+                            limit,
+                            options: HybridSearchOptions::default(),
+                        },
+                    )
+                    .await
+            } else {
+                // Degrade to text search without embeddings
+                self.search_service
+                    .text_search(
+                        ctx,
+                        TextSearchRequest {
+                            intent: TextSearchIntent::make_full_text(prompt),
+                            entity_schemas: vec![dataset_schema::SCHEMA_NAME],
+                            source: SearchRequestSourceSpec::None,
+                            filter: None,
+                            secondary_sort: vec![],
+                            page: SearchPaginationSpec { offset: 0, limit },
+                            options: TextSearchOptions::default(),
+                        },
+                    )
+                    .await
+            }
         }
         .int_err()?;
 

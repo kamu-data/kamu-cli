@@ -31,7 +31,7 @@ impl PhraseSearchPolicyBuilder {
                     });
                 }
 
-                SearchSchemaFieldRole::Description => {
+                SearchSchemaFieldRole::Description { .. } => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
                         boost: 4.0 * text_boosting_overrides.description_boost,
@@ -52,8 +52,7 @@ impl PhraseSearchPolicyBuilder {
                 | SearchSchemaFieldRole::DateTime
                 | SearchSchemaFieldRole::Keyword
                 | SearchSchemaFieldRole::Identifier { .. }
-                | SearchSchemaFieldRole::UnprocessedObject
-                | SearchSchemaFieldRole::EmbeddingChunks => {
+                | SearchSchemaFieldRole::UnprocessedObject => {
                     // No phrase matching
                 }
             }

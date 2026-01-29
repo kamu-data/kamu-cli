@@ -64,8 +64,10 @@ interface "DeleteDatasetUseCase" <<i>>
 interface "DependencyGraphService" <<i>>
 interface "DidGenerator" <<i>>
 interface "DidSecretKeyRepository" <<i>>
+interface "EmbeddingsCacheRepository" <<i>>
 interface "EmbeddingsChunker" <<i>>
 interface "EmbeddingsEncoder" <<i>>
+interface "EmbeddingsProvider" <<i>>
 interface "EngineProvisioner" <<i>>
 interface "ExpensiveAccountRepository" <<i>>
 interface "ExportService" <<i>>
@@ -247,6 +249,7 @@ class "EmbeddingsChunkerConfigSimple" <<singleton>>
 class "EmbeddingsChunkerSimple"
 class "EmbeddingsEncoderConfigOpenAI" <<singleton>>
 class "EmbeddingsEncoderOpenAi" <<singleton>>
+class "EmbeddingsProviderImpl"
 class "EngineConfigDatafusionEmbeddedBatchQuery" <<singleton>>
 class "EngineConfigDatafusionEmbeddedCompaction" <<singleton>>
 class "EngineConfigDatafusionEmbeddedIngest" <<singleton>>
@@ -404,6 +407,7 @@ class "SqliteDatasetKeyBlockRepository"
 class "SqliteDatasetReferenceRepository"
 class "SqliteDatasetStatisticsRepository"
 class "SqliteDidSecretKeyRepository"
+class "SqliteEmbeddingsCacheRepository"
 class "SqliteFlowConfigurationEventStore"
 class "SqliteFlowEventStore"
 class "SqliteFlowProcessStateQuery"
@@ -754,11 +758,9 @@ class "WsSmartTransferProtocolClient"
 "DidGenerator" <|-- "DidGeneratorDefault"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"
-"DatasetSearchSchemaProvider"  --> "EmbeddingsChunker"
-"DatasetSearchSchemaProvider"  --> "EmbeddingsEncoder"
 "DatasetSearchService" <|-- "DatasetSearchServiceImpl"
 "DatasetSearchServiceImpl"  --> "DatasetRegistry"
-"DatasetSearchServiceImpl"  --> "EmbeddingsEncoder"
+"DatasetSearchServiceImpl"  --> "EmbeddingsProvider"
 "DatasetSearchServiceImpl"  --> "SearchService"
 "MessageConsumer" <|-- "DatasetSearchUpdater"
 "MessageConsumerT" <|-- "DatasetSearchUpdater"
@@ -769,8 +771,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetSearchUpdater"  --> "RebacService"
 "DatasetSearchUpdater"  --> "DatasetEntryService"
 "DatasetSearchUpdater"  --> "DatasetRegistry"
-"DatasetSearchUpdater"  --> "EmbeddingsChunker"
-"DatasetSearchUpdater"  --> "EmbeddingsEncoder"
+"DatasetSearchUpdater"  --> "EmbeddingsProvider"
 "DatasetSearchUpdater"  --> "SearchService"
 "AccountQuotaStorageChecker" <|-- "AccountQuotaCheckerStorageImpl"
 "AccountQuotaCheckerStorageImpl"  --> "AccountQuotaEventStore"
@@ -1056,11 +1057,17 @@ class "WsSmartTransferProtocolClient"
 "MoleculeUploadVersionedFileVersionUseCase" <|-- "MoleculeUploadVersionedFileVersionUseCaseImpl"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
+"EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
+"SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
 "EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
 "SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
+"EmbeddingsProvider" <|-- "EmbeddingsProviderImpl"
+"EmbeddingsProviderImpl"  --> "EmbeddingsCacheRepository"
+"EmbeddingsProviderImpl"  --> "EmbeddingsChunker"
+"EmbeddingsProviderImpl"  --> "EmbeddingsEncoder"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

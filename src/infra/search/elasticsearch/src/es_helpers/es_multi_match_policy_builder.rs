@@ -67,7 +67,7 @@ impl MultiMatchPolicyBuilder {
                     }
                 }
 
-                SearchSchemaFieldRole::Description => {
+                SearchSchemaFieldRole::Description { .. } => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
                         boost: 3.5 * text_boosting_overrides.description_boost,
@@ -81,8 +81,7 @@ impl MultiMatchPolicyBuilder {
                     });
                 }
 
-                SearchSchemaFieldRole::EmbeddingChunks
-                | SearchSchemaFieldRole::Boolean
+                SearchSchemaFieldRole::Boolean
                 | SearchSchemaFieldRole::Integer
                 | SearchSchemaFieldRole::DateTime
                 | SearchSchemaFieldRole::Keyword
@@ -139,9 +138,8 @@ impl MultiMatchPolicyBuilder {
                 }
 
                 // Note: no autocomplete on prose and description
-                SearchSchemaFieldRole::Description
+                SearchSchemaFieldRole::Description { .. }
                 | SearchSchemaFieldRole::Prose
-                | SearchSchemaFieldRole::EmbeddingChunks
                 | SearchSchemaFieldRole::Boolean
                 | SearchSchemaFieldRole::Integer
                 | SearchSchemaFieldRole::DateTime

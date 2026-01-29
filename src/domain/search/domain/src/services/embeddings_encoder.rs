@@ -9,12 +9,18 @@
 
 use internal_error::InternalError;
 
+use crate::EmbeddingModelKey;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Encodes chunks of text into embedding vectors using a transformer model
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait EmbeddingsEncoder: Send + Sync {
+    fn model_key(&self) -> EmbeddingModelKey;
+
+    fn dimensions(&self) -> usize;
+
     async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError>;
 }
 

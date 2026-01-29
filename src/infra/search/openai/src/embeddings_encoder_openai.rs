@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::*;
-use kamu_search::EmbeddingsEncoder;
+use kamu_search::{EmbeddingModelKey, EmbeddingsEncoder};
 use secrecy::ExposeSecret as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,6 +80,18 @@ impl EmbeddingsEncoderOpenAi {
 
 #[async_trait::async_trait]
 impl EmbeddingsEncoder for EmbeddingsEncoderOpenAi {
+    fn model_key(&self) -> EmbeddingModelKey {
+        EmbeddingModelKey {
+            provider: "openai",
+            name: self.config.model_name.clone(),
+            revision: None,
+        }
+    }
+
+    fn dimensions(&self) -> usize {
+        self.config.dimensions
+    }
+
     #[tracing::instrument(level = "info", skip_all)]
     async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
         if input.is_empty() {

@@ -164,6 +164,39 @@ impl DatabaseTransactionRunner {
         })
         .await
     }
+
+    pub async fn transactional_with4<
+        Iface1,
+        Iface2,
+        Iface3,
+        Iface4,
+        H,
+        HFut,
+        HFutResultT,
+        HFutResultE,
+    >(
+        &self,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        Iface1: 'static + ?Sized + Send + Sync,
+        Iface2: 'static + ?Sized + Send + Sync,
+        Iface3: 'static + ?Sized + Send + Sync,
+        Iface4: 'static + ?Sized + Send + Sync,
+        H: FnOnce(Arc<Iface1>, Arc<Iface2>, Arc<Iface3>, Arc<Iface4>) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        self.transactional(|transaction_catalog| async move {
+            let catalog_item1 = transaction_catalog.get_one().int_err()?;
+            let catalog_item2 = transaction_catalog.get_one().int_err()?;
+            let catalog_item3 = transaction_catalog.get_one().int_err()?;
+            let catalog_item4 = transaction_catalog.get_one().int_err()?;
+
+            callback(catalog_item1, catalog_item2, catalog_item3, catalog_item4).await
+        })
+        .await
+    }
 }
 
 impl From<dill::Catalog> for DatabaseTransactionRunner {

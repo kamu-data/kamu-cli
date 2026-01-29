@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO embeddings_cache (model_id, input_hash, input_text, embedding)\n                    VALUES ($1, $2, $3, $4)\n                    ON CONFLICT (model_id, input_hash) DO NOTHING\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "e29d2d0989c71c186aa8ac9738280b9b6b6931a0165b33c0f6cb4ac7759b69fb"
+}

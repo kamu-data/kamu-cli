@@ -20,6 +20,19 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.257.2] - 2026-01-29
+### Changed
+- Hybrid search flow improvements:
+  - Smaller indexing bulk sizes during indexing to follow the progress
+  - Simplified common fields generation via flags (is_banned, security, embeddings)
+  - Implemented caching embeddings in the database and tracking stats for entity chunks and prompts
+  - Telemetry improvements around hybrid search
+  - Improved RRF custom explanation
+### Fixed
+- Bug fixes in hybrid search flow:
+  - dealing with dummy encoder not returning anything for prompts: degrading to textual search
+  - hybrid search also needs secondary sort criterias for textual part  
+
 ## [0.257.1] - 2026-01-27
 ### Fixed
 - Eliminated several dependency loops

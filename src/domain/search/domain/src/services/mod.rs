@@ -9,6 +9,7 @@
 
 mod embeddings_chunker;
 mod embeddings_encoder;
+mod embeddings_provider;
 mod helpers;
 mod search_entity_schema_provider;
 mod search_indexer;
@@ -16,6 +17,7 @@ mod search_service;
 
 pub use embeddings_chunker::*;
 pub use embeddings_encoder::*;
+pub use embeddings_provider::*;
 pub use helpers::*;
 pub use search_entity_schema_provider::*;
 pub use search_indexer::*;

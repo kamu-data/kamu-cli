@@ -224,46 +224,12 @@ impl ElasticsearchRepository {
         })
     }
 
-    fn resolve_embedding_field(
-        &self,
-        entity_schemas: &[Arc<SearchEntitySchema>],
-    ) -> Result<SearchFieldPath, InternalError> {
-        assert!(!entity_schemas.is_empty());
-
-        let mut embedding_field_path: Option<SearchFieldPath> = None;
-
-        for schema in entity_schemas {
-            let Some(embedding_field) = schema.find_embedding_chunks_field() else {
-                return Err(InternalError::new(format!(
-                    "Entity schema '{}' does not have an embedding chunks field",
-                    schema.schema_name
-                )));
-            };
-
-            match embedding_field_path {
-                None => {
-                    embedding_field_path = Some(embedding_field.path);
-                }
-                Some(expected_path) => {
-                    if embedding_field.path != expected_path {
-                        return Err(InternalError::new(format!(
-                            "Entity schema '{}' has embedding field '{}', but expected '{}' to \
-                             match other schemas",
-                            schema.schema_name, embedding_field.path, expected_path
-                        )));
-                    }
-                }
-            }
-        }
-
-        Ok(embedding_field_path.unwrap())
-    }
-
-    #[allow(dead_code)]
     fn make_security_filter(
         &self,
         security_ctx: SearchSecurityContext,
     ) -> Option<SearchFilterExpr> {
+        tracing::debug!(security_ctx = ?security_ctx, "Building security filter for search request");
+
         match security_ctx {
             // For unrestricted context, no additional filtering
             SearchSecurityContext::Unrestricted => None,
@@ -305,7 +271,7 @@ impl ElasticsearchRepository {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SearchRepository for ElasticsearchRepository {
-    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_health skip_all)]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_health, skip_all)]
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         let client = self.es_client().await?;
         client.cluster_health().await.int_err()
@@ -314,7 +280,8 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(
         level = "debug",
         name=ElasticsearchRepository_ensure_entity_index,
-        skip_all, fields(
+        skip_all,
+        fields(
             entity_kind = %schema.schema_name,
             version = schema.version
         )
@@ -459,6 +426,12 @@ impl SearchRepository for ElasticsearchRepository {
                 term_operator,
                 field_relation,
             } => {
+                tracing::debug!(
+                    ?term_operator,
+                    ?field_relation,
+                    "Performing full-text search"
+                );
+
                 let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -506,6 +479,8 @@ impl SearchRepository for ElasticsearchRepository {
             }
 
             TextSearchIntent::Prefix { prompt } => {
+                tracing::debug!("Performing prefix search");
+
                 let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -535,6 +510,8 @@ impl SearchRepository for ElasticsearchRepository {
             }
 
             TextSearchIntent::Phrase { prompt, user_slop } => {
+                tracing::debug!(user_slop, "Performing phrase search");
+
                 let phrase_search_policy = es_helpers::PhraseSearchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -572,16 +549,13 @@ impl SearchRepository for ElasticsearchRepository {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Determine embedding field
-        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
-
         // Build filter with security context
         let maybe_filter =
             SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
 
         // Build Elasticsearch vector request body
         let es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
-            embedding_field,
+            kamu_search::fields::SEMANTIC_EMBEDDINGS,
             &req.prompt_embedding,
             maybe_filter.as_ref(),
             &req.source,
@@ -602,12 +576,15 @@ impl SearchRepository for ElasticsearchRepository {
         // Resolve entity schemas
         let entity_schemas = self.resolve_entity_schemas(&req.entity_schemas)?;
 
-        // Determine embedding field
-        let embedding_field = self.resolve_embedding_field(&entity_schemas)?;
-
         // Build filter with security context
         let maybe_filter =
             SearchFilterExpr::merge_and(req.filter, self.make_security_filter(security_ctx));
+
+        // Build sort spec
+        let mut sort_spec = vec![SearchSortSpec::Relevance];
+        for secondary_sort in req.secondary_sort {
+            sort_spec.push(secondary_sort);
+        }
 
         // Build multi-match policy for textual part
         let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
@@ -631,14 +608,7 @@ impl SearchRepository for ElasticsearchRepository {
                 &multi_match_policy,
                 maybe_filter.as_ref(),
                 &req.source,
-                &[
-                    SearchSortSpec::Relevance,
-                    SearchSortSpec::ByField {
-                        field: kamu_search::fields::TITLE,
-                        direction: SearchSortDirection::Ascending,
-                        nulls_first: false,
-                    },
-                ],
+                &sort_spec,
                 &SearchPaginationSpec {
                     limit: req.options.rrf.rank_window_size,
                     offset: 0,
@@ -652,7 +622,7 @@ impl SearchRepository for ElasticsearchRepository {
 
         // Vector query part
         let vector_es_query_body = es_helpers::ElasticsearchQueryBuilder::build_vector_search_query(
-            embedding_field,
+            kamu_search::fields::SEMANTIC_EMBEDDINGS,
             &req.prompt_embedding,
             maybe_filter.as_ref(),
             &req.source,
@@ -670,6 +640,14 @@ impl SearchRepository for ElasticsearchRepository {
         );
         let text_search_response = text_search_response?;
         let vector_search_response = vector_search_response?;
+
+        tracing::debug!(
+            text_hits = text_search_response.hits.len(),
+            text_took_ms = text_search_response.took_ms,
+            vector_hits = vector_search_response.hits.len(),
+            vector_took_ms = vector_search_response.took_ms,
+            "Both text and vector searches completed",
+        );
 
         // Combine results using RRF
         let combined_response = es_helpers::ElasticsearchRRFCombiner::combine_search_responses(

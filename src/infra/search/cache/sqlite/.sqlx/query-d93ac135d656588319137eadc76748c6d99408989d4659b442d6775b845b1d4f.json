@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO embedding_models (provider, name, revision, dims)\n                VALUES ($1, $2, $3, $4)\n            ON CONFLICT (provider, name, COALESCE(revision, ''))\n            DO UPDATE\n                SET dims = dims\n                WHERE dims = excluded.dims\n            RETURNING id, provider, name, revision, dims, created_at as \"created_at: DateTime<Utc>\";\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "provider",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "revision",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "dims",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "d93ac135d656588319137eadc76748c6d99408989d4659b442d6775b845b1d4f"
+}

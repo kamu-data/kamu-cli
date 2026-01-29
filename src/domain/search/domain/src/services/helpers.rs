@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::*;
 
@@ -73,8 +73,7 @@ pub fn insert_search_incremental_update_field<T: serde::Serialize>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_semantic_embeddings_document(
-    embeddings_chunker: &dyn EmbeddingsChunker,
-    embeddings_encoder: &dyn EmbeddingsEncoder,
+    embeddings_provider: &dyn EmbeddingsProvider,
     fields: &[&dyn TextFieldEmbeddingsContributor],
 ) -> Result<SearchFieldUpdate<Vec<serde_json::Value>>, InternalError> {
     // If all fields have been cleared, we need to clear embeddings as well
@@ -96,17 +95,14 @@ pub async fn prepare_semantic_embeddings_document(
         return Ok(SearchFieldUpdate::Absent);
     }
 
-    // Split parts into chunks
-    let chunks = embeddings_chunker.chunk(texts).await?;
-    if chunks.is_empty() {
-        return Ok(SearchFieldUpdate::Absent);
-    }
-
-    // Encode chunks into embedding vectors
-    let vectors = embeddings_encoder.encode(chunks).await?;
-    if vectors.is_empty() {
-        return Ok(SearchFieldUpdate::Absent);
-    }
+    // Obtain embeddings for input texts
+    let vectors = match embeddings_provider.provide_content_embeddings(texts).await {
+        Ok(v) => Ok(v),
+        Err(EmbeddingsProviderError::Unsupported) => {
+            return Ok(SearchFieldUpdate::Absent);
+        }
+        Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+    }?;
 
     #[derive(serde::Serialize)]
     struct ChunkDoc<'a> {
@@ -135,6 +131,22 @@ pub trait TextFieldEmbeddingsContributor: Send + Sync {
     fn is_present(&self) -> bool;
     fn is_cleared(&self) -> bool;
     fn contribute_texts(&self, texts: &mut Vec<String>);
+}
+
+impl TextFieldEmbeddingsContributor for SearchFieldUpdate<&str> {
+    fn is_present(&self) -> bool {
+        matches!(self, SearchFieldUpdate::Present(_))
+    }
+
+    fn is_cleared(&self) -> bool {
+        matches!(self, SearchFieldUpdate::Cleared)
+    }
+
+    fn contribute_texts(&self, texts: &mut Vec<String>) {
+        if let SearchFieldUpdate::Present(s) = self {
+            texts.push(s.to_string());
+        }
+    }
 }
 
 impl TextFieldEmbeddingsContributor for SearchFieldUpdate<String> {

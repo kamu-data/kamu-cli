@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    SearchEntitySchema,
-    SearchEntitySchemaUpgradeMode,
-    SearchSchemaField,
-    SearchSchemaFieldRole,
-};
+use kamu_search::*;
 
 use crate::search::schemas::molecule_search_schema_common as molecule_schema;
 
@@ -62,8 +57,6 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::DESCRIPTION,
     molecule_schema::field_definitions::CATEGORIES,
     molecule_schema::field_definitions::TAGS,
-    kamu_search::field_definitions::VISIBILITY,
-    kamu_search::field_definitions::PRINCIPAL_IDS,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +67,11 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
     fields: SCHEMA_FIELDS,
     title_field: molecule_schema::fields::PATH,
-    enable_banning: false,
+    flags: SearchEntitySchemaFlags {
+        enable_banning: false,
+        enable_security: true,
+        enable_embeddings: false,
+    },
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
