@@ -114,7 +114,7 @@ impl ElasticsearchRRFCombiner {
             let out = match (acc.text_hit, acc.vector_hit) {
                 (Some(textual_hit), Some(vector_hit)) => {
                     // Create a merged explanation with details from both searches
-                    let explanation = Self::create_merged_explanation(
+                    let explanation = Self::create_rrf_explanation(
                         acc.fused,
                         acc.text_rank,
                         textual_hit.score,
@@ -134,14 +134,48 @@ impl ElasticsearchRRFCombiner {
                         explanation,
                     }
                 }
-                (Some(textual_hit), None) => SearchHit {
-                    score: Some(acc.fused),
-                    ..textual_hit
-                },
-                (None, Some(vector_hit)) => SearchHit {
-                    score: Some(acc.fused),
-                    ..vector_hit
-                },
+                (Some(textual_hit), None) => {
+                    let explanation = Self::create_rrf_explanation(
+                        acc.fused,
+                        acc.text_rank,
+                        textual_hit.score,
+                        textual_hit.explanation.as_ref(),
+                        None,
+                        None,
+                        None,
+                        &rrf_options,
+                    );
+
+                    SearchHit {
+                        score: Some(acc.fused),
+                        schema_name: textual_hit.schema_name,
+                        id: textual_hit.id,
+                        source: textual_hit.source,
+                        highlights: textual_hit.highlights,
+                        explanation,
+                    }
+                }
+                (None, Some(vector_hit)) => {
+                    let explanation = Self::create_rrf_explanation(
+                        acc.fused,
+                        None,
+                        None,
+                        None,
+                        acc.vector_rank,
+                        vector_hit.score,
+                        vector_hit.explanation.as_ref(),
+                        &rrf_options,
+                    );
+
+                    SearchHit {
+                        score: Some(acc.fused),
+                        schema_name: vector_hit.schema_name,
+                        id: vector_hit.id,
+                        source: vector_hit.source,
+                        highlights: vector_hit.highlights,
+                        explanation,
+                    }
+                }
                 (None, None) => continue,
             };
 
@@ -173,7 +207,7 @@ impl ElasticsearchRRFCombiner {
         1.0 / rank
     }
 
-    fn create_merged_explanation(
+    fn create_rrf_explanation(
         fused_score: f64,
         text_rank: Option<usize>,
         text_score: Option<f64>,
@@ -183,7 +217,7 @@ impl ElasticsearchRRFCombiner {
         vector_explanation: Option<&serde_json::Value>,
         rrf_options: &RRFOptions,
     ) -> Option<serde_json::Value> {
-        // Only create merged explanation if at least one component has an explanation
+        // Only create RRF explanation if at least one component has an explanation
         if text_explanation.is_none() && vector_explanation.is_none() {
             return None;
         }
