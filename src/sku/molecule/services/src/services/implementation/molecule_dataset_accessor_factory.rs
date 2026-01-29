@@ -207,7 +207,9 @@ impl MoleculeDatasetReader {
             return Ok(None);
         };
 
-        let df = df.filter(col(filter_key).eq(lit(filter_value))).int_err()?;
+        let df = df
+            .filter(lower(col(filter_key)).eq(lower(lit(filter_value))))
+            .int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
         assert!(records.len() <= 1);

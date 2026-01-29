@@ -531,6 +531,47 @@ async fn test_molecule_v2_provision_project(es_ctx: Arc<ElasticsearchTestContext
         }),
     );
 
+    // Read back the project entry by `ipnftUid`` with modified character casing
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($ipnftUid: String!) {
+                    molecule {
+                        v2 {
+                            project(ipnftUid: $ipnftUid) {
+                                account { id accountName }
+                                ipnftSymbol
+                                ipnftUid
+                                ipnftAddress
+                                ipnftTokenId
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcad88677cA87a7815728C72D74B4ff4982d54fc1_9",
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        json!({
+            "account": {
+                "id": project_account_id,
+                "accountName": project_account_name,
+            },
+            "ipnftSymbol": "vitafast",
+            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+            "ipnftTokenId": "9",
+        }),
+    );
+
     // Project appears in the list
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_PROJECTS))
