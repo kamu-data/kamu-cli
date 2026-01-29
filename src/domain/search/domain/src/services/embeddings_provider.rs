@@ -13,15 +13,32 @@ use internal_error::InternalError;
 
 #[async_trait::async_trait]
 pub trait EmbeddingsProvider: Send + Sync {
+    /// Provides embeddings for a batch of content pieces
     async fn provide_content_embeddings(
         &self,
         content: Vec<String>,
-    ) -> Result<Vec<Vec<f32>>, InternalError>;
+    ) -> Result<Vec<Vec<f32>>, EmbeddingsProviderError>;
 
+    /// Provides embeddings for a single prompt
     async fn provide_prompt_embeddings(
         &self,
         prompt: String,
-    ) -> Result<Option<Vec<f32>>, InternalError>;
+    ) -> Result<Vec<f32>, EmbeddingsProviderError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum EmbeddingsProviderError {
+    #[error("Generating real embeddings are not supported by the current provider")]
+    Unsupported,
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

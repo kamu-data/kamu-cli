@@ -23,9 +23,15 @@ pub struct PostgresEmbeddingsCacheRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
-    /// Ensures that the embedding model is registered in the cache
+    #[tracing::instrument(
+        level = "debug",
+        name = PostgresEmbeddingsCacheRepository_ensure_model,
+        skip_all,
+        fields(key = ?key, dims = %dims)
+    )]
     async fn ensure_model(
         &self,
         key: &EmbeddingModelKey,
@@ -72,8 +78,13 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         })
     }
 
-    /// Returns a map-like vec: only hits are returned.
-    async fn get_many(
+    #[tracing::instrument(
+        level = "debug",
+        name = PostgresEmbeddingsCacheRepository_retrieve_embeddings_batch,
+        skip_all,
+        fields(keys_count = keys.len())
+    )]
+    async fn retrieve_embeddings_batch(
         &self,
         keys: &[EmbeddingCacheKey],
     ) -> Result<Vec<(EmbeddingCacheKey, Vec<u8>)>, EmbeddingsCacheError> {
@@ -85,8 +96,8 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         let connection_mut = tr.connection_mut().await?;
 
         // Build query with UNNEST for efficient batch lookup
-        let model_ids: Vec<i64> = keys.iter().map(|k| k.model_id).collect();
-        let input_hashes: Vec<Vec<u8>> = keys.iter().map(|k| k.input_hash.to_vec()).collect();
+        let model_ids: Vec<_> = keys.iter().map(|k| k.model_id).collect();
+        let input_hashes: Vec<_> = keys.iter().map(|k| k.input_hash.to_vec()).collect();
 
         let records = sqlx::query!(
             r#"
@@ -120,8 +131,13 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         Ok(result)
     }
 
-    /// Inserts only missing rows. Must be idempotent.
-    async fn put_many_if_absent(
+    #[tracing::instrument(
+        level = "debug",
+        name = PostgresEmbeddingsCacheRepository_bulk_upsert_embeddings,
+        skip_all,
+        fields(rows_count = rows.len())
+    )]
+    async fn bulk_upsert_embeddings(
         &self,
         rows: &[(EmbeddingCacheKey, Vec<u8>)],
     ) -> Result<(), EmbeddingsCacheError> {
@@ -132,10 +148,10 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let model_ids: Vec<i64> = rows.iter().map(|r| r.0.model_id).collect();
-        let input_hashes: Vec<Vec<u8>> = rows.iter().map(|r| r.0.input_hash.to_vec()).collect();
-        let input_texts: Vec<String> = rows.iter().map(|r| r.0.input_text.clone()).collect();
-        let embeddings: Vec<Vec<u8>> = rows.iter().map(|r| r.1.clone()).collect();
+        let model_ids: Vec<_> = rows.iter().map(|r| r.0.model_id).collect();
+        let input_hashes: Vec<_> = rows.iter().map(|r| r.0.input_hash.to_vec()).collect();
+        let input_texts: Vec<_> = rows.iter().map(|r| r.0.input_text.clone()).collect();
+        let embeddings: Vec<_> = rows.iter().map(|r| r.1.clone()).collect();
 
         sqlx::query!(
             r#"
@@ -155,8 +171,13 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         Ok(())
     }
 
-    /// Stats bump for keys we used
-    async fn touch_many(
+    #[tracing::instrument(
+        level = "debug",
+        name = PostgresEmbeddingsCacheRepository_touch_embeddings,
+        skip_all,
+        fields(keys_count = keys.len())
+    )]
+    async fn touch_embeddings(
         &self,
         keys: &[EmbeddingCacheKey],
         now: DateTime<Utc>,
@@ -168,8 +189,8 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let model_ids: Vec<i64> = keys.iter().map(|k| k.model_id).collect();
-        let input_hashes: Vec<Vec<u8>> = keys.iter().map(|k| k.input_hash.to_vec()).collect();
+        let model_ids: Vec<_> = keys.iter().map(|k| k.model_id).collect();
+        let input_hashes: Vec<_> = keys.iter().map(|k| k.input_hash.to_vec()).collect();
 
         sqlx::query!(
             r#"
@@ -191,7 +212,12 @@ impl EmbeddingsCacheRepository for PostgresEmbeddingsCacheRepository {
         Ok(())
     }
 
-    /// Cache eviction logic
+    #[tracing::instrument(
+        level = "debug",
+        name = PostgresEmbeddingsCacheRepository_evict_older_than,
+        skip_all,
+        fields(older_than, limit)
+    )]
     async fn evict_older_than(
         &self,
         older_than: DateTime<Utc>,

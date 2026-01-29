@@ -26,6 +26,7 @@ pub struct EmbeddingsProviderImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[dill::component(pub)]
 #[dill::interface(dyn EmbeddingsProvider)]
 impl EmbeddingsProviderImpl {
@@ -109,11 +110,16 @@ impl EmbeddingsProviderImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl EmbeddingsProvider for EmbeddingsProviderImpl {
-    #[tracing::instrument(level = "debug", name =EmbeddingsProviderImpl_provide_content_embeddings,  skip_all, fields(content))]
+    #[tracing::instrument(
+        level = "debug",
+        name =EmbeddingsProviderImpl_provide_content_embeddings,
+        skip_all,
+        fields(content_parts = content.len())
+    )]
     async fn provide_content_embeddings(
         &self,
         content: Vec<String>,
-    ) -> Result<Vec<Vec<f32>>, InternalError> {
+    ) -> Result<Vec<Vec<f32>>, EmbeddingsProviderError> {
         // 1) Ensure model exists (so we have model_id).
         let model = self
             .cached_model
@@ -128,17 +134,27 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
             })
             .await?;
 
+        tracing::debug!(model = ?model, "Resolved embedding model");
+
         // 2) Split parts into chunks
         let chunks = self.embeddings_chunker.chunk(content).await?;
         if chunks.is_empty() {
+            tracing::warn!("No chunks produced from input content");
             return Ok(vec![]);
         }
+
+        tracing::debug!(chunk_count = chunks.len(), "Content chunking completed");
 
         // 3) Normalize chunks
         let normalized_chunks: Vec<String> = chunks
             .iter()
             .map(|s| Self::normalize_input_chunk(s))
             .collect();
+
+        tracing::debug!(
+            normalized_chunk_count = normalized_chunks.len(),
+            "Chunk normalization completed"
+        );
 
         // 4) Check cache for existing embeddings
         let cache_keys: Vec<EmbeddingCacheKey> = normalized_chunks
@@ -152,7 +168,7 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         let hits = self
             .embeddings_cache_repo
-            .get_many(&cache_keys)
+            .retrieve_embeddings_batch(&cache_keys)
             .await
             .int_err()?;
 
@@ -161,6 +177,12 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
         for (k, v) in hits {
             hit_map.insert(k, v);
         }
+
+        tracing::debug!(
+            hit_count = hit_map.len(),
+            miss_count = cache_keys.len() - hit_map.len(),
+            "Cache lookup completed"
+        );
 
         // 5) Identify misses in input order
         let mut miss_positions = Vec::<usize>::new();
@@ -174,37 +196,43 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         // 6) Encode misses via encoder (chunk by max_batch)
         if !miss_texts.is_empty() {
-            let mut newly_computed: Vec<(EmbeddingCacheKey, Vec<u8>)> = Vec::new();
-
+            // Invoke encoder
             let new_vecs = self.embeddings_encoder.encode(miss_texts).await?;
-            if !new_vecs.is_empty() {
-                assert_eq!(new_vecs.len(), miss_positions.len());
-
-                for (i, vec) in new_vecs.into_iter().enumerate() {
-                    let original_position = miss_positions[i];
-                    let k = cache_keys[original_position].clone();
-
-                    let bytes = Self::pack_f32_le(&vec, model.dims)?;
-                    newly_computed.push((k.clone(), bytes.clone()));
-                    hit_map.insert(k, bytes);
-                }
-
-                // 7) Persist computed embeddings (idempotent)
-                self.embeddings_cache_repo
-                    .put_many_if_absent(&newly_computed)
-                    .await
-                    .int_err()?;
+            if new_vecs.is_empty() {
+                return Err(EmbeddingsProviderError::Unsupported);
             }
+
+            // Sanity check
+            tracing::debug!(
+                new_embeddings_count = new_vecs.len(),
+                "New embeddings computed"
+            );
+            assert_eq!(new_vecs.len(), miss_positions.len());
+
+            // Map newly computed embeddings back to original positions
+            let mut newly_computed: Vec<(EmbeddingCacheKey, Vec<u8>)> = Vec::new();
+            for (i, vec) in new_vecs.into_iter().enumerate() {
+                let original_position = miss_positions[i];
+                let k = cache_keys[original_position].clone();
+
+                let bytes = Self::pack_f32_le(&vec, model.dims)?;
+                newly_computed.push((k.clone(), bytes.clone()));
+                hit_map.insert(k, bytes);
+            }
+
+            // 7) Persist computed embeddings (idempotent)
+            self.embeddings_cache_repo
+                .bulk_upsert_embeddings(&newly_computed)
+                .await
+                .int_err()?;
         }
 
-        // Handle empty case
-        if hit_map.is_empty() {
-            return Ok(vec![]);
-        }
+        // There must be hits for all keys now
+        assert_eq!(hit_map.len(), normalized_chunks.len());
 
         // 8) Touch stats
         self.embeddings_cache_repo
-            .touch_many(&cache_keys, Utc::now())
+            .touch_embeddings(&cache_keys, Utc::now())
             .await
             .int_err()?;
 
@@ -213,18 +241,23 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
         for k in &cache_keys {
             let bytes = hit_map
                 .get(k)
-                .ok_or_else(|| InternalError::new("Cache invariant failed: missing embedding"))?;
+                .expect("All embeddings must be in the map by now");
             out.push(Self::unpack_f32_le(bytes, model.dims)?);
         }
 
         Ok(out)
     }
 
-    #[tracing::instrument(level = "debug", name =EmbeddingsProviderImpl_provide_prompt_embeddings, skip_all, fields(prompt))]
+    #[tracing::instrument(
+        level = "debug",
+        name = EmbeddingsProviderImpl_provide_prompt_embeddings,
+        skip_all,
+        fields(prompt)
+    )]
     async fn provide_prompt_embeddings(
         &self,
         prompt: String,
-    ) -> Result<Option<Vec<f32>>, InternalError> {
+    ) -> Result<Vec<f32>, EmbeddingsProviderError> {
         // 1) Ensure model exists (so we have model_id).
         let model = self
             .cached_model
@@ -238,6 +271,8 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
                     .int_err()
             })
             .await?;
+
+        tracing::debug!(model = ?model, "Resolved embedding model");
 
         // 2) Normalize prompt
         let normalized_prompt = Self::normalize_input_chunk(&prompt);
@@ -252,12 +287,11 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
         // 4) Check cache
         let hits = self
             .embeddings_cache_repo
-            .get_many(std::slice::from_ref(&cache_key))
+            .retrieve_embeddings_batch(std::slice::from_ref(&cache_key))
             .await
             .int_err()?;
 
         let embedding_bytes = if let Some((_, bytes)) = hits.into_iter().next() {
-            // Cache hit
             bytes
         } else {
             // Cache miss - encode
@@ -270,14 +304,14 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
                 .next()
             else {
                 // Encoder returned nothing
-                return Ok(None);
+                return Err(EmbeddingsProviderError::Unsupported);
             };
 
             let bytes = Self::pack_f32_le(&prompt_vec, model.dims)?;
 
             // 5) Persist to cache (idempotent)
             self.embeddings_cache_repo
-                .put_many_if_absent(&[(cache_key.clone(), bytes.clone())])
+                .bulk_upsert_embeddings(&[(cache_key.clone(), bytes.clone())])
                 .await
                 .int_err()?;
 
@@ -286,12 +320,12 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         // 6) Touch stats
         self.embeddings_cache_repo
-            .touch_many(&[cache_key], Utc::now())
+            .touch_embeddings(&[cache_key], Utc::now())
             .await
             .int_err()?;
 
         // 7) Unpack and return
-        Self::unpack_f32_le(&embedding_bytes, model.dims).map(Some)
+        Self::unpack_f32_le(&embedding_bytes, model.dims).map_err(Into::into)
     }
 }
 

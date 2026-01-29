@@ -24,19 +24,19 @@ pub trait EmbeddingsCacheRepository: Send + Sync {
     ) -> Result<EmbeddingModelRow, EmbeddingsCacheError>;
 
     /// Returns a map-like vec: only hits are returned.
-    async fn get_many(
+    async fn retrieve_embeddings_batch(
         &self,
         keys: &[EmbeddingCacheKey],
     ) -> Result<Vec<(EmbeddingCacheKey, Vec<u8>)>, EmbeddingsCacheError>;
 
     /// Inserts only missing rows. Must be idempotent.
-    async fn put_many_if_absent(
+    async fn bulk_upsert_embeddings(
         &self,
         rows: &[(EmbeddingCacheKey, Vec<u8>)],
     ) -> Result<(), EmbeddingsCacheError>;
 
     /// Stats bump for keys we used
-    async fn touch_many(
+    async fn touch_embeddings(
         &self,
         keys: &[EmbeddingCacheKey],
         now: DateTime<Utc>,

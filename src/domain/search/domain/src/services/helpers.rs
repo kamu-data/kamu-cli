@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::*;
 
@@ -96,12 +96,13 @@ pub async fn prepare_semantic_embeddings_document(
     }
 
     // Obtain embeddings for input texts
-    let vectors = embeddings_provider
-        .provide_content_embeddings(texts)
-        .await?;
-    if vectors.is_empty() {
-        return Ok(SearchFieldUpdate::Absent);
-    }
+    let vectors = match embeddings_provider.provide_content_embeddings(texts).await {
+        Ok(v) => Ok(v),
+        Err(EmbeddingsProviderError::Unsupported) => {
+            return Ok(SearchFieldUpdate::Absent);
+        }
+        Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+    }?;
 
     #[derive(serde::Serialize)]
     struct ChunkDoc<'a> {

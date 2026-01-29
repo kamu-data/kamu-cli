@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+common-macros = { workspace = true }
 database-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-search = { workspace = true }

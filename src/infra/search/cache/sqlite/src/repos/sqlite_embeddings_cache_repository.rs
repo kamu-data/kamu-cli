@@ -23,9 +23,15 @@ pub struct SqliteEmbeddingsCacheRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
-    /// Ensures that the embedding model is registered in the cache
+    #[tracing::instrument(
+        level = "debug",
+        name = SqliteEmbeddingsCacheRepository_ensure_model,
+        skip_all,
+        fields(key = ?key, dims = %dims)
+    )]
     async fn ensure_model(
         &self,
         key: &EmbeddingModelKey,
@@ -74,8 +80,13 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         })
     }
 
-    /// Returns a map-like vec: only hits are returned.
-    async fn get_many(
+    #[tracing::instrument(
+        level = "debug",
+        name = SqliteEmbeddingsCacheRepository_retrieve_embeddings_batch,
+        skip_all,
+        fields(keys_count = keys.len())
+    )]
+    async fn retrieve_embeddings_batch(
         &self,
         keys: &[EmbeddingCacheKey],
     ) -> Result<Vec<(EmbeddingCacheKey, Vec<u8>)>, EmbeddingsCacheError> {
@@ -120,8 +131,13 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         Ok(result)
     }
 
-    /// Inserts only missing rows. Must be idempotent.
-    async fn put_many_if_absent(
+    #[tracing::instrument(
+        level = "debug",
+        name = SqliteEmbeddingsCacheRepository_bulk_upsert_embeddings,
+        skip_all,
+        fields(rows_count = rows.len())
+    )]
+    async fn bulk_upsert_embeddings(
         &self,
         rows: &[(EmbeddingCacheKey, Vec<u8>)],
     ) -> Result<(), EmbeddingsCacheError> {
@@ -156,8 +172,13 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         Ok(())
     }
 
-    /// Stats bump for keys we used
-    async fn touch_many(
+    #[tracing::instrument(
+        level = "debug",
+        name = SqliteEmbeddingsCacheRepository_touch_embeddings,
+        skip_all,
+        fields(keys_count = keys.len())
+    )]
+    async fn touch_embeddings(
         &self,
         keys: &[EmbeddingCacheKey],
         now: DateTime<Utc>,
@@ -167,8 +188,6 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         }
 
         let mut tr = self.transaction.lock().await;
-
-        let now_str = now.to_rfc3339();
 
         // SQLite doesn't support updating multiple rows with UNNEST,
         // so we update one by one
@@ -182,7 +201,7 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
                     SET last_seen_at = $1, hit_count = hit_count + 1
                     WHERE model_id = $2 AND input_hash = $3
                 "#,
-                now_str,
+                now,
                 key.model_id,
                 input_hash_slice,
             )
@@ -194,7 +213,12 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         Ok(())
     }
 
-    /// Cache eviction logic
+    #[tracing::instrument(
+        level = "debug",
+        name = SqliteEmbeddingsCacheRepository_evict_older_than,
+        skip_all,
+        fields(older_than, limit)
+    )]
     async fn evict_older_than(
         &self,
         older_than: DateTime<Utc>,
@@ -203,20 +227,18 @@ impl EmbeddingsCacheRepository for SqliteEmbeddingsCacheRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let older_than_str = older_than.to_rfc3339();
-
         let result = sqlx::query!(
             r#"
             DELETE FROM embeddings_cache
-            WHERE rowid IN (
-                SELECT rowid
-                FROM embeddings_cache
-                WHERE last_seen_at < $1
-                ORDER BY last_seen_at ASC
-                LIMIT $2
-            )
+                WHERE rowid IN (
+                    SELECT rowid
+                    FROM embeddings_cache
+                    WHERE last_seen_at < $1
+                    ORDER BY last_seen_at ASC
+                    LIMIT $2
+                )
             "#,
-            older_than_str,
+            older_than,
             limit,
         )
         .execute(connection_mut)

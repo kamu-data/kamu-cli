@@ -96,7 +96,7 @@ impl EmbeddingsCacheRepository for InMemoryEmbeddingsCacheRepository {
         Ok(model_row)
     }
 
-    async fn get_many(
+    async fn retrieve_embeddings_batch(
         &self,
         keys: &[EmbeddingCacheKey],
     ) -> Result<Vec<(EmbeddingCacheKey, Vec<u8>)>, EmbeddingsCacheError> {
@@ -119,7 +119,7 @@ impl EmbeddingsCacheRepository for InMemoryEmbeddingsCacheRepository {
         Ok(result)
     }
 
-    async fn put_many_if_absent(
+    async fn bulk_upsert_embeddings(
         &self,
         rows: &[(EmbeddingCacheKey, Vec<u8>)],
     ) -> Result<(), EmbeddingsCacheError> {
@@ -147,7 +147,7 @@ impl EmbeddingsCacheRepository for InMemoryEmbeddingsCacheRepository {
         Ok(())
     }
 
-    async fn touch_many(
+    async fn touch_embeddings(
         &self,
         keys: &[EmbeddingCacheKey],
         now: DateTime<Utc>,

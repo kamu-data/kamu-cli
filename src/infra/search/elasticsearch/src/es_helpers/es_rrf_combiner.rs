@@ -33,21 +33,6 @@ impl ElasticsearchRRFCombiner {
         rrf_options: RRFOptions,
         limit: usize,
     ) -> SearchResponse {
-        #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-        struct DocKey {
-            schema: SearchEntitySchemaName,
-            id: String,
-        }
-
-        #[derive(Debug, Default)]
-        struct Acc {
-            fused: f64,
-            text_rank: Option<usize>,
-            vector_rank: Option<usize>,
-            text_hit: Option<SearchHit>,
-            vector_hit: Option<SearchHit>,
-        }
-
         let mut map: HashMap<DocKey, Acc> = HashMap::new();
 
         for (i, hit) in text_response.hits.into_iter().enumerate() {
@@ -76,6 +61,26 @@ impl ElasticsearchRRFCombiner {
             entry.vector_rank = Some(rank);
             entry.vector_hit = Some(hit);
         }
+
+        let docs_in_both = map
+            .values()
+            .filter(|acc| acc.text_hit.is_some() && acc.vector_hit.is_some())
+            .count();
+
+        tracing::debug!(
+            total_unique_docs = map.len(),
+            docs_in_both = docs_in_both,
+            docs_text_only = map.len().saturating_sub(docs_in_both).saturating_sub(
+                map.values()
+                    .filter(|acc| acc.vector_hit.is_some() && acc.text_hit.is_none())
+                    .count()
+            ),
+            docs_vector_only = map
+                .values()
+                .filter(|acc| acc.vector_hit.is_some() && acc.text_hit.is_none())
+                .count(),
+            "RRF merge statistics"
+        );
 
         // Materialize and sort
         let mut fused: Vec<(DocKey, Acc)> = map.into_iter().collect();
@@ -129,6 +134,13 @@ impl ElasticsearchRRFCombiner {
             hits.push(out);
         }
 
+        tracing::debug!(
+            fused_hits = hits.len(),
+            max_score = hits.first().and_then(|h| h.score),
+            min_score = hits.last().and_then(|h| h.score),
+            "RRF fusion completed"
+        );
+
         SearchResponse {
             // these were run in parallel
             took_ms: text_response.took_ms.max(vector_response.took_ms),
@@ -146,6 +158,25 @@ impl ElasticsearchRRFCombiner {
         let rank = rank as f64;
         1.0 / rank
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct DocKey {
+    schema: SearchEntitySchemaName,
+    id: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+struct Acc {
+    fused: f64,
+    text_rank: Option<usize>,
+    vector_rank: Option<usize>,
+    text_hit: Option<SearchHit>,
+    vector_hit: Option<SearchHit>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

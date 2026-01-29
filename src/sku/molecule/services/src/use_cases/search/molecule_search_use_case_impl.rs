@@ -13,7 +13,7 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_molecule_domain::{
     molecule_announcement_search_schema as announcement_schema,
@@ -313,6 +313,12 @@ impl MoleculeSearchUseCaseImpl {
             }
         });
 
+        tracing::debug!(
+            empty_prompt = prompt.is_empty(),
+            non_zero_offset = pagination.offset > 0,
+            "Selecting search strategy"
+        );
+
         let search_results = if prompt.is_empty() {
             self.search_via_listing(ctx, entity_schemas, maybe_filter, pagination)
                 .await?
@@ -323,6 +329,12 @@ impl MoleculeSearchUseCaseImpl {
             self.search_via_hybrid_search(ctx, prompt, entity_schemas, maybe_filter, pagination)
                 .await?
         };
+
+        tracing::debug!(
+            total_hits = search_results.total_hits,
+            hits_count = search_results.hits.len(),
+            "Search completed"
+        );
 
         Ok(MoleculeSearchHitsListing {
             total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
@@ -439,19 +451,30 @@ impl MoleculeSearchUseCaseImpl {
         maybe_filter: Option<SearchFilterExpr>,
         pagination: PaginationOpts,
     ) -> Result<SearchResponse, InternalError> {
-        let maybe_prompt_embedding = self
+        // Try to get embeddings for the prompt
+        let maybe_prompt_vec = match self
             .embeddings_provider
             .provide_prompt_embeddings(prompt.to_string())
-            .await?;
+            .await
+        {
+            // Got embeddings => do hybrid search
+            Ok(v) => Ok(Some(v)),
 
-        if let Some(prompt_embedding) = maybe_prompt_embedding {
-            // Hybrid search with embeddings
+            // Encoder couldn't produce embeddings - degrade to text search
+            Err(EmbeddingsProviderError::Unsupported) => Ok(None),
+
+            // Bad error
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
+
+        // Hybrid search or degrade to text search
+        if let Some(prompt_vec) = maybe_prompt_vec {
             self.search_service
                 .hybrid_search(
                     ctx,
                     HybridSearchRequest {
                         prompt: prompt.to_string(),
-                        prompt_embedding,
+                        prompt_embedding: prompt_vec,
                         entity_schemas,
                         source: SearchRequestSourceSpec::All,
                         filter: maybe_filter,
@@ -470,7 +493,6 @@ impl MoleculeSearchUseCaseImpl {
                 .await
                 .int_err()
         } else {
-            // Degrade to text search without embeddings
             self.search_via_text_search(ctx, prompt, entity_schemas, maybe_filter, pagination)
                 .await
         }
@@ -482,7 +504,12 @@ impl MoleculeSearchUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeSearchUseCaseImpl_execute, skip_all, fields(?pagination))]
+    #[tracing::instrument(
+        level = "debug",
+        name = MoleculeSearchUseCaseImpl_execute,
+        skip_all,
+        fields(prompt, ?mode, ?filters, ?pagination ))
+    ]
     async fn execute(
         &self,
         molecule_subject: &kamu_accounts::LoggedAccount,

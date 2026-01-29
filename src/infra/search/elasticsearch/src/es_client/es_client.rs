@@ -14,6 +14,8 @@ use crate::ElasticsearchClientConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const MAX_LOG_SIZE_CHARS: usize = 1000;
+
 const DEFAULT_ELASTICSEARCH_USER: &str = "elastic";
 
 const ES_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
@@ -124,7 +126,11 @@ impl ElasticsearchClient {
         req_body: serde_json::Value,
         index_names: &[&str],
     ) -> Result<es_client::SearchResponse, ElasticsearchClientError> {
-        tracing::debug!(index_names = ?index_names, req_body = ?req_body, "Executing Elasticsearch search");
+        tracing::debug!(
+            index_names = ?index_names,
+            req_body = Self::sanitize_json_for_logging(&req_body, MAX_LOG_SIZE_CHARS),
+            "Executing Elasticsearch request"
+        );
         /*println!(
             "\nES Search request: {}, indexes: {index_names:?}\n",
             serde_json::to_string_pretty(&req_body).unwrap()
@@ -141,16 +147,17 @@ impl ElasticsearchClient {
         // Obtain and log a raw response
         let response = ensure_client_response(response).await?;
         let body: serde_json::Value = response.json().await?;
-        tracing::debug!(body = ?body, "Raw Elasticsearch response");
+        tracing::debug!(
+            body = Self::sanitize_json_for_logging(&body, MAX_LOG_SIZE_CHARS),
+            "Elasticsearch response"
+        );
         /*println!(
             "\nRaw ES Search response: {}\n",
             serde_json::to_string_pretty(&body).unwrap()
         );*/
 
         // Try interpreting the response
-
         let search_response: SearchResponse = serde_json::from_value(body).unwrap();
-        tracing::debug!(search_response=?search_response, "Parsed search response");
         Ok(search_response)
     }
 
@@ -688,6 +695,52 @@ impl ElasticsearchClient {
             }
 
             _ => false,
+        }
+    }
+
+    /// Sanitize JSON for logging by truncating large arrays (embeddings) and
+    /// limiting total size
+    fn sanitize_json_for_logging(value: &serde_json::Value, max_chars: usize) -> String {
+        fn truncate_arrays(value: &serde_json::Value) -> serde_json::Value {
+            match value {
+                serde_json::Value::Array(arr) => {
+                    // If array has more than 3 elements and looks like a vector (all numbers)
+                    if arr.len() > 3
+                        && arr
+                            .iter()
+                            .all(|v| matches!(v, serde_json::Value::Number(_)))
+                    {
+                        // This is likely an embedding vector - show only first 3 elements
+                        let truncated: Vec<_> = arr.iter().take(3).cloned().collect();
+                        serde_json::json!({
+                            "truncated_vector": truncated,
+                            "total_dims": arr.len()
+                        })
+                    } else {
+                        // Recursively process normal arrays
+                        serde_json::Value::Array(arr.iter().map(truncate_arrays).collect())
+                    }
+                }
+                serde_json::Value::Object(obj) => serde_json::Value::Object(
+                    obj.iter()
+                        .map(|(k, v)| (k.clone(), truncate_arrays(v)))
+                        .collect(),
+                ),
+                other => other.clone(),
+            }
+        }
+
+        let sanitized = truncate_arrays(value);
+        let json_str = serde_json::to_string(&sanitized).unwrap_or_else(|_| "{}".to_string());
+
+        if json_str.len() > max_chars {
+            format!(
+                "{}... (truncated, total {} chars)",
+                &json_str[..max_chars],
+                json_str.len()
+            )
+        } else {
+            json_str
         }
     }
 }

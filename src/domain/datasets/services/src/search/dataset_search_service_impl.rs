@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_datasets::*;
 use kamu_search::*;
 
@@ -108,18 +108,21 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         }
 
         // Get embeddings for the prompt
-        let Some(prompt_vec) = self
+        let prompt_vec = match self
             .embeddings_provider
             .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?
-        else {
-            // Encoder couldn't produce embeddings - cannot do vector search
-            return Ok(DatasetSearchResponse {
-                total_hits: None,
-                hits: vec![],
-            });
-        };
+        {
+            Ok(v) => Ok(v),
+            Err(EmbeddingsProviderError::Unsupported) => {
+                // Encoder couldn't produce embeddings - cannot do vector search
+                return Ok(DatasetSearchResponse {
+                    total_hits: None,
+                    hits: vec![],
+                });
+            }
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
 
         // Run vector search request
         let search_response = {
@@ -165,11 +168,18 @@ impl DatasetSearchService for DatasetSearchServiceImpl {
         }
 
         // Get embeddings for the prompt
-        let maybe_prompt_vec = self
+        let maybe_prompt_vec = match self
             .embeddings_provider
             .provide_prompt_embeddings(prompt.to_string())
             .await
-            .int_err()?;
+        {
+            Ok(v) => Ok(Some(v)),
+            Err(EmbeddingsProviderError::Unsupported) => {
+                // Encoder couldn't produce embeddings - degrade to text search
+                Ok(None)
+            }
+            Err(e @ EmbeddingsProviderError::Internal(_)) => Err(e.int_err()),
+        }?;
 
         // Run search request
         let search_response = {

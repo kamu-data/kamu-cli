@@ -224,11 +224,12 @@ impl ElasticsearchRepository {
         })
     }
 
-    #[allow(dead_code)]
     fn make_security_filter(
         &self,
         security_ctx: SearchSecurityContext,
     ) -> Option<SearchFilterExpr> {
+        tracing::debug!(security_ctx = ?security_ctx, "Building security filter for search request");
+
         match security_ctx {
             // For unrestricted context, no additional filtering
             SearchSecurityContext::Unrestricted => None,
@@ -270,7 +271,7 @@ impl ElasticsearchRepository {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SearchRepository for ElasticsearchRepository {
-    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_health skip_all)]
+    #[tracing::instrument(level = "debug", name=ElasticsearchRepository_health, skip_all)]
     async fn health(&self) -> Result<serde_json::Value, InternalError> {
         let client = self.es_client().await?;
         client.cluster_health().await.int_err()
@@ -279,7 +280,8 @@ impl SearchRepository for ElasticsearchRepository {
     #[tracing::instrument(
         level = "debug",
         name=ElasticsearchRepository_ensure_entity_index,
-        skip_all, fields(
+        skip_all,
+        fields(
             entity_kind = %schema.schema_name,
             version = schema.version
         )
@@ -424,6 +426,12 @@ impl SearchRepository for ElasticsearchRepository {
                 term_operator,
                 field_relation,
             } => {
+                tracing::debug!(
+                    ?term_operator,
+                    ?field_relation,
+                    "Performing full-text search"
+                );
+
                 let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -471,6 +479,8 @@ impl SearchRepository for ElasticsearchRepository {
             }
 
             TextSearchIntent::Prefix { prompt } => {
+                tracing::debug!("Performing prefix search");
+
                 let multi_match_policy = es_helpers::MultiMatchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -500,6 +510,8 @@ impl SearchRepository for ElasticsearchRepository {
             }
 
             TextSearchIntent::Phrase { prompt, user_slop } => {
+                tracing::debug!(user_slop, "Performing phrase search");
+
                 let phrase_search_policy = es_helpers::PhraseSearchPolicy::merge(
                     &entity_schemas
                         .iter()
@@ -628,6 +640,14 @@ impl SearchRepository for ElasticsearchRepository {
         );
         let text_search_response = text_search_response?;
         let vector_search_response = vector_search_response?;
+
+        tracing::debug!(
+            text_hits = text_search_response.hits.len(),
+            text_took_ms = text_search_response.took_ms,
+            vector_hits = vector_search_response.hits.len(),
+            vector_took_ms = vector_search_response.took_ms,
+            "Both text and vector searches completed",
+        );
 
         // Combine results using RRF
         let combined_response = es_helpers::ElasticsearchRRFCombiner::combine_search_responses(
