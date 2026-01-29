@@ -38,9 +38,9 @@ sqlx = { version = "0.8", default-features = false, features = [
 ] }
 tracing = "0.1"
 
-
-[dev-dependencies]
-database-common-macros = { workspace = true }
-
-test-log = { version = "0.2", features = ["trace"] }
-test-group = { version = "1" }
+# TODO: Enable when tests will be added
+#[dev-dependencies]
+# database-common-macros = { workspace = true }
+#
+# test-log = { version = "0.2", features = ["trace"] }
+# test-group = { version = "1" }

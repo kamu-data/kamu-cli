@@ -33,8 +33,9 @@ chrono = { version = "0.4", default-features = false }
 dill = "0.15"
 
 
-[dev-dependencies]
-database-common-macros = { workspace = true }
-
-test-log = { version = "0.2", features = ["trace"] }
-test-group = { version = "1" }
+# TODO: Enable when tests will be added
+#[dev-dependencies]
+# database-common-macros = { workspace = true }
+#
+# test-log = { version = "0.2", features = ["trace"] }
+# test-group = { version = "1" }

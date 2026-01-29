@@ -112,14 +112,28 @@ impl ElasticsearchRRFCombiner {
         for (_key, acc) in fused.into_iter().take(limit) {
             // Choose a base hit (prefer textual for highlights, or semantic if you want)
             let out = match (acc.text_hit, acc.vector_hit) {
-                (Some(textual_hit), Some(vector_hit)) => SearchHit {
-                    score: Some(acc.fused),
-                    schema_name: textual_hit.schema_name,
-                    id: textual_hit.id,
-                    source: textual_hit.source,
-                    highlights: textual_hit.highlights.or(vector_hit.highlights),
-                    explanation: textual_hit.explanation.or(vector_hit.explanation),
-                },
+                (Some(textual_hit), Some(vector_hit)) => {
+                    // Create a merged explanation with details from both searches
+                    let explanation = Self::create_merged_explanation(
+                        acc.fused,
+                        acc.text_rank,
+                        textual_hit.score,
+                        textual_hit.explanation.as_ref(),
+                        acc.vector_rank,
+                        vector_hit.score,
+                        vector_hit.explanation.as_ref(),
+                        &rrf_options,
+                    );
+
+                    SearchHit {
+                        score: Some(acc.fused),
+                        schema_name: textual_hit.schema_name,
+                        id: textual_hit.id,
+                        source: textual_hit.source,
+                        highlights: textual_hit.highlights.or(vector_hit.highlights),
+                        explanation,
+                    }
+                }
                 (Some(textual_hit), None) => SearchHit {
                     score: Some(acc.fused),
                     ..textual_hit
@@ -157,6 +171,95 @@ impl ElasticsearchRRFCombiner {
         let rank = rank_constant + rank_1_based;
         let rank = rank as f64;
         1.0 / rank
+    }
+
+    fn create_merged_explanation(
+        fused_score: f64,
+        text_rank: Option<usize>,
+        text_score: Option<f64>,
+        text_explanation: Option<&serde_json::Value>,
+        vector_rank: Option<usize>,
+        vector_score: Option<f64>,
+        vector_explanation: Option<&serde_json::Value>,
+        rrf_options: &RRFOptions,
+    ) -> Option<serde_json::Value> {
+        // Only create merged explanation if at least one component has an explanation
+        if text_explanation.is_none() && vector_explanation.is_none() {
+            return None;
+        }
+
+        let mut explanation_obj = serde_json::Map::new();
+        explanation_obj.insert(
+            "description".to_string(),
+            serde_json::json!("Reciprocal Rank Fusion (RRF) combined score"),
+        );
+        explanation_obj.insert("value".to_string(), serde_json::json!(fused_score));
+
+        let mut details = Vec::new();
+
+        // Add text search details
+        if let Some(rank) = text_rank {
+            let rrf_contribution =
+                Self::rrf_inc(rrf_options.rank_constant, rank) * rrf_options.textual_weight;
+            let mut text_detail = serde_json::Map::new();
+            text_detail.insert(
+                "description".to_string(),
+                serde_json::json!("Textual search component"),
+            );
+            text_detail.insert("rank".to_string(), serde_json::json!(rank));
+            text_detail.insert(
+                "weight".to_string(),
+                serde_json::json!(rrf_options.textual_weight),
+            );
+            text_detail.insert(
+                "rrf_contribution".to_string(),
+                serde_json::json!(rrf_contribution),
+            );
+
+            if let Some(score) = text_score {
+                text_detail.insert("original_score".to_string(), serde_json::json!(score));
+            }
+
+            if let Some(explanation) = text_explanation {
+                text_detail.insert("original_explanation".to_string(), explanation.clone());
+            }
+
+            details.push(serde_json::Value::Object(text_detail));
+        }
+
+        // Add vector search details
+        if let Some(rank) = vector_rank {
+            let rrf_contribution =
+                Self::rrf_inc(rrf_options.rank_constant, rank) * rrf_options.vector_weight;
+            let mut vector_detail = serde_json::Map::new();
+            vector_detail.insert(
+                "description".to_string(),
+                serde_json::json!("Vector search component"),
+            );
+            vector_detail.insert("rank".to_string(), serde_json::json!(rank));
+            vector_detail.insert(
+                "weight".to_string(),
+                serde_json::json!(rrf_options.vector_weight),
+            );
+            vector_detail.insert(
+                "rrf_contribution".to_string(),
+                serde_json::json!(rrf_contribution),
+            );
+
+            if let Some(score) = vector_score {
+                vector_detail.insert("original_score".to_string(), serde_json::json!(score));
+            }
+
+            if let Some(explanation) = vector_explanation {
+                vector_detail.insert("original_explanation".to_string(), explanation.clone());
+            }
+
+            details.push(serde_json::Value::Object(vector_detail));
+        }
+
+        explanation_obj.insert("details".to_string(), serde_json::Value::Array(details));
+
+        Some(serde_json::Value::Object(explanation_obj))
     }
 }
 
