@@ -59,7 +59,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
 pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     schema_name: SCHEMA_NAME,
     version: SCHEMA_VERSION,
-    upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+    upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
     fields: SCHEMA_FIELDS,
     title_field: fields::HEADLINE_KEYWORD,
     flags: SearchEntitySchemaFlags {
