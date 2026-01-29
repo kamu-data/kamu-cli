@@ -8617,12 +8617,9 @@ dependencies = [
  "async-trait",
  "cheap-clone",
  "chrono",
- "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
- "test-group",
- "test-log",
 ]
 
 [[package]]
@@ -8633,13 +8630,10 @@ dependencies = [
  "chrono",
  "common-macros",
  "database-common",
- "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
  "sqlx",
- "test-group",
- "test-log",
  "tracing",
 ]
 
@@ -8651,13 +8645,10 @@ dependencies = [
  "chrono",
  "common-macros",
  "database-common",
- "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
  "sqlx",
- "test-group",
- "test-log",
  "tracing",
 ]
 

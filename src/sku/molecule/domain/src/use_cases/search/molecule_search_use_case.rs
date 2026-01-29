@@ -29,6 +29,7 @@ pub trait MoleculeSearchUseCase: Send + Sync {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError>;
 }
 
@@ -57,12 +58,19 @@ pub struct MoleculeSearchFilters {
 pub type MoleculeSearchHitsListing = EntityPageListing<MoleculeSearchHit>;
 
 #[derive(Debug)]
-pub enum MoleculeSearchHit {
+pub struct MoleculeSearchHit {
+    pub entity: MoleculeSearchHitEntity,
+    pub score: Option<f64>,
+    pub explanation: Option<serde_json::Value>,
+}
+
+#[derive(Debug)]
+pub enum MoleculeSearchHitEntity {
     DataRoomActivity(MoleculeDataRoomActivity),
     Announcement(MoleculeGlobalAnnouncement),
 }
 
-impl MoleculeSearchHit {
+impl MoleculeSearchHitEntity {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             Self::DataRoomActivity(entity) => entity.event_time,

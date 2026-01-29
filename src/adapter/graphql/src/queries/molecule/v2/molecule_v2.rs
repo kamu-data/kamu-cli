@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
     MoleculeGlobalActivity,
     MoleculeProjectListing,
     MoleculeSearchError,
-    MoleculeSearchHit,
+    MoleculeSearchHitEntity,
     MoleculeSearchUseCase,
     MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesUseCase,
@@ -265,6 +265,7 @@ impl MoleculeV2 {
         filters: Option<MoleculeSemanticSearchFilters>,
         page: Option<usize>,
         per_page: Option<usize>,
+        #[graphql(visible = false)] explain: Option<bool>,
     ) -> Result<MoleculeSemanticSearchHitConnection> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -285,6 +286,7 @@ impl MoleculeV2 {
                 prompt.as_str(),
                 filters.map(Into::into),
                 PaginationOpts::from_page(page, per_page),
+                explain.unwrap_or(false),
             )
             .await
             .map_err(|e| -> GqlError {
@@ -305,27 +307,35 @@ impl MoleculeV2 {
             .list
             .into_iter()
             .map(|search_hit| {
-                let ipnft_uid = search_hit.ipnft_uid();
+                let ipnft_uid = search_hit.entity.ipnft_uid();
                 let Some(project) = projects_mapping.get(ipnft_uid) else {
                     return Err(GqlError::gql(format!(
                         "Project [{ipnft_uid}] unexpectedly not found",
                     )));
                 };
 
-                match search_hit {
-                    MoleculeSearchHit::DataRoomActivity(data_room_activity) => {
+                match search_hit.entity {
+                    MoleculeSearchHitEntity::DataRoomActivity(data_room_activity) => {
                         let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
                             project,
                             data_room_activity,
                         );
-                        Ok(MoleculeSemanticSearchHit::data_room_entry(entry))
+                        Ok(MoleculeSemanticSearchHit::data_room_entry(
+                            entry,
+                            search_hit.score,
+                            search_hit.explanation,
+                        ))
                     }
-                    MoleculeSearchHit::Announcement(announcement) => {
+                    MoleculeSearchHitEntity::Announcement(announcement) => {
                         let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
                             project,
                             announcement,
                         );
-                        Ok(MoleculeSemanticSearchHit::announcement(entry))
+                        Ok(MoleculeSemanticSearchHit::announcement(
+                            entry,
+                            search_hit.score,
+                            search_hit.explanation,
+                        ))
                     }
                 }
             })
@@ -394,23 +404,47 @@ pub enum MoleculeSemanticSearchHit {
 }
 
 impl MoleculeSemanticSearchHit {
-    pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
-        Self::Announcement(MoleculeSemanticSearchFoundAnnouncement { announcement })
+    pub fn announcement(
+        announcement: MoleculeAnnouncementEntry,
+        score: Option<f64>,
+        explanation: Option<serde_json::Value>,
+    ) -> Self {
+        Self::Announcement(MoleculeSemanticSearchFoundAnnouncement {
+            announcement,
+            score,
+            explanation,
+        })
     }
 
-    pub fn data_room_entry(entry: MoleculeDataRoomEntry) -> Self {
-        Self::DataRoomEntry(MoleculeSemanticSearchFoundDataRoomEntry { entry })
+    pub fn data_room_entry(
+        entry: MoleculeDataRoomEntry,
+        score: Option<f64>,
+        explanation: Option<serde_json::Value>,
+    ) -> Self {
+        Self::DataRoomEntry(MoleculeSemanticSearchFoundDataRoomEntry {
+            entry,
+            score,
+            explanation,
+        })
     }
 }
 
 #[derive(SimpleObject)]
 pub struct MoleculeSemanticSearchFoundDataRoomEntry {
     pub entry: MoleculeDataRoomEntry,
+    #[graphql(visible = false)]
+    pub score: Option<f64>,
+    #[graphql(visible = false)]
+    pub explanation: Option<serde_json::Value>,
 }
 
 #[derive(SimpleObject)]
 pub struct MoleculeSemanticSearchFoundAnnouncement {
     pub announcement: MoleculeAnnouncementEntry,
+    #[graphql(visible = false)]
+    pub score: Option<f64>,
+    #[graphql(visible = false)]
+    pub explanation: Option<serde_json::Value>,
 }
 
 page_based_connection!(

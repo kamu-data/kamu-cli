@@ -80,7 +80,7 @@ impl MoleculeSearchUseCaseImpl {
         };
 
         // Sort by event time descending
-        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.event_time()));
+        list.sort_unstable_by_key(|item| std::cmp::Reverse(item.entity.event_time()));
 
         // Pagination
         let safe_offset = pagination.offset.min(total_count);
@@ -189,7 +189,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeDataRoomActivity::from_changelog_entry_json(record)?;
-                Ok(MoleculeSearchHit::DataRoomActivity(entity))
+                Ok(MoleculeSearchHit {
+                    entity: MoleculeSearchHitEntity::DataRoomActivity(entity),
+                    score: None,
+                    explanation: None,
+                })
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -265,7 +269,11 @@ impl MoleculeSearchUseCaseImpl {
             .into_iter()
             .map(|record| {
                 let entity = MoleculeGlobalAnnouncement::from_changelog_entry_json(record)?;
-                Ok(MoleculeSearchHit::Announcement(entity))
+                Ok(MoleculeSearchHit {
+                    entity: MoleculeSearchHitEntity::Announcement(entity),
+                    score: None,
+                    explanation: None,
+                })
             })
             .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -278,6 +286,7 @@ impl MoleculeSearchUseCaseImpl {
         prompt: &str,
         maybe_search_filters: Option<MoleculeSearchFilters>,
         pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         let prompt = prompt.trim();
 
@@ -323,11 +332,25 @@ impl MoleculeSearchUseCaseImpl {
             self.search_via_listing(ctx, entity_schemas, maybe_filter, pagination)
                 .await?
         } else if pagination.offset > 0 {
-            self.search_via_text_search(ctx, prompt, entity_schemas, maybe_filter, pagination)
-                .await?
+            self.search_via_text_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await?
         } else {
-            self.search_via_hybrid_search(ctx, prompt, entity_schemas, maybe_filter, pagination)
-                .await?
+            self.search_via_hybrid_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await?
         };
 
         tracing::debug!(
@@ -370,11 +393,20 @@ impl MoleculeSearchUseCaseImpl {
                         );
 
                         // Finally wrap as search hit
-                        Ok(MoleculeSearchHit::DataRoomActivity(activity))
+                        Ok(MoleculeSearchHit {
+                            entity: MoleculeSearchHitEntity::DataRoomActivity(activity),
+                            score: hit.score,
+                            explanation: hit.explanation,
+                        })
                     }
                     announcement_schema::SCHEMA_NAME => {
-                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)
-                            .map(MoleculeSearchHit::Announcement)
+                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source).map(
+                            |announcement| MoleculeSearchHit {
+                                entity: MoleculeSearchHitEntity::Announcement(announcement),
+                                score: hit.score,
+                                explanation: hit.explanation,
+                            },
+                        )
                     }
                     _ => Err(InternalError::new(format!(
                         "Unexpected schema name: {schema_name}",
@@ -418,6 +450,7 @@ impl MoleculeSearchUseCaseImpl {
         entity_schemas: Vec<&'static str>,
         maybe_filter: Option<SearchFilterExpr>,
         pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<SearchResponse, InternalError> {
         self.search_service
             .text_search(
@@ -434,7 +467,7 @@ impl MoleculeSearchUseCaseImpl {
                     }],
                     page: Some(pagination).into(),
                     options: TextSearchOptions {
-                        enable_explain: false,
+                        enable_explain,
                         ..TextSearchOptions::default()
                     },
                 },
@@ -450,6 +483,7 @@ impl MoleculeSearchUseCaseImpl {
         entity_schemas: Vec<&'static str>,
         maybe_filter: Option<SearchFilterExpr>,
         pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<SearchResponse, InternalError> {
         // Try to get embeddings for the prompt
         let maybe_prompt_vec = match self
@@ -485,7 +519,7 @@ impl MoleculeSearchUseCaseImpl {
                         }],
                         limit: pagination.limit,
                         options: HybridSearchOptions {
-                            enable_explain: false,
+                            enable_explain,
                             ..HybridSearchOptions::for_limit(pagination.limit)
                         },
                     },
@@ -493,8 +527,15 @@ impl MoleculeSearchUseCaseImpl {
                 .await
                 .int_err()
         } else {
-            self.search_via_text_search(ctx, prompt, entity_schemas, maybe_filter, pagination)
-                .await
+            self.search_via_text_search(
+                ctx,
+                prompt,
+                entity_schemas,
+                maybe_filter,
+                pagination,
+                enable_explain,
+            )
+            .await
         }
     }
 }
@@ -517,6 +558,7 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
         prompt: &str,
         filters: Option<MoleculeSearchFilters>,
         pagination: PaginationOpts,
+        enable_explain: bool,
     ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError> {
         match mode {
             MoleculeSearchMode::ViaChangelog => {
@@ -524,8 +566,14 @@ impl MoleculeSearchUseCase for MoleculeSearchUseCaseImpl {
                     .await
             }
             MoleculeSearchMode::ViaSearchIndex => {
-                self.search_via_search_index(molecule_subject, prompt, filters, pagination)
-                    .await
+                self.search_via_search_index(
+                    molecule_subject,
+                    prompt,
+                    filters,
+                    pagination,
+                    enable_explain,
+                )
+                .await
             }
         }
     }
