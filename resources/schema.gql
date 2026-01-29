@@ -3828,10 +3828,14 @@ input MoleculeSemanticSearchFilters {
 
 type MoleculeSemanticSearchFoundAnnouncement {
 	announcement: MoleculeAnnouncementEntry!
+	score: Float
+	explanation: JSON
 }
 
 type MoleculeSemanticSearchFoundDataRoomEntry {
 	entry: MoleculeDataRoomEntry!
+	score: Float
+	explanation: JSON
 }
 
 union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundDataRoomEntry | MoleculeSemanticSearchFoundAnnouncement
@@ -3893,7 +3897,7 @@ type MoleculeV2 {
 	- specific categories and tags
 	- only returning files or announcements
 	"""
-	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int): MoleculeSemanticSearchHitConnection!
+	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int, explain: Boolean): MoleculeSemanticSearchHitConnection!
 }
 
 type MoleculeVersionedFile {
