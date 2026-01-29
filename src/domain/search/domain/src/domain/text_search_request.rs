@@ -25,6 +25,9 @@ pub struct TextSearchRequest {
     /// Structured filter
     pub filter: Option<SearchFilterExpr>,
 
+    /// Secondary sort specification: tie-breakers after relevance
+    pub secondary_sort: Vec<SearchSortSpec>,
+
     /// Pagination specification
     pub page: SearchPaginationSpec,
 

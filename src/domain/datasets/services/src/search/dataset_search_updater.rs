@@ -54,8 +54,7 @@ pub struct DatasetSearchUpdater {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_service: Arc<dyn RebacService>,
-    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,8 +67,7 @@ impl DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
             rebac_service: self.rebac_service.as_ref(),
         };
 
@@ -247,8 +245,7 @@ impl DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
             rebac_service: self.rebac_service.as_ref(),
         };
 
@@ -295,8 +292,7 @@ impl DatasetSearchUpdater {
     ) -> Result<(), InternalError> {
         // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
-            embeddings_chunker: self.embeddings_chunker.as_ref(),
-            embeddings_encoder: self.embeddings_encoder.as_ref(),
+            embeddings_provider: self.embeddings_provider.as_ref(),
             rebac_service: self.rebac_service.as_ref(),
         };
 

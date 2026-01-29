@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    SearchEntitySchema,
-    SearchEntitySchemaUpgradeMode,
-    SearchSchemaField,
-    SearchSchemaFieldRole,
-};
+use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,14 +71,6 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         role: SearchSchemaFieldRole::Keyword,
     },
     SearchSchemaField {
-        path: kamu_search::fields::VISIBILITY,
-        role: SearchSchemaFieldRole::Keyword,
-    },
-    SearchSchemaField {
-        path: kamu_search::fields::PRINCIPAL_IDS,
-        role: SearchSchemaFieldRole::Keyword,
-    },
-    SearchSchemaField {
         path: fields::CREATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
@@ -101,7 +88,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     },
     SearchSchemaField {
         path: fields::DESCRIPTION,
-        role: SearchSchemaFieldRole::Description,
+        role: SearchSchemaFieldRole::Description { add_keyword: false },
     },
     SearchSchemaField {
         path: fields::KEYWORDS,
@@ -115,10 +102,6 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::ATTACHMENTS,
         role: SearchSchemaFieldRole::Prose,
     },
-    SearchSchemaField {
-        path: kamu_search::fields::SEMANTIC_EMBEDDINGS,
-        role: SearchSchemaFieldRole::EmbeddingChunks,
-    },
 ];
 
 pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
@@ -126,8 +109,12 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: fields::ALIAS,
-    enable_banning: false, // Potentially might be useful for datasets
     upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
+    flags: SearchEntitySchemaFlags {
+        enable_banning: false,
+        enable_security: true,
+        enable_embeddings: true,
+    },
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

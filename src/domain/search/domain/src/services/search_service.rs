@@ -73,7 +73,7 @@ impl<'a> SearchContext<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum SearchSecurityContext {
     /// No security filtering (e.g., for internal system use, admin mode)
     Unrestricted,

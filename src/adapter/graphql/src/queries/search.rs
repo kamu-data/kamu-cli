@@ -172,6 +172,7 @@ impl Search {
                             source: source_spec,
                             entity_schemas,
                             filter: None,
+                            secondary_sort: sort!(kamu_search::fields::TITLE),
                             page: page_spec,
                             options: TextSearchOptions {
                                 enable_explain: false,

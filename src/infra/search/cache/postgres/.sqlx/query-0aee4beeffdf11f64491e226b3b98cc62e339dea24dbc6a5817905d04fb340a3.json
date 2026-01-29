@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE embeddings_cache\n                SET\n                    last_seen_at = $1, hit_count = hit_count + 1\n                WHERE (model_id, input_hash) IN (\n                    SELECT * FROM UNNEST($2::BIGINT[], $3::BYTEA[])\n                )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8Array",
+        "ByteaArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0aee4beeffdf11f64491e226b3b98cc62e339dea24dbc6a5817905d04fb340a3"
+}

@@ -137,6 +137,8 @@ pub fn configure_database_components(
             b.add::<kamu_webhooks_postgres::PostgresWebhookSubscriptionEventStore>();
 
             b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthEip4361NonceRepository>();
+
+            b.add::<kamu_search_cache_postgres::PostgresEmbeddingsCacheRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             MySqlPlugin::init_database_components(b);
@@ -174,6 +176,8 @@ pub fn configure_database_components(
             b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
 
             b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
+
+            b.add::<kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository>();
         }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::init_database_components(b);
@@ -209,6 +213,8 @@ pub fn configure_database_components(
             b.add::<kamu_webhooks_sqlite::SqliteWebhookSubscriptionEventStore>();
 
             b.add::<kamu_auth_web3_sqlite::SqliteWeb3AuthEip4361NonceRepository>();
+
+            b.add::<kamu_search_cache_sqlite::SqliteEmbeddingsCacheRepository>();
         }
     }
 
@@ -251,6 +257,8 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
 
     b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
+
+    b.add::<kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository>();
 
     NoOpDatabasePlugin::init_database_components(b);
 }

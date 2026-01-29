@@ -9,14 +9,18 @@
 
 #![feature(error_generic_member_access)]
 
+mod dummy_embeddings_encoder;
 mod dummy_search_service;
 mod embeddings_chunker_simple;
+mod embeddings_provider_impl;
 mod search_indexer_impl;
 mod search_lazy_init_impl;
 mod search_service_impl;
 
+pub use dummy_embeddings_encoder::*;
 pub use dummy_search_service::*;
 pub use embeddings_chunker_simple::*;
+pub use embeddings_provider_impl::*;
 pub use search_indexer_impl::*;
 pub use search_lazy_init_impl::*;
 pub use search_service_impl::*;

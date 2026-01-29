@@ -944,6 +944,7 @@ impl DatasetSearchHarness {
                     entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
                     source: SearchRequestSourceSpec::None,
                     filter: None,
+                    secondary_sort: sort!(kamu_search::fields::TITLE),
                     page: SearchPaginationSpec {
                         limit: 100,
                         offset: 0,

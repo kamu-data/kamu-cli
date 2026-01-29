@@ -119,6 +119,9 @@ kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-elasticsearch = { workspace = true }
+kamu-search-cache-inmem = { workspace = true }
+kamu-search-cache-postgres ={ workspace = true }
+kamu-search-cache-sqlite = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }

@@ -143,7 +143,7 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
                         existing_version = existing_version_metadata.schema_version,
                         new_version = self.version,
                         upgrade_mode = ?schema.upgrade_mode,
-                        enable_banning = schema.enable_banning,
+                        flags = ?schema.flags,
                         "Upgrading index to new version",
                     );
 
@@ -219,7 +219,7 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
         // This will make banned documents invisible in search results.
         // Note that the documents will still exist in the index,
         // just won't be returned in search queries.
-        if schema.enable_banning {
+        if schema.flags.enable_banning {
             Some(serde_json::json!({
                 "bool": {
                     "must_not": [

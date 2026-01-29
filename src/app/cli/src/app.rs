@@ -30,6 +30,7 @@ use kamu_flow_system::{
     MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
+use kamu_search_services::EmbeddingsProviderImpl;
 use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
 use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
 use merge::Merge as _;
@@ -1114,6 +1115,8 @@ pub fn register_config_in_catalog(
         clear_on_start: indexer.clear_on_start,
     });
 
+    catalog_builder.add::<EmbeddingsProviderImpl>();
+
     match embeddings_chunker.unwrap_or_default() {
         config::EmbeddingsChunkerConfig::Simple(cfg) => {
             catalog_builder.add::<kamu_search_services::EmbeddingsChunkerSimple>();
@@ -1135,6 +1138,10 @@ pub fn register_config_in_catalog(
                 model_name: cfg.model_name.unwrap(),
                 dimensions: cfg.dimensions.unwrap(),
             });
+        }
+
+        config::EmbeddingsEncoderConfig::Dummy => {
+            catalog_builder.add::<kamu_search_services::DummyEmbeddingsEncoder>();
         }
     }
 

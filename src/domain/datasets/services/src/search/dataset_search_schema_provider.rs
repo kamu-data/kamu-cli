@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method3;
+use database_common_macros::transactional_method4;
 use internal_error::InternalError;
 use kamu_auth_rebac::RebacService;
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, dataset_search_schema};
@@ -23,17 +23,16 @@ use crate::search::dataset_search_indexer::*;
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct DatasetSearchSchemaProvider {
     catalog: dill::Catalog,
-    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetSearchSchemaProvider {
-    #[transactional_method3(
+    #[transactional_method4(
         dataset_entry_service: Arc<dyn DatasetEntryService>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        rebac_service: Arc<dyn RebacService>
+        rebac_service: Arc<dyn RebacService>,
+        embeddings_provider: Arc<dyn EmbeddingsProvider>
     )]
     async fn index_datasets(
         &self,
@@ -43,8 +42,7 @@ impl DatasetSearchSchemaProvider {
             dataset_entry_service.as_ref(),
             dataset_registry.as_ref(),
             search_repo.as_ref(),
-            self.embeddings_chunker.as_ref(),
-            self.embeddings_encoder.as_ref(),
+            embeddings_provider.as_ref(),
             rebac_service.as_ref(),
         )
         .await

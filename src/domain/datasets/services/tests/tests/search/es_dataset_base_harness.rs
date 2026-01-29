@@ -29,12 +29,13 @@ use kamu_messaging_outbox_inmem::{
     InMemoryOutboxMessageRepository,
 };
 use kamu_search::*;
+use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{
     ElasticsearchBaseHarness,
     ElasticsearchTestContext,
     SearchTestResponse,
 };
-use kamu_search_services::SearchIndexerImpl;
+use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl, SearchIndexerImpl};
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -96,14 +97,13 @@ impl ElasticsearchDatasetBaseHarness {
             let mut embeddings_chunker = MockEmbeddingsChunker::new();
             embeddings_chunker.expect_chunk().returning(Ok);
 
-            let mut embeddings_encoder = MockEmbeddingsEncoder::new();
-            embeddings_encoder.expect_encode().returning(|_| Ok(vec![]));
-
             b.add_value(embeddings_chunker);
             b.bind::<dyn EmbeddingsChunker, MockEmbeddingsChunker>();
-            b.add_value(embeddings_encoder);
-            b.bind::<dyn EmbeddingsEncoder, MockEmbeddingsEncoder>();
+            b.add::<DummyEmbeddingsEncoder>();
+            b.add::<EmbeddingsProviderImpl>();
+            b.add::<InMemoryEmbeddingsCacheRepository>();
 
+            // Outbox messages
             register_message_dispatcher::<AccountLifecycleMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,

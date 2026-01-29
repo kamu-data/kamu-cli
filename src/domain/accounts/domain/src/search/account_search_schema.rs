@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_search::{
-    SearchEntitySchema,
-    SearchEntitySchemaUpgradeMode,
-    SearchSchemaField,
-    SearchSchemaFieldRole,
-};
+use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,10 +46,6 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
         path: fields::UPDATED_AT,
         role: SearchSchemaFieldRole::DateTime,
     },
-    SearchSchemaField {
-        path: kamu_search::fields::VISIBILITY,
-        role: SearchSchemaFieldRole::Keyword,
-    },
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,8 +55,12 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     version: SCHEMA_VERSION,
     fields: SCHEMA_FIELDS,
     title_field: fields::ACCOUNT_NAME,
-    enable_banning: true,
     upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
+    flags: SearchEntitySchemaFlags {
+        enable_banning: true,
+        enable_security: true,
+        enable_embeddings: false,
+    },
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
