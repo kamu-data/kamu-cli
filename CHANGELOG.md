@@ -20,6 +20,10 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.257.3] - 2026-01-30
+### Fixed
+- ReBAC -> DatasetSearchUpdater failure when creating new dataset, before it's indexed
+
 ## [0.257.2] - 2026-01-29
 ### Changed
 - Hybrid search flow improvements:
