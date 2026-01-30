@@ -243,6 +243,27 @@ impl DatasetSearchUpdater {
         dataset_id: &odf::DatasetID,
         properties: &kamu_auth_rebac::DatasetProperties,
     ) -> Result<(), InternalError> {
+        // Find existing document
+        let maybe_existing_document = self
+            .search_service
+            .find_document_by_id(
+                SearchContext::unrestricted(catalog),
+                dataset_search_schema::SCHEMA_NAME,
+                &dataset_id.to_string(),
+            )
+            .await
+            .int_err()?;
+
+        // Skip if document is not present.
+        // ReBAC properties would be taken into account during first set_ref()
+        if maybe_existing_document.is_none() {
+            tracing::info!(
+                dataset_id = %dataset_id,
+                "Dataset search document not found during ReBAC properties update, skipping",
+            );
+            return Ok(());
+        }
+
         // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
             embeddings_provider: self.embeddings_provider.as_ref(),
@@ -290,6 +311,27 @@ impl DatasetSearchUpdater {
         dataset_id: &odf::DatasetID,
         authorized_accounts: &[kamu_auth_rebac::AuthorizedAccount],
     ) -> Result<(), InternalError> {
+        // Find existing document
+        let maybe_existing_document = self
+            .search_service
+            .find_document_by_id(
+                SearchContext::unrestricted(catalog),
+                dataset_search_schema::SCHEMA_NAME,
+                &dataset_id.to_string(),
+            )
+            .await
+            .int_err()?;
+
+        // Skip if document is not present.
+        // ReBAC properties would be taken into account during first set_ref()
+        if maybe_existing_document.is_none() {
+            tracing::info!(
+                dataset_id = %dataset_id,
+                "Dataset search document not found during ReBAC properties update, skipping",
+            );
+            return Ok(());
+        }
+
         // Prepare indexing helper
         let indexing_helper = DatasetIndexingHelper {
             embeddings_provider: self.embeddings_provider.as_ref(),
