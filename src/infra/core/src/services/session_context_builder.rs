@@ -66,6 +66,13 @@ impl SessionContextBuilder {
                 datafusion_functions_json::register_all(&mut ctx).unwrap();
             }
         }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "query-extensions-nested-functions")] {
+                // Register array functions (and some others)
+                // https://datafusion.apache.org/user-guide/sql/scalar_functions.html#array-functions
+                datafusion::functions_nested::register_all(&mut ctx).unwrap();
+            }
+        }
 
         Ok(ctx)
     }

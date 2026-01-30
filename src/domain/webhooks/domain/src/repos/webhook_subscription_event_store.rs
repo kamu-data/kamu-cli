@@ -32,6 +32,10 @@ pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError>;
 
+    async fn list_all_subscription_ids(
+        &self,
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError>;
+
     async fn find_subscription_id_by_dataset_and_label(
         &self,
         dataset_id: &odf::DatasetID,

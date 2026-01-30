@@ -30,6 +30,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, options: AccountDomainDepen
 
     b.add::<AccessTokenServiceImpl>();
     b.add::<AccountServiceImpl>();
+    b.add::<AccountQuotaServiceImpl>();
     b.add::<AuthenticationServiceImpl>();
     b.add::<LoginPasswordAuthProvider>();
     b.add::<PredefinedAccountsRegistrator>();

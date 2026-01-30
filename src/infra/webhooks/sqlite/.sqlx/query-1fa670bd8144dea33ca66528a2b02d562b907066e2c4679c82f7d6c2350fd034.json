@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id as \"id: uuid::Uuid\" FROM webhook_subscriptions\n                WHERE status != 'REMOVED'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1fa670bd8144dea33ca66528a2b02d562b907066e2c4679c82f7d6c2350fd034"
+}

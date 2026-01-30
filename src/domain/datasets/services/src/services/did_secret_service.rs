@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use kamu_datasets::{
     DatasetLifecycleMessage,
@@ -104,20 +104,20 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
 
         match message {
             AccountLifecycleMessage::Deleted(message) => {
-                self.handle_account_lifecycle_deleted_message(message).await
+                self.handle_account_lifecycle_deleted_message(message)
+                    .await?;
             }
 
             AccountLifecycleMessage::Created(_)
             | AccountLifecycleMessage::Updated(_)
             | AccountLifecycleMessage::PasswordChanged(_) => {
                 // No action required
-                Ok(())
             }
         }
+
+        Ok(())
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
@@ -135,14 +135,14 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DidSecretService {
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                self.handle_dataset_lifecycle_deleted_message(message).await
+                self.handle_dataset_lifecycle_deleted_message(message)
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?;
             }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
-                Ok(())
-            }
+            DatasetLifecycleMessage::Renamed(_) | DatasetLifecycleMessage::Created(_) => {}
         }
+
+        Ok(())
     }
 }
 

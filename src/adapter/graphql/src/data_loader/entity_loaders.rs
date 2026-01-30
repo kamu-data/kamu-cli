@@ -14,7 +14,7 @@ use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,12 +80,11 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
             .get_accounts_by_names(&key_refs)
             .await?;
 
-        let mut result = HashMap::with_capacity(lookup.found.len());
-        for account in lookup.found {
-            result.insert(account.account_name.clone(), account);
-        }
-
-        Ok(result)
+        Ok(lookup
+            .found
+            .into_iter()
+            .map(|account| (account.account_name.clone(), account))
+            .collect())
     }
 }
 
@@ -95,12 +94,17 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
 
 pub struct DatasetHandleLoader {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 impl DatasetHandleLoader {
-    pub fn new(rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>) -> Self {
+    pub fn new(
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+    ) -> Self {
         Self {
             rebac_dataset_registry_facade,
+            dataset_registry,
         }
     }
 }
@@ -113,7 +117,7 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     type Value = odf::DatasetHandle;
     type Error = Arc<InternalError>;
 
-    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::byDatasetRef::load", skip_all, fields(num_keys = keys.len()))]
+    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::<odf::DatasetRef, odf::DatasetHandle>::load", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
         keys: &[odf::DatasetRef],
@@ -126,12 +130,48 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
             .await
             .int_err()?;
 
-        let mut result = HashMap::with_capacity(resolution.accessible_resolved_refs.len());
-        for (dataset_ref, dataset_handle) in resolution.accessible_resolved_refs {
-            result.insert(dataset_ref, dataset_handle);
-        }
+        Ok(resolution.accessible_resolved_refs.into_iter().collect())
+    }
+}
 
-        Ok(result)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetHandleLoader: AccessCheckedDatasetRef(odf::DatasetRef)
+//                      -> ResolvedDataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, Eq, Hash, Into, PartialEq))]
+pub struct AccessCheckedDatasetRef(odf::DatasetRef);
+
+impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
+    type Value = ResolvedDataset;
+    type Error = Arc<InternalError>;
+
+    #[tracing::instrument(level = "debug", name = "Gql::DatasetHandleLoader::byDatasetRef::load", skip_all, fields(num_keys = keys.len()))]
+    async fn load(
+        &self,
+        keys: &[AccessCheckedDatasetRef],
+    ) -> Result<HashMap<AccessCheckedDatasetRef, Self::Value>, Self::Error> {
+        let dataset_refs: Vec<&_> = keys.iter().map(AsRef::as_ref).collect();
+
+        let resolution = self
+            .dataset_registry
+            .resolve_dataset_handles_by_refs(&dataset_refs)
+            .await
+            .int_err()?;
+        let futures_iter = resolution
+            .resolved_handles
+            .into_iter()
+            .map(|(dataset_ref, dataset_handle)| async move {
+                let resolved_dataset = self
+                    .dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
+                (AccessCheckedDatasetRef::new(dataset_ref), resolved_dataset)
+            })
+            .collect::<Vec<_>>();
+        let resolved_dataset_pairs = futures::future::join_all(futures_iter).await;
+
+        Ok(resolved_dataset_pairs.into_iter().collect())
     }
 }
 

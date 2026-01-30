@@ -17,6 +17,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowControllerWebhookDeliver>();
 
     catalog_builder.add::<FlowWebhooksEventBridge>();
+    catalog_builder.add::<WebhookTriggerStartupRecoveryJob>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

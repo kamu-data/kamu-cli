@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id FROM webhook_subscriptions\n                WHERE status != 'REMOVED'::webhook_subscription_status\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "af503eb9770ae39356d943e97687b0bd50f8ab1bd869c5a5fd884ce74c099d50"
+}

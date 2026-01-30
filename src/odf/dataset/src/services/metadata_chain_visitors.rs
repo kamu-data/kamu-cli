@@ -396,6 +396,13 @@ impl SearchActivePushSourcesVisitor {
         // No reallocation
         Vec::from(self.active_push_sources)
     }
+
+    pub fn into_events(self) -> Vec<AddPushSource> {
+        self.into_hashed_blocks()
+            .into_iter()
+            .map(|(_, block)| block.event)
+            .collect()
+    }
 }
 
 impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
@@ -481,6 +488,10 @@ impl SearchActivePollingSourceVisitor {
 
     pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<SetPollingSource>)> {
         self.hashed_block
+    }
+
+    pub fn into_event(self) -> Option<SetPollingSource> {
+        self.hashed_block.map(|(_, block)| block.event)
     }
 }
 
