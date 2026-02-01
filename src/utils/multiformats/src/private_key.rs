@@ -9,9 +9,13 @@
 
 use super::{Multibase, MultibaseError};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Multibase-encoded private key
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PrivateKey(ed25519_dalek::SigningKey);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Don't leak secrets in debug logs
 impl std::fmt::Debug for PrivateKey {
@@ -19,6 +23,8 @@ impl std::fmt::Debug for PrivateKey {
         f.write_str("PrivateKey(***)")
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PrivateKey {
     pub fn from_bytes(bytes: &[u8; ed25519_dalek::SECRET_KEY_LENGTH]) -> Self {
@@ -37,6 +43,8 @@ impl PrivateKey {
         Ok(Self::from_bytes(&buf))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<ed25519_dalek::SigningKey> for PrivateKey {
     fn from(value: ed25519_dalek::SigningKey) -> Self {
@@ -57,6 +65,8 @@ impl std::ops::Deref for PrivateKey {
         &self.0
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl serde::Serialize for PrivateKey {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -97,3 +107,22 @@ pub enum PrivateKeyDecodeError {
     #[error("Invalid key length, expected {expected} actual {actual}")]
     InvalidLength { actual: usize, expected: usize },
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for PrivateKey {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "PrivateKey".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::PrivateKey").into()
+    }
+
+    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        str::json_schema(g)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

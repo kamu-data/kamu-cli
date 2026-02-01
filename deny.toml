@@ -22,6 +22,7 @@ deny = [
     ### Crates we shouldn't use ####
     { name = "md5", reason = "Use `md-5` instead, which is part of the RustCrypto ecosystem" },
     { name = "native-tls", reason = "We use rustls throughout the project" },
+    { name = "serde_yaml", reason = "Use serde_yaml_ng as replacement" },
 
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
@@ -42,6 +43,8 @@ deny = [
     { name = "reqwest", deny-multiple-versions = true },
     # TODO: Too many versions between alloy, aws-sdk, reqwest etc.
     # { name = "rustls", deny-multiple-versions = true },
+    { name = "setty", deny-multiple-versions = true },
+    { name = "schemars", deny-multiple-versions = true },
     { name = "sqlx", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
     { name = "tonic", deny-multiple-versions = true },

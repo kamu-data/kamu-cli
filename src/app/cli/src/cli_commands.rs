@@ -14,6 +14,7 @@ use kamu_accounts::CurrentAccountSubject;
 use crate::accounts::CurrentAccountIndication;
 use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
+use crate::config::ConfigScope;
 use crate::{WorkspaceService, accounts, cli, odf_server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,15 +52,33 @@ pub fn get_command(
         cli::Command::Completions(c) => Box::new(CompletionsCommand::builder(c.shell).cast()),
 
         cli::Command::Config(c) => match c.subcommand {
-            cli::ConfigSubCommand::List(sc) => {
-                Box::new(ConfigListCommand::builder(sc.user, sc.with_defaults).cast())
-            }
-            cli::ConfigSubCommand::Get(sc) => {
-                Box::new(ConfigGetCommand::builder(sc.user, sc.with_defaults, sc.cfgkey).cast())
-            }
-            cli::ConfigSubCommand::Set(sc) => {
-                Box::new(ConfigSetCommand::builder(sc.user, sc.cfgkey, sc.value).cast())
-            }
+            cli::ConfigSubCommand::List(sc) => Box::new(
+                ConfigGetCommand::builder(
+                    None,
+                    if sc.user { ConfigScope::User } else { sc.scope },
+                    sc.with_defaults,
+                    sc.output_format,
+                )
+                .cast(),
+            ),
+            cli::ConfigSubCommand::Get(sc) => Box::new(
+                ConfigGetCommand::builder(
+                    sc.cfgkey,
+                    if sc.user { ConfigScope::User } else { sc.scope },
+                    sc.with_defaults,
+                    sc.output_format,
+                )
+                .cast(),
+            ),
+            cli::ConfigSubCommand::Set(sc) => Box::new(
+                ConfigSetCommand::builder(
+                    sc.cfgkey,
+                    sc.value,
+                    if sc.user { ConfigScope::User } else { sc.scope },
+                    sc.input_format,
+                )
+                .cast(),
+            ),
         },
 
         cli::Command::Delete(c) => Box::new(

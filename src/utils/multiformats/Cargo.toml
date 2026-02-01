@@ -15,6 +15,7 @@ publish = { workspace = true }
 
 [features]
 default = []
+schemars = ["dep:schemars"]
 utoipa = ["dep:utoipa", "dep:serde_json"]
 
 
@@ -52,6 +53,9 @@ unsigned-varint = { version = "0.8", default-features = false, features = [
 ] }
 
 # Optional
+schemars = { optional = true, version = "1", default-features = false, features = [
+    "derive",
+] }
 utoipa = { optional = true, version = "5", default-features = false, features = [
 ] }
 serde_json = { optional = true, version = "1", default-features = false }

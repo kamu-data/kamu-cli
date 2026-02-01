@@ -196,7 +196,10 @@ odf-storage-s3 = { version = "0.257.3", path = "src/odf/storage-s3", default-fea
 kamu-accounts-services = { version = "0.257.3", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.257.3", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-auth-web3-services = { version = "0.257.3", path = "src/domain/auth-web3/services", default-features = false }
-kamu-datasets-services = { version = "0.257.3", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"] }
+kamu-datasets-services = { version = "0.257.3", path = "src/domain/datasets/services", default-features = false, features = [
+    "lfs",
+    "s3",
+] }
 kamu-flow-system-services = { version = "0.257.3", path = "src/domain/flow-system/services", default-features = false }
 kamu-search-services = { version = "0.257.3", path = "src/domain/search/services", default-features = false }
 kamu-task-system-services = { version = "0.257.3", path = "src/domain/task-system/services", default-features = false }
@@ -374,3 +377,4 @@ debug = "line-tables-only"
 # object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }
 assert_cmd = { git = 'https://github.com/kamu-data/assert_cmd', branch = "deactivate-output-truncation" }
 # dill = { path = "../dill-rs/dill" }
+# setty = { path = "../setty/setty" }

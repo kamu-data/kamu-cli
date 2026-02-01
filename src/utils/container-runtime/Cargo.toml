@@ -21,6 +21,10 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+
+
 [dependencies]
 random-strings = { workspace = true }
 
@@ -38,8 +42,10 @@ tokio = { version = "1", default-features = false, features = [
     "process",
     "parking_lot",
 ] }
+setty = { version = "0.3", default-features = false }
 tracing = "0.1"
 url = "2"
+
 
 [target.'cfg(target_os = "linux")'.dependencies]
 once_cell = "1"

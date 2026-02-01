@@ -98,7 +98,7 @@ impl NotebookCommand {
             .start(
                 Some(std::net::Ipv4Addr::UNSPECIFIED.into()),
                 None,
-                self.auth_config.allow_anonymous.unwrap(),
+                self.auth_config.allow_anonymous,
             )
             .await?;
 

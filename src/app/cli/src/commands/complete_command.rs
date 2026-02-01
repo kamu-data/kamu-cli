@@ -100,10 +100,8 @@ impl CompleteCommand {
     }
 
     fn complete_config_key(&self, output: &mut impl Write, prefix: &str) {
-        for key in self.config_service.all_keys() {
-            if key.starts_with(prefix) {
-                writeln!(output, "{key}").unwrap();
-            }
+        for path in self.config_service.complete_path(prefix) {
+            writeln!(output, "{path}").unwrap();
         }
     }
 

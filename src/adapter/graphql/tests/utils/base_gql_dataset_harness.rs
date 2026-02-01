@@ -57,7 +57,7 @@ impl BaseGQLDatasetHarness {
                 dill::CatalogBuilder::new()
             };
 
-            b.add_value(kamu_adapter_graphql::Config::default())
+            b.add_value(kamu_adapter_graphql::GqlConfig::default())
                 .add::<DidGeneratorDefault>()
                 .add_value(tenancy_config)
                 .add::<DatabaseTransactionRunner>()

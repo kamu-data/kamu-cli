@@ -33,7 +33,7 @@ impl NotebookServerFactory {
         listener: Option<&dyn PullImageListener>,
     ) -> Result<(), ImagePullError> {
         self.container_runtime
-            .ensure_image(self.jupyter_config.image.as_ref().unwrap(), listener)
+            .ensure_image(&self.jupyter_config.image, listener)
             .await?;
 
         Ok(())
@@ -62,7 +62,7 @@ impl NotebookServerFactory {
 
         let mut contaniner = self
             .container_runtime
-            .run_attached(self.jupyter_config.image.as_ref().unwrap())
+            .run_attached(&self.jupyter_config.image)
             .random_container_name_with_prefix("kamu-jupyter-")
             .user("root")
             // Start jupyter under root which suits better for rootless podman
@@ -181,7 +181,7 @@ impl NotebookServerFactory {
             contaniner,
             token_extractor,
             container_runtime: self.container_runtime.clone(),
-            chown_image: self.jupyter_config.image.clone().unwrap(),
+            chown_image: self.jupyter_config.image.clone(),
             chown_dir: cwd,
         })
     }

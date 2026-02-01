@@ -72,11 +72,7 @@ impl SqlServerCommand {
     async fn run_datafusion_flight_sql(&self) -> Result<(), CLIError> {
         let flight_sql_svc = self
             .flight_sql_service_factory
-            .start(
-                self.address,
-                self.port,
-                self.auth_config.allow_anonymous.unwrap(),
-            )
+            .start(self.address, self.port, self.auth_config.allow_anonymous)
             .await?;
 
         eprintln!(

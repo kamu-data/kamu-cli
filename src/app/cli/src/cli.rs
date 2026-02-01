@@ -13,6 +13,7 @@ use clap::{ArgAction, Parser};
 use kamu::domain::ExportFormat;
 
 use crate::cli_value_parser::{self as parsers};
+use crate::config::{ConfigObjectFormat, ConfigScope};
 use crate::{
     LineageOutputFormat,
     MetadataLogOutputFormat,
@@ -302,6 +303,10 @@ pub enum ConfigSubCommand {
 #[derive(Debug, clap::Args)]
 #[command(visible_alias = "ls")]
 pub struct ConfigList {
+    /// Which configs to use
+    #[arg(long, value_name = "SC", value_enum, default_value_t = ConfigScope::Combined)]
+    pub scope: ConfigScope,
+
     /// Show only user scope configuration
     #[arg(long)]
     pub user: bool,
@@ -309,11 +314,19 @@ pub struct ConfigList {
     /// Show configuration with all default values applied
     #[arg(long)]
     pub with_defaults: bool,
+
+    /// Serialization format of the returned object
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = ConfigObjectFormat::Yaml)]
+    pub output_format: ConfigObjectFormat,
 }
 
 /// Get current configuration value
 #[derive(Debug, clap::Args)]
 pub struct ConfigGet {
+    /// Which configs to use
+    #[arg(long, value_name = "SC", value_enum, default_value_t = ConfigScope::Combined)]
+    pub scope: ConfigScope,
+
     /// Operate on the user scope configuration file
     #[arg(long)]
     pub user: bool,
@@ -324,12 +337,20 @@ pub struct ConfigGet {
 
     /// Path to the config option
     #[arg()]
-    pub cfgkey: String,
+    pub cfgkey: Option<String>,
+
+    /// Serialization format of the returned object
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = ConfigObjectFormat::Yaml)]
+    pub output_format: ConfigObjectFormat,
 }
 
 /// Set or unset configuration value
 #[derive(Debug, clap::Args)]
 pub struct ConfigSet {
+    /// Which configs to consider
+    #[arg(long, value_name = "SC", value_enum, default_value_t = ConfigScope::Combined)]
+    pub scope: ConfigScope,
+
     /// Operate on the user scope configuration file
     #[arg(long)]
     pub user: bool,
@@ -341,6 +362,10 @@ pub struct ConfigSet {
     /// New value to set
     #[arg(index = 2)]
     pub value: Option<String>,
+
+    /// Serialization format of the provided object
+    #[arg(long, short = 'i', value_name = "FMT", value_enum, default_value_t = ConfigObjectFormat::Yaml)]
+    pub input_format: ConfigObjectFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

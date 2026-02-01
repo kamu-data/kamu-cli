@@ -46,10 +46,13 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = "0.3"
-jsonwebtoken = { version = "10", default-features = false, features = [ "rust_crypto" ] }
+jsonwebtoken = { version = "10", default-features = false, features = [
+    "rust_crypto",
+] }
 secrecy = "0.10"
 serde = "1"
 serde_json = "1"
+setty = { version = "0.3", default-features = false }
 thiserror = "2"
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }

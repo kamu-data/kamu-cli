@@ -10,301 +10,164 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use database_common::DatabaseProvider;
-use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_webhooks::{DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES, DEFAULT_WEBHOOK_DELIVERY_TIMEOUT};
-use merge::Merge;
-use merge::option::overwrite_none;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
+use setty::types::DurationString;
 use url::Url;
 
 use crate::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct CLIConfig {
     /// Database connection configuration
-    #[merge(strategy = merge::option::overwrite_none)]
     pub database: Option<DatabaseConfig>,
 
     /// Dataset environment variables configuration
-    #[merge(strategy = merge_recursive)]
-    pub dataset_env_vars: Option<DatasetEnvVarsConfig>,
+    #[config(default)]
+    pub dataset_env_vars: DatasetEnvVarsConfig,
 
     /// Engine configuration
-    #[merge(strategy = merge_recursive)]
-    pub engine: Option<EngineConfig>,
+    #[config(default)]
+    pub engine: EngineConfig,
 
     /// Configuration for flow system
-    #[merge(strategy = merge_recursive)]
-    pub flow_system: Option<FlowSystemConfig>,
+    #[config(default)]
+    pub flow_system: FlowSystemConfig,
 
     /// Configuration for webhooks
-    #[merge(strategy = merge_recursive)]
-    pub webhooks: Option<WebhooksConfig>,
+    #[config(default)]
+    pub webhooks: WebhooksConfig,
 
     /// Data access and visualization configuration
-    #[merge(strategy = merge_recursive)]
-    pub frontend: Option<FrontendConfig>,
+    #[config(default)]
+    pub frontend: FrontendConfig,
 
     /// UNSTABLE: Identity configuration
-    #[merge(strategy = merge_recursive)]
-    pub identity: Option<IdentityConfig>,
+    #[config(default)]
+    pub identity: IdentityConfig,
 
     /// Messaging outbox configuration
-    #[merge(strategy = merge_recursive)]
-    pub outbox: Option<OutboxConfig>,
+    #[config(default)]
+    pub outbox: OutboxConfig,
 
     /// Network protocols configuration
-    #[merge(strategy = merge_recursive)]
-    pub protocol: Option<ProtocolConfig>,
+    #[config(default)]
+    pub protocol: ProtocolConfig,
 
     /// Search configuration
-    #[merge(strategy = merge_recursive)]
-    pub search: Option<SearchConfig>,
+    #[config(default)]
+    pub search: SearchConfig,
 
     /// Source configuration
-    #[merge(strategy = merge_recursive)]
-    pub source: Option<SourceConfig>,
+    #[config(default)]
+    pub source: SourceConfig,
 
     /// Auth configuration
-    #[merge(strategy = merge_recursive)]
-    pub auth: Option<AuthConfig>,
+    #[config(default)]
+    pub auth: AuthConfig,
 
     /// Uploads configuration
-    #[merge(strategy = merge_recursive)]
-    pub uploads: Option<UploadsConfig>,
+    #[config(default)]
+    pub uploads: UploadsConfig,
 
     /// Did secret key encryption configuration
-    #[merge(strategy = merge::option::overwrite_none)]
-    pub did_encryption: Option<DidSecretEncryptionConfig>,
+    #[config(default)]
+    pub did_encryption: DidSecretEncryptionConfig,
 
     /// Experimental and temporary configuration options
-    #[merge(strategy = merge::option::overwrite_none)]
-    pub extra: Option<ExtraConfig>,
-}
-
-impl CLIConfig {
-    pub fn new() -> Self {
-        Self {
-            database: None,
-            dataset_env_vars: None,
-            engine: None,
-            flow_system: None,
-            webhooks: None,
-            frontend: None,
-            identity: None,
-            outbox: None,
-            protocol: None,
-            search: None,
-            source: None,
-            auth: None,
-            uploads: None,
-            did_encryption: None,
-            extra: None,
-        }
-    }
-
-    // TODO: Remove this workaround
-    // Returns config with all values set to non-None
-    // This is used to walk the key tree where values that default to None would
-    // otherwise be omitted
-    pub fn sample() -> Self {
-        Self {
-            database: Some(DatabaseConfig::sample()),
-            dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
-            engine: Some(EngineConfig::sample()),
-            flow_system: Some(FlowSystemConfig::sample()),
-            webhooks: Some(WebhooksConfig::sample()),
-            frontend: Some(FrontendConfig::sample()),
-            identity: Some(IdentityConfig::sample()),
-            outbox: Some(OutboxConfig::sample()),
-            protocol: Some(ProtocolConfig::sample()),
-            search: Some(SearchConfig::sample()),
-            source: Some(SourceConfig::sample()),
-            auth: Some(AuthConfig::sample()),
-            uploads: Some(UploadsConfig::sample()),
-            did_encryption: Some(DidSecretEncryptionConfig::sample()),
-            extra: Some(ExtraConfig::sample()),
-        }
-    }
-}
-
-impl Default for CLIConfig {
-    fn default() -> Self {
-        Self {
-            database: None,
-            dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
-            engine: Some(EngineConfig::default()),
-            flow_system: Some(FlowSystemConfig::default()),
-            webhooks: Some(WebhooksConfig::default()),
-            frontend: Some(FrontendConfig::default()),
-            identity: Some(IdentityConfig::default()),
-            outbox: Some(OutboxConfig::default()),
-            protocol: Some(ProtocolConfig::default()),
-            search: Some(SearchConfig::default()),
-            source: Some(SourceConfig::default()),
-            auth: Some(AuthConfig::default()),
-            uploads: Some(UploadsConfig::default()),
-            did_encryption: Some(DidSecretEncryptionConfig::default()),
-            extra: Some(ExtraConfig::default()),
-        }
-    }
+    #[config(default)]
+    pub extra: ExtraConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Extra
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct ExtraConfig {
-    pub graphql: kamu_adapter_graphql::Config,
-}
-
-impl ExtraConfig {
-    fn sample() -> Self {
-        Self::default()
-    }
+    #[config(default)]
+    pub graphql: kamu_adapter_graphql::GqlConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Engine
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct EngineConfig {
     /// Maximum number of engine operations that can be performed concurrently
     pub max_concurrency: Option<u32>,
+
     /// Type of the runtime to use when running the data processing engines
-    pub runtime: Option<ContainerRuntimeType>,
+    #[config(default = container_runtime::ContainerRuntimeType::Docker)]
+    pub runtime: container_runtime::ContainerRuntimeType,
+
     /// Type of the networking namespace (relevant when running in container
     /// environments)
-    pub network_ns: Option<NetworkNamespaceType>,
+    #[config(default = container_runtime::NetworkNamespaceType::Private)]
+    pub network_ns: container_runtime::NetworkNamespaceType,
+
     /// Timeout for starting an engine container
-    pub start_timeout: Option<DurationString>,
+    #[config(default_str = "30s")]
+    pub start_timeout: DurationString,
+
     /// Timeout for waiting the engine container to stop gracefully
-    pub shutdown_timeout: Option<DurationString>,
+    #[config(default_str = "5s")]
+    pub shutdown_timeout: DurationString,
+
     /// UNSTABLE: Default engine images
-    #[merge(strategy = merge_recursive)]
-    pub images: Option<EngineImagesConfig>,
+    #[config(default)]
+    pub images: EngineImagesConfig,
 
     /// Embedded Datafusion engine configuration
-    #[merge(strategy = merge_recursive)]
-    pub datafusion_embedded: Option<EngineConfigDatafution>,
-}
-
-impl EngineConfig {
-    pub fn new() -> Self {
-        Self {
-            max_concurrency: None,
-            runtime: None,
-            network_ns: None,
-            start_timeout: None,
-            shutdown_timeout: None,
-            images: None,
-            datafusion_embedded: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self {
-            max_concurrency: Some(0),
-            images: Some(EngineImagesConfig::sample()),
-            datafusion_embedded: Some(EngineConfigDatafution::sample()),
-            ..Self::default()
-        }
-    }
-}
-
-impl Default for EngineConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrency: None,
-            runtime: Some(ContainerRuntimeType::Docker),
-            network_ns: Some(NetworkNamespaceType::Private),
-            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
-            shutdown_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
-            images: Some(EngineImagesConfig::default()),
-            datafusion_embedded: Some(EngineConfigDatafution::default()),
-        }
-    }
+    #[config(default)]
+    pub datafusion_embedded: EngineConfigDatafusion,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct EngineImagesConfig {
     /// UNSTABLE: `Spark` engine image
-    pub spark: Option<String>,
+    #[config(default = docker_images::SPARK)]
+    pub spark: String,
+
     /// UNSTABLE: `Flink` engine image
-    pub flink: Option<String>,
+    #[config(default = docker_images::FLINK)]
+    pub flink: String,
+
     /// UNSTABLE: `Datafusion` engine image
-    pub datafusion: Option<String>,
+    #[config(default = docker_images::DATAFUSION)]
+    pub datafusion: String,
+
     /// UNSTABLE: `RisingWave` engine image
-    pub risingwave: Option<String>,
-}
-
-impl EngineImagesConfig {
-    pub fn new() -> Self {
-        Self {
-            spark: None,
-            flink: None,
-            datafusion: None,
-            risingwave: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-}
-
-impl Default for EngineImagesConfig {
-    fn default() -> Self {
-        Self {
-            spark: Some(docker_images::SPARK.to_owned()),
-            flink: Some(docker_images::FLINK.to_owned()),
-            datafusion: Some(docker_images::DATAFUSION.to_owned()),
-            risingwave: Some(docker_images::RISINGWAVE.to_owned()),
-        }
-    }
+    #[config(default = docker_images::RISINGWAVE)]
+    pub risingwave: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
-pub struct EngineConfigDatafution {
+#[derive(setty::Config, setty::Default)]
+pub struct EngineConfigDatafusion {
     /// Base configuration options
     /// See: `<https://datafusion.apache.org/user-guide/configs.html>`
-    pub base: Option<BTreeMap<String, String>>,
+    #[config(default = to_map(kamu::EngineConfigDatafusionEmbeddedBase::DEFAULT_SETTINGS), combine(merge))]
+    pub base: BTreeMap<String, String>,
 
     /// Ingest-specific overrides to the base config
-    pub ingest: Option<BTreeMap<String, String>>,
+    #[config(default = to_map(kamu::EngineConfigDatafusionEmbeddedIngest::DEFAULT_OVERRIDES), combine(merge))]
+    pub ingest: BTreeMap<String, String>,
 
     /// Batch query-specific overrides to the base config
-    pub batch_query: Option<BTreeMap<String, String>>,
+    #[config(default = to_map(kamu::EngineConfigDatafusionEmbeddedBatchQuery::DEFAULT_OVERRIDES), combine(merge))]
+    pub batch_query: BTreeMap<String, String>,
 
     /// Compaction-specific overrides to the base config
-    pub compaction: Option<BTreeMap<String, String>>,
+    #[config(default = to_map(kamu::EngineConfigDatafusionEmbeddedCompaction::DEFAULT_OVERRIDES), combine(merge))]
+    pub compaction: BTreeMap<String, String>,
 
     // TODO: Integrate this parameter better with datafusion configuration
     /// Makes arrow batches use contiguous `Binary` and `Utf8` encodings instead
@@ -312,31 +175,31 @@ pub struct EngineConfigDatafution {
     /// compatibility with some older libraries that don't yet support them.
     ///
     /// See: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)
-    pub use_legacy_arrow_buffer_encoding: Option<bool>,
+    #[config(default = false)]
+    pub use_legacy_arrow_buffer_encoding: bool,
 }
 
-impl EngineConfigDatafution {
-    pub fn sample() -> Self {
-        Self {
-            base: Some(BTreeMap::from([
-                (
-                    "datafusion.execution.target_partitions".to_string(),
-                    "0".to_string(),
-                ),
-                (
-                    "datafusion.execution.parquet.metadata_size_hint".to_string(),
-                    "NULL".to_string(),
-                ),
-                (
-                    "datafusion.execution.batch_size".to_string(),
-                    "8192".to_string(),
-                ),
-            ])),
-            ingest: Some(BTreeMap::default()),
-            batch_query: Some(BTreeMap::default()),
-            compaction: Some(BTreeMap::default()),
-            use_legacy_arrow_buffer_encoding: Some(false),
-        }
+fn to_map(v: &[(&str, &str)]) -> BTreeMap<String, String> {
+    v.iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect()
+}
+
+impl EngineConfigDatafusion {
+    // Called by `ConfigService` right after loading.
+    // TODO: Consider how to incorporate this into `setty`
+    pub fn merge_with_defaults(&mut self) {
+        let mut default = Self::default();
+
+        default.base.append(&mut self.base);
+        default.ingest.append(&mut self.ingest);
+        default.batch_query.append(&mut self.batch_query);
+        default.compaction.append(&mut self.compaction);
+
+        self.base = default.base;
+        self.ingest = default.ingest;
+        self.batch_query = default.batch_query;
+        self.compaction = default.compaction;
     }
 
     pub fn into_system(
@@ -349,24 +212,20 @@ impl EngineConfigDatafution {
         ),
         CLIError,
     > {
-        let base = self.base.unwrap_or_default();
-
         let from_merged_with_base = |overrides: BTreeMap<String, String>| {
             kamu::EngineConfigDatafusionEmbeddedBase::new_session_config(
-                base.clone().into_iter().chain(overrides),
+                self.base.clone().into_iter().chain(overrides),
             )
             .map_err(CLIError::usage_error_from)
         };
 
-        let ingest_config = from_merged_with_base(self.ingest.unwrap_or_default())?;
-        let mut batch_query_config = from_merged_with_base(self.batch_query.unwrap_or_default())?;
-        let compaction_config = from_merged_with_base(self.compaction.unwrap_or_default())?;
+        let ingest_config = from_merged_with_base(self.ingest)?;
+        let mut batch_query_config = from_merged_with_base(self.batch_query)?;
+        let compaction_config = from_merged_with_base(self.compaction)?;
 
         batch_query_config.set_extension(std::sync::Arc::new(
             kamu::EngineConfigDatafusionEmbeddedBatchQueryExt {
-                use_legacy_arrow_buffer_encoding: self
-                    .use_legacy_arrow_buffer_encoding
-                    .unwrap_or_default(),
+                use_legacy_arrow_buffer_encoding: self.use_legacy_arrow_buffer_encoding,
             },
         ));
 
@@ -378,206 +237,103 @@ impl EngineConfigDatafution {
     }
 }
 
-impl Default for EngineConfigDatafution {
-    fn default() -> Self {
-        Self {
-            base: Some(
-                kamu::EngineConfigDatafusionEmbeddedBase::DEFAULT_SETTINGS
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect(),
-            ),
-            ingest: Some(
-                kamu::EngineConfigDatafusionEmbeddedIngest::DEFAULT_OVERRIDES
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect(),
-            ),
-            batch_query: Some(
-                kamu::EngineConfigDatafusionEmbeddedBatchQuery::DEFAULT_OVERRIDES
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect(),
-            ),
-            compaction: Some(
-                kamu::EngineConfigDatafusionEmbeddedCompaction::DEFAULT_OVERRIDES
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect(),
-            ),
-            use_legacy_arrow_buffer_encoding: Some(false),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Source
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct SourceConfig {
     /// Target number of records after which we will stop consuming from the
     /// resumable source and commit data, leaving the rest for the next
     /// iteration. This ensures that one data slice doesn't become too big.
-    pub target_records_per_slice: Option<u64>,
+    #[config(default = kamu::ingest::SourceConfig::default().target_records_per_slice)]
+    pub target_records_per_slice: u64,
+
     /// HTTP-specific configuration
-    pub http: Option<HttpSourceConfig>,
+    #[config(default)]
+    pub http: HttpSourceConfig,
+
     /// MQTT-specific configuration
-    #[merge(strategy = merge_recursive)]
-    pub mqtt: Option<MqttSourceConfig>,
+    #[config(default)]
+    pub mqtt: MqttSourceConfig,
+
     /// Ethereum-specific configuration
-    #[merge(strategy = merge_recursive)]
-    pub ethereum: Option<EthereumSourceConfig>,
+    #[config(default)]
+    pub ethereum: EthereumSourceConfig,
 }
 
 impl SourceConfig {
-    pub fn new() -> Self {
-        Self {
-            target_records_per_slice: None,
-            http: None,
-            mqtt: None,
-            ethereum: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self {
-            http: Some(HttpSourceConfig::sample()),
-            mqtt: Some(MqttSourceConfig::sample()),
-            ethereum: Some(EthereumSourceConfig::sample()),
-            ..Self::default()
-        }
-    }
-
     pub fn to_infra_cfg(&self) -> kamu::ingest::SourceConfig {
         kamu::ingest::SourceConfig {
-            target_records_per_slice: self.target_records_per_slice.unwrap(),
-        }
-    }
-}
-
-impl Default for SourceConfig {
-    fn default() -> Self {
-        let infra_cfg = kamu::ingest::SourceConfig::default();
-        Self {
-            target_records_per_slice: Some(infra_cfg.target_records_per_slice),
-            http: Some(HttpSourceConfig::default()),
-            mqtt: Some(MqttSourceConfig::default()),
-            ethereum: Some(EthereumSourceConfig::default()),
+            target_records_per_slice: self.target_records_per_slice,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct HttpSourceConfig {
     /// Value to use for User-Agent header
-    pub user_agent: Option<String>,
+    #[config(default = concat!("kamu-cli/", env!("CARGO_PKG_VERSION")))]
+    pub user_agent: String,
+
     /// Timeout for the connect phase of the HTTP client
-    pub connect_timeout: Option<DurationString>,
+    #[config(default = kamu::ingest::HttpSourceConfig::default().connect_timeout)]
+    pub connect_timeout: DurationString,
+
     /// Maximum number of redirects to follow
-    pub max_redirects: Option<usize>,
+    #[config(default = kamu::ingest::HttpSourceConfig::default().max_redirects)]
+    pub max_redirects: usize,
 }
 
 impl HttpSourceConfig {
-    pub fn new() -> Self {
-        Self {
-            user_agent: None,
-            connect_timeout: None,
-            max_redirects: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-
     pub fn to_infra_cfg(&self) -> kamu::ingest::HttpSourceConfig {
         kamu::ingest::HttpSourceConfig {
-            user_agent: self.user_agent.clone().unwrap(),
-            connect_timeout: (*self.connect_timeout.as_ref().unwrap()).into(),
-            max_redirects: self.max_redirects.unwrap(),
-        }
-    }
-}
-
-impl Default for HttpSourceConfig {
-    fn default() -> Self {
-        let infra_cfg = kamu::ingest::HttpSourceConfig::default();
-        Self {
-            user_agent: Some(concat!("kamu-cli/", env!("CARGO_PKG_VERSION")).to_string()),
-            connect_timeout: Some(DurationString::from(infra_cfg.connect_timeout)),
-            max_redirects: Some(infra_cfg.max_redirects),
+            user_agent: self.user_agent.clone(),
+            connect_timeout: self.connect_timeout.into(),
+            max_redirects: self.max_redirects,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct MqttSourceConfig {
     /// Time in milliseconds to wait for MQTT broker to send us some data after
     /// which we will consider that we have "caught up" and end the polling
     /// loop.
-    pub broker_idle_timeout_ms: Option<u64>,
+    #[config(default_str = "1s")]
+    pub broker_idle_timeout: DurationString,
 }
 
 impl MqttSourceConfig {
-    pub fn new() -> Self {
-        Self {
-            broker_idle_timeout_ms: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-
     pub fn to_infra_cfg(&self) -> kamu::ingest::MqttSourceConfig {
         kamu::ingest::MqttSourceConfig {
-            broker_idle_timeout_ms: self.broker_idle_timeout_ms.unwrap(),
-        }
-    }
-}
-
-impl Default for MqttSourceConfig {
-    fn default() -> Self {
-        let infra_cfg = kamu::ingest::MqttSourceConfig::default();
-        Self {
-            broker_idle_timeout_ms: Some(infra_cfg.broker_idle_timeout_ms),
+            broker_idle_timeout_ms: u64::try_from(self.broker_idle_timeout.as_millis()).unwrap(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct EthereumSourceConfig {
     /// Default RPC endpoints to use if source does not specify one explicitly.
-    #[merge(strategy = merge::vec::append)]
+    #[config(default, combine(merge))]
     pub rpc_endpoints: Vec<EthRpcEndpoint>,
 
     /// Default number of blocks to scan within one query to `eth_getLogs` RPC
     /// endpoint.
-    pub get_logs_block_stride: Option<u64>,
+    #[config(default = kamu::ingest::EthereumSourceConfig::default().get_logs_block_stride)]
+    pub get_logs_block_stride: u64,
 
     /// Forces iteration to stop after the specified number of blocks were
     /// scanned even if we didn't reach the target record number. This is useful
     /// to not lose a lot of scanning progress in case of an RPC error.
-    pub commit_after_blocks_scanned: Option<u64>,
+    #[config(default = kamu::ingest::EthereumSourceConfig::default().commit_after_blocks_scanned)]
+    pub commit_after_blocks_scanned: u64,
 
     /// Many providers don't yet return `blockTimestamp` from `eth_getLogs` RPC
     /// endpoint and in such cases `block_timestamp` column will be `null`.
@@ -586,23 +342,11 @@ pub struct EthereumSourceConfig {
     /// significant performance penalty when fetching many log records.
     ///
     /// See: [ethereum/execution-apis#295](https://github.com/ethereum/execution-apis/issues/295)
-    pub use_block_timestamp_fallback: Option<bool>,
+    #[config(default = kamu::ingest::EthereumSourceConfig::default().use_block_timestamp_fallback)]
+    pub use_block_timestamp_fallback: bool,
 }
 
 impl EthereumSourceConfig {
-    pub fn new() -> Self {
-        Self {
-            rpc_endpoints: Vec::new(),
-            get_logs_block_stride: None,
-            commit_after_blocks_scanned: None,
-            use_block_timestamp_fallback: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-
     pub fn to_infra_cfg(&self) -> kamu::ingest::EthereumSourceConfig {
         kamu::ingest::EthereumSourceConfig {
             rpc_endpoints: self
@@ -610,28 +354,14 @@ impl EthereumSourceConfig {
                 .iter()
                 .map(EthRpcEndpoint::to_infra_cfg)
                 .collect(),
-            get_logs_block_stride: self.get_logs_block_stride.unwrap(),
-            commit_after_blocks_scanned: self.commit_after_blocks_scanned.unwrap(),
-            use_block_timestamp_fallback: self.use_block_timestamp_fallback.unwrap(),
+            get_logs_block_stride: self.get_logs_block_stride,
+            commit_after_blocks_scanned: self.commit_after_blocks_scanned,
+            use_block_timestamp_fallback: self.use_block_timestamp_fallback,
         }
     }
 }
 
-impl Default for EthereumSourceConfig {
-    fn default() -> Self {
-        let infra_cfg = kamu::ingest::EthereumSourceConfig::default();
-        Self {
-            rpc_endpoints: Vec::new(),
-            get_logs_block_stride: Some(infra_cfg.get_logs_block_stride),
-            commit_after_blocks_scanned: Some(infra_cfg.commit_after_blocks_scanned),
-            use_block_timestamp_fallback: Some(infra_cfg.use_block_timestamp_fallback),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct EthRpcEndpoint {
     pub chain_id: u64,
     pub chain_name: String,
@@ -652,165 +382,77 @@ impl EthRpcEndpoint {
 // Protocol
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct ProtocolConfig {
     /// IPFS configuration
-    #[merge(strategy = merge_recursive)]
-    pub ipfs: Option<IpfsConfig>,
+    #[config(default)]
+    pub ipfs: IpfsConfig,
 
     /// `FlightSQL` configuration
-    #[merge(strategy = merge_recursive)]
-    pub flight_sql: Option<FlightSqlConfig>,
-}
-
-impl ProtocolConfig {
-    pub fn new() -> Self {
-        Self {
-            ipfs: None,
-            flight_sql: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self {
-            ipfs: Some(IpfsConfig::sample()),
-            flight_sql: Some(FlightSqlConfig::sample()),
-        }
-    }
-}
-
-impl Default for ProtocolConfig {
-    fn default() -> Self {
-        Self {
-            ipfs: Some(IpfsConfig::default()),
-            flight_sql: Some(FlightSqlConfig::default()),
-        }
-    }
+    #[config(default)]
+    pub flight_sql: FlightSqlConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct IpfsConfig {
     /// HTTP Gateway URL to use for downloads.
     /// For safety, it defaults to `http://localhost:8080` - a local IPFS daemon.
     /// If you don't have IPFS installed, you can set this URL to
     /// one of the public gateways like `https://ipfs.io`.
     /// List of public gateways can be found here: `https://ipfs.github.io/public-gateway-checker/`
-    pub http_gateway: Option<Url>,
+    #[config(default_str = "http://localhost:8080")]
+    pub http_gateway: Url,
 
     /// Whether kamu should pre-resolve IPNS `DNSLink` names using DNS or leave
     /// it to the Gateway.
-    pub pre_resolve_dnslink: Option<bool>,
-}
-
-impl IpfsConfig {
-    pub fn new() -> Self {
-        Self {
-            http_gateway: None,
-            pre_resolve_dnslink: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-}
-
-impl Default for IpfsConfig {
-    fn default() -> Self {
-        Self {
-            http_gateway: Some(Url::parse("http://localhost:8080").unwrap()),
-            pre_resolve_dnslink: Some(true),
-        }
-    }
+    #[config(default = true)]
+    pub pre_resolve_dnslink: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct FlightSqlConfig {
     /// Whether clients can authenticate as 'anonymous' user
-    pub allow_anonymous: Option<bool>,
+    #[config(default = true)]
+    pub allow_anonymous: bool,
 
     /// Time after which `FlightSQL` client session will be forgotten and client
     /// will have to re-authroize (for authenticated clients)
-    pub authed_session_expiration_timeout: Option<DurationString>,
+    #[config(default_str = "30m")]
+    pub authed_session_expiration_timeout: DurationString,
 
     /// Time after which `FlightSQL` session context will be released to free
     /// the resources (for authenticated clients)
-    pub authed_session_inactivity_timeout: Option<DurationString>,
+    #[config(default_str = "5s")]
+    pub authed_session_inactivity_timeout: DurationString,
 
     /// Time after which `FlightSQL` client session will be forgotten and client
     /// will have to re-authroize (for anonymous clients)
-    pub anon_session_expiration_timeout: Option<DurationString>,
+    #[config(default_str = "30m")]
+    pub anon_session_expiration_timeout: DurationString,
 
     /// Time after which `FlightSQL` session context will be released to free
     /// the resources (for anonymous clients)
-    pub anon_session_inactivity_timeout: Option<DurationString>,
+    #[config(default_str = "5s")]
+    pub anon_session_inactivity_timeout: DurationString,
 }
 
 impl FlightSqlConfig {
-    pub fn new() -> Self {
-        Self {
-            allow_anonymous: None,
-            authed_session_expiration_timeout: None,
-            authed_session_inactivity_timeout: None,
-            anon_session_expiration_timeout: None,
-            anon_session_inactivity_timeout: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-
     pub fn to_session_auth_config(&self) -> kamu_adapter_flight_sql::SessionAuthConfig {
         kamu_adapter_flight_sql::SessionAuthConfig {
-            allow_anonymous: self.allow_anonymous.unwrap(),
+            allow_anonymous: self.allow_anonymous,
         }
     }
 
     pub fn to_session_caching_config(&self) -> kamu_adapter_flight_sql::SessionCachingConfig {
         kamu_adapter_flight_sql::SessionCachingConfig {
-            authed_session_expiration_timeout: self
-                .authed_session_expiration_timeout
-                .unwrap()
-                .into(),
-            authed_session_inactivity_timeout: self
-                .authed_session_inactivity_timeout
-                .unwrap()
-                .into(),
-            anon_session_expiration_timeout: self.anon_session_expiration_timeout.unwrap().into(),
-            anon_session_inactivity_timeout: self.anon_session_inactivity_timeout.unwrap().into(),
-        }
-    }
-}
-
-impl Default for FlightSqlConfig {
-    fn default() -> Self {
-        Self {
-            allow_anonymous: Some(true),
-            authed_session_expiration_timeout: Some(
-                DurationString::from_string("30m".to_owned()).unwrap(),
-            ),
-            authed_session_inactivity_timeout: Some(
-                DurationString::from_string("5s".to_owned()).unwrap(),
-            ),
-            anon_session_expiration_timeout: Some(
-                DurationString::from_string("30m".to_owned()).unwrap(),
-            ),
-            anon_session_inactivity_timeout: Some(
-                DurationString::from_string("5s".to_owned()).unwrap(),
-            ),
+            authed_session_expiration_timeout: self.authed_session_expiration_timeout.into(),
+            authed_session_inactivity_timeout: self.authed_session_inactivity_timeout.into(),
+            anon_session_expiration_timeout: self.anon_session_expiration_timeout.into(),
+            anon_session_inactivity_timeout: self.anon_session_inactivity_timeout.into(),
         }
     }
 }
@@ -819,80 +461,31 @@ impl Default for FlightSqlConfig {
 // Frontend
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct FrontendConfig {
     /// Integrated Jupyter notebook configuration
-    #[merge(strategy = merge_recursive)]
-    pub jupyter: Option<JupyterConfig>,
-}
-
-impl FrontendConfig {
-    pub fn new() -> Self {
-        Self { jupyter: None }
-    }
-
-    fn sample() -> Self {
-        Self {
-            jupyter: Some(JupyterConfig::sample()),
-        }
-    }
-}
-
-impl Default for FrontendConfig {
-    fn default() -> Self {
-        Self {
-            jupyter: Some(JupyterConfig::default()),
-        }
-    }
+    #[config(default)]
+    pub jupyter: JupyterConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct JupyterConfig {
     /// Jupyter notebook server image
-    pub image: Option<String>,
+    #[config(default = docker_images::JUPYTER)]
+    pub image: String,
+
     /// UNSTABLE: Livy + Spark server image
-    pub livy_image: Option<String>,
-}
-
-impl JupyterConfig {
-    pub const IMAGE: &'static str = docker_images::JUPYTER;
-
-    pub fn new() -> Self {
-        Self {
-            image: None,
-            livy_image: None,
-        }
-    }
-
-    fn sample() -> Self {
-        Self { ..Self::default() }
-    }
-}
-
-impl Default for JupyterConfig {
-    fn default() -> Self {
-        Self {
-            image: Some(Self::IMAGE.to_owned()),
-            livy_image: EngineImagesConfig::default().spark,
-        }
-    }
+    #[config(default = docker_images::LIVY)]
+    pub livy_image: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Database
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 #[serde(tag = "provider")]
 pub enum DatabaseConfig {
     Sqlite(SqliteDatabaseConfig),
@@ -902,26 +495,6 @@ pub enum DatabaseConfig {
 }
 
 impl DatabaseConfig {
-    pub fn sample() -> Self {
-        Self::Postgres(RemoteDatabaseConfig {
-            credentials_policy: DatabaseCredentialsPolicyConfig {
-                source: DatabaseCredentialSourceConfig::RawPassword(
-                    RawDatabasePasswordPolicyConfig {
-                        user_name: String::from("root"),
-                        raw_password: String::from("p455w0rd"),
-                    },
-                ),
-                rotation_frequency_in_minutes: None,
-            },
-            database_name: String::from("kamu"),
-            host: String::from("localhost"),
-            port: Some(DatabaseProvider::Postgres.default_port()),
-            acquire_timeout_secs: None,
-            max_connections: None,
-            max_lifetime_secs: None,
-        })
-    }
-
     pub fn sqlite(database_path: &Path) -> Self {
         Self::Sqlite(SqliteDatabaseConfig {
             database_path: database_path.to_str().unwrap().into(),
@@ -929,17 +502,12 @@ impl DatabaseConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct SqliteDatabaseConfig {
     pub database_path: String,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct RemoteDatabaseConfig {
     pub credentials_policy: DatabaseCredentialsPolicyConfig,
     pub database_name: String,
@@ -950,47 +518,31 @@ pub struct RemoteDatabaseConfig {
     pub acquire_timeout_secs: Option<u64>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct DatabaseCredentialsPolicyConfig {
     pub source: DatabaseCredentialSourceConfig,
     pub rotation_frequency_in_minutes: Option<u64>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[derive(setty::Config)]
 pub enum DatabaseCredentialSourceConfig {
     RawPassword(RawDatabasePasswordPolicyConfig),
     AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
     AwsIamToken(AwsIamTokenPasswordPolicyConfig),
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct RawDatabasePasswordPolicyConfig {
     pub user_name: String,
     pub raw_password: String,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct AwsSecretDatabasePasswordPolicyConfig {
     pub secret_name: String,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config)]
 pub struct AwsIamTokenPasswordPolicyConfig {
     pub user_name: String,
 }
@@ -999,10 +551,7 @@ pub struct AwsIamTokenPasswordPolicyConfig {
 // Identity
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct IdentityConfig {
     /// Private key used to sign API responses.
     /// Currently only `ed25519` keys are supported.
@@ -1020,20 +569,11 @@ pub struct IdentityConfig {
     /// - base64-encodes them
     /// - converts default base64 encoding to base64url and removes padding
     /// - prepends a multibase prefix
+    #[config(combine(replace))]
     pub private_key: Option<odf::metadata::PrivateKey>,
 }
 
 impl IdentityConfig {
-    pub fn new() -> Self {
-        Self { private_key: None }
-    }
-
-    fn sample() -> Self {
-        Self {
-            private_key: Some(odf::metadata::PrivateKey::from_bytes(&[0; 32])),
-        }
-    }
-
     pub fn to_infra_cfg(&self) -> Option<kamu_adapter_http::data::query_types::IdentityConfig> {
         self.private_key
             .clone()
@@ -1045,371 +585,215 @@ impl IdentityConfig {
 // Search
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct SearchConfig {
     /// Indexer configuration
-    pub indexer: Option<SearchIndexerConfig>,
+    #[config(default)]
+    pub indexer: SearchIndexerConfig,
 
     /// Embeddings chunker configuration
-    pub embeddings_chunker: Option<EmbeddingsChunkerConfig>,
+    #[config(default = EmbeddingsChunkerConfig::Simple(EmbeddingsChunkerConfigSimple::default()))]
+    pub embeddings_chunker: EmbeddingsChunkerConfig,
 
     /// Embeddings encoder configuration
-    pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
+    #[config(default = EmbeddingsEncoderConfig::OpenAi(EmbeddingsEncoderConfigOpenAi::default()))]
+    pub embeddings_encoder: EmbeddingsEncoderConfig,
 
     /// Search repository configuration
-    pub repo: Option<SearchRepositoryConfig>,
+    #[config(default = SearchRepositoryConfig::Dummy(SearchRepositoryConfigDummy::default()))]
+    pub repo: SearchRepositoryConfig,
 }
 
 impl SearchConfig {
     pub const DEFAULT_MODEL: &str = "text-embedding-ada-002";
     pub const DEFAULT_DIMENSIONS: usize = 1536;
-
-    pub fn sample() -> Self {
-        Self {
-            indexer: Some(SearchIndexerConfig::default()),
-            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
-                EmbeddingsChunkerConfigSimple::default(),
-            )),
-            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
-                EmbeddingsEncoderConfigOpenAi {
-                    url: Some("https://api.openai.com/v1".to_string()),
-                    api_key: Some("<key>".to_string()),
-                    model_name: Some(Self::DEFAULT_MODEL.to_string()),
-                    dimensions: Some(Self::DEFAULT_DIMENSIONS),
-                },
-            )),
-            repo: Some(SearchRepositoryConfig::Elasticsearch(
-                SearchRepositoryConfigElasticsearch {
-                    url: "http://localhost:9200".to_string(),
-                    password: Some("root".to_string()),
-                    ca_cert_pem_path: None, // not used for http
-                    index_prefix: Some(String::new()),
-                    timeout_secs: Some(30),
-                    enable_compression: Some(false),
-                    embedding_dimensions: Some(Self::DEFAULT_DIMENSIONS),
-                },
-            )),
-        }
-    }
-}
-
-impl Default for SearchConfig {
-    fn default() -> Self {
-        Self {
-            indexer: Some(SearchIndexerConfig::default()),
-            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
-                EmbeddingsChunkerConfigSimple::default(),
-            )),
-            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
-                EmbeddingsEncoderConfigOpenAi::default(),
-            )),
-            repo: Some(SearchRepositoryConfig::default()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct SearchIndexerConfig {
     /// Whether incremental indexing is enabled
+    #[config(default = true)]
     pub incremental_indexing: bool,
 
     /// Whether to clear and re-index on start or use existing vectors if any
+    #[config(default = false)]
     pub clear_on_start: bool,
-}
-
-impl Default for SearchIndexerConfig {
-    fn default() -> Self {
-        Self {
-            incremental_indexing: true,
-            clear_on_start: false,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[derive(setty::Config)]
 pub enum EmbeddingsChunkerConfig {
     Simple(EmbeddingsChunkerConfigSimple),
 }
 
-impl Default for EmbeddingsChunkerConfig {
-    fn default() -> Self {
-        Self::Simple(EmbeddingsChunkerConfigSimple::default())
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct EmbeddingsChunkerConfigSimple {
     // Whether to chunk separately major dataset sections like name, schema, readme, or to combine
     // them all into one chunk
-    pub split_sections: Option<bool>,
+    #[config(default = false)]
+    pub split_sections: bool,
 
     // Whether to split section content by paragraph
-    pub split_paragraphs: Option<bool>,
-}
-
-impl Default for EmbeddingsChunkerConfigSimple {
-    fn default() -> Self {
-        Self {
-            split_sections: Some(false),
-            split_paragraphs: Some(false),
-        }
-    }
+    #[config(default = false)]
+    pub split_paragraphs: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[derive(setty::Config)]
 pub enum EmbeddingsEncoderConfig {
+    Dummy(EmbeddingsEncoderConfigDummy),
     OpenAi(EmbeddingsEncoderConfigOpenAi),
-    Dummy,
 }
 
-impl Default for EmbeddingsEncoderConfig {
-    fn default() -> Self {
-        Self::OpenAi(EmbeddingsEncoderConfigOpenAi::default())
-    }
-}
+#[derive(setty::Config, setty::Default)]
+pub struct EmbeddingsEncoderConfigDummy {}
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct EmbeddingsEncoderConfigOpenAi {
     pub url: Option<String>,
-    pub api_key: Option<String>,
-    pub model_name: Option<String>,
-    pub dimensions: Option<usize>,
-}
 
-impl Default for EmbeddingsEncoderConfigOpenAi {
-    fn default() -> Self {
-        Self {
-            url: None,
-            api_key: None,
-            model_name: Some(SearchConfig::DEFAULT_MODEL.to_string()),
-            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
-        }
-    }
+    pub api_key: Option<String>,
+
+    #[config(default = SearchConfig::DEFAULT_MODEL)]
+    pub model_name: String,
+
+    #[config(default = SearchConfig::DEFAULT_DIMENSIONS)]
+    pub dimensions: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "kind")]
+#[derive(setty::Config)]
 pub enum SearchRepositoryConfig {
-    #[default]
-    Dummy,
+    Dummy(SearchRepositoryConfigDummy),
     Elasticsearch(SearchRepositoryConfigElasticsearch),
     ElasticsearchContainer(SearchRepositoryConfigElasticsearchContainer),
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
+pub struct SearchRepositoryConfigDummy {}
+
+#[derive(setty::Config, setty::Default)]
 pub struct SearchRepositoryConfigElasticsearch {
-    #[merge(skip)]
-    pub url: String,
+    #[config(default_str = "http://localhost:9200")]
+    pub url: Url,
+
     pub password: Option<String>,
+
     pub ca_cert_pem_path: Option<String>,
-    pub index_prefix: Option<String>,
-    pub timeout_secs: Option<u64>,
-    pub enable_compression: Option<bool>,
-    pub embedding_dimensions: Option<usize>,
+
+    #[config(default = "")]
+    pub index_prefix: String,
+
+    #[config(default = 30)]
+    pub timeout_secs: u64,
+
+    #[config(default = false)]
+    pub enable_compression: bool,
+
+    #[config(default = SearchConfig::DEFAULT_DIMENSIONS)]
+    pub embedding_dimensions: usize,
 }
 
-impl Default for SearchRepositoryConfigElasticsearch {
-    fn default() -> Self {
-        Self {
-            url: "http://localhost:9200".to_string(),
-            password: None,
-            ca_cert_pem_path: None,
-            index_prefix: Some(String::new()),
-            timeout_secs: Some(30),
-            enable_compression: Some(false),
-            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct SearchRepositoryConfigElasticsearchContainer {
-    pub image: Option<String>,
-    pub start_timeout: Option<DurationString>,
-    pub embedding_dimensions: Option<usize>,
-}
+    #[config(default = kamu::utils::docker_images::ELASTICSEARCH)]
+    pub image: String,
 
-impl Default for SearchRepositoryConfigElasticsearchContainer {
-    fn default() -> Self {
-        Self {
-            image: Some(kamu::utils::docker_images::ELASTICSEARCH.to_string()),
-            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
-            embedding_dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
-        }
-    }
+    #[config(default_str = "30s")]
+    pub start_timeout: DurationString,
+
+    #[config(default = SearchConfig::DEFAULT_DIMENSIONS)]
+    pub embedding_dimensions: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Misc
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct UploadsConfig {
-    pub max_file_size_in_mb: Option<usize>,
-}
-
-impl UploadsConfig {
-    pub fn sample() -> Self {
-        Default::default()
-    }
-}
-
-impl Default for UploadsConfig {
-    fn default() -> Self {
-        Self {
-            max_file_size_in_mb: Some(50),
-        }
-    }
+    #[config(default = 50)]
+    pub max_file_size_in_mb: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct OutboxConfig {
-    pub awaiting_step_secs: Option<i64>,
-    pub batch_size: Option<i64>,
-}
+    #[config(default = 1)]
+    pub awaiting_step_secs: i64,
 
-impl OutboxConfig {
-    pub fn sample() -> Self {
-        Default::default()
-    }
-}
-
-impl Default for OutboxConfig {
-    fn default() -> Self {
-        Self {
-            awaiting_step_secs: Some(1),
-            batch_size: Some(20),
-        }
-    }
+    #[config(default = 20)]
+    pub batch_size: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct FlowSystemConfig {
-    #[merge(strategy = merge_recursive)]
-    pub flow_agent: Option<FlowAgentConfig>,
+    #[config(default)]
+    pub flow_agent: FlowAgentConfig,
 
-    #[merge(strategy = merge_recursive)]
-    pub flow_system_event_agent: Option<FlowSystemEventAgentConfig>,
+    #[config(default)]
+    pub flow_system_event_agent: FlowSystemEventAgentConfig,
 
-    #[merge(strategy = merge_recursive)]
-    pub task_agent: Option<TaskAgentConfig>,
+    #[config(default)]
+    pub task_agent: TaskAgentConfig,
 }
 
-impl FlowSystemConfig {
-    pub fn sample() -> Self {
-        Self {
-            flow_agent: Some(FlowAgentConfig::sample()),
-            flow_system_event_agent: Some(FlowSystemEventAgentConfig::sample()),
-            task_agent: Some(TaskAgentConfig::sample()),
-        }
-    }
-}
-
-impl Default for FlowSystemConfig {
-    fn default() -> Self {
-        Self {
-            flow_agent: Some(FlowAgentConfig::default()),
-            flow_system_event_agent: Some(FlowSystemEventAgentConfig::default()),
-            task_agent: Some(TaskAgentConfig::default()),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct FlowAgentConfig {
-    pub awaiting_step_secs: Option<i64>,
-    pub mandatory_throttling_period_secs: Option<i64>,
-    pub default_retry_policies: Option<BTreeMap<String, RetryPolicyConfig>>,
+    #[config(default = 1)]
+    pub awaiting_step_secs: i64,
+
+    #[config(default = 60)]
+    pub mandatory_throttling_period_secs: i64,
+
+    #[config(default, combine(merge))]
+    pub default_retry_policies: BTreeMap<String, RetryPolicyConfig>,
 }
 
 impl FlowAgentConfig {
-    fn sample() -> Self {
-        Self::default()
+    pub fn into_system(&self) -> kamu_flow_system::FlowAgentConfig {
+        kamu_flow_system::FlowAgentConfig::new(
+            chrono::Duration::seconds(self.awaiting_step_secs),
+            chrono::Duration::seconds(self.mandatory_throttling_period_secs),
+            self.default_retry_policies
+                .iter()
+                .map(|(t, policy)| (t.clone(), policy.into_system()))
+                .collect(),
+        )
     }
 }
 
-impl Default for FlowAgentConfig {
-    fn default() -> Self {
-        Self {
-            awaiting_step_secs: Some(1),
-            mandatory_throttling_period_secs: Some(60),
-            default_retry_policies: Some(BTreeMap::new()),
-        }
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct RetryPolicyConfig {
-    pub max_attempts: Option<u32>,
-    pub min_delay_secs: Option<u32>,
-    pub backoff_type: Option<RetryPolicyConfigBackoffType>,
+    #[config(default = 0)]
+    pub max_attempts: u32,
+
+    #[config(default = 0)]
+    pub min_delay_secs: u32,
+
+    #[config(default = RetryPolicyConfigBackoffType::Fixed)]
+    pub backoff_type: RetryPolicyConfigBackoffType,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+impl RetryPolicyConfig {
+    pub fn into_system(&self) -> kamu_flow_system::RetryPolicy {
+        kamu_flow_system::RetryPolicy::new(
+            self.max_attempts,
+            self.min_delay_secs,
+            self.backoff_type.into(),
+        )
+    }
+}
+
+#[derive(setty::Config, Copy)]
 pub enum RetryPolicyConfigBackoffType {
     Fixed,
     Linear,
@@ -1417,68 +801,73 @@ pub enum RetryPolicyConfigBackoffType {
     ExponentialWithJitter,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
+    fn from(value: RetryPolicyConfigBackoffType) -> Self {
+        match value {
+            RetryPolicyConfigBackoffType::Fixed => Self::Fixed,
+            RetryPolicyConfigBackoffType::Linear => Self::Linear,
+            RetryPolicyConfigBackoffType::Exponential => Self::Exponential,
+            RetryPolicyConfigBackoffType::ExponentialWithJitter => Self::ExponentialWithJitter,
+        }
+    }
+}
+
+// Note: these are good default values for CLI use case with SQLite target
+// Postgres targets need a higher timeout (~60s), larger batch size (~100..500),
+// and loopback offset (of batch size * 3)
+#[derive(setty::Config, setty::Default)]
 pub struct FlowSystemEventAgentConfig {
-    pub min_debounce_interval_ms: Option<u32>,
-    pub max_listening_timeout_ms: Option<u32>,
-    pub batch_size: Option<usize>,
+    #[config(default = 100)]
+    pub min_debounce_interval_ms: u32,
+
+    #[config(default = 2_000)]
+    pub max_listening_timeout_ms: u32,
+
+    #[config(default = 20)]
+    pub batch_size: usize,
 }
 
 impl FlowSystemEventAgentConfig {
-    fn sample() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for FlowSystemEventAgentConfig {
-    fn default() -> Self {
-        // Note: these are good values for CLI use case with SQLite target
-        // Postgres targets need a higher timeout (~60s), larger batch size (~100..500),
-        // and loopback offset (of batch size * 3)
-        Self {
-            min_debounce_interval_ms: Some(100),
-            max_listening_timeout_ms: Some(2000),
-            batch_size: Some(20),
+    pub fn into_system(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
+        kamu_flow_system::FlowSystemEventAgentConfig {
+            min_debounce_interval: std::time::Duration::from_millis(u64::from(
+                self.min_debounce_interval_ms,
+            )),
+            max_listening_timeout: std::time::Duration::from_millis(u64::from(
+                self.max_listening_timeout_ms,
+            )),
+            batch_size: self.batch_size,
         }
     }
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct TaskAgentConfig {
-    pub checking_interval_secs: Option<u32>,
+    #[config(default = 1)]
+    pub checking_interval_secs: u32,
 }
 
 impl TaskAgentConfig {
-    fn sample() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for TaskAgentConfig {
-    fn default() -> Self {
-        Self {
-            checking_interval_secs: Some(1),
-        }
+    pub fn into_system(&self) -> kamu_task_system_inmem::domain::TaskAgentConfig {
+        kamu_task_system_inmem::domain::TaskAgentConfig::new(chrono::Duration::seconds(i64::from(
+            self.checking_interval_secs,
+        )))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
-#[merge(strategy = overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct WebhooksConfig {
-    pub max_consecutive_failures: Option<u32>,
-    pub delivery_timeout: Option<u32>,
-    pub secret_encryption_enabled: Option<bool>,
+    #[config(default = kamu_webhooks::DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES)]
+    pub max_consecutive_failures: u32,
+
+    #[config(default = kamu_webhooks::DEFAULT_WEBHOOK_DELIVERY_TIMEOUT)]
+    pub delivery_timeout: u32,
+
+    #[config(default = false)]
+    pub secret_encryption_enabled: bool,
+
     /// Represents the encryption key for the webhooks secret. This field is
     /// required if `secret_encryption_enabled` is `true` or `None`.
     ///
@@ -1495,50 +884,6 @@ pub struct WebhooksConfig {
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub secret_encryption_key: Option<String>,
-}
-
-impl WebhooksConfig {
-    pub fn sample() -> Self {
-        Default::default()
-    }
-}
-
-impl Default for WebhooksConfig {
-    fn default() -> Self {
-        Self {
-            max_consecutive_failures: Some(DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES),
-            delivery_timeout: Some(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT),
-            secret_encryption_enabled: Some(false),
-            secret_encryption_key: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConfigScope {
-    User,
-    Workspace,
-    Flattened,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// For some reason merge crate does not recursively merge values inside `Option`
-fn merge_recursive<T>(left: &mut Option<T>, right: Option<T>)
-where
-    T: Merge,
-{
-    let Some(r) = right else {
-        return;
-    };
-
-    if let Some(l) = left {
-        l.merge(r);
-    } else {
-        left.replace(r);
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

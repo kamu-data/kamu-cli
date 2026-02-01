@@ -330,3 +330,20 @@ impl utoipa::PartialSchema for AccountID {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for AccountID {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "AccountID".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::AccountID").into()
+    }
+
+    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        str::json_schema(g)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

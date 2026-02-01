@@ -9,9 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
-use merge::Merge;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 
 use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
 use crate::{
@@ -31,11 +28,9 @@ const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/508969
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Default, Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct PredefinedAccountsConfig {
-    #[merge(strategy = merge::vec::append)]
+    #[config(default, combine(merge))]
     pub predefined: Vec<AccountConfig>,
 }
 
@@ -57,8 +52,8 @@ impl PredefinedAccountsConfig {
                 account_type: AccountType::User,
                 display_name: None,
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
-                properties: Some(vec![AccountPropertyName::IsAdmin]),
-                registered_at: Utc::now(),
+                properties: vec![AccountPropertyName::IsAdmin],
+                registered_at: None,
                 provider: AccountProvider::Password.to_string(),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
                 treat_datasets_as_public: true,
@@ -82,37 +77,50 @@ impl PredefinedAccountsConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// NOTE: Our config uses camelCase
-#[serde(rename_all = "camelCase")]
+#[setty::derive(setty::Config, Clone, Copy, PartialEq, Eq)]
 pub enum AccountPropertyName {
     CanProvisionAccounts,
-    #[serde(rename = "admin")]
+    #[serde(rename = "Admin")]
     IsAdmin,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[setty::derive(setty::Config, Clone)]
 pub struct AccountConfig {
-    // 'id' is auto-derived from `account_name` if omitted
-    id: Option<odf::AccountID>,
+    /// Auto-derived from `account_name` if omitted
+    #[config(combine(replace))]
+    pub id: Option<odf::AccountID>,
+
+    #[config(combine(replace))]
     pub account_name: odf::AccountName,
+
+    #[config(combine(replace))]
     pub password: Password,
+
+    #[config(combine(replace))]
     pub email: Email,
-    // 'display_name' is auto-derived from `account_name` if omitted
-    display_name: Option<AccountDisplayName>,
-    #[serde(default = "AccountConfig::default_account_type")]
+
+    /// Auto-derived from `account_name` if omitted
+    #[config(combine(replace))]
+    pub display_name: Option<AccountDisplayName>,
+
+    #[config(default = AccountType::User, combine(replace))]
     pub account_type: AccountType,
-    #[serde(default = "AccountConfig::default_provider")]
+
+    #[config(default = AccountProvider::Password.to_string())]
     pub provider: String,
+
     pub avatar_url: Option<String>,
-    #[serde(default = "AccountConfig::default_registered_at")]
-    pub registered_at: DateTime<Utc>,
-    pub properties: Option<Vec<AccountPropertyName>>,
-    #[serde(default)]
+
+    // TODO: This should not be in config - we are mixing configuration and domain model here
+    #[config(combine(replace))]
+    pub registered_at: Option<DateTime<Utc>>,
+
+    #[config(default)]
+    pub properties: Vec<AccountPropertyName>,
+
+    #[config(default = false)]
     pub treat_datasets_as_public: bool,
 }
 
@@ -132,8 +140,8 @@ impl AccountConfig {
             account_type: Self::default_account_type(),
             provider: Self::default_provider(),
             avatar_url: None,
-            registered_at: Self::default_registered_at(),
-            properties: None,
+            registered_at: None,
+            properties: Vec::new(),
             treat_datasets_as_public: false,
         }
     }
@@ -153,8 +161,8 @@ impl AccountConfig {
             account_type: Self::default_account_type(),
             provider: Self::default_provider(),
             avatar_url: None,
-            registered_at: Self::default_registered_at(),
-            properties: None,
+            registered_at: None,
+            properties: Vec::new(),
             treat_datasets_as_public: false,
         }
     }
@@ -170,12 +178,12 @@ impl AccountConfig {
     }
 
     pub fn set_properties(mut self, properties: Vec<AccountPropertyName>) -> Self {
-        self.properties = Some(properties);
+        self.properties = properties;
         self
     }
 
     pub fn set_registered_at(mut self, registered_at: DateTime<Utc>) -> Self {
-        self.registered_at = registered_at;
+        self.registered_at = Some(registered_at);
         self
     }
 
@@ -193,18 +201,6 @@ impl AccountConfig {
         } else {
             self.account_name.to_string()
         }
-    }
-
-    pub fn default_account_type() -> AccountType {
-        AccountType::User
-    }
-
-    pub fn default_provider() -> String {
-        AccountProvider::Password.to_string()
-    }
-
-    pub fn default_registered_at() -> DateTime<Utc> {
-        Utc::now()
     }
 
     pub fn generate_password(account_name: &odf::AccountName) -> Password {

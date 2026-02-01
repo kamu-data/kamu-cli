@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
+use setty::derive;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, Debug, Clone)]
 pub struct ContainerRuntimeConfig {
     pub runtime: ContainerRuntimeType,
     pub network_ns: NetworkNamespaceType,
@@ -32,8 +34,9 @@ impl Default for ContainerRuntimeConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerRuntimeType {
     Docker,
     Podman,
@@ -49,12 +52,15 @@ impl std::fmt::Display for ContainerRuntimeType {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Corresponds to podman's `containers.conf::netns`
 /// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)
 /// it usually runs uses host network namespace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(setty::Config, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NetworkNamespaceType {
     Private,
     Host,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -136,7 +136,7 @@ impl Command for APIServerRunCommand {
             self.port,
             self.file_upload_limit_config.as_ref(),
             self.dataset_env_vars_config.is_enabled(),
-            self.auth_config.as_ref().allow_anonymous.unwrap(),
+            self.auth_config.allow_anonymous,
             self.external_address,
             self.e2e_output_data_path.as_ref(),
             self.password_policy_config.as_ref(),

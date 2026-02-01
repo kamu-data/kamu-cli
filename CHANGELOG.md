@@ -11,6 +11,16 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Using new library for application config that:
+  - Improves `kamu config` subcommand behavior
+  - Accepts any case of enum variants (e.g. `provider: Postgres` and `provider: postgres`)
+  - Uses concatenation for all array types when combining values from multiple configs
+- Generating `resources/config-schema.json` and `resources/config-reference.md`
+- User config now defaults to `$XDG_CONFIG_HOME/kamu/config.yaml` with config in user home still supported (#848)
+- Config(s) location can be overridden using `KAMU_CONFIG=file1,file2` env var
+
 ## [0.257.3] - 2026-01-30
 ### Fixed
 - ReBAC -> DatasetSearchUpdater failure when creating new dataset, before it's indexed

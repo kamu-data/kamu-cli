@@ -49,7 +49,7 @@ thiserror = { version = "2", default-features = false, features = ["std"] }
 url = "2"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-serde_yaml = { version = "0.9", default-features = false }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # Optional
 pretty_assertions = { optional = true, version = "1" }
