@@ -99,12 +99,13 @@ impl MessageConsumerT<MoleculeActivityMessage> for MoleculeActivitySearchUpdater
 
         match message {
             MoleculeActivityMessage::Published(published_message) => {
-                self.handle_published_message(ctx, published_message)
-                    .await?;
+                self.handle_published_message(ctx, published_message).await
+            }
+            MoleculeActivityMessage::WriteRequested(_) => {
+                // No action required
+                Ok(())
             }
         }
-
-        Ok(())
     }
 }
 
