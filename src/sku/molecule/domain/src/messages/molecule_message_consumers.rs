@@ -21,4 +21,7 @@ pub const MESSAGE_CONSUMER_MOLECULE_ANNOUNCEMENT_SEARCH_UPDATER: &str =
 pub const MESSAGE_CONSUMER_MOLECULE_ACTIVITY_SEARCH_UPDATER: &str =
     "xyz.molecule.kamu.MoleculeActivitySearchUpdater";
 
+pub const MESSAGE_CONSUMER_MOLECULE_GLOBAL_ACTIVITY_WRITER: &str =
+    "xyz.molecule.kamu.MoleculeGlobalActivityWriter";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

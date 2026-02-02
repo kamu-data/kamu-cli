@@ -56,6 +56,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
                 MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
                 MoleculeActivityMessage::write_requested(
                     molecule_subject.account_name.clone(),
+                    molecule_subject.account_id.clone(),
                     source_event_time,
                     activity_record,
                 ),
