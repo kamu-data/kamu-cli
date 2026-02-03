@@ -2644,6 +2644,8 @@ type FlowProcessSummary {
 	lastAttemptAt: DateTime
 	lastFailureAt: DateTime
 	nextPlannedAt: DateTime
+	runningSince: DateTime
+	pausedAt: DateTime
 	autoStoppedReason: FlowProcessAutoStopReason
 	autoStoppedAt: DateTime
 }

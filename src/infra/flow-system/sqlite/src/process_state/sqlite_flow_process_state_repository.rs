@@ -48,6 +48,8 @@ impl SqliteFlowProcessStateRepository {
         let last_failure_at = process_state.last_failure_at();
         let last_attempt_at = process_state.last_attempt_at();
         let next_planned_at = process_state.next_planned_at();
+        let paused_at = process_state.paused_at();
+        let running_since = process_state.running_since();
         let auto_stopped_at = process_state.auto_stopped_at();
         let auto_stopped_reason = process_state.auto_stopped_reason().map(|r| r.to_string());
         let updated_at = process_state.updated_at();
@@ -69,13 +71,15 @@ impl SqliteFlowProcessStateRepository {
                 last_failure_at,
                 last_attempt_at,
                 next_planned_at,
+                paused_at,
+                running_since,
                 auto_stopped_at,
                 effective_state,
                 auto_stopped_reason,
                 updated_at,
                 last_applied_flow_system_event_id
             )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (flow_type, scope_data) DO NOTHING
             "#,
             scope_data_json,
@@ -88,6 +92,8 @@ impl SqliteFlowProcessStateRepository {
             last_failure_at,
             last_attempt_at,
             next_planned_at,
+            paused_at,
+            running_since,
             auto_stopped_at,
             effective_state_str,
             auto_stopped_reason,
@@ -138,6 +144,8 @@ impl SqliteFlowProcessStateRepository {
         let last_failure_at = state.last_failure_at();
         let last_attempt_at = state.last_attempt_at();
         let next_planned_at = state.next_planned_at();
+        let paused_at = state.paused_at();
+        let running_since = state.running_since();
         let auto_stopped_at = state.auto_stopped_at();
         let auto_stopped_reason = state.auto_stopped_reason().map(|r| r.to_string());
         let updated_at = state.updated_at();
@@ -159,14 +167,16 @@ impl SqliteFlowProcessStateRepository {
                     last_failure_at = $6,
                     last_attempt_at = $7,
                     next_planned_at = $8,
-                    auto_stopped_at = $9,
-                    effective_state = $10,
-                    auto_stopped_reason = $11,
-                    updated_at = $12,
-                    last_applied_flow_system_event_id = $13
+                    paused_at = $9,
+                    running_since = $10,
+                    auto_stopped_at = $11,
+                    effective_state = $12,
+                    auto_stopped_reason = $13,
+                    updated_at = $14,
+                    last_applied_flow_system_event_id = $15
                 WHERE
-                    flow_type = $14 AND scope_data = $15 AND
-                    last_applied_flow_system_event_id = $16
+                    flow_type = $16 AND scope_data = $17 AND
+                    last_applied_flow_system_event_id = $18
             "#,
             user_intent_str,
             stop_policy_kind,
@@ -176,6 +186,8 @@ impl SqliteFlowProcessStateRepository {
             last_failure_at,
             last_attempt_at,
             next_planned_at,
+            paused_at,
+            running_since,
             auto_stopped_at,
             effective_state_str,
             auto_stopped_reason,
