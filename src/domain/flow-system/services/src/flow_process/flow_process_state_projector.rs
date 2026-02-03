@@ -318,6 +318,39 @@ impl FlowProcessStateProjector {
                         .await?;
                 }
 
+                // Resume from auto-stop events have side effects on the trigger
+                FlowProcessEvent::ResumedFromAutoStop(e) => {
+                    // Resume the trigger (self-healing) - reuse existing resume method
+                    self.flow_trigger_service
+                        .resume_flow_trigger(e.event_time, flow_binding)
+                        .await?;
+
+                    // Reload trigger state after resume
+                    let new_trigger_state = self
+                        .flow_trigger_service
+                        .find_trigger(flow_binding)
+                        .await
+                        .int_err()?;
+
+                    // Merge new state with any previous state change in this batch of events
+                    maybe_new_trigger_state = match (maybe_new_trigger_state, new_trigger_state) {
+                        (None, None) => None,
+                        (Some(x), None) => Some(x),
+                        (_, Some(y)) => Some(y),
+                    };
+
+                    // Notify external systems about the self-healing
+                    self.outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
+                            FlowProcessLifecycleMessage::trigger_resumed_from_auto_stop(
+                                e.event_time,
+                                flow_binding.clone(),
+                            ),
+                        )
+                        .await?;
+                }
+
                 // State change events have no side effects on the trigger
                 FlowProcessEvent::EffectiveStateChanged(e) => {
                     self.outbox
