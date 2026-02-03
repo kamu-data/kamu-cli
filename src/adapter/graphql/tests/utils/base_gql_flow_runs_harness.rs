@@ -613,6 +613,44 @@ impl BaseGQLFlowRunsHarness {
         flow_state.flow_id
     }
 
+    /// Manually trigger a flow without a trigger configured
+    pub async fn manually_trigger_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        flow_type: &str,
+        task_outcome: TaskOutcome,
+    ) {
+        use chrono::Utc;
+        use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+
+        let flow_run_service = self
+            .catalog_authorized
+            .get_one::<dyn fs::FlowRunService>()
+            .unwrap();
+
+        let flow_binding = match flow_type {
+            "INGEST" => afs::ingest_dataset_binding(dataset_id),
+            "EXECUTE_TRANSFORM" => afs::transform_dataset_binding(dataset_id),
+            _ => panic!("Unsupported flow type: {flow_type}"),
+        };
+
+        let account_id = self.logged_account_id();
+
+        let current_time = Utc::now();
+        let flow_state = flow_run_service
+            .run_flow_manually(
+                current_time,
+                &flow_binding,
+                account_id,
+                None, // no forced configuration
+            )
+            .await
+            .unwrap();
+
+        self.mimic_flow_run_with_outcome(flow_state.flow_id.to_string().as_str(), task_outcome)
+            .await;
+    }
+
     pub async fn mimic_flow_run_with_outcome(
         &self,
         flow_id: &str,

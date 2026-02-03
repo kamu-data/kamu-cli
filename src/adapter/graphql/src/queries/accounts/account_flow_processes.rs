@@ -254,9 +254,15 @@ impl<'a> AccountFlowProcesses<'a> {
             .as_ref()
             .map(|v| v.iter().map(|s| (*s).into()).collect());
 
+        // Apply default filter (exclude Unconfigured) when no effective states
+        // specified
+        let effective_state_in_with_default = effective_state_in_converted
+            .as_deref()
+            .or(Some(fs::FlowProcessEffectiveState::default_filter_states()));
+
         let filter = fs::FlowProcessListFilter::for_scope(scope_query)
             .for_flow_types(flow_types)
-            .with_effective_states_opt(effective_state_in_converted.as_deref())
+            .with_effective_states_opt(effective_state_in_with_default)
             .with_last_attempt_between_opt(
                 filters
                     .last_attempt_between

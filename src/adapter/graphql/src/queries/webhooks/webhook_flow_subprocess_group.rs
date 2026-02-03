@@ -64,10 +64,14 @@ impl<'a> WebhookFlowSubProcessGroup<'a> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
 
         // Load all webhooks processes matching the scope of this group
+        // Apply default filter to exclude Unconfigured processes
         let webhook_processes_listing = flow_process_state_query
             .list_processes(
                 FlowProcessListFilter::for_scope(self.scope_query.clone())
-                    .for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER]),
+                    .for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER])
+                    .with_effective_states(
+                        kamu_flow_system::FlowProcessEffectiveState::default_filter_states(),
+                    ),
                 FlowProcessOrder::recent(),
                 None, // No pagination, we expect small number of webhooks in dataset
             )
