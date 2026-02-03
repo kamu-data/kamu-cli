@@ -14,7 +14,7 @@ use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
-use kamu_task_system::{TaskError, TaskOutcome};
+use kamu_task_system::{TaskError, TaskOutcome, TaskResult};
 use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainIncrementInterval;
 use pretty_assertions::assert_eq;
@@ -40,11 +40,11 @@ async fn test_primary_rollup() {
     assert_eq!(
         primary_rollup,
         &value!({
-            "total": 4,
+            "total": 5,
             "active": 1,
             "failing": 1,
             "paused": 1,
-            "unconfigured": 0,
+            "unconfigured": 1,
             "stopped": 1,
             "worstConsecutiveFailures": 1,
         })
@@ -102,11 +102,11 @@ async fn test_full_rollup() {
     assert_eq!(
         full_rollup,
         &value!({
-            "total": 8,
+            "total": 9,
             "active": 2,
             "failing": 2,
             "paused": 2,
-            "unconfigured": 0,
+            "unconfigured": 1,
             "stopped": 2,
             "worstConsecutiveFailures": 1,
         })
@@ -347,6 +347,75 @@ async fn test_primary_cards() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_primary_cards_with_unconfigured() {
+    let harness = AccountFlowProcessesHarness::new().await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    harness.create_shared_test_case(&schema).await;
+
+    // Explicitly request only UNCONFIGURED processes
+    let primary_cards_response = harness
+        .primary_cards_query(
+            Some(value!({
+                "effectiveStateIn": [ "UNCONFIGURED" ]
+            })), /* filters */
+            None, /* ordering */
+            None, /* pagination */
+        )
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
+
+    assert_eq!(
+        cards,
+        &value!({
+            "nodes": [
+                {
+                    "dataset": { "name": "qux" },
+                    "flowType": "INGEST",
+                    "summary": {
+                        "effectiveState": "UNCONFIGURED",
+                        "consecutiveFailures": 0,
+                        "autoStoppedReason": null,
+                    }
+                },
+            ],
+            "pageInfo": {
+                "hasPreviousPage": false,
+                "hasNextPage": false,
+                "currentPage": 0,
+                "totalPages": 1,
+            }
+        })
+    );
+
+    // Request all states explicitly (including UNCONFIGURED)
+    let primary_cards_response = harness
+        .primary_cards_query(
+            Some(value!({
+                "effectiveStateIn": [ "ACTIVE", "FAILING", "PAUSED_MANUAL", "STOPPED_AUTO", "UNCONFIGURED" ]
+            })), /* filters */
+            None, /* ordering */
+            None, /* pagination */
+        )
+        .await
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    let cards = harness.extract_cards("primaryCards", &primary_cards_response.data);
+
+    // Should now include all 5 processes
+    let async_graphql::Value::List(nodes) =
+        get_gql_value_property(cards, "nodes").unwrap_or_else(|| panic!("Expected nodes property"))
+    else {
+        panic!("Expected nodes to be a list");
+    };
+    assert_eq!(nodes.len(), 5);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_webhook_cards() {
     let harness = AccountFlowProcessesHarness::new().await;
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -546,16 +615,18 @@ impl AccountFlowProcessesHarness {
     }
 
     async fn create_shared_test_case(&self, schema: &kamu_adapter_graphql::Schema) {
-        // Create hierarchy of 4 datasets
+        // Create hierarchy of 5 datasets (one will remain unconfigured)
 
         let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
         let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
         let baz_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
         let baz_daily_alias =
             odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz.daily"));
+        let qux_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("qux"));
 
         let foo = self.create_root_dataset(foo_alias.clone()).await;
         let bar = self.create_root_dataset(bar_alias.clone()).await;
+        let qux = self.create_root_dataset(qux_alias).await;
 
         let baz = self
             .create_derived_dataset(baz_alias.clone(), &[foo_alias, bar_alias])
@@ -579,7 +650,7 @@ impl AccountFlowProcessesHarness {
             .create_webhook_for_dataset_updates(&baz_daily.dataset_handle.id, "baz_daily_updates")
             .await;
 
-        // Flow 0
+        // Flow 0: foo ingest - will become failing
         self.set_time_delta_trigger(
             &foo.dataset_handle.id,
             "INGEST",
@@ -595,7 +666,7 @@ impl AccountFlowProcessesHarness {
         .execute(schema, &self.catalog_authorized)
         .await;
 
-        // Flow 1
+        // Flow 1: bar ingest - will become stopped
         self.set_time_delta_trigger(
             &bar.dataset_handle.id,
             "INGEST",
@@ -643,6 +714,15 @@ impl AccountFlowProcessesHarness {
             .await;
 
         self.pause_webhook_subscription(subscription_id_baz).await;
+
+        // NOTE: qux has NO trigger set - manually run the flow to create an
+        // UNCONFIGURED       INGEST process state
+        self.manually_trigger_flow(
+            &qux.dataset_handle.id,
+            "INGEST",
+            TaskOutcome::Success(TaskResult::empty()),
+        )
+        .await;
     }
 
     async fn rollup_query(&self, rollup_name: &str) -> GraphQLQueryRequest {
