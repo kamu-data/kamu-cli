@@ -16,6 +16,7 @@ use super::flow_process_event::{
     FlowProcessEvent,
     FlowProcessEventAutoStopped,
     FlowProcessEventEffectiveStateChanged,
+    FlowProcessEventResumedFromAutoStop,
 };
 use crate::{
     FlowBinding,
@@ -397,6 +398,14 @@ impl FlowProcessState {
                     reason: self.auto_stopped_reason.unwrap(),
                     event_time,
                 }));
+        }
+
+        // Emit resume event if just resumed from auto-stop (self-healing)
+        if old_auto_stopped && self.auto_stopped_reason.is_none() {
+            self.pending_events
+                .push(FlowProcessEvent::ResumedFromAutoStop(
+                    FlowProcessEventResumedFromAutoStop { event_time },
+                ));
         }
 
         self.last_applied_event_id = event_id;
@@ -1944,6 +1953,40 @@ mod tests {
             state.last_success_at(),
             Some(current_time + Duration::minutes(15))
         );
+
+        // Verify that ResumedFromAutoStop event was emitted for trigger re-enablement
+        let events = state.take_pending_events();
+        assert_eq!(events.len(), 2); // EffectiveStateChanged + ResumedFromAutoStop
+
+        // Find the ResumedFromAutoStop event
+        let resume_event = events
+            .iter()
+            .find(|e| matches!(e, FlowProcessEvent::ResumedFromAutoStop(_)));
+        assert!(
+            resume_event.is_some(),
+            "ResumedFromAutoStop event should be emitted for self-healing"
+        );
+
+        match resume_event.unwrap() {
+            FlowProcessEvent::ResumedFromAutoStop(e) => {
+                assert_eq!(e.event_time, current_time + Duration::minutes(15));
+            }
+            _ => panic!("Expected ResumedFromAutoStop event"),
+        }
+
+        // Verify state change event from StoppedAuto to Active
+        let state_change_event = events
+            .iter()
+            .find(|e| matches!(e, FlowProcessEvent::EffectiveStateChanged(_)));
+        assert!(state_change_event.is_some());
+
+        match state_change_event.unwrap() {
+            FlowProcessEvent::EffectiveStateChanged(e) => {
+                assert_eq!(e.old_state, FlowProcessEffectiveState::StoppedAuto);
+                assert_eq!(e.new_state, FlowProcessEffectiveState::Active);
+            }
+            _ => panic!("Expected EffectiveStateChanged event"),
+        }
 
         // Flow is now healthy and ready for automatic execution again
     }
