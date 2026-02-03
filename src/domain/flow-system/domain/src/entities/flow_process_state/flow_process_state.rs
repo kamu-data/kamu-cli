@@ -40,6 +40,8 @@ pub struct FlowProcessState {
     last_failure_at: Option<DateTime<Utc>>,
     last_attempt_at: Option<DateTime<Utc>>,
     next_planned_at: Option<DateTime<Utc>>,
+    paused_at: Option<DateTime<Utc>>,
+    running_since: Option<DateTime<Utc>>,
     auto_stopped_at: Option<DateTime<Utc>>,
 
     effective_state: FlowProcessEffectiveState,
@@ -70,6 +72,8 @@ impl FlowProcessState {
             last_failure_at: None,
             last_attempt_at: None,
             next_planned_at: None,
+            paused_at: None,
+            running_since: None,
             auto_stopped_at: None,
             effective_state: FlowProcessEffectiveState::calculate(user_intent, 0, stop_policy),
             auto_stopped_reason: None,
@@ -98,6 +102,8 @@ impl FlowProcessState {
         last_failure_at: Option<DateTime<Utc>>,
         last_attempt_at: Option<DateTime<Utc>>,
         next_planned_at: Option<DateTime<Utc>>,
+        paused_at: Option<DateTime<Utc>>,
+        running_since: Option<DateTime<Utc>>,
         auto_stopped_at: Option<DateTime<Utc>>,
         effective_state: FlowProcessEffectiveState,
         auto_stopped_reason: Option<FlowProcessAutoStopReason>,
@@ -140,6 +146,8 @@ impl FlowProcessState {
             last_failure_at,
             last_attempt_at,
             next_planned_at,
+            paused_at,
+            running_since,
             auto_stopped_at,
             effective_state,
             auto_stopped_reason,
@@ -197,6 +205,16 @@ impl FlowProcessState {
     }
 
     #[inline]
+    pub fn paused_at(&self) -> Option<DateTime<Utc>> {
+        self.paused_at
+    }
+
+    #[inline]
+    pub fn running_since(&self) -> Option<DateTime<Utc>> {
+        self.running_since
+    }
+
+    #[inline]
     pub fn auto_stopped_at(&self) -> Option<DateTime<Utc>> {
         self.auto_stopped_at
     }
@@ -245,6 +263,16 @@ impl FlowProcessState {
         // (transition from STOPPED -> ACTIVE)
         let was_stopped_auto = self.effective_state == FlowProcessEffectiveState::StoppedAuto;
         let is_resuming = was_stopped_auto && !paused;
+
+        // Track when flow was paused or resumed
+        let was_paused = self.user_intent == FlowProcessUserIntent::Paused;
+        if paused && !was_paused {
+            // Transitioning to paused state
+            self.paused_at = Some(current_time);
+        } else if !paused && was_paused {
+            // Resuming from paused state
+            self.paused_at = None;
+        }
 
         self.user_intent = new_user_intent;
         self.stop_policy = stop_policy;
@@ -306,6 +334,8 @@ impl FlowProcessState {
             FlowOutcome::Success(_) => {
                 self.last_success_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
+                // Flow completed, no longer running
+                self.running_since = None;
 
                 // Only enabled flows participate in auto-stop logic
                 if self.user_intent == FlowProcessUserIntent::Enabled {
@@ -318,6 +348,8 @@ impl FlowProcessState {
             FlowOutcome::Failed(task_error) => {
                 self.last_failure_at = Some(event_time);
                 self.last_attempt_at = Some(event_time);
+                // Flow completed (with failure), no longer running
+                self.running_since = None;
 
                 // Only enabled flows participate in auto-stop logic, and only if not already
                 // auto-stopped
@@ -403,6 +435,9 @@ impl FlowProcessState {
         // Clear next_planned_at only if the old value is in the past relative to the
         // started_at time
         self.handle_next_planned_at_update(started_at);
+
+        // Track when flow started running
+        self.running_since = Some(started_at);
 
         self.last_applied_event_id = event_id;
         self.updated_at = current_time;
@@ -610,6 +645,8 @@ mod tests {
         assert_eq!(state.last_failure_at(), None);
         assert_eq!(state.last_attempt_at(), None);
         assert_eq!(state.next_planned_at(), None);
+        assert_eq!(state.paused_at(), None);
+        assert_eq!(state.running_since(), None);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
         assert_eq!(state.updated_at, current_time);
         assert_eq!(state.last_applied_event_id, event_id);
@@ -666,6 +703,9 @@ mod tests {
         let update_time = Utc::now() + Duration::minutes(1);
         let new_stop_policy = make_test_stop_policy_with_failures(3);
 
+        // Verify initially not paused
+        assert_eq!(state.paused_at(), None);
+
         // Test updating both pause state and stop policy
         state
             .update_trigger_state(
@@ -683,10 +723,11 @@ mod tests {
             state.effective_state(),
             FlowProcessEffectiveState::PausedManual
         );
+        assert_eq!(state.paused_at(), Some(update_time));
         assert_eq!(state.updated_at, update_time);
         assert_eq!(state.last_applied_event_id, EventID::new(2));
 
-        // Test updating to enabled state
+        // Test updating to enabled state clears paused_at
         state
             .update_trigger_state(
                 EventID::new(3),
@@ -698,6 +739,7 @@ mod tests {
 
         assert_eq!(state.user_intent(), FlowProcessUserIntent::Enabled);
         assert!(!state.is_paused_manually());
+        assert_eq!(state.paused_at(), None);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
     }
 
@@ -714,7 +756,10 @@ mod tests {
         let current_time = Utc::now() + Duration::minutes(10);
         let event_time = Utc::now() + Duration::minutes(9);
 
-        // Test failure increments failures count
+        // Simulate flow running before outcome
+        state.running_since = Some(event_time - Duration::minutes(5));
+
+        // Test failure increments failures count and clears running_since
         state
             .on_flow_outcome(
                 EventID::new(2),
@@ -727,9 +772,13 @@ mod tests {
         assert_eq!(state.consecutive_failures, 1);
         assert_eq!(state.last_failure_at(), Some(event_time));
         assert_eq!(state.last_attempt_at, Some(event_time));
+        assert_eq!(state.running_since(), None);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Failing);
 
-        // Test success resets failures count
+        // Simulate flow running again
+        state.running_since = Some(event_time);
+
+        // Test success resets failures count and clears running_since
         state
             .on_flow_outcome(
                 EventID::new(3),
@@ -744,6 +793,7 @@ mod tests {
             state.last_success_at(),
             Some(event_time + Duration::minutes(1))
         );
+        assert_eq!(state.running_since(), None);
         assert_eq!(state.effective_state(), FlowProcessEffectiveState::Active);
 
         // Test multiple failures leading to auto-stop
@@ -1070,6 +1120,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(state.next_planned_at, None); // Cleared because past_time <= execution_time
+        assert_eq!(state.running_since(), Some(execution_time)); // Track when flow started
         assert_eq!(state.last_applied_event_id, EventID::new(2));
 
         // Test 2: Future scheduled time should be preserved
@@ -1086,18 +1137,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(state.next_planned_at, Some(future_time)); // Preserved because future_time > execution_time
+        assert_eq!(state.running_since(), Some(earlier_execution_time)); // Updated to new start time
 
         // Test 3: No scheduled time - should remain None
         state.next_planned_at = None;
+        let final_exec_time = base_time + Duration::hours(4);
         state
-            .on_running(
-                EventID::new(4),
-                base_time + Duration::hours(4),
-                base_time + Duration::hours(4),
-            )
+            .on_running(EventID::new(4), final_exec_time, final_exec_time)
             .unwrap();
 
         assert_eq!(state.next_planned_at, None); // Should remain None
+        assert_eq!(state.running_since(), Some(final_exec_time)); // Track flow start
 
         // Test 4: Event ordering validation
         let result = state.on_running(
@@ -1792,6 +1842,8 @@ mod tests {
             Some(current_time), // last_attempt_at
             None,               /* next_planned_at (cleared because not
                                  * running) */
+            None,                                        // paused_at
+            None,                                        // running_since
             Some(current_time),                          // auto_stopped_at
             FlowProcessEffectiveState::StoppedAuto,      // effective_state
             Some(FlowProcessAutoStopReason::StopPolicy), // auto_stopped_reason

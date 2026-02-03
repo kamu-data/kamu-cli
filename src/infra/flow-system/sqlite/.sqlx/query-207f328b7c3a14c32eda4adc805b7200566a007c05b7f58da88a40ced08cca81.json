@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                user_intent,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                auto_stopped_at as \"auto_stopped_at: _\",\n                effective_state,\n                auto_stopped_reason,\n                updated_at as \"updated_at: _\",\n                last_applied_flow_system_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
+  "query": "\n            SELECT\n                flow_type,\n                scope_data as \"scope_data: _\",\n                user_intent,\n                stop_policy_kind,\n                stop_policy_data as \"stop_policy_data: _\",\n                consecutive_failures,\n                last_success_at as \"last_success_at: _\",\n                last_failure_at as \"last_failure_at: _\",\n                last_attempt_at as \"last_attempt_at: _\",\n                next_planned_at as \"next_planned_at: _\",\n                paused_at as \"paused_at: _\",\n                running_since as \"running_since: _\",\n                auto_stopped_at as \"auto_stopped_at: _\",\n                effective_state,\n                auto_stopped_reason,\n                updated_at as \"updated_at: _\",\n                last_applied_flow_system_event_id\n            FROM flow_process_states\n            WHERE\n                flow_type = $1 AND scope_data = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -54,28 +54,38 @@
         "type_info": "Null"
       },
       {
-        "name": "auto_stopped_at: _",
+        "name": "paused_at: _",
         "ordinal": 10,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
-        "name": "effective_state",
+        "name": "running_since: _",
         "ordinal": 11,
         "type_info": "Text"
       },
       {
-        "name": "auto_stopped_reason",
+        "name": "auto_stopped_at: _",
         "ordinal": 12,
+        "type_info": "Null"
+      },
+      {
+        "name": "effective_state",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "auto_stopped_reason",
+        "ordinal": 14,
         "type_info": "Text"
       },
       {
         "name": "updated_at: _",
-        "ordinal": 13,
+        "ordinal": 15,
         "type_info": "Null"
       },
       {
         "name": "last_applied_flow_system_event_id",
-        "ordinal": 14,
+        "ordinal": 16,
         "type_info": "Integer"
       }
     ],
@@ -94,11 +104,13 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       true,
       false,
       false
     ]
   },
-  "hash": "07b2802839b85bee0e912ab67c1b402bd7708ea778c8f4ed3933cdc6ca04dd0f"
+  "hash": "207f328b7c3a14c32eda4adc805b7200566a007c05b7f58da88a40ced08cca81"
 }

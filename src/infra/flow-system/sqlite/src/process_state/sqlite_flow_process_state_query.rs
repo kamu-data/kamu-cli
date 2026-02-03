@@ -224,6 +224,8 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 last_failure_at,
                 last_attempt_at,
                 next_planned_at,
+                paused_at,
+                running_since,
                 auto_stopped_at,
                 effective_state,
                 auto_stopped_reason,
