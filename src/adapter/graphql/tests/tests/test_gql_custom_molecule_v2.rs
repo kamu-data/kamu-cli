@@ -45,6 +45,27 @@ use crate::utils::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+macro_rules! test_gql_custom_molecule {
+    ($test_name: expr) => {
+        ::paste::paste! {
+            #[test_group::group(elasticsearch)]
+            #[::test_log::test(::kamu_search_elasticsearch::test)]
+            async fn [<$test_name "_es">](es_ctx: Arc<ElasticsearchTestContext>) {
+                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx);
+                $test_name(search_variant).await;
+            }
+
+            #[test_log::test(tokio::test)]
+            async fn [<$test_name "_src">]() {
+                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::SourceBased;
+                $test_name(search_variant).await;
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
 const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
@@ -405,12 +426,267 @@ const SEARCH_QUERY: &str = indoc!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_provision_project(es_ctx: Arc<ElasticsearchTestContext>) {
+test_gql_custom_molecule!(test_molecule_v2_provision_project);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_disable_enable_project);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_disable_enable_project_errors);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_data_room_quota_exceeded);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_data_room_operations);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_data_room_as_of_block_hash);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_announcements_quota_exceeded);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_announcements_operations);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_activity);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_activity_access_level_rules_filters);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_search);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(resourcegen)]
+#[test_log::test(tokio::test)]
+async fn test_molecule_v2_dump_dataset_snapshots() {
+    // NOTE: Instead of dumping the source snapshots of datasets here we create
+    // datasets all and scan their metadata chains to dump events exactly how they
+    // appear in real datasets
+
+    const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let dataset_reg = harness
+        .catalog_authorized
+        .get_one::<dyn kamu_datasets::DatasetRegistry>()
+        .unwrap();
+
+    let (project_data_room_dataset, project_announcements_dataset) = {
+        let res = harness
+            .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+                async_graphql::Variables::from_json(json!({
+                    "ipnftSymbol": "VITAFAST",
+                    "ipnftUid": PROJECT_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            ))
+            .await;
+
+        let data = res.data.into_json().unwrap();
+
+        let data_room_dataset = dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let announcements_dataset = dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        (data_room_dataset, announcements_dataset)
+    };
+
+    let project_file_dataset = {
+        let data = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "accessLevel": "public",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        dataset_reg
+            .get_dataset_by_id(
+                &odf::DatasetID::from_did_str(
+                    data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap()
+    };
+
+    // Create an announcement to force creation of global announcements dataset
+    GraphQLQueryRequest::new(
+        CREATE_ANNOUNCEMENT,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": PROJECT_UID,
+            "headline": "Test announcement",
+            "body": "Blah blah",
+            "attachments": [],
+            "accessLevel": "holders",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "categories": [],
+            "tags": [],
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .into_result()
+    .unwrap();
+
+    let molecule_projects_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
+        .await
+        .unwrap();
+
+    let molecule_data_room_activity_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/data-room-activity".parse().unwrap())
+        .await
+        .unwrap();
+
+    let molecule_announcements_dataset = dataset_reg
+        .get_dataset_by_ref(&"molecule/announcements".parse().unwrap())
+        .await
+        .unwrap();
+
+    // NOTE: Dataset names in snapshots must match dataset names
+    //       -- we use them for data migration
+    //       -->
+    dump_snapshot(
+        molecule_projects_dataset.as_ref(),
+        "molecule-projects",
+        Some("projects"),
+    )
+    .await;
+    dump_snapshot(
+        molecule_announcements_dataset.as_ref(),
+        "molecule-announcements",
+        Some("announcements"),
+    )
+    .await;
+    dump_snapshot(
+        molecule_data_room_activity_dataset.as_ref(),
+        "molecule-data-room-activity",
+        Some("data-room-activity"),
+    )
+    .await;
+    // <--
+    dump_snapshot(
+        project_data_room_dataset.as_ref(),
+        "project-data-room",
+        None,
+    )
+    .await;
+    dump_snapshot(
+        project_announcements_dataset.as_ref(),
+        "project-announcements",
+        None,
+    )
+    .await;
+    dump_snapshot(project_file_dataset.as_ref(), "project-file", None).await;
+}
+
+async fn dump_snapshot(
+    dataset: &dyn odf::dataset::Dataset,
+    file_name: &str,
+    dataset_name_override: Option<&str>,
+) {
+    use futures::TryStreamExt;
+
+    let blocks: Vec<_> = dataset
+        .as_metadata_chain()
+        .iter_blocks()
+        .try_collect()
+        .await
+        .unwrap();
+
+    let snapshot = odf::DatasetSnapshot {
+        name: dataset_name_override.unwrap_or(file_name).parse().unwrap(),
+        kind: odf::DatasetKind::Root,
+        metadata: blocks
+            .into_iter()
+            .rev()
+            .map(|(_, b)| b.event)
+            .filter(|e| {
+                !matches!(
+                    e,
+                    odf::MetadataEvent::Seed(_) | odf::MetadataEvent::AddData(_)
+                )
+            })
+            .collect(),
+    };
+
+    let yaml = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+
+    let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push(format!("../../../resources/molecule/{file_name}.yaml"));
+
+    std::fs::write(path, &yaml).unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -672,13 +948,13 @@ async fn test_molecule_v2_provision_project(es_ctx: Arc<ElasticsearchTestContext
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_disable_enable_project(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_disable_enable_project(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -855,11 +1131,11 @@ async fn test_molecule_v2_disable_enable_project(es_ctx: Arc<ElasticsearchTestCo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_disable_enable_project_errors(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_disable_enable_project_errors(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -898,13 +1174,11 @@ async fn test_molecule_v2_disable_enable_project_errors(es_ctx: Arc<Elasticsearc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
-    es_ctx: Arc<ElasticsearchTestContext>,
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
 ) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -963,13 +1237,13 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_data_room_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_data_room_quota_exceeded(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -1066,13 +1340,13 @@ async fn test_molecule_v2_data_room_quota_exceeded(es_ctx: Arc<ElasticsearchTest
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_data_room_operations(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -3846,13 +4120,13 @@ async fn test_molecule_v2_data_room_operations(es_ctx: Arc<ElasticsearchTestCont
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_data_room_as_of_block_hash(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_data_room_as_of_block_hash(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -4144,13 +4418,13 @@ async fn test_molecule_v2_data_room_as_of_block_hash(es_ctx: Arc<ElasticsearchTe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_announcements_quota_exceeded(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_announcements_quota_exceeded(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
             is_admin: true,
@@ -4218,11 +4492,11 @@ async fn test_molecule_v2_announcements_quota_exceeded(es_ctx: Arc<Elasticsearch
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_announcements_operations(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -5595,11 +5869,9 @@ async fn test_molecule_v2_announcements_operations(es_ctx: Arc<ElasticsearchTest
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -9580,13 +9852,11 @@ async fn test_molecule_v2_activity(es_ctx: Arc<ElasticsearchTestContext>) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
 async fn test_molecule_v2_activity_access_level_rules_filters(
-    es_ctx: Arc<ElasticsearchTestContext>,
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
 ) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -9735,11 +10005,9 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
+async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
     let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
+        .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -10713,219 +10981,18 @@ async fn test_molecule_v2_search(es_ctx: Arc<ElasticsearchTestContext>) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(resourcegen)]
-#[test_group::group(elasticsearch)]
-#[test_log::test(kamu_search_elasticsearch::test)]
-async fn test_molecule_v2_dump_dataset_snapshots(es_ctx: Arc<ElasticsearchTestContext>) {
-    // NOTE: Instead of dumping the source snapshots of datasets here we create
-    // datasets all and scan their metadata chains to dump events exactly how they
-    // appear in real datasets
-
-    const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
-    let harness = GraphQLMoleculeV2Harness::builder()
-        .es_ctx(es_ctx)
-        .tenancy_config(TenancyConfig::MultiTenant)
-        .build()
-        .await;
-
-    let dataset_reg = harness
-        .catalog_authorized
-        .get_one::<dyn kamu_datasets::DatasetRegistry>()
-        .unwrap();
-
-    let (project_data_room_dataset, project_announcements_dataset) = {
-        let res = harness
-            .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
-                async_graphql::Variables::from_json(json!({
-                    "ipnftSymbol": "VITAFAST",
-                    "ipnftUid": PROJECT_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
-                })),
-            ))
-            .await;
-
-        let data = res.data.into_json().unwrap();
-
-        let data_room_dataset = dataset_reg
-            .get_dataset_by_id(
-                &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["id"]
-                        .as_str()
-                        .unwrap(),
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        let announcements_dataset = dataset_reg
-            .get_dataset_by_id(
-                &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["id"]
-                        .as_str()
-                        .unwrap(),
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        (data_room_dataset, announcements_dataset)
-    };
-
-    let project_file_dataset = {
-        let data = GraphQLQueryRequest::new(
-            CREATE_VERSIONED_FILE,
-            async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_UID,
-                "path": "/foo.txt",
-                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
-                "contentType": "text/plain",
-                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-                "accessLevel": "public",
-            })),
-        )
-        .execute(&harness.schema, &harness.catalog_authorized)
-        .await
-        .data
-        .into_json()
-        .unwrap();
-
-        dataset_reg
-            .get_dataset_by_id(
-                &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
-                        .as_str()
-                        .unwrap(),
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap()
-    };
-
-    // Create an announcement to force creation of global announcements dataset
-    GraphQLQueryRequest::new(
-        CREATE_ANNOUNCEMENT,
-        async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_UID,
-            "headline": "Test announcement",
-            "body": "Blah blah",
-            "attachments": [],
-            "accessLevel": "holders",
-            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
-            "categories": [],
-            "tags": [],
-        })),
-    )
-    .execute(&harness.schema, &harness.catalog_authorized)
-    .await
-    .into_result()
-    .unwrap();
-
-    let molecule_projects_dataset = dataset_reg
-        .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
-        .await
-        .unwrap();
-
-    let molecule_data_room_activity_dataset = dataset_reg
-        .get_dataset_by_ref(&"molecule/data-room-activity".parse().unwrap())
-        .await
-        .unwrap();
-
-    let molecule_announcements_dataset = dataset_reg
-        .get_dataset_by_ref(&"molecule/announcements".parse().unwrap())
-        .await
-        .unwrap();
-
-    // NOTE: Dataset names in snapshots must match dataset names
-    //       -- we use them for data migration
-    //       -->
-    dump_snapshot(
-        molecule_projects_dataset.as_ref(),
-        "molecule-projects",
-        Some("projects"),
-    )
-    .await;
-    dump_snapshot(
-        molecule_announcements_dataset.as_ref(),
-        "molecule-announcements",
-        Some("announcements"),
-    )
-    .await;
-    dump_snapshot(
-        molecule_data_room_activity_dataset.as_ref(),
-        "molecule-data-room-activity",
-        Some("data-room-activity"),
-    )
-    .await;
-    // <--
-    dump_snapshot(
-        project_data_room_dataset.as_ref(),
-        "project-data-room",
-        None,
-    )
-    .await;
-    dump_snapshot(
-        project_announcements_dataset.as_ref(),
-        "project-announcements",
-        None,
-    )
-    .await;
-    dump_snapshot(project_file_dataset.as_ref(), "project-file", None).await;
-}
-
-async fn dump_snapshot(
-    dataset: &dyn odf::dataset::Dataset,
-    file_name: &str,
-    dataset_name_override: Option<&str>,
-) {
-    use futures::TryStreamExt;
-
-    let blocks: Vec<_> = dataset
-        .as_metadata_chain()
-        .iter_blocks()
-        .try_collect()
-        .await
-        .unwrap();
-
-    let snapshot = odf::DatasetSnapshot {
-        name: dataset_name_override.unwrap_or(file_name).parse().unwrap(),
-        kind: odf::DatasetKind::Root,
-        metadata: blocks
-            .into_iter()
-            .rev()
-            .map(|(_, b)| b.event)
-            .filter(|e| {
-                !matches!(
-                    e,
-                    odf::MetadataEvent::Seed(_) | odf::MetadataEvent::AddData(_)
-                )
-            })
-            .collect(),
-    };
-
-    let yaml = odf::serde::yaml::YamlDatasetSnapshotSerializer
-        .write_manifest_str(&snapshot)
-        .unwrap();
-
-    let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../../resources/molecule/{file_name}.yaml"));
-
-    std::fs::write(path, &yaml).unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+enum GraphQLMoleculeV2HarnessSearchVariant {
+    SourceBased,
+    ElasticsearchBased(Arc<ElasticsearchTestContext>),
+}
+
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-pub struct GraphQLMoleculeV2Harness {
+struct GraphQLMoleculeV2Harness {
     base_gql_harness: BaseGQLDatasetHarness,
-    es_base_harness: ElasticsearchBaseHarness,
+    maybe_es_base_harness: Option<ElasticsearchBaseHarness>,
     schema: kamu_adapter_graphql::Schema,
     catalog_authorized: dill::Catalog,
     outbox_agent: Arc<dyn OutboxAgent>,
@@ -10936,7 +11003,7 @@ pub struct GraphQLMoleculeV2Harness {
 impl GraphQLMoleculeV2Harness {
     #[builder]
     async fn new(
-        es_ctx: Arc<ElasticsearchTestContext>,
+        search_variant: GraphQLMoleculeV2HarnessSearchVariant,
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
         #[builder(default = PredefinedAccountOpts {
@@ -10945,16 +11012,33 @@ impl GraphQLMoleculeV2Harness {
         })]
         predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
-        let es_base_harness =
-            ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default);
+        let maybe_es_base_harness = match search_variant {
+            GraphQLMoleculeV2HarnessSearchVariant::SourceBased => None,
+            GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx) => Some(
+                ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default),
+            ),
+        };
+        let elasticsearch_backed = maybe_es_base_harness.is_some();
 
-        let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .base_catalog(es_base_harness.catalog())
-            .tenancy_config(tenancy_config)
-            .outbox_provider(OutboxProvider::Dispatching)
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
-            .system_time_source_provider(SystemTimeSourceProvider::Inherited)
-            .build();
+        let base_gql_harness = {
+            let b = BaseGQLDatasetHarness::builder()
+                .tenancy_config(tenancy_config)
+                .outbox_provider(OutboxProvider::Dispatching)
+                .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer);
+            if let Some(es_base_harness) = &maybe_es_base_harness {
+                b.base_catalog(es_base_harness.catalog())
+                    .system_time_source_provider(SystemTimeSourceProvider::Inherited)
+                    .build()
+            } else {
+                let base_catalog = dill::CatalogBuilder::new()
+                    .add::<kamu_search_services::DummySearchService>()
+                    .build();
+
+                b.base_catalog(&base_catalog)
+                    .system_time_source_provider(SystemTimeSourceProvider::Default)
+                    .build()
+            }
+        };
 
         let base_gql_catalog = base_gql_harness.catalog();
 
@@ -10993,7 +11077,9 @@ impl GraphQLMoleculeV2Harness {
             kamu_molecule_services::MoleculeDomainDependenciesOptions::default(),
         );
 
-        base_builder.add_value(kamu_molecule_domain::MoleculeConfig::default());
+        base_builder.add_value(kamu_molecule_domain::MoleculeConfig {
+            enable_reads_from_projections: elasticsearch_backed,
+        });
 
         // Embedding mocks
         let mut embeddings_chunker = MockEmbeddingsChunker::new();
@@ -11029,7 +11115,7 @@ impl GraphQLMoleculeV2Harness {
         outbox_agent.run_initialization().await.unwrap();
 
         // Ensure search indexes schemas are properly initialized
-        {
+        if elasticsearch_backed {
             let indexing_catalog = dill::CatalogBuilder::new_chained(&catalog_no_subject)
                 .add_value(KamuBackgroundCatalog::new(
                     catalog_no_subject,
@@ -11041,7 +11127,7 @@ impl GraphQLMoleculeV2Harness {
 
         Self {
             base_gql_harness,
-            es_base_harness,
+            maybe_es_base_harness,
             schema: kamu_adapter_graphql::schema_quiet(),
             catalog_authorized,
             outbox_agent: base_catalog.get_one::<dyn OutboxAgent>().unwrap(),
@@ -11121,7 +11207,10 @@ impl GraphQLMoleculeV2Harness {
 
     async fn synchronize_agents(&self) {
         self.outbox_agent.run_while_has_tasks().await.unwrap();
-        self.es_base_harness.es_ctx().refresh_indices().await;
+
+        if let Some(es_base_harness) = &self.maybe_es_base_harness {
+            es_base_harness.es_ctx().refresh_indices().await;
+        }
     }
 }
 

@@ -7317,6 +7317,7 @@ dependencies = [
  "observability",
  "oop",
  "opendatafabric",
+ "paste",
  "pretty_assertions",
  "random-strings",
  "secrecy",
