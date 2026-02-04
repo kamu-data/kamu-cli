@@ -43,12 +43,14 @@ impl MoleculeActivityMessage {
     }
 
     pub fn published(
+        system_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         offset: u64,
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Self {
         Self::Published(MoleculeActivityMessagePublished {
+            system_time,
             event_time,
             molecule_account_id,
             offset,
@@ -79,6 +81,7 @@ pub struct MoleculeActivityMessageWriteRequested {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeActivityMessagePublished {
+    pub system_time: DateTime<Utc>,
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub offset: u64,

@@ -45,7 +45,7 @@ pub struct MoleculeDataRoomActivity {
 
     pub version: u32,
 
-    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    // NOTE: This should be odf::AccountID but kept as String for safety.
     pub change_by: String,
 
     // TODO: Communicate: we need to agree on its values

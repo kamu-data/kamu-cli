@@ -62,12 +62,13 @@ pub(crate) fn index_data_room_activity(
 pub(crate) fn index_activity_from_data_room_publication_record(
     molecule_account_id: &odf::AccountID,
     activity_record: &MoleculeDataRoomActivityPayloadRecord,
+    system_time: DateTime<Utc>,
     event_time: DateTime<Utc>,
     offset: u64,
 ) -> serde_json::Value {
     serde_json::json!({
         molecule_schema::fields::EVENT_TIME: event_time,
-        molecule_schema::fields::SYSTEM_TIME: event_time,
+        molecule_schema::fields::SYSTEM_TIME: system_time,
         activity_schema::fields::OFFSET: offset,
         molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id,
         molecule_schema::fields::IPNFT_UID: activity_record.ipnft_uid,
