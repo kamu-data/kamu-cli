@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use async_graphql::value;
+use chrono::Utc;
 use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
@@ -18,6 +19,7 @@ use kamu_task_system::{TaskError, TaskOutcome, TaskResult};
 use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainIncrementInterval;
 use pretty_assertions::assert_eq;
+use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use crate::utils::*;
 
@@ -578,11 +580,16 @@ struct AccountFlowProcessesHarness {
 
 impl AccountFlowProcessesHarness {
     async fn new() -> Self {
+        let fixed_time = Utc::now();
+
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
             .outbox_provider(OutboxProvider::Immediate {
                 force_immediate: true,
             })
+            .system_time_source_provider(SystemTimeSourceProvider::Stub(
+                SystemTimeSourceStub::new_set(fixed_time),
+            ))
             .build();
 
         let base_gql_flow_catalog =
