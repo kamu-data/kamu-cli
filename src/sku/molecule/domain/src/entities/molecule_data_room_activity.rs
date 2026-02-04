@@ -192,7 +192,7 @@ impl MoleculeDataRoomActivityPayloadRecord {
             + self.change_by.len()
             + self.access_level.len()
             + self.content_type.as_ref().map_or(0, |s| s.0.len())
-            + self.description.as_ref().map_or(0, |s| s.len())
+            + self.description.as_ref().map_or(0, String::len)
             + self.categories.iter().fold(0, |acc, s| acc + s.len())
             + self.tags.iter().fold(0, |acc, s| acc + s.len());
 
