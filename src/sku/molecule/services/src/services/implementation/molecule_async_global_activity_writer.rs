@@ -91,6 +91,7 @@ impl MoleculeAsyncGlobalActivityWriter {
                         MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
                         MoleculeActivityMessage::published(
                             insertion_system_time,
+                            source_event_time.unwrap_or(insertion_system_time),
                             molecule_subject_account_id.clone(),
                             offset,
                             new_changelog_record.payload,
