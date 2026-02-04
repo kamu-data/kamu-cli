@@ -204,7 +204,6 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // 4. Log the activity.
-        // TODO: asynchronous write of activity log
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
@@ -346,7 +345,6 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // 4. Log the activity.
-        // TODO: asynchronous write of activity log
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
@@ -469,7 +467,6 @@ impl MoleculeDataRoomMutV2 {
             tags: denormalized_latest_file_info.tags,
         };
 
-        // TODO: asynchronous write of activity log
         match append_global_data_room_activity_uc
             .execute(
                 &molecule_subject,
@@ -732,7 +729,6 @@ impl MoleculeDataRoomMutV2 {
             .await
         {
             Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
-                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
                     event_time,
@@ -800,7 +796,6 @@ impl MoleculeDataRoomMutV2 {
             .await
         {
             Ok(MoleculeUpdateDataRoomEntryResult::Success(r)) => {
-                // TODO: asynchronous write of activity log
                 self.append_global_data_room_activity(
                     ctx,
                     event_time,
@@ -982,7 +977,6 @@ impl MoleculeDataRoomMutV2 {
         };
 
         // 3. Log the activity.
-        // TODO: asynchronous write of activity log
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
