@@ -75,6 +75,18 @@ impl FlowProcessEffectiveState {
             FlowProcessEffectiveState::Active | FlowProcessEffectiveState::Failing
         )
     }
+
+    /// Returns the default set of states to filter by when listing processes.
+    /// This excludes Unconfigured processes, which are typically not shown in
+    /// user-facing lists by default.
+    pub fn default_filter_states() -> &'static [FlowProcessEffectiveState] {
+        &[
+            FlowProcessEffectiveState::Active,
+            FlowProcessEffectiveState::Failing,
+            FlowProcessEffectiveState::PausedManual,
+            FlowProcessEffectiveState::StoppedAuto,
+        ]
+    }
 }
 
 impl<T> std::ops::Index<FlowProcessEffectiveState> for [T] {

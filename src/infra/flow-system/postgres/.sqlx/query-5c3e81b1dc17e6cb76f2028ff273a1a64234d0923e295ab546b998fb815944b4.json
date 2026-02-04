@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            user_intent as \"user_intent: FlowProcessUserIntent\",\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            auto_stopped_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            auto_stopped_reason as \"auto_stopped_reason: FlowProcessAutoStopReason\",\n            updated_at,\n            last_applied_flow_system_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
+  "query": "\n        SELECT\n            flow_type,\n            scope_data,\n            user_intent as \"user_intent: FlowProcessUserIntent\",\n            stop_policy_kind as \"stop_policy_kind: PostgresFlowStopPolicyKind\",\n            stop_policy_data,\n            consecutive_failures,\n            last_success_at,\n            last_failure_at,\n            last_attempt_at,\n            next_planned_at,\n            paused_at,\n            running_since,\n            auto_stopped_at,\n            effective_state as \"effective_state: FlowProcessEffectiveState\",\n            auto_stopped_reason as \"auto_stopped_reason: FlowProcessAutoStopReason\",\n            updated_at,\n            last_applied_flow_system_event_id\n        FROM flow_process_states\n        WHERE\n            flow_type = $1 AND scope_data = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -76,11 +76,21 @@
       },
       {
         "ordinal": 10,
-        "name": "auto_stopped_at",
+        "name": "paused_at",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 11,
+        "name": "running_since",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "auto_stopped_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
         "name": "effective_state: FlowProcessEffectiveState",
         "type_info": {
           "Custom": {
@@ -98,7 +108,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "auto_stopped_reason: FlowProcessAutoStopReason",
         "type_info": {
           "Custom": {
@@ -113,12 +123,12 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 15,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 16,
         "name": "last_applied_flow_system_event_id",
         "type_info": "Int8"
       }
@@ -141,11 +151,13 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       true,
       false,
       false
     ]
   },
-  "hash": "e9533b6b78108c0a951689aabe3d6bdba3dbf971cbeebe227c5ec522127bc1b8"
+  "hash": "5c3e81b1dc17e6cb76f2028ff273a1a64234d0923e295ab546b998fb815944b4"
 }
