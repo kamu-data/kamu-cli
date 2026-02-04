@@ -184,6 +184,22 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
     pub tags: Vec<String>,
 }
 
+impl MoleculeDataRoomActivityPayloadRecord {
+    pub fn total_size_bytes(&self) -> usize {
+        let stack_size = size_of::<Self>();
+        let heap_size = self.ipnft_uid.len()
+            + self.path.len()
+            + self.change_by.len()
+            + self.access_level.len()
+            + self.content_type.as_ref().map_or(0, |s| s.0.len())
+            + self.description.as_ref().map_or(0, |s| s.len())
+            + self.categories.iter().fold(0, |acc, s| acc + s.len())
+            + self.tags.iter().fold(0, |acc, s| acc + s.len());
+
+        stack_size + heap_size
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type MoleculeDataRoomActivityChangelogEntry =

@@ -22,7 +22,24 @@ use crate::MoleculeGlobalDataRoomActivitiesService;
 #[dill::interface(dyn MoleculeAppendGlobalDataRoomActivityUseCase)]
 pub struct MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
     global_data_room_activities_service: Arc<dyn MoleculeGlobalDataRoomActivitiesService>,
+    account_quota_storage_checker: Arc<dyn kamu_accounts::AccountQuotaStorageChecker>,
     outbox: Arc<dyn Outbox>,
+}
+
+impl MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
+    async fn ensure_within_quota(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        activity_record: &MoleculeDataRoomActivityPayloadRecord,
+    ) -> Result<(), kamu_accounts::QuotaError> {
+        // NOTE: we take with margin, as we don't aim to reproduce the same calculation
+        //       as during ingesting (most importantly, no less).
+        let roughly_estimated_size = (activity_record.total_size_bytes() * 3) as u64;
+
+        self.account_quota_storage_checker
+            .ensure_within_quota(&molecule_subject.account_id, roughly_estimated_size)
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +66,9 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
             .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
+
+        self.ensure_within_quota(molecule_subject, &activity_record)
+            .await?;
 
         // Request asynchronous write
         self.outbox

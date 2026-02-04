@@ -46,7 +46,7 @@ impl PushIngestExecutorImpl {
         target: &ResolvedDataset,
         incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaError> {
-        // In single-tenant mode aliases does not carry account names; skip quota check
+        // In single-tenant mode aliases do not carry account names; skip quota check
         // in that case
         let Some(account_name) = target.get_alias().account_name.as_ref() else {
             assert!(
