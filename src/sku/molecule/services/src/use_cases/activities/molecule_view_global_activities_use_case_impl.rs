@@ -50,12 +50,9 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             fut: Fut,
         ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError>
         where
-            Fut: std::future::Future<
-                    Output = Result<
-                        MoleculeGlobalActivityListing,
-                        MoleculeViewGlobalActivitiesError,
-                    >,
-                >,
+            Fut: Future<
+                Output = Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError>,
+            >,
         {
             if enabled {
                 fut.await
@@ -273,34 +270,40 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                     entity_schemas,
                     source: SearchRequestSourceSpec::All,
                     filter: maybe_filter,
-                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::EVENT_TIME, desc),
                     page: pagination.into(),
                 },
             )
             .await
             .int_err()?;
 
-        Ok(MoleculeGlobalActivityListing {
-            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
-            list: search_results
-                .hits
-                .into_iter()
-                .map(|hit| match hit.schema_name {
-                    activity_schema::SCHEMA_NAME => {
-                        MoleculeDataRoomActivity::from_search_index_json(hit.source)
-                            .map(MoleculeGlobalActivity::DataRoomActivity)
-                    }
-                    announcement_schema::SCHEMA_NAME => {
-                        MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)
-                            .map(MoleculeGlobalActivity::Announcement)
-                    }
-                    _ => Err(InternalError::new(format!(
-                        "Unexpected schema name: {schema_name}",
-                        schema_name = hit.schema_name
-                    ))),
-                })
-                .collect::<Result<Vec<_>, InternalError>>()?,
-        })
+        let list = search_results
+            .hits
+            .into_iter()
+            .map(|hit| match hit.schema_name {
+                activity_schema::SCHEMA_NAME => {
+                    MoleculeDataRoomActivity::from_search_index_json(hit.source)
+                        .map(MoleculeGlobalActivity::DataRoomActivity)
+                }
+                announcement_schema::SCHEMA_NAME => {
+                    MoleculeGlobalAnnouncement::from_search_index_json(hit.id, hit.source)
+                        .map(MoleculeGlobalActivity::Announcement)
+                }
+                _ => Err(InternalError::new(format!(
+                    "Unexpected schema name: {schema_name}",
+                    schema_name = hit.schema_name
+                ))),
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        let total_count = if let Some(total_hits) = search_results.total_hits {
+            usize::try_from(total_hits).unwrap()
+        } else {
+            // NOTE: fallback
+            list.len()
+        };
+
+        Ok(MoleculeGlobalActivityListing { total_count, list })
     }
 }
 

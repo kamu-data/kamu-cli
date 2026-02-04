@@ -40,6 +40,7 @@ pub type MoleculeGlobalActivityListing = EntityPageListing<MoleculeGlobalActivit
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum MoleculeGlobalActivity {
     DataRoomActivity(MoleculeDataRoomActivity),
     Announcement(MoleculeGlobalAnnouncement),
