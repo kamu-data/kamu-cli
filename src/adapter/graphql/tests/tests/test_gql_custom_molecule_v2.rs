@@ -10006,6 +10006,13 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
+    // NOTE: In this test, we allow different orderings in some places where the
+    //       sequence of results may vary.
+    let elasticsearch_backed = match &search_variant {
+        GraphQLMoleculeV2HarnessSearchVariant::SourceBased => false,
+        GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(_) => true,
+    };
+
     let harness = GraphQLMoleculeV2Harness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -10587,12 +10594,22 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
     pretty_assertions::assert_eq!(
         harness.execute_search_query("tEXt", None).await,
         json!({
-            "nodes": [
-                // project_2_file_1_dataset_search_hit_node,
-                project_1_file_1_dataset_search_hit_node, // earlier, but higher score
-                project_2_announcement_1_search_hit_node,
-                project_1_announcement_1_search_hit_node,
-            ],
+            // NOTE: In this case, there are different behaviors that we allow:
+            "nodes": if elasticsearch_backed {
+                [
+                    // project_2_file_1_dataset_search_hit_node,
+                    &project_1_file_1_dataset_search_hit_node, // earlier, but higher score
+                    &project_2_announcement_1_search_hit_node,
+                    &project_1_announcement_1_search_hit_node,
+                ]
+            } else {
+                [
+                    // project_2_file_1_dataset_search_hit_node,
+                    &project_2_announcement_1_search_hit_node,
+                    &project_1_announcement_1_search_hit_node,
+                    &project_1_file_1_dataset_search_hit_node,
+                ]
+            },
             "totalCount": 3
         })
     );
@@ -10629,12 +10646,22 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
     pretty_assertions::assert_eq!(
         harness.execute_search_query("plain", None).await,
         json!({
-            "nodes": [
-                project_1_file_1_dataset_search_hit_node,
-                project_2_file_1_dataset_search_hit_node,
-                // project_2_announcement_1_search_hit_node,
-                // project_1_announcement_1_search_hit_node,
-            ],
+            // NOTE: In this case, there are different behaviors that we allow:
+            "nodes": if elasticsearch_backed {
+                [
+                    &project_1_file_1_dataset_search_hit_node, // earlier, but higher score
+                    &project_2_file_1_dataset_search_hit_node,
+                    // project_2_announcement_1_search_hit_node,
+                    // project_1_announcement_1_search_hit_node,
+                ]
+            } else {
+                [
+                    &project_2_file_1_dataset_search_hit_node,
+                    &project_1_file_1_dataset_search_hit_node,
+                    // project_2_announcement_1_search_hit_node,
+                    // project_1_announcement_1_search_hit_node,
+                ]
+            },
             "totalCount": 2
         })
     );
