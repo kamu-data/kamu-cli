@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use internal_error::InternalError;
@@ -43,11 +45,9 @@ pub trait FlowProcessStateQuery: Send + Sync {
     ) -> Result<FlowProcessStateListing, InternalError>;
 
     /// Compute rollup for matching rows.
-    async fn rollup_by_scope(
+    async fn rollup(
         &self,
-        flow_scope_query: FlowScopeQuery,
-        for_flow_types: Option<&[&'static str]>,
-        effective_state_in: Option<&[FlowProcessEffectiveState]>,
+        filter: FlowProcessListFilter<'_>,
     ) -> Result<FlowProcessGroupRollup, InternalError>;
 }
 
@@ -69,7 +69,7 @@ pub struct FlowProcessListFilter<'a> {
     pub for_flow_types: Option<&'a [&'static str]>,
 
     /// Chips / state cuts
-    pub effective_state_in: Option<&'a [FlowProcessEffectiveState]>,
+    pub effective_state_in: Option<Cow<'a, [FlowProcessEffectiveState]>>,
 
     /// Time windows (UTC). Bounds inclusive.
     pub last_attempt_between: Option<(DateTime<Utc>, DateTime<Utc>)>,
@@ -123,7 +123,7 @@ impl<'a> FlowProcessListFilter<'a> {
         effective_state_in: &'a [FlowProcessEffectiveState],
     ) -> Self {
         Self {
-            effective_state_in: Some(effective_state_in),
+            effective_state_in: Some(Cow::Borrowed(effective_state_in)),
             ..self
         }
     }
@@ -134,7 +134,29 @@ impl<'a> FlowProcessListFilter<'a> {
         effective_state_in: Option<&'a [FlowProcessEffectiveState]>,
     ) -> Self {
         Self {
-            effective_state_in,
+            effective_state_in: effective_state_in.map(Cow::Borrowed),
+            ..self
+        }
+    }
+
+    /// Adding effective states from owned Vec.
+    pub fn with_effective_states_owned(
+        self,
+        effective_state_in: Vec<FlowProcessEffectiveState>,
+    ) -> Self {
+        Self {
+            effective_state_in: Some(Cow::Owned(effective_state_in)),
+            ..self
+        }
+    }
+
+    /// Adding effective states from owned Vec (optional).
+    pub fn with_effective_states_owned_opt(
+        self,
+        effective_state_in: Option<Vec<FlowProcessEffectiveState>>,
+    ) -> Self {
+        Self {
+            effective_state_in: effective_state_in.map(Cow::Owned),
             ..self
         }
     }

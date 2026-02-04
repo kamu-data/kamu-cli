@@ -49,10 +49,9 @@ impl<'a> WebhookFlowSubProcessGroup<'a> {
     pub async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
         let rollup = flow_process_state_query
-            .rollup_by_scope(
-                self.scope_query.clone(),
-                Some(&[FLOW_TYPE_WEBHOOK_DELIVER]),
-                None,
+            .rollup(
+                FlowProcessListFilter::for_scope(self.scope_query.clone())
+                    .for_flow_types(&[FLOW_TYPE_WEBHOOK_DELIVER]),
             )
             .await?;
 

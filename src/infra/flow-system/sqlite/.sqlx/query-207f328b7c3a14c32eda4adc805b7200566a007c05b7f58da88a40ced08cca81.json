@@ -56,12 +56,12 @@
       {
         "name": "paused_at: _",
         "ordinal": 10,
-        "type_info": "Text"
+        "type_info": "Null"
       },
       {
         "name": "running_since: _",
         "ordinal": 11,
-        "type_info": "Text"
+        "type_info": "Null"
       },
       {
         "name": "auto_stopped_at: _",

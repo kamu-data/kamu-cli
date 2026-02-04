@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::AsRef;
 use std::num::NonZeroUsize;
 
 use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
@@ -122,6 +123,9 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         let effective_state_parameter_index =
             flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
 
+        // Get the slice from Cow for counting
+        let effective_state_slice = filter.effective_state_in.as_ref().map(AsRef::as_ref);
+
         // First, get the total count (same filters, no ordering/pagination)
         let count_sql = format!(
             r#"
@@ -160,7 +164,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
             ))
             .bind(i32::from(
-                filter.effective_state_in.is_some_and(|es| !es.is_empty()),
+                effective_state_slice.is_some_and(|es| !es.is_empty()),
             ))
             .bind(filter.last_attempt_between.map(|r| r.0))
             .bind(filter.last_attempt_between.map(|r| r.1))
@@ -179,7 +183,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             }
         }
 
-        if let Some(effective_states) = filter.effective_state_in {
+        if let Some(effective_states) = effective_state_slice {
             for state in effective_states {
                 count_query = count_query.bind(state);
             }
@@ -252,8 +256,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     NonZeroUsize::new(list_flow_types_parameter_index).unwrap()
                 ))
                 .unwrap_or_default(),
-            filter
-                .effective_state_in
+            effective_state_slice
                 .as_ref()
                 .map(|states| sqlite_generate_placeholders_list(
                     states.len(),
@@ -268,7 +271,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                     filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
                 ))
                 .bind(i32::from(
-                    filter.effective_state_in.is_some_and(|es| !es.is_empty()),
+                    effective_state_slice.is_some_and(|es| !es.is_empty()),
                 ))
                 .bind(filter.last_attempt_between.map(|r| r.0))
                 .bind(filter.last_attempt_between.map(|r| r.1))
@@ -294,7 +297,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
             }
         }
 
-        if let Some(effective_states) = filter.effective_state_in {
+        if let Some(effective_states) = effective_state_slice {
             for state in effective_states {
                 list_query = list_query.bind(state);
             }
@@ -314,22 +317,23 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn rollup_by_scope(
+    async fn rollup(
         &self,
-        flow_scope_query: FlowScopeQuery,
-        for_flow_types: Option<&[&'static str]>,
-        effective_state_in: Option<&[FlowProcessEffectiveState]>,
+        filter: FlowProcessListFilter<'_>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let (scope_conditions, flow_types_parameter_index) =
-            generate_scope_query_condition_clauses(&flow_scope_query, 3 /* 2 params + 1 */);
+            generate_scope_query_condition_clauses(&filter.scope, 9 /* 8 params + 1 */);
 
-        let scope_values = form_scope_query_condition_values(flow_scope_query);
+        let scope_values = form_scope_query_condition_values(filter.scope);
 
         let effective_state_parameter_index =
-            flow_types_parameter_index + for_flow_types.map(<[&str]>::len).unwrap_or(0);
+            flow_types_parameter_index + filter.for_flow_types.map(<[&str]>::len).unwrap_or(0);
+
+        // Get the slice from Cow
+        let effective_state_slice = filter.effective_state_in.as_ref().map(AsRef::as_ref);
 
         let sql = format!(
             r#"
@@ -345,16 +349,23 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 WHERE
                     ({scope_conditions}) AND
                     ($1 = 0 OR flow_type IN ({})) AND
-                    ($2 = 0 OR effective_state IN ({}))
+                    ($2 = 0 OR effective_state IN ({})) AND
+                    ($3 IS NULL OR $4 IS NULL OR (last_attempt_at BETWEEN $3 AND $4)) AND
+                    ($5 IS NULL OR last_failure_at >= $5) AND
+                    ($6 IS NULL OR next_planned_at < $6) AND
+                    ($7 IS NULL OR next_planned_at > $7) AND
+                    ($8 IS NULL OR consecutive_failures >= $8)
             "#,
-            for_flow_types
+            filter
+                .for_flow_types
                 .as_ref()
                 .map(|flow_types| sqlite_generate_placeholders_list(
                     flow_types.len(),
                     NonZeroUsize::new(flow_types_parameter_index).unwrap()
                 ))
                 .unwrap_or_default(),
-            effective_state_in
+            filter
+                .effective_state_in
                 .as_ref()
                 .map(|states| sqlite_generate_placeholders_list(
                     states.len(),
@@ -364,20 +375,30 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         );
 
         let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
-            .bind(i32::from(for_flow_types.is_some()))
-            .bind(i32::from(effective_state_in.is_some()));
+            .bind(i32::from(
+                filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
+            ))
+            .bind(i32::from(
+                effective_state_slice.is_some_and(|es| !es.is_empty()),
+            ))
+            .bind(filter.last_attempt_between.map(|r| r.0))
+            .bind(filter.last_attempt_between.map(|r| r.1))
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from));
 
         for scope_value in &scope_values {
             query = query.bind(scope_value);
         }
 
-        if let Some(flow_types) = for_flow_types {
+        if let Some(flow_types) = filter.for_flow_types {
             for flow_type in flow_types {
                 query = query.bind(flow_type);
             }
         }
 
-        if let Some(effective_states) = effective_state_in {
+        if let Some(effective_states) = effective_state_slice {
             for state in effective_states {
                 query = query.bind(state);
             }

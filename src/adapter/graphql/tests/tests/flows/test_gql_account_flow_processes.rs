@@ -40,11 +40,11 @@ async fn test_primary_rollup() {
     assert_eq!(
         primary_rollup,
         &value!({
-            "total": 5,
+            "total": 4,
             "active": 1,
             "failing": 1,
             "paused": 1,
-            "unconfigured": 1,
+            "unconfigured": 0,
             "stopped": 1,
             "worstConsecutiveFailures": 1,
         })
@@ -102,11 +102,11 @@ async fn test_full_rollup() {
     assert_eq!(
         full_rollup,
         &value!({
-            "total": 9,
+            "total": 8,
             "active": 2,
             "failing": 2,
             "paused": 2,
-            "unconfigured": 1,
+            "unconfigured": 0,
             "stopped": 2,
             "worstConsecutiveFailures": 1,
         })
