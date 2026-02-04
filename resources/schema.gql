@@ -154,9 +154,9 @@ type AccountFlowProcessCardEdge {
 }
 
 type AccountFlowProcesses {
-	primaryRollup: FlowProcessGroupRollup!
-	webhookRollup: FlowProcessGroupRollup!
-	fullRollup: FlowProcessGroupRollup!
+	primaryRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
+	webhookRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
+	fullRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
 	primaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
 	webhookCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): WebhookFlowSubProcessConnection!
 	allCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessCardConnection!

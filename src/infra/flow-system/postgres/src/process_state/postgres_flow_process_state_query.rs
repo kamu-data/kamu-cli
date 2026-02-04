@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::AsRef;
+
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use kamu_flow_system::*;
@@ -114,6 +116,8 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
         // Normalize optional array parameters to None if empty
         let maybe_effective_states = filter
             .effective_state_in
+            .as_ref()
+            .map(AsRef::as_ref)
             .filter(|states| !states.is_empty());
 
         // Range as 2-element array
@@ -241,24 +245,32 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
 
     /// Compute rollup for matching rows.
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn rollup_by_scope(
+    async fn rollup(
         &self,
-        flow_scope_query: FlowScopeQuery,
-        for_flow_types: Option<&[&'static str]>,
-        effective_state_in: Option<&[FlowProcessEffectiveState]>,
+        filter: FlowProcessListFilter<'_>,
     ) -> Result<FlowProcessGroupRollup, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let (scope_conditions, _next) =
-            generate_scope_query_condition_clauses(&flow_scope_query, 3);
-        let scope_values = form_scope_query_condition_values(flow_scope_query);
+            generate_scope_query_condition_clauses(&filter.scope, 8 /* 7 params + 1 */);
+        let scope_values = form_scope_query_condition_values(filter.scope);
 
         // Normalize optional array parameters to None if empty
-        let maybe_flow_types = for_flow_types.filter(|flow_types| !flow_types.is_empty());
+        let maybe_flow_types = filter
+            .for_flow_types
+            .filter(|flow_types| !flow_types.is_empty());
 
         // Normalize optional array parameters to None if empty
-        let maybe_effective_states = effective_state_in.filter(|states| !states.is_empty());
+        let maybe_effective_states = filter
+            .effective_state_in
+            .as_ref()
+            .map(AsRef::as_ref)
+            .filter(|states| !states.is_empty());
+
+        // Range as 2-element array
+        let maybe_last_attempt_between =
+            filter.last_attempt_between.map(|(start, end)| [start, end]);
 
         let sql = format!(
             r#"
@@ -274,13 +286,23 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
                 WHERE
                     ({scope_conditions}) AND
                     ($1::text[] IS NULL OR flow_type = ANY($1)) AND
-                    ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2))
+                    ($2::flow_process_effective_state[] IS NULL OR effective_state = ANY($2)) AND
+                    ($3::timestamptz[] IS NULL OR (last_attempt_at BETWEEN $3[1] AND $3[2])) AND
+                    ($4 IS NULL OR last_failure_at >= $4) AND
+                    ($5 IS NULL OR next_planned_at < $5) AND
+                    ($6 IS NULL OR next_planned_at > $6) AND
+                    ($7 IS NULL OR consecutive_failures >= $7)
             "#
         );
 
         let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
             .bind(maybe_flow_types as Option<&[&str]>)
-            .bind(maybe_effective_states as Option<&[FlowProcessEffectiveState]>);
+            .bind(maybe_effective_states as Option<&[FlowProcessEffectiveState]>)
+            .bind(maybe_last_attempt_between)
+            .bind(filter.last_failure_since)
+            .bind(filter.next_planned_before)
+            .bind(filter.next_planned_after)
+            .bind(filter.min_consecutive_failures.map(i64::from));
 
         for arr in &scope_values {
             query = query.bind(arr);

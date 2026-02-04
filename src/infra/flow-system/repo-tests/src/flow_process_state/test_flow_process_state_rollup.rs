@@ -27,7 +27,7 @@ pub async fn test_rollup_from_csv_unfiltered(catalog: &Catalog) {
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
 
@@ -53,7 +53,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     let single_dataset_query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(single_dataset_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(single_dataset_query))
         .await
         .unwrap();
 
@@ -75,7 +75,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
         FlowScopeDataset::query_for_multiple_datasets(&[&dataset_id, &dataset_id2, &dataset_id3]);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(multi_dataset_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(multi_dataset_query))
         .await
         .unwrap();
 
@@ -94,7 +94,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     let subscription_query = FlowScopeSubscription::query_for_subscriptions_of_dataset(&dataset_id);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(subscription_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(subscription_query))
         .await
         .unwrap();
 
@@ -111,7 +111,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     let dataset_only_query = FlowScopeDataset::query_for_single_dataset_only(&dataset_id);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(dataset_only_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(dataset_only_query))
         .await
         .unwrap();
 
@@ -128,7 +128,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     let all_webhooks_query = FlowScopeSubscription::query_for_all_subscriptions();
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(all_webhooks_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(all_webhooks_query))
         .await
         .unwrap();
 
@@ -149,7 +149,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
         ]);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(multi_webhook_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(multi_webhook_query))
         .await
         .unwrap();
 
@@ -168,7 +168,7 @@ pub async fn test_rollup_from_csv_filtered_by_scope(catalog: &Catalog) {
     let system_query = FlowScopeQuery::build_for_system_scope();
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(system_query, None, None)
+        .rollup(FlowProcessListFilter::for_scope(system_query))
         .await
         .unwrap();
 
@@ -193,7 +193,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     // Test 1: Filter by INGEST flow type only
     let ingest_flows = [FLOW_TYPE_DATASET_INGEST];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), Some(&ingest_flows), None)
+        .rollup(FlowProcessListFilter::all().for_flow_types(&ingest_flows))
         .await
         .unwrap();
 
@@ -209,7 +209,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     // Test 2: Filter by TRANSFORM flow type only
     let transform_flows = [FLOW_TYPE_DATASET_TRANSFORM];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), Some(&transform_flows), None)
+        .rollup(FlowProcessListFilter::all().for_flow_types(&transform_flows))
         .await
         .unwrap();
 
@@ -224,7 +224,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     // Test 3: Filter by WEBHOOK_DELIVER flow type only
     let webhook_flows = [FLOW_TYPE_WEBHOOK_DELIVER];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), Some(&webhook_flows), None)
+        .rollup(FlowProcessListFilter::all().for_flow_types(&webhook_flows))
         .await
         .unwrap();
 
@@ -240,7 +240,7 @@ pub async fn test_rollup_from_csv_filtered_by_flow_type(catalog: &Catalog) {
     // Test 4: Filter by multiple flow types
     let multiple_flows = [FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), Some(&multiple_flows), None)
+        .rollup(FlowProcessListFilter::all().for_flow_types(&multiple_flows))
         .await
         .unwrap();
 
@@ -264,7 +264,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     // Test 1: Filter by Active status only
     let active_states = [FlowProcessEffectiveState::Active];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&active_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&active_states))
         .await
         .unwrap();
 
@@ -279,7 +279,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     // Test 2: Filter by Failing status only
     let failing_states = [FlowProcessEffectiveState::Failing];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&failing_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&failing_states))
         .await
         .unwrap();
 
@@ -294,7 +294,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     // Test 3: Filter by PausedManual status only
     let paused_states = [FlowProcessEffectiveState::PausedManual];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&paused_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&paused_states))
         .await
         .unwrap();
 
@@ -309,7 +309,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
     // Test 4: Filter by StoppedAuto status only
     let stopped_states = [FlowProcessEffectiveState::StoppedAuto];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&stopped_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&stopped_states))
         .await
         .unwrap();
 
@@ -327,7 +327,7 @@ pub async fn test_rollup_from_csv_filtered_by_effective_status(catalog: &Catalog
         FlowProcessEffectiveState::StoppedAuto,
     ];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&problematic_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&problematic_states))
         .await
         .unwrap();
 
@@ -358,7 +358,7 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     let webhook_flows = [FLOW_TYPE_WEBHOOK_DELIVER];
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(scope_query, Some(&webhook_flows), None)
+        .rollup(FlowProcessListFilter::for_scope(scope_query).for_flow_types(&webhook_flows))
         .await
         .unwrap();
 
@@ -377,7 +377,9 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     let failing_states = [FlowProcessEffectiveState::Failing];
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(scope_query, None, Some(&failing_states))
+        .rollup(
+            FlowProcessListFilter::for_scope(scope_query).with_effective_states(&failing_states),
+        )
         .await
         .unwrap();
 
@@ -396,10 +398,10 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     let active_states = [FlowProcessEffectiveState::Active];
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(
-            FlowScopeQuery::all(),
-            Some(&webhook_flows),
-            Some(&active_states),
+        .rollup(
+            FlowProcessListFilter::all()
+                .for_flow_types(&webhook_flows)
+                .with_effective_states(&active_states),
         )
         .await
         .unwrap();
@@ -420,7 +422,11 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     let active_states = [FlowProcessEffectiveState::Active];
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(scope_query, Some(&webhook_flows), Some(&active_states))
+        .rollup(
+            FlowProcessListFilter::for_scope(scope_query)
+                .for_flow_types(&webhook_flows)
+                .with_effective_states(&active_states),
+        )
         .await
         .unwrap();
 
@@ -442,7 +448,11 @@ pub async fn test_rollup_from_csv_combined_filters(catalog: &Catalog) {
     let stopped_states = [FlowProcessEffectiveState::StoppedAuto];
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(scope_query, Some(&ingest_flows), Some(&stopped_states))
+        .rollup(
+            FlowProcessListFilter::for_scope(scope_query)
+                .for_flow_types(&ingest_flows)
+                .with_effective_states(&stopped_states),
+        )
         .await
         .unwrap();
 
@@ -466,7 +476,7 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
     // Test 1: Filter by Unconfigured status only
     let unconfigured_states = [FlowProcessEffectiveState::Unconfigured];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&unconfigured_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&unconfigured_states))
         .await
         .unwrap();
 
@@ -484,7 +494,7 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
         FlowProcessEffectiveState::Unconfigured,
     ];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&operational_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&operational_states))
         .await
         .unwrap();
 
@@ -499,10 +509,10 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
     // Test 3: Unconfigured flows by type (ingest only)
     let ingest_flows = [FLOW_TYPE_DATASET_INGEST];
     let rollup = flow_process_state_query
-        .rollup_by_scope(
-            FlowScopeQuery::all(),
-            Some(&ingest_flows),
-            Some(&unconfigured_states),
+        .rollup(
+            FlowProcessListFilter::all()
+                .for_flow_types(&ingest_flows)
+                .with_effective_states(&unconfigured_states),
         )
         .await
         .unwrap();
@@ -519,10 +529,10 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
     // Test 4: Unconfigured flows by type (webhook only)
     let webhook_flows = [FLOW_TYPE_WEBHOOK_DELIVER];
     let rollup = flow_process_state_query
-        .rollup_by_scope(
-            FlowScopeQuery::all(),
-            Some(&webhook_flows),
-            Some(&unconfigured_states),
+        .rollup(
+            FlowProcessListFilter::all()
+                .for_flow_types(&webhook_flows)
+                .with_effective_states(&unconfigured_states),
         )
         .await
         .unwrap();
@@ -543,7 +553,7 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
         FlowProcessEffectiveState::StoppedAuto,
     ];
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, Some(&managed_states))
+        .rollup(FlowProcessListFilter::all().with_effective_states(&managed_states))
         .await
         .unwrap();
 
@@ -560,7 +570,10 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
     let scope_query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(scope_query, None, Some(&unconfigured_states))
+        .rollup(
+            FlowProcessListFilter::for_scope(scope_query)
+                .with_effective_states(&unconfigured_states),
+        )
         .await
         .unwrap();
 
@@ -572,6 +585,209 @@ pub async fn test_rollup_unconfigured_edge_cases(catalog: &Catalog) {
     assert_eq!(rollup.paused, 0);
     assert_eq!(rollup.stopped, 0);
     assert_eq!(rollup.unconfigured, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_filtered_by_last_attempt_between(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test with a time window that should match records #2 (07:40) and #11 (07:58)
+    // Between 07:30 and 08:00
+    let start = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:30:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let end = chrono::DateTime::parse_from_rfc3339("2025-09-08T08:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_last_attempt_between(start, end))
+        .await
+        .unwrap();
+
+    // Should match records with last_attempt_at in [07:30, 08:00):
+    // #2 (07:40 failing), #4 (07:55 failing), #6 (07:41 failing),
+    // #8 (07:42 failing), #11 (07:58 active), #13 (07:43 failing),
+    // #16 (07:50 stopped), #19 (07:51 failing), #21 (07:52 failing),
+    // #24 (07:52 stopped)
+    assert_eq!(rollup.total, 10);
+    assert_eq!(rollup.active, 1);
+    assert_eq!(rollup.failing, 7);
+    assert_eq!(rollup.stopped, 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_filtered_by_last_failure_since(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test filtering by failures since 07:45
+    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:45:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_last_failure_since(since))
+        .await
+        .unwrap();
+
+    // Should match records with last_failure_at >= 07:45:
+    // #4 (07:55), #16 (07:50), #19 (07:51), #21 (07:52), #24 (07:52)
+    assert_eq!(rollup.total, 5);
+    assert_eq!(rollup.failing, 3);
+    assert_eq!(rollup.stopped, 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_filtered_by_next_planned_before(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test filtering by next_planned_at before 10:00
+    let before = chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_next_planned_before(before))
+        .await
+        .unwrap();
+
+    // Should match records with next_planned_at < 10:00:
+    // #1 (09:00), #11 (08:30), #17 (09:30)
+    assert_eq!(rollup.total, 3);
+    assert_eq!(rollup.active, 2);
+    assert_eq!(rollup.failing, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_filtered_by_next_planned_after(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test filtering by next_planned_at after 11:30
+    let after = chrono::DateTime::parse_from_rfc3339("2025-09-08T11:30:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_next_planned_after(after))
+        .await
+        .unwrap();
+
+    // Should match records with next_planned_at > 11:30:
+    // #12 (12:00), #19 (12:00), #21 (14:00), #23 (11:30 - excluded, not after)
+    // Wait, #23 is exactly 11:30, so with "after" it should be excluded
+    assert_eq!(rollup.total, 3);
+    assert_eq!(rollup.active, 1);
+    assert_eq!(rollup.failing, 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_filtered_by_min_consecutive_failures(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Test with min_consecutive_failures = 2
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_min_consecutive_failures(2))
+        .await
+        .unwrap();
+
+    // Should match records with consecutive_failures >= 2:
+    // #4 (2), #6 (2), #8 (2), #9 (2), #13 (2), #16 (5), #17 (2), #19 (3),
+    // #21 (4), #24 (9)
+    assert_eq!(rollup.total, 10);
+    assert_eq!(rollup.failing, 8);
+    assert_eq!(rollup.stopped, 2);
+
+    // Test with higher threshold
+    let rollup = flow_process_state_query
+        .rollup(FlowProcessListFilter::all().with_min_consecutive_failures(5))
+        .await
+        .unwrap();
+
+    // Should match: #16 (5), #24 (9)
+    assert_eq!(rollup.total, 2);
+    assert_eq!(rollup.stopped, 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_combined_time_filters(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Combine time-based filters: last_failure_since and next_planned_before
+    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:40:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let before = chrono::DateTime::parse_from_rfc3339("2025-09-08T11:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(
+            FlowProcessListFilter::all()
+                .with_last_failure_since(since)
+                .with_next_planned_before(before),
+        )
+        .await
+        .unwrap();
+
+    // Should match records with both conditions:
+    // last_failure_at >= 07:40 AND next_planned_at < 11:00
+    // #2 (07:40, 10:00), #4 (07:55, 10:15), #8 (07:42, 10:30)
+    assert_eq!(rollup.total, 3);
+    assert_eq!(rollup.failing, 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rollup_from_csv_combined_failures_and_time(catalog: &Catalog) {
+    let mut csv_loader = CsvFlowProcessStateLoader::new(catalog);
+    csv_loader.populate_from_csv().await;
+
+    let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
+
+    // Combine min_consecutive_failures with time filter
+    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:50:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+
+    let rollup = flow_process_state_query
+        .rollup(
+            FlowProcessListFilter::all()
+                .with_min_consecutive_failures(3)
+                .with_last_failure_since(since),
+        )
+        .await
+        .unwrap();
+
+    // Should match records with consecutive_failures >= 3 AND last_failure_at >=
+    // 07:50 #16 (5 failures, 07:50), #19 (3 failures, 07:51), #21 (4
+    // failures, 07:52), #24 (9 failures, 07:52)
+    assert_eq!(rollup.total, 4);
+    assert_eq!(rollup.failing, 2);
+    assert_eq!(rollup.stopped, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

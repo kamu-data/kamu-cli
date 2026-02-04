@@ -51,15 +51,16 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_primary_rollup, skip_all)]
-    pub async fn primary_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
-        let scope_query = self.build_scope_query(ctx).await?;
-
-        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-        let rollup = flow_process_state_query
-            .rollup_by_scope(
-                scope_query,
-                Some(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]),
-                None,
+    pub async fn primary_rollup(
+        &self,
+        ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
+    ) -> Result<FlowProcessGroupRollup> {
+        let rollup = self
+            .get_process_states_rollup(
+                ctx,
+                &[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM],
+                filters,
             )
             .await?;
 
@@ -67,24 +68,34 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_webhook_rollup, skip_all)]
-    pub async fn webhook_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
-        let scope_query = self.build_scope_query(ctx).await?;
-
-        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-        let rollup = flow_process_state_query
-            .rollup_by_scope(scope_query, Some(&[FLOW_TYPE_WEBHOOK_DELIVER]), None)
+    pub async fn webhook_rollup(
+        &self,
+        ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
+    ) -> Result<FlowProcessGroupRollup> {
+        let rollup = self
+            .get_process_states_rollup(ctx, &[FLOW_TYPE_WEBHOOK_DELIVER], filters)
             .await?;
 
         Ok(rollup.into())
     }
 
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_full_rollup, skip_all)]
-    pub async fn full_rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
-        let scope_query = self.build_scope_query(ctx).await?;
-
-        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-        let rollup = flow_process_state_query
-            .rollup_by_scope(scope_query, None, None)
+    pub async fn full_rollup(
+        &self,
+        ctx: &Context<'_>,
+        filters: Option<FlowProcessFilters>,
+    ) -> Result<FlowProcessGroupRollup> {
+        let rollup = self
+            .get_process_states_rollup(
+                ctx,
+                &[
+                    FLOW_TYPE_DATASET_INGEST,
+                    FLOW_TYPE_DATASET_TRANSFORM,
+                    FLOW_TYPE_WEBHOOK_DELIVER,
+                ],
+                filters,
+            )
             .await?;
 
         Ok(rollup.into())
@@ -237,6 +248,23 @@ impl<'a> AccountFlowProcesses<'a> {
     }
 
     #[graphql(skip)]
+    async fn get_process_states_rollup(
+        &self,
+        ctx: &Context<'_>,
+        flow_types: &[&'static str],
+        filters: Option<FlowProcessFilters>,
+    ) -> Result<fs::FlowProcessGroupRollup> {
+        let scope_query = self.build_scope_query(ctx).await?;
+        let filter = self.convert_filters(scope_query, flow_types, filters);
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+
+        let rollup = flow_process_state_query.rollup(filter).await?;
+
+        Ok(rollup)
+    }
+
+    #[graphql(skip)]
     async fn get_process_state_listing(
         &self,
         ctx: &Context<'_>,
@@ -245,24 +273,45 @@ impl<'a> AccountFlowProcesses<'a> {
         ordering: Option<FlowProcessOrdering>,
         pagination: PaginationOpts,
     ) -> Result<fs::FlowProcessStateListing> {
-        let filters = filters.unwrap_or_default();
-
         let scope_query = self.build_scope_query(ctx).await?;
+        let filter = self.convert_filters(scope_query, flow_types, filters);
+        let ordering = self.convert_ordering(ordering);
+
+        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
+        let listing = flow_process_state_query
+            .list_processes(filter, ordering, Some(pagination))
+            .await?;
+
+        Ok(listing)
+    }
+
+    #[graphql(skip)]
+    fn convert_filters<'b>(
+        &self,
+        scope: fs::FlowScopeQuery,
+        flow_types: &'b [&'static str],
+        filters: Option<FlowProcessFilters>,
+    ) -> fs::FlowProcessListFilter<'b> {
+        let filters = filters.unwrap_or_default();
 
         let effective_state_in_converted: Option<Vec<fs::FlowProcessEffectiveState>> = filters
             .effective_state_in
             .as_ref()
             .map(|v| v.iter().map(|s| (*s).into()).collect());
 
-        // Apply default filter (exclude Unconfigured) when no effective states
-        // specified
-        let effective_state_in_with_default = effective_state_in_converted
-            .as_deref()
-            .or(Some(fs::FlowProcessEffectiveState::default_filter_states()));
+        // Build base filter
+        let mut filter = fs::FlowProcessListFilter::for_scope(scope).for_flow_types(flow_types);
 
-        let filter = fs::FlowProcessListFilter::for_scope(scope_query)
-            .for_flow_types(flow_types)
-            .with_effective_states_opt(effective_state_in_with_default)
+        // Apply default filter (exclude Unconfigured)
+        // when no effective states specified explicitly
+        if let Some(states) = effective_state_in_converted {
+            filter = filter.with_effective_states_owned(states);
+        } else {
+            filter = filter
+                .with_effective_states(fs::FlowProcessEffectiveState::default_filter_states());
+        }
+
+        filter
             .with_last_attempt_between_opt(
                 filters
                     .last_attempt_between
@@ -272,16 +321,7 @@ impl<'a> AccountFlowProcesses<'a> {
             .with_last_failure_since_opt(filters.last_failure_since)
             .with_next_planned_after_opt(filters.next_planned_after)
             .with_next_planned_before_opt(filters.next_planned_before)
-            .with_min_consecutive_failures_opt(filters.min_consecutive_failures);
-
-        let ordering = self.convert_ordering(ordering);
-
-        let flow_process_state_query = from_catalog_n!(ctx, dyn fs::FlowProcessStateQuery);
-        let listing = flow_process_state_query
-            .list_processes(filter, ordering, Some(pagination))
-            .await?;
-
-        Ok(listing)
+            .with_min_consecutive_failures_opt(filters.min_consecutive_failures)
     }
 
     #[graphql(skip)]
