@@ -11,6 +11,16 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Flow states UX enhancements:
+  - indicating if flow is currently running (tracking "running_since" field)
+  - remembering when flow was manually paused (tracking "paused_at" field)
+  - state listings should not include UNCONFIGURED processes by default,
+     only if those are requested explicitly
+  - Manual healing of flow process auto-resumes stopped trigger
+  - Rollups support similar filters as listings
+
 ## [0.257.3] - 2026-01-30
 ### Fixed
 - ReBAC -> DatasetSearchUpdater failure when creating new dataset, before it's indexed
