@@ -242,6 +242,54 @@ async fn test_data_query_some() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_udtf_loaded() {
+    let harness = GraphQLDataHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // NOTE: The purpose of this test is not to validate the function itself:
+    //       we need to ensure that the function is loaded into the Datafusion
+    //       context.
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc::indoc!(
+            r#"
+            {
+              data {
+                query(
+                  query: "SELECT * FROM to_table(\"kamu/not_correct_ref_format\")"
+                  queryDialect: SQL_DATA_FUSION
+                  schemaFormat: ARROW_JSON
+                  dataFormat: JSON
+                ) {
+                  ... on DataQueryResultError {
+                    errorMessage
+                    errorKind
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+
+    let json = serde_json::to_value(&res.data).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!({
+            "errorMessage": "to_table() requires correct dataset_ref format but got: \"kamu/not_correct_ref_format\"",
+            "errorKind": "INVALID_SQL",
+        }),
+        json["data"]["query"],
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_error_sql_unparsable() {
     let harness = GraphQLDataHarness::builder()

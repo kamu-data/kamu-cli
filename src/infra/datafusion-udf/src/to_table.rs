@@ -101,7 +101,7 @@ impl TryFrom<&[Expr]> for ToTableFunctionArgs {
         let Ok(dataset_ref) = dataset_ref_as_str.parse::<odf::DatasetRef>() else {
             return plan_err!(
                 "{FUNCTION_NAME}() requires correct dataset_ref format but got: \
-                 {dataset_ref_as_str}"
+                 \"{dataset_ref_as_str}\""
             );
         };
 
