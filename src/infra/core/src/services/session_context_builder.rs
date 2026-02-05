@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::prelude::SessionContext;
 use internal_error::InternalError;
-use kamu_core::{ObjectStoreRegistry, QueryOptions};
+use kamu_core::{ObjectStoreRegistry, QueryDatasetDataUseCase, QueryOptions};
 use kamu_datasets::DatasetRegistry;
 
 use crate::EngineConfigDatafusionEmbeddedBatchQuery;
@@ -25,6 +25,7 @@ pub struct SessionContextBuilder {
     datafusion_engine_config: Arc<EngineConfigDatafusionEmbeddedBatchQuery>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    query_dataset_data_use_case: Arc<dyn QueryDatasetDataUseCase>,
 }
 
 impl SessionContextBuilder {
@@ -74,7 +75,7 @@ impl SessionContextBuilder {
             }
         }
 
-        kamu_datafusion_udf::ToTableUdtf::register(&ctx, self.to_arc());
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, self.query_dataset_data_use_case.clone());
 
         Ok(ctx)
     }
