@@ -16,6 +16,7 @@ use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetAction,
@@ -26,8 +27,8 @@ use kamu_datasets::{
 };
 use odf::utils::data::DataFrameExt;
 
-use crate::SessionContextBuilder;
 use crate::utils::docker_images;
+use crate::{QueryDatasetDataUseCaseImpl, SessionContextBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -343,6 +344,36 @@ impl QueryServiceImpl {
             Ok((head, Some(df.into())))
         }
     }
+
+    async fn session_context(
+        &self,
+        options: QueryOptions,
+    ) -> Result<SessionContext, InternalError> {
+        let ctx = self
+            .session_context_builder
+            .session_context(options)
+            .await?;
+
+        // NOTE: Ugly way to avoid circular dependencies in a DI tree
+        let rebac_dataset_registry_facade = Arc::new(RebacDatasetRegistryFacadeImpl::new(
+            self.dataset_registry.clone(),
+            self.dataset_action_authorizer.clone(),
+        ));
+        let self_as_arc = Arc::new(Self {
+            session_context_builder: self.session_context_builder.clone(),
+            dataset_registry: self.dataset_registry.clone(),
+            dataset_action_authorizer: self.dataset_action_authorizer.clone(),
+        });
+        let query_dataset_data_use_case = Arc::new(QueryDatasetDataUseCaseImpl::new(
+            self_as_arc,
+            self.dataset_registry.clone(),
+            rebac_dataset_registry_facade,
+        ));
+
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, query_dataset_data_use_case);
+
+        Ok(ctx)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -385,7 +416,6 @@ impl QueryService for QueryServiceImpl {
             .collect();
 
         let ctx = self
-            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(input_datasets),
             })
@@ -506,7 +536,6 @@ impl QueryService for QueryServiceImpl {
             .collect();
 
         let ctx = self
-            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(input_datasets),
             })
@@ -550,10 +579,7 @@ impl QueryService for QueryServiceImpl {
         let (state, new_options) = self.resolve_query_state(statement, options).await?;
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
-        let ctx = self
-            .session_context_builder
-            .session_context(new_options)
-            .await?;
+        let ctx = self.session_context(new_options).await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse {
