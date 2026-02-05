@@ -65,7 +65,7 @@ impl MoleculeAsyncGlobalActivityWriter {
             .await
             .int_err()?;
 
-        //  Check commit status
+        // Check commit status
         match push_res {
             PushIngestResult::UpToDate => {
                 unreachable!("We just ingested a new global activity, it cannot be up-to-date")

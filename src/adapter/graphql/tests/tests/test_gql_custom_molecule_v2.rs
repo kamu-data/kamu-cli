@@ -48,14 +48,14 @@ use crate::utils::{
 macro_rules! test_gql_custom_molecule {
     ($test_name: expr) => {
         ::paste::paste! {
-            #[test_group::group(elasticsearch)]
+            #[::test_group::group(elasticsearch)]
             #[::test_log::test(::kamu_search_elasticsearch::test)]
             async fn [<$test_name "_es">](es_ctx: Arc<ElasticsearchTestContext>) {
                 let search_variant = GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx);
                 $test_name(search_variant).await;
             }
 
-            #[test_log::test(tokio::test)]
+            #[::test_log::test(::tokio::test)]
             async fn [<$test_name "_src">]() {
                 let search_variant = GraphQLMoleculeV2HarnessSearchVariant::SourceBased;
                 $test_name(search_variant).await;
@@ -479,7 +479,7 @@ test_gql_custom_molecule!(test_molecule_v2_search);
 
 #[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]
-async fn test_molecule_v2_dump_dataset_snapshots() {
+async fn test_molecule_v2_dump_dataset_snapshots_src() {
     // NOTE: Instead of dumping the source snapshots of datasets here we create
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
@@ -11004,6 +11004,219 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             ],
             "totalCount": 1
         })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 8))]
+async fn test_competitive_writing_of_global_activities_src_multi_thread() {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
+    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
+
+    pretty_assertions::assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitafast",
+                    "ipnftUid": PROJECT_1_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
+
+    harness.synchronize_agents().await;
+
+    let harness = Arc::new(harness);
+
+    // Create a few versioned files
+    let harness_clone = harness.clone();
+    let project_1_file_1_dataset_id = tokio::spawn(async move {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": "public",
+                "description": "Plain text file (foo)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
+        )
+        .execute(&harness_clone.schema, &harness_clone.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        pretty_assertions::assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    });
+
+    let harness_clone = harness.clone();
+    let project_1_file_2_dataset_id = tokio::spawn(async move {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/bar.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
+                "contentType": "text/plain",
+                "changeBy": USER_2,
+                "accessLevel": "holders",
+                "description": "Plain text file (bar)",
+                "categories": ["test-category-2"],
+                "tags": [],
+                "contentText": "hello bar",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
+        )
+        .execute(&harness_clone.schema, &harness_clone.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        pretty_assertions::assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    });
+
+    let (project_1_file_1_dataset_id, project_1_file_2_dataset_id) =
+        tokio::try_join!(project_1_file_1_dataset_id, project_1_file_2_dataset_id).unwrap();
+
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
+        {
+            let mut res_json = GraphQLQueryRequest::new(
+                LIST_GLOBAL_ACTIVITY_QUERY,
+                async_graphql::Variables::from_json(json!({
+                    "filters": null,
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            let mut nodes = res_json["molecule"]["v2"]["activity"]["nodes"].take();
+
+            use serde_json::Value;
+
+            if let Value::Array(ref mut nodes_as_array) = nodes {
+                nodes_as_array.sort_by(|a, b| {
+                    let change_by_a = a["entry"]["changeBy"].as_str().unwrap();
+                    let change_by_b = b["entry"]["changeBy"].as_str().unwrap();
+                    change_by_b.cmp(change_by_a)
+                });
+            } else {
+                unimplemented!();
+            }
+
+            nodes
+        },
+        json!([
+            {
+                "__typename": "MoleculeActivityFileAddedV2",
+                "entry": {
+                    "path": "/bar.txt",
+                    "ref": project_1_file_2_dataset_id,
+                    "accessLevel": "holders",
+                    "changeBy": USER_2,
+                }
+            },
+            {
+                "__typename": "MoleculeActivityFileAddedV2",
+                "entry": {
+                    "path": "/foo.txt",
+                    "ref": project_1_file_1_dataset_id,
+                    "accessLevel": "public",
+                    "changeBy": USER_1,
+                }
+            },
+        ])
     );
 }
 
