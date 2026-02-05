@@ -31,7 +31,6 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
-    "dep:kamu-auth-rebac-services",
     "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
@@ -58,6 +57,7 @@ kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datafusion-udf = { workspace = true }
 kamu-datasets = { workspace = true }
@@ -129,7 +129,6 @@ tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
-kamu-auth-rebac-services = { optional = true, workspace = true }
 kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
 alloy = { optional = true, version = "1.5", default-features = false, features = [
