@@ -187,8 +187,11 @@ impl PushIngestExecutorImpl {
 
         match stage_result {
             Ok(staged) => {
-                let estimated_size = Self::estimate_staged_size(&staged)?;
-                self.ensure_quota(&target, estimated_size).await?;
+                if !args.opts.ignore_quota_check {
+                    let estimated_size = Self::estimate_staged_size(&staged)?;
+                    self.ensure_quota(&target, estimated_size).await?;
+                }
+
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let system_time = staged.system_time;

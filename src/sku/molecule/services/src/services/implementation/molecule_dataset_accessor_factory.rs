@@ -120,7 +120,7 @@ impl MoleculeDatasetWriter {
     pub(crate) async fn push_ndjson_data(
         &self,
         buffer: bytes::Bytes,
-        source_event_time: Option<DateTime<Utc>>,
+        opts: MoleculeDatasetWriterPushNdjsonDataOptions,
     ) -> Result<PushIngestResult, PushIngestError> {
         let res = self
             .push_ingest_uc
@@ -129,10 +129,11 @@ impl MoleculeDatasetWriter {
                 kamu_core::DataSource::Buffer(buffer),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
-                    source_event_time,
+                    source_event_time: opts.source_event_time,
                     is_ingest_from_upload: false,
                     media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
+                    ignore_quota_check: opts.ignore_quota_check,
                 },
                 None,
             )
@@ -144,6 +145,11 @@ impl MoleculeDatasetWriter {
 
         Ok(res)
     }
+}
+
+pub struct MoleculeDatasetWriterPushNdjsonDataOptions {
+    pub source_event_time: Option<DateTime<Utc>>,
+    pub ignore_quota_check: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

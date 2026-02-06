@@ -15,6 +15,7 @@ use kamu_molecule_domain::*;
 use messaging_outbox::*;
 
 use crate::MoleculeGlobalDataRoomActivitiesService;
+use crate::services::MoleculeDatasetWriterPushNdjsonDataOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +67,16 @@ impl MoleculeAsyncGlobalActivityWriter {
         //            Thus, we cannot have concurrent writes here.
 
         let push_res = global_data_room_activities_writer
-            .push_ndjson_data(new_changelog_record.to_bytes(), *source_event_time)
+            .push_ndjson_data(
+                new_changelog_record.to_bytes(),
+                MoleculeDatasetWriterPushNdjsonDataOptions {
+                    source_event_time: *source_event_time,
+                    // NOTE: It's a tradeoff/compromise, but it seems better to have
+                    //       a few kilobytes more data written than to cause an error
+                    //       in the outbox dispatcher and stop processing the message queue.
+                    ignore_quota_check: true,
+                },
+            )
             .await
             .int_err()?;
 

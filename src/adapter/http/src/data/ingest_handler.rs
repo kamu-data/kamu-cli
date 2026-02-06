@@ -148,6 +148,7 @@ pub async fn dataset_ingest_handler(
                 is_ingest_from_upload,
                 media_type,
                 expected_head: None,
+                ignore_quota_check: false,
             },
             None,
         )
