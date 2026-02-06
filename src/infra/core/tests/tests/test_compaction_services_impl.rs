@@ -1679,7 +1679,7 @@ impl CompactTestHarness {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
-                    ignore_quota_check: false,
+                    skip_quota_check: false,
                 },
                 None,
             )

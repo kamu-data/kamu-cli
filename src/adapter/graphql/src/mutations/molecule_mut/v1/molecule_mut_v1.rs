@@ -202,7 +202,7 @@ impl MoleculeProjectMut {
                     is_ingest_from_upload: false,
                     media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
-                    ignore_quota_check: false,
+                    skip_quota_check: false,
                 },
                 None,
             )

@@ -187,7 +187,7 @@ impl PushIngestExecutorImpl {
 
         match stage_result {
             Ok(staged) => {
-                if !args.opts.ignore_quota_check {
+                if !args.opts.skip_quota_check {
                     let estimated_size = Self::estimate_staged_size(&staged)?;
                     self.ensure_quota(&target, estimated_size).await?;
                 }

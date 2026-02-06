@@ -46,7 +46,7 @@ pub struct PushIngestOpts {
     /// Expected head block to prevent concurrent updates
     pub expected_head: Option<odf::Multihash>,
     /// Skip the account quota check after ingesting.
-    pub ignore_quota_check: bool,
+    pub skip_quota_check: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

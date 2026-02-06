@@ -74,7 +74,7 @@ impl MoleculeAsyncGlobalActivityWriter {
                     // NOTE: It's a tradeoff/compromise, but it seems better to have
                     //       a few kilobytes more data written than to cause an error
                     //       in the outbox dispatcher and stop processing the message queue.
-                    ignore_quota_check: true,
+                    skip_quota_check: true,
                 },
             )
             .await

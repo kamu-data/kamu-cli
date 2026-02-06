@@ -133,7 +133,7 @@ impl MoleculeDatasetWriter {
                     is_ingest_from_upload: false,
                     media_type: Some(file_utils::MediaType::NDJSON.to_owned()),
                     expected_head: None,
-                    ignore_quota_check: opts.ignore_quota_check,
+                    skip_quota_check: opts.skip_quota_check,
                 },
                 None,
             )
@@ -149,7 +149,7 @@ impl MoleculeDatasetWriter {
 
 pub struct MoleculeDatasetWriterPushNdjsonDataOptions {
     pub source_event_time: Option<DateTime<Utc>>,
-    pub ignore_quota_check: bool,
+    pub skip_quota_check: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

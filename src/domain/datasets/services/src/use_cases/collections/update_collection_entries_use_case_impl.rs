@@ -246,7 +246,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                         is_ingest_from_upload: false,
                         media_type: Some(MediaType::NDJSON.to_owned()),
                         expected_head: Some(expected_head_value),
-                        ignore_quota_check: false,
+                        skip_quota_check: false,
                     },
                     None,
                 )

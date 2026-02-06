@@ -170,7 +170,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                     is_ingest_from_upload: false,
                     media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head,
-                    ignore_quota_check: false,
+                    skip_quota_check: false,
                 },
                 None,
             )

@@ -53,7 +53,7 @@ pub struct PushIngestDataUseCaseOptions {
     pub is_ingest_from_upload: bool,
     pub media_type: Option<MediaType>,
     pub expected_head: Option<odf::Multihash>,
-    pub ignore_quota_check: bool,
+    pub skip_quota_check: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

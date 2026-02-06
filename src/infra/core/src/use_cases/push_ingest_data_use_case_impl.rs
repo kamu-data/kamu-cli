@@ -44,7 +44,7 @@ impl PushIngestDataUseCaseImpl {
             is_ingest_from_upload,
             media_type,
             expected_head,
-            ignore_quota_check,
+            skip_quota_check,
         } = options;
 
         let ingest_plan = self
@@ -58,7 +58,7 @@ impl PushIngestDataUseCaseImpl {
                     auto_create_push_source: is_ingest_from_upload,
                     schema_inference: SchemaInferenceOpts::default(),
                     expected_head,
-                    ignore_quota_check,
+                    skip_quota_check,
                 },
             )
             .await?;

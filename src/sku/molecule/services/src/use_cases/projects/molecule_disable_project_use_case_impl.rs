@@ -82,7 +82,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
                 new_changelog_record.to_bytes(),
                 MoleculeDatasetWriterPushNdjsonDataOptions {
                     source_event_time,
-                    ignore_quota_check: false,
+                    skip_quota_check: false,
                 },
             )
             .await
