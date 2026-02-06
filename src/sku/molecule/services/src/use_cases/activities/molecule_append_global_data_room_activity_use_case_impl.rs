@@ -32,9 +32,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
         molecule_subject: &kamu_accounts::LoggedAccount,
         activity_record: &MoleculeDataRoomActivityPayloadRecord,
     ) -> Result<(), kamu_accounts::QuotaError> {
-        // NOTE: we take with margin, as we don't aim to reproduce the same calculation
-        //       as during ingesting (most importantly, no less).
-        let roughly_estimated_size = (activity_record.total_size_bytes() * 3) as u64;
+        let roughly_estimated_size = activity_record.roughly_estimated_size_in_bytes() as u64;
 
         self.account_quota_storage_checker
             .ensure_within_quota(&molecule_subject.account_id, roughly_estimated_size)

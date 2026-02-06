@@ -185,7 +185,7 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
 }
 
 impl MoleculeDataRoomActivityPayloadRecord {
-    pub fn total_size_bytes(&self) -> usize {
+    fn total_size_bytes(&self) -> usize {
         let stack_size = size_of::<Self>();
         let heap_size = self.ipnft_uid.len()
             + self.path.len()
@@ -197,6 +197,14 @@ impl MoleculeDataRoomActivityPayloadRecord {
             + self.tags.iter().fold(0, |acc, s| acc + s.len());
 
         stack_size + heap_size
+    }
+
+    pub fn roughly_estimated_size_in_bytes(&self) -> usize {
+        // NOTE: We take with margin, as we don't aim to reproduce the same calculation
+        //       as during ingesting (read as Parquet data).
+        //
+        //       Most importantly, no less.
+        self.total_size_bytes() * 3
     }
 }
 
