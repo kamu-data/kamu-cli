@@ -59,7 +59,12 @@ impl MoleculeAsyncGlobalActivityWriter {
             .await
             .int_err()?;
 
-        // TODO: several attempts
+        // IMPORTANT: Since this message handler is the only writing point to the global
+        //            activity dataset, each new message will be processed sequentially
+        //            by the outbox dispatcher.
+        //
+        //            Thus, we cannot have concurrent writes here.
+
         let push_res = global_data_room_activities_writer
             .push_ndjson_data(new_changelog_record.to_bytes(), *source_event_time)
             .await
