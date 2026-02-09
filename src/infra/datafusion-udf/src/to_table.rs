@@ -24,18 +24,16 @@ const FUNCTION_NAME: &str = "to_table";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// IMPORTANT: Multi-threaded tokio runtime is required for operation!
-pub struct ToTableUdtf<F, Fut>
+pub struct ToTableUdtf<F>
 where
-    F: Fn(odf::DatasetRef) -> Fut,
-    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>>,
+    F: AsyncFn(odf::DatasetRef) -> Result<Option<DataFrameExt>, QueryError>,
 {
     on_resolve_dataset_callback: F,
 }
 
-impl<F, Fut> ToTableUdtf<F, Fut>
+impl<F> ToTableUdtf<F>
 where
-    F: Fn(odf::DatasetRef) -> Fut + Sync + Send + 'static,
-    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>> + 'static,
+    F: AsyncFn(odf::DatasetRef) -> Result<Option<DataFrameExt>, QueryError> + Sync + Send + 'static,
 {
     pub fn register(ctx: &SessionContext, on_resolve_dataset_callback: F) {
         ctx.register_udtf(
@@ -75,10 +73,9 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // NOTE: Required for TableFunctionImpl (DataFusion trait)
-impl<F, Fut> std::fmt::Debug for ToTableUdtf<F, Fut>
+impl<F> std::fmt::Debug for ToTableUdtf<F>
 where
-    F: Fn(odf::DatasetRef) -> Fut,
-    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>>,
+    F: AsyncFn(odf::DatasetRef) -> Result<Option<DataFrameExt>, QueryError>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToTableUdtf").finish_non_exhaustive()
@@ -119,10 +116,9 @@ impl TryFrom<&[Expr]> for ToTableFunctionArgs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<F, Fut> TableFunctionImpl for ToTableUdtf<F, Fut>
+impl<F> TableFunctionImpl for ToTableUdtf<F>
 where
-    F: Fn(odf::DatasetRef) -> Fut + Sync + Send + 'static,
-    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>> + 'static,
+    F: AsyncFn(odf::DatasetRef) -> Result<Option<DataFrameExt>, QueryError> + Sync + Send + 'static,
 {
     fn call(&self, args: &[Expr]) -> DfResult<Arc<dyn TableProvider>> {
         let ToTableFunctionArgs { dataset_ref } = args.try_into()?;
