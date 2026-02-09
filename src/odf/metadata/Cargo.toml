@@ -62,7 +62,10 @@ base64 = { version = "0.22", default-features = false, features = ["std"] }
 flatbuffers = "25"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
-serde_with = { version = "3", default-features = false }
+serde_with = { version = "3", default-features = false, features = [
+    "std",
+    "macros",
+] }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # gRPC

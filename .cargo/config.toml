@@ -2,3 +2,11 @@
 #   warning: the following packages contain code that will be rejected by a future version of Rust: num-bigint-dig v0.8.4
 [future-incompat-report]
 frequency = "never"
+
+[unstable]
+feature-unification = true
+
+[resolver]
+# Reduces recompilation due to feature permutations
+# See: https://www.reddit.com/r/rust/comments/1qzvkwf/workspace_feature_permutations_hell/
+feature-unification = "workspace"
