@@ -315,3 +315,88 @@ impl From<GqlError> for async_graphql::Error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn get_content_args(
+    ctx: &Context<'_>,
+    content_source: ContentSource<'_>,
+    content_type: Option<file_utils::MediaType>,
+) -> Result<kamu_datasets::ContentArgs, GetContentArgsError> {
+    use std::io::Cursor;
+
+    use sha3::Digest;
+    use tokio::io::{AsyncReadExt, BufReader};
+
+    match content_source {
+        ContentSource::Bytes(bytes) => {
+            let reader = BufReader::new(Cursor::new(bytes.to_owned()));
+
+            Ok(kamu_datasets::ContentArgs {
+                content_length: bytes.len(),
+                content_stream: Some(Box::new(reader)),
+                content_hash: odf::Multihash::from_digest_sha3_256(bytes),
+                content_type,
+            })
+        }
+        ContentSource::Token(token) => {
+            let upload_token: kamu_core::UploadTokenBase64Json = token.parse()?;
+
+            let upload_service = from_catalog_n!(ctx, dyn kamu_core::UploadService);
+
+            let mut stream = upload_service
+                .upload_token_into_stream(&upload_token.0)
+                .await
+                .int_err()?;
+
+            let mut digest = sha3::Sha3_256::new();
+            let mut buf = [0u8; 2048];
+
+            loop {
+                let read = stream.read(&mut buf).await.int_err()?;
+                if read == 0 {
+                    break;
+                }
+                digest.update(&buf[..read]);
+            }
+
+            let content_hash =
+                odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest.finalize())
+                    .unwrap();
+
+            // Get the stream again and copy data from uploads to storage using computed
+            // hash
+            // TODO: PERF: Should we create file in the final storage directly to avoid
+            // copying?
+            let content_stream = upload_service
+                .upload_token_into_stream(&upload_token.0)
+                .await
+                .int_err()?;
+
+            Ok(kamu_datasets::ContentArgs {
+                content_length: upload_token.0.content_length,
+                content_hash,
+                content_stream: Some(content_stream),
+                content_type: upload_token.0.content_type,
+            })
+        }
+    }
+}
+
+pub(crate) enum ContentSource<'a> {
+    Bytes(&'a [u8]),
+    Token(String),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum GetContentArgsError {
+    #[error(transparent)]
+    TokenDecode(#[from] kamu_core::UploadTokenBase64JsonDecodeError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

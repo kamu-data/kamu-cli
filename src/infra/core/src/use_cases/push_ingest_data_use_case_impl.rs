@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
@@ -43,6 +44,7 @@ impl PushIngestDataUseCaseImpl {
             is_ingest_from_upload,
             media_type,
             expected_head,
+            skip_quota_check,
         } = options;
 
         let ingest_plan = self
@@ -56,6 +58,7 @@ impl PushIngestDataUseCaseImpl {
                     auto_create_push_source: is_ingest_from_upload,
                     schema_inference: SchemaInferenceOpts::default(),
                     expected_head,
+                    skip_quota_check,
                 },
             )
             .await?;
@@ -160,6 +163,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         let source_name = base_options.source_name.clone();
         let mut next_expected_head = base_options.expected_head.clone();
         let mut total_blocks = 0usize;
+        let mut last_system_time = Utc::now();
         let mut head_transition: Option<(odf::Multihash, odf::Multihash)> = None;
 
         for data_source in data_sources {
@@ -181,9 +185,11 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                 old_head,
                 new_head,
                 num_blocks,
+                system_time,
             } = ingest_result
             {
                 total_blocks += num_blocks;
+                last_system_time = system_time;
 
                 match &mut head_transition {
                     None => head_transition = Some((old_head, new_head.clone())),
@@ -202,6 +208,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                 old_head,
                 new_head,
                 num_blocks: total_blocks,
+                system_time: last_system_time,
             })
         } else {
             Ok(PushIngestResult::UpToDate)

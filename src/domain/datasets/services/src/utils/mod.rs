@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod create_dataset_use_case_helper;
+mod create_dataset_use_case_helper;
+mod data_frame_extra_data_fields_filter_applier;
 
 pub use create_dataset_use_case_helper::*;
+pub use data_frame_extra_data_fields_filter_applier::*;

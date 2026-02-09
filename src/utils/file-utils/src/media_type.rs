@@ -32,6 +32,7 @@ impl MediaType {
     /// See: <https://www.iana.org/assignments/media-types/application/vnd.shp>
     /// See: <https://en.wikipedia.org/wiki/Shapefile>
     pub const ESRI_SHAPEFILE: MediaTypeRef<'static> = MediaTypeRef("application/vnd.shp");
+    pub const OCTET_STREAM: MediaTypeRef<'static> = MediaTypeRef("application/octet-stream");
 }
 
 impl MediaTypeRef<'_> {
@@ -64,13 +65,13 @@ impl std::fmt::Display for MediaTypeRef<'_> {
     }
 }
 
-impl<'a> std::cmp::PartialEq<MediaTypeRef<'a>> for MediaType {
+impl<'a> PartialEq<MediaTypeRef<'a>> for MediaType {
     fn eq(&self, other: &MediaTypeRef<'a>) -> bool {
         self.0 == other.0
     }
 }
 
-impl std::cmp::PartialEq<MediaType> for MediaTypeRef<'_> {
+impl PartialEq<MediaType> for MediaTypeRef<'_> {
     fn eq(&self, other: &MediaType) -> bool {
         self.0 == other.0
     }

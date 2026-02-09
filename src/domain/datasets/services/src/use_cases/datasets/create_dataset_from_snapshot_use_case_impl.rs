@@ -42,6 +42,9 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
     did_secret_encryption_key: Option<SecretString>,
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
+
+    // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
+    rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
 #[component(pub)]
@@ -56,6 +59,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         create_helper: Arc<CreateDatasetUseCaseHelper>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
+        rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
     ) -> Self {
         Self {
             current_account_subject,
@@ -68,6 +72,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
             did_secret_key_repo,
+            rebac_svc,
         }
     }
 }
@@ -154,14 +159,23 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // TODO: Creating dataset under another account is not supported yet.
-        // In future we should check organization-level permissions here.
+        // TODO: HACK: SEC: When creating a dataset under another account we currently
+        // give subject a "maintainer" role on it. In future this should be refactored
+        // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        assert_eq!(
-            target_account_id, subject.account_id,
-            "Creating dataset under another account is not supported yet"
-        );
+        if target_account_id != subject.account_id {
+            self.rebac_svc
+                .get()
+                .int_err()?
+                .set_account_dataset_relation(
+                    &subject.account_id,
+                    kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
+                    &store_result.dataset_id,
+                )
+                .await
+                .int_err()?;
+        }
 
         // Notify interested parties the dataset was created
         self.create_helper

@@ -9,7 +9,8 @@
 
 use async_graphql::{EmptySubscription, Object, value};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_graphql::{ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE, LoggedInGuard};
+use kamu_adapter_graphql::*;
+use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -184,3 +185,5 @@ impl TestMutation {
 }
 
 type TestSchema = async_graphql::Schema<TestQuery, TestMutation, EmptySubscription>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,6 +16,33 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     RequestBody,
 };
+use reqwest::StatusCode;
+
+use crate::utils::generate_password;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const MULTITENANT_QUOTA_INGEST_TEST_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      auth:
+        allowAnonymous: false
+        users:
+          predefined:
+            - accountName: kamu
+              password: kamu.dev
+              email: kamu@example.com
+              properties: [ admin ]
+            - accountName: quota-low
+              password: test#quota-low
+              email: quota-low@example.com
+            - accountName: quota-ok
+              password: test#quota-ok
+              email: quota-ok@example.com
+    "#
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -165,4 +192,72 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
                 2000-01-01T00:00:00Z,1,Bob,2,80"#
             )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_respects_account_quota(mut kamu_api_server_client: KamuApiServerClient) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let low_account = "quota-low";
+    let ok_account = "quota-ok";
+
+    kamu_api_server_client
+        .account()
+        .set_account_quota_bytes(low_account, 1)
+        .await;
+    kamu_api_server_client
+        .account()
+        .set_account_quota_bytes(ok_account, 1_000_000)
+        .await;
+
+    kamu_api_server_client.auth().logout();
+    kamu_api_server_client
+        .auth()
+        .login_with_password(
+            low_account,
+            &generate_password(&odf::AccountName::new_unchecked(low_account)),
+        )
+        .await;
+
+    let low_quota_dataset = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await
+        .dataset_alias;
+
+    let low_quota_response = kamu_api_server_client
+        .rest_api_call(
+            reqwest::Method::POST,
+            &format!("{low_quota_dataset}/ingest"),
+            Some(RequestBody::NdJson(
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into(),
+            )),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(StatusCode::FORBIDDEN, low_quota_response.status());
+
+    kamu_api_server_client.auth().logout();
+    kamu_api_server_client
+        .auth()
+        .login_with_password(
+            ok_account,
+            &generate_password(&odf::AccountName::new_unchecked(ok_account)),
+        )
+        .await;
+
+    let ok_dataset = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await
+        .dataset_alias;
+
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &ok_dataset,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
+        )
+        .await;
 }

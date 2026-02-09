@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::InternalError;
 use odf::dataset::RefCASError;
@@ -18,10 +19,11 @@ use crate::{ExtraDataFields, FileVersion, WriteCheckedDataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateVersionFileUseCase: Send + Sync {
+pub trait UpdateVersionedFileUseCase: Send + Sync {
     async fn execute(
         &self,
         file_dataset: WriteCheckedDataset<'_>,
+        source_event_time: Option<DateTime<Utc>>,
         content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
@@ -45,19 +47,13 @@ pub struct UpdateVersionFileResult {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub content_hash: odf::Multihash,
+    pub system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum UpdateVersionFileUseCaseError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-
     #[error(transparent)]
     Access(
         #[from]
@@ -67,6 +63,20 @@ pub enum UpdateVersionFileUseCaseError {
 
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
+
+    #[error("Quota exceeded")]
+    QuotaExceeded(
+        #[from]
+        #[backtrace]
+        kamu_accounts::QuotaError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

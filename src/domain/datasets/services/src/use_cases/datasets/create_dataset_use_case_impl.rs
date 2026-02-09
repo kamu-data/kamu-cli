@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
     CreateDatasetError,
@@ -28,6 +29,9 @@ use crate::utils::CreateDatasetUseCaseHelper;
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
+
+    // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
+    rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
 #[common_macros::method_names_consts]
@@ -83,14 +87,23 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        // TODO: Creating dataset under another account is not supported yet.
-        // In future we should check organization-level permissions here.
+        // TODO: HACK: SEC: When creating a dataaset under another account we currently
+        // give subject a "maintainer" role on it. In future this should be refactored
+        // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        assert_eq!(
-            target_account_id, subject.account_id,
-            "Creating dataset under another account is not supported yet"
-        );
+        if target_account_id != subject.account_id {
+            self.rebac_svc
+                .get()
+                .int_err()?
+                .set_account_dataset_relation(
+                    &subject.account_id,
+                    kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
+                    &store_result.dataset_id,
+                )
+                .await
+                .int_err()?;
+        }
 
         // Notify interested parties the dataset was created
         self.create_helper

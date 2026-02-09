@@ -59,6 +59,40 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
         Ok(res)
     }
 
+    async fn list_all_webhook_subscriptions(
+        &self,
+    ) -> Result<Vec<WebhookSubscription>, InternalError> {
+        let subscription_ids = self
+            .subscription_event_store
+            .list_all_subscription_ids()
+            .await
+            .map_err(|e| match e {
+                ListWebhookSubscriptionsError::Internal(e) => e,
+            })?;
+
+        let subscriptions = WebhookSubscription::load_multi(
+            &subscription_ids,
+            self.subscription_event_store.as_ref(),
+        )
+        .await
+        .map_err(|e| match e {
+            GetEventsError::Internal(e) => e,
+        })?;
+
+        let mut res = Vec::with_capacity(subscriptions.len());
+        for subscription_res in subscriptions {
+            let subscription = match subscription_res {
+                Ok(subscription) => subscription,
+                Err(LoadError::NotFound(_)) => continue,
+                Err(LoadError::ProjectionError(e)) => return Err(e.int_err()),
+                Err(LoadError::Internal(e)) => return Err(e),
+            };
+            res.push(subscription);
+        }
+
+        Ok(res)
+    }
+
     async fn find_webhook_subscription_in_dataset(
         &self,
         dataset_id: &odf::DatasetID,

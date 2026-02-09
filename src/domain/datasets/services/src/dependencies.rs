@@ -47,8 +47,14 @@ pub fn register_dependencies(
     b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
     b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<RenameDatasetUseCaseImpl>();
+
+    b.add::<FindCollectionEntriesUseCaseImpl>();
     b.add::<UpdateCollectionEntriesUseCaseImpl>();
-    b.add::<UpdateVersionFileUseCaseImpl>();
+    b.add::<ViewCollectionEntriesUseCaseImpl>();
+
+    b.add::<FindVersionedFileVersionUseCaseImpl>();
+    b.add::<ViewVersionedFileHistoryUseCaseImpl>();
+    b.add::<UpdateVersionedFileUseCaseImpl>();
 
     b.add::<CreateDatasetUseCaseHelper>();
 
@@ -57,6 +63,7 @@ pub fn register_dependencies(
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();
+    b.add::<AccountQuotaCheckerStorageImpl>();
 
     b.add::<DatasetAliasUpdateHandler>();
     b.add::<DatasetBlockUpdateHandler>();

@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::QuotaError;
 use kamu_datasets::{
+    CollectionEntryAdd,
     CollectionEntryMove,
     CollectionEntryRemove,
-    CollectionEntryUpdate,
     CollectionUpdateOperation,
     UpdateCollectionEntriesResult,
     UpdateCollectionEntriesUseCase,
@@ -41,12 +42,14 @@ impl<'a> CollectionMut<'a> {
         operations: Vec<CollectionUpdateInput>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<CollectionUpdateResult> {
-        let update_entries_use_case = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
+        let update_collection_entries = from_catalog_n!(ctx, dyn UpdateCollectionEntriesUseCase);
 
         let mut mapped_ops = Vec::with_capacity(operations.len());
         for op in operations {
             if let Some(add) = op.add {
-                mapped_ops.push(CollectionUpdateOperation::Add(add.entry.into()));
+                mapped_ops.push(CollectionUpdateOperation::Add(CollectionEntryAdd {
+                    record: add.entry.into(),
+                }));
             } else if let Some(remove) = op.remove {
                 mapped_ops.push(CollectionUpdateOperation::Remove(CollectionEntryRemove {
                     path: remove.path.into(),
@@ -62,9 +65,10 @@ impl<'a> CollectionMut<'a> {
 
         let collection_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_entries_use_case
+        match update_collection_entries
             .execute(
-                WriteCheckedDataset(collection_dataset),
+                WriteCheckedDataset::from_ref(collection_dataset),
+                None,
                 mapped_ops,
                 expected_head,
             )
@@ -91,6 +95,23 @@ impl<'a> CollectionMut<'a> {
                 }),
             ),
             Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
+            Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(err)) => match err {
+                QuotaError::Exceeded(e) => Ok(CollectionUpdateResult::QuotaExceeded(
+                    CollectionUpdateErrorQuotaExceeded {
+                        used: Some(e.used),
+                        incoming: Some(e.incoming),
+                        limit: Some(e.limit),
+                    },
+                )),
+                QuotaError::NotConfigured => Ok(CollectionUpdateResult::QuotaExceeded(
+                    CollectionUpdateErrorQuotaExceeded {
+                        used: None,
+                        incoming: None,
+                        limit: None,
+                    },
+                )),
+                QuotaError::Internal(e) => Err(e.into()),
+            },
             Err(UpdateCollectionEntriesUseCaseError::Internal(err)) => Err(err.into()),
         }
     }
@@ -125,8 +146,8 @@ impl CollectionMut<'_> {
     pub async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        path_from: CollectionPath,
-        path_to: CollectionPath,
+        path_from: CollectionPath<'static>,
+        path_to: CollectionPath<'static>,
         extra_data: Option<ExtraData>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
@@ -150,7 +171,7 @@ impl CollectionMut<'_> {
     pub async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: CollectionPath,
+        path: CollectionPath<'static>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -182,7 +203,7 @@ impl CollectionMut<'_> {
 #[derive(InputObject, Debug)]
 pub struct CollectionEntryInput {
     /// Entry path
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
@@ -192,7 +213,7 @@ pub struct CollectionEntryInput {
     pub extra_data: Option<ExtraData>,
 }
 
-impl From<CollectionEntryInput> for CollectionEntryUpdate {
+impl From<CollectionEntryInput> for kamu_datasets::CollectionEntryRecord {
     fn from(value: CollectionEntryInput) -> Self {
         Self {
             path: value.path.into(),
@@ -227,8 +248,8 @@ pub struct CollectionUpdateInputAdd {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputMove {
-    pub path_from: CollectionPath,
-    pub path_to: CollectionPath,
+    pub path_from: CollectionPath<'static>,
+    pub path_to: CollectionPath<'static>,
 
     /// Optionally update the extra data
     pub extra_data: Option<ExtraData>,
@@ -236,7 +257,7 @@ pub struct CollectionUpdateInputMove {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputRemove {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,6 +272,7 @@ pub enum CollectionUpdateResult {
     UpToDate(CollectionUpdateUpToDate),
     CasFailed(CollectionUpdateErrorCasFailed),
     NotFound(CollectionUpdateErrorNotFound),
+    QuotaExceeded(CollectionUpdateErrorQuotaExceeded),
 }
 
 #[derive(SimpleObject)]
@@ -299,7 +321,7 @@ impl CollectionUpdateErrorCasFailed {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorNotFound {
-    pub path: CollectionPath,
+    pub path: CollectionPath<'static>,
 }
 
 #[ComplexObject]
@@ -309,6 +331,30 @@ impl CollectionUpdateErrorNotFound {
     }
     async fn message(&self) -> String {
         format!("Path {} does not exist", self.path)
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CollectionUpdateErrorQuotaExceeded {
+    pub used: Option<u64>,
+    pub incoming: Option<u64>,
+    pub limit: Option<u64>,
+}
+
+#[ComplexObject]
+impl CollectionUpdateErrorQuotaExceeded {
+    async fn is_success(&self) -> bool {
+        false
+    }
+
+    async fn message(&self) -> String {
+        match (self.used, self.incoming, self.limit) {
+            (Some(used), Some(incoming), Some(limit)) => {
+                format!("Quota exceeded: used={used}, incoming={incoming}, limit={limit}")
+            }
+            _ => "Quota exceeded".to_string(),
+        }
     }
 }
 

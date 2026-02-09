@@ -5234,6 +5234,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "format-utils"
+version = "0.258.0"
+dependencies = [
+ "pretty_assertions",
+]
+
+[[package]]
 name = "fraction"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6857,6 +6864,8 @@ dependencies = [
  "internal-error",
  "itertools 0.14.0",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
@@ -6910,6 +6919,7 @@ dependencies = [
  "crypto-utils",
  "database-common",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "jsonwebtoken",
@@ -6924,6 +6934,7 @@ dependencies = [
  "schemars 1.2.1",
  "secrecy",
  "serde",
+ "serde_json",
  "setty",
  "sqlx",
  "strum",
@@ -6941,6 +6952,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
@@ -6986,11 +6998,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -7007,6 +7021,7 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "kamu-accounts",
  "kamu-accounts-services",
@@ -7030,6 +7045,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "init-on-startup",
  "internal-error",
@@ -7073,11 +7089,13 @@ dependencies = [
  "database-common-macros",
  "dill",
  "email-utils",
+ "event-sourcing",
  "futures",
  "internal-error",
  "kamu-accounts",
  "kamu-accounts-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -7224,6 +7242,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "futures",
+ "init-on-startup",
  "internal-error",
  "kamu-accounts",
  "kamu-adapter-flow-dataset",
@@ -7232,6 +7251,7 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
+ "kamu-flow-system-services",
  "kamu-task-system",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
@@ -7305,10 +7325,12 @@ dependencies = [
  "kamu-webhooks-inmem",
  "kamu-webhooks-services",
  "messaging-outbox",
+ "num-bigint",
  "nutype",
  "observability",
  "oop",
  "opendatafabric",
+ "paste",
  "pretty_assertions",
  "random-strings",
  "secrecy",
@@ -7316,6 +7338,7 @@ dependencies = [
  "serde_json",
  "setty",
  "sha3",
+ "strum",
  "tempfile",
  "test-group",
  "test-log",
@@ -7916,6 +7939,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.258.0"
 dependencies = [
  "async-graphql",
+ "base64",
  "chrono",
  "database-common",
  "datafusion",
@@ -7932,12 +7956,15 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "random-strings",
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml_ng",
  "tempfile",
  "test-utils",
  "tokio",
+ "tokio-retry",
  "url",
 ]
 
@@ -7991,6 +8018,7 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
+ "messaging-outbox",
  "mockall",
  "object_store",
  "opendatafabric",
@@ -8043,11 +8071,14 @@ dependencies = [
  "database-common",
  "dill",
  "file-utils",
+ "format-utils",
  "futures",
  "internal-error",
+ "kamu-accounts",
  "kamu-search",
  "messaging-outbox",
  "mockall",
+ "nonempty",
  "opendatafabric",
  "oso",
  "secrecy",
@@ -8059,6 +8090,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "urlencoding",
  "uuid",
 ]
 
@@ -8169,21 +8201,25 @@ dependencies = [
  "nutype",
  "oop",
  "opendatafabric",
+ "paste",
  "petgraph 0.8.3",
  "pretty_assertions",
  "s3-utils",
  "secrecy",
  "serde",
  "serde_json",
+ "sha3",
  "tempfile",
  "test-group",
  "test-log",
+ "test-utils",
  "thiserror 2.0.18",
  "time-source",
  "tokio",
  "tokio-stream",
  "tracing",
  "url",
+ "urlencoding",
  "uuid",
 ]
 
@@ -9646,6 +9682,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "nonempty"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "303e8749c804ccd6ca3b428de7fe0d86cb86bc7606bc15291f100fd487960bb8"
 
 [[package]]
 name = "nu-ansi-term"
@@ -13147,9 +13189,9 @@ checksum = "5d0eda75b662bc3d7a9e751292c96a71a3d9bdcfb887e0b895032a5fd23c203e"
 
 [[package]]
 name = "ssi-core"
-version = "0.2.3"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4354a6134c0b984d51a75f850e8e9d78991b0b928389582113a4b77ea2960ff0"
+checksum = "1736eba3e90c21fc492870501995a07a6ad83bfef7a5af80a7a75e9d7c8a8834"
 dependencies = [
  "async-trait",
  "pin-project",

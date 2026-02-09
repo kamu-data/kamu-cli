@@ -35,6 +35,8 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
         dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
+    // TODO: This likely should be a sync function to signify that handles are
+    // transformed to resolved datasets with no overhead
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
 }
 
@@ -58,6 +60,11 @@ pub trait DatasetRegistryExt: DatasetRegistry {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError>;
+
+    async fn try_get_dataset_by_ref(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<ResolvedDataset>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +104,17 @@ where
             .await?;
         let dataset = self.get_dataset_by_handle(&dataset_handle).await;
         Ok(dataset)
+    }
+
+    async fn try_get_dataset_by_ref(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<Option<ResolvedDataset>, InternalError> {
+        match self.get_dataset_by_ref(dataset_ref).await {
+            Ok(hdl) => Ok(Some(hdl)),
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => Ok(None),
+            Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
+        }
     }
 }
 

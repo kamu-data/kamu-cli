@@ -7,23 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_graphql::value;
 use indoc::indoc;
-use internal_error::{ErrorIntoInternal, InternalError};
-use kamu::DatasetRegistrySoloUnitBridge;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_adapter_graphql::data_loader::dataset_handle_data_loader;
-use kamu_auth_rebac::{
-    ClassifyDatasetRefsByAccessResponse,
-    ClassifyDatasetRefsByAllowanceResponse,
-    RebacDatasetIdUnresolvedError,
-    RebacDatasetRefUnresolvedError,
-    RebacDatasetRegistryFacade,
-};
-use kamu_core::TenancyConfig;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetAction, ResolvedDataset};
+use internal_error::ErrorIntoInternal;
 use pretty_assertions::assert_eq;
 use thiserror::Error;
-use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,84 +59,61 @@ async fn test_malformed_argument() {
 
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
-    #[derive(Debug, Error)]
-    #[error("I'm a dummy error that should not propagate through")]
-    struct DummyError;
-
+    // NOTE: Service chosen to have the shortest DI catalog.
     #[dill::component]
-    #[dill::interface(dyn RebacDatasetRegistryFacade)]
-    struct ErrorRebacDatasetRegistryFacadeImpl {}
+    #[dill::interface(dyn kamu_accounts::AuthenticationService)]
+    struct DummyAuthenticationService;
 
     #[async_trait::async_trait]
-    impl RebacDatasetRegistryFacade for ErrorRebacDatasetRegistryFacadeImpl {
-        async fn resolve_dataset_handle_by_ref(
-            &self,
-            _dataset_ref: &odf::DatasetRef,
-            _action: DatasetAction,
-        ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
-            unreachable!()
+    impl kamu_accounts::AuthenticationService for DummyAuthenticationService {
+        fn supported_login_methods(&self) -> Vec<&'static str> {
+            unimplemented!()
         }
 
-        async fn resolve_dataset_by_ref(
+        async fn login(
             &self,
-            _dataset_ref: &odf::DatasetRef,
-            _action: DatasetAction,
-        ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
-            unreachable!()
+            _login_method: &str,
+            _login_credentials_json: String,
+            _device_code: Option<kamu_accounts::DeviceCode>,
+        ) -> Result<kamu_accounts::LoginResponse, kamu_accounts::LoginError> {
+            unimplemented!()
         }
 
-        async fn resolve_dataset_by_handle(
+        async fn account_by_token(
             &self,
-            _dataset_handle: &odf::DatasetHandle,
-            _action: DatasetAction,
-        ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
-            unreachable!()
-        }
+            _access_token: String,
+        ) -> Result<kamu_accounts::Account, kamu_accounts::GetAccountInfoError> {
+            #[derive(Debug, Error)]
+            #[error("I'm a dummy error that should not propagate through")]
+            struct DummyError;
 
-        async fn classify_dataset_refs_by_allowance(
-            &self,
-            _dataset_refs: &[&odf::DatasetRef],
-            _action: DatasetAction,
-        ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
-            Err(DummyError.int_err())
-        }
-
-        async fn classify_dataset_refs_by_access(
-            &self,
-            _dataset_refs: &[&odf::DatasetRef],
-            _action: DatasetAction,
-        ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
-            unreachable!()
+            Err(DummyError.int_err().into())
         }
     }
 
-    let tempdir = tempfile::tempdir().unwrap();
-
     let catalog = dill::CatalogBuilder::new()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            tempdir.path().join("datasets"),
-        ))
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<ErrorRebacDatasetRegistryFacadeImpl>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<DummyAuthenticationService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema.execute(async_graphql::Request::new(indoc!(
-            r#"
-            {
-                datasets {
-                    byId (datasetId: "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc") {
-                        name
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($accessToken: String!) {
+                  auth {
+                    accountDetails(accessToken: $accessToken) {
+                      __typename
                     }
+                  }
                 }
-            }
-            "#
-
-        )).data(dataset_handle_data_loader(&catalog)).data(catalog))
+                "#
+            ))
+            .variables(async_graphql::Variables::from_value(value!({
+                "accessToken": "foobar",
+            })))
+            .data(catalog),
+        )
         .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
@@ -162,10 +127,10 @@ async fn test_internal_error() {
             "errors":[{
                 "locations": [],
                 "message": "Internal error",
-                "path": ["datasets", "byId"],
+                "path": ["auth", "accountDetails"],
             }],
             "data": {
-                "datasets": null,
+                "auth": null,
             }
         })
     );

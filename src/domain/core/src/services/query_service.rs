@@ -113,7 +113,7 @@ pub struct QueryOptionsDataset {
     pub block_hash: Option<odf::Multihash>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
-    /// query, as they are not inlcuded in the [`QueryState`] and thus can
+    /// query, as they are not included in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
     pub hints: DatasetQueryHints,
 }
@@ -169,7 +169,7 @@ pub struct QueryStateDataset {
 #[derive(Debug, Clone)]
 pub struct GetDataResponse {
     /// A [`DataFrameExt`] that can be used to read schema and access the data.
-    /// `None` when dataset schema was not yet defined. Note that the data
+    /// `None` when the dataset schema was not yet defined. Note that the data
     /// frames are "lazy". They are a representation of a logical query
     /// plan. The actual query is executed only when you pull the resulting
     /// data from it.
@@ -218,6 +218,7 @@ pub enum CreateSessionError {
         #[backtrace]
         odf::metadata::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -458,6 +459,14 @@ impl From<DatasetActionUnauthorizedError> for QueryError {
             DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("'{dataset_handle}' has no primary keys")]
+pub struct DatasetHasNoPrimaryKeysError {
+    pub dataset_handle: odf::DatasetHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
