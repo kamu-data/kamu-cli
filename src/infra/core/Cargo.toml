@@ -109,6 +109,9 @@ async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1"
 cfg-if = "1" # Conditional compilation
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "6", default-features = false }
 dill = { version = "0.15", default-features = false }

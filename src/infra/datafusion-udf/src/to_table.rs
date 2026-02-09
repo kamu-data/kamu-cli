@@ -14,7 +14,8 @@ use datafusion::catalog::{TableFunctionImpl, TableProvider};
 use datafusion::common::{DataFusionError as DFError, Result as DfResult, plan_err};
 use datafusion::datasource::empty::EmptyTable;
 use datafusion::prelude::*;
-use kamu_core::{QueryDatasetDataUseCase, QueryError};
+use kamu_core::QueryError;
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,43 +24,46 @@ const FUNCTION_NAME: &str = "to_table";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// IMPORTANT: Multi-threaded tokio runtime is required for operation!
-pub struct ToTableUdtf {
-    query_dataset_data_use_case: Arc<dyn QueryDatasetDataUseCase>,
+pub struct ToTableUdtf<F, Fut>
+where
+    F: Fn(odf::DatasetRef) -> Fut,
+    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>>,
+{
+    on_resolve_dataset_callback: F,
 }
 
-impl ToTableUdtf {
-    pub fn register(
-        ctx: &SessionContext,
-        query_dataset_data_use_case: Arc<dyn QueryDatasetDataUseCase>,
-    ) {
+impl<F, Fut> ToTableUdtf<F, Fut>
+where
+    F: Fn(odf::DatasetRef) -> Fut + Sync + Send + 'static,
+    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>> + 'static,
+{
+    pub fn register(ctx: &SessionContext, on_resolve_dataset_callback: F) {
         ctx.register_udtf(
             FUNCTION_NAME,
-            Arc::new(Self::new(query_dataset_data_use_case)),
+            Arc::new(Self::new(on_resolve_dataset_callback)),
         );
     }
 
-    pub fn new(query_dataset_data_use_case: Arc<dyn QueryDatasetDataUseCase>) -> Self {
+    pub fn new(on_resolve_dataset_callback: F) -> Self {
         Self {
-            query_dataset_data_use_case,
+            on_resolve_dataset_callback,
         }
     }
 
     async fn main(&self, dataset_ref: odf::DatasetRef) -> DfResult<Arc<dyn TableProvider>> {
-        let data_response = self
-            .query_dataset_data_use_case
-            .get_changelog_projection(&dataset_ref, Default::default())
+        let maybe_df = (self.on_resolve_dataset_callback)(dataset_ref.clone())
             .await
             .map_err(|e| {
                 // Rewrite access error
                 if let QueryError::Access(_) = e {
-                    odf::DatasetNotFoundError::new(dataset_ref.clone()).into()
+                    odf::DatasetNotFoundError::new(dataset_ref).into()
                 } else {
                     e
                 }
             })
             .map_err(|e| DFError::External(Box::new(e)))?;
 
-        if let Some(df) = data_response.df {
+        if let Some(df) = maybe_df {
             Ok(df.into_view())
         } else {
             // Dataset has no schema yet -- return empty table
@@ -71,7 +75,11 @@ impl ToTableUdtf {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // NOTE: Required for TableFunctionImpl (DataFusion trait)
-impl std::fmt::Debug for ToTableUdtf {
+impl<F, Fut> std::fmt::Debug for ToTableUdtf<F, Fut>
+where
+    F: Fn(odf::DatasetRef) -> Fut,
+    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToTableUdtf").finish_non_exhaustive()
     }
@@ -111,7 +119,11 @@ impl TryFrom<&[Expr]> for ToTableFunctionArgs {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TableFunctionImpl for ToTableUdtf {
+impl<F, Fut> TableFunctionImpl for ToTableUdtf<F, Fut>
+where
+    F: Fn(odf::DatasetRef) -> Fut + Sync + Send + 'static,
+    Fut: Future<Output = Result<Option<DataFrameExt>, QueryError>> + 'static,
+{
     fn call(&self, args: &[Expr]) -> DfResult<Arc<dyn TableProvider>> {
         let ToTableFunctionArgs { dataset_ref } = args.try_into()?;
 

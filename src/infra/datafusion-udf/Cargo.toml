@@ -30,8 +30,6 @@ tokio = { version = "1", default-features = false, features = ["rt"] }
 
 
 [dev-dependencies]
-kamu-core = { workspace = true, default-features = false, features = ["testing"] }
-kamu-datasets = { workspace = true, default-features = false, features = ["testing"] }
 odf = { workspace = true, default-features = false, features = ["datafusion", "testing"] }
 
 indoc = { version = "2" }

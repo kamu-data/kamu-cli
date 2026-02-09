@@ -12,11 +12,11 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use cheap_clone::CheapClone;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetAction,
@@ -27,27 +27,33 @@ use kamu_datasets::{
 };
 use odf::utils::data::DataFrameExt;
 
+use crate::SessionContextBuilder;
+use crate::use_cases::helpers;
 use crate::utils::docker_images;
-use crate::{QueryDatasetDataUseCaseImpl, SessionContextBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 #[dill::component]
 #[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
     session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn kamu_auth_rebac::RebacDatasetRegistryFacade>,
 }
 
+impl CheapClone for QueryServiceImpl {}
+
+#[common_macros::method_names_consts]
 impl QueryServiceImpl {
-    /// Unless state is already provided in the options this will attempt to
+    /// Unless state is already provided in the options, this will attempt to
     /// parse the SQL, extract the names of all datasets mentioned in the
     /// query and affix their states in the query options to specific blocks.
     #[expect(clippy::single_match)]
     #[tracing::instrument(
         level = "info",
-        name = "QueryServiceImpl::resolve_query_state",
+        name = QueryServiceImpl_resolve_query_state,
         skip_all
     )]
     async fn resolve_query_state(
@@ -61,7 +67,7 @@ impl QueryServiceImpl {
         let mut new_dataset_opts = BTreeMap::new();
         let mut input_dataset_states = BTreeMap::new();
 
-        // If input datasets options are specified we check access and resolve block
+        // If input datasets options are specified, we check access and resolve block
         // hash if not already provided.
         //
         // Otherwise, we infer the datasets from the query itself.
@@ -81,7 +87,7 @@ impl QueryServiceImpl {
             }
 
             // We skip adding inaccessible datasets to state and options and let the query
-            // fail with "not found" error
+            // fail with the "not found" error
             for id in by_access.authorized_ids {
                 let mut opts = input_dataset_opts.get(&id).unwrap().clone();
 
@@ -138,7 +144,7 @@ impl QueryServiceImpl {
 
             // Some queries like `show tables` will not be affixed to a specific set of
             // datasets and for now require populating session context with all datasets
-            // accessible to the user. We will not include such datasets in the state, but
+            // accessible to the user. We will not include such datasets in the state but
             // will propagate them to [`KamuSchema`] via options.
             let mut is_restricted_set = false;
             let mut needs_schema = false;
@@ -191,7 +197,7 @@ impl QueryServiceImpl {
                     .try_collect()
                     .await?;
 
-                // We don't include datasets into the state, but add them to options
+                // We don't include datasets in the state but add them to options
                 for hdl in handles {
                     new_dataset_opts.insert(
                         hdl.id.clone(),
@@ -209,7 +215,7 @@ impl QueryServiceImpl {
                 }
             } else {
                 // Resolve table references into datasets.
-                // We simply ignore unresolvable, letting query to fail at the execution stage.
+                // We simply ignore unresolvable, letting a query fail at the execution stage.
                 for mut table in table_refs {
                     // Strip possible `kamu.kamu.` prefix
                     while table.0.len() > 1
@@ -249,7 +255,7 @@ impl QueryServiceImpl {
                         .is_action_allowed(&hdl.id, DatasetAction::Read)
                         .await?
                     {
-                        // Ignore this alias and let the query fail with "not found" error
+                        // Ignore this alias and let the query fail with the "not found" error
                         tracing::warn!(?dataset_ref, "Restricting access to unauthorized dataset");
                         continue;
                     }
@@ -354,23 +360,23 @@ impl QueryServiceImpl {
             .session_context(options)
             .await?;
 
-        // NOTE: Ugly way to avoid circular dependencies in a DI tree
-        let rebac_dataset_registry_facade = Arc::new(RebacDatasetRegistryFacadeImpl::new(
-            self.dataset_registry.clone(),
-            self.dataset_action_authorizer.clone(),
-        ));
-        let self_as_arc = Arc::new(Self {
-            session_context_builder: self.session_context_builder.clone(),
-            dataset_registry: self.dataset_registry.clone(),
-            dataset_action_authorizer: self.dataset_action_authorizer.clone(),
-        });
-        let query_dataset_data_use_case = Arc::new(QueryDatasetDataUseCaseImpl::new(
-            self_as_arc,
-            self.dataset_registry.clone(),
-            rebac_dataset_registry_facade,
-        ));
+        let self_clone = (*self).cheap_clone();
 
-        kamu_datafusion_udf::ToTableUdtf::register(&ctx, query_dataset_data_use_case);
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, move |dataset_ref| {
+            let self_clone = self_clone.cheap_clone();
+            async move {
+                let source = helpers::resolve_dataset_for_querying(
+                    self_clone.rebac_dataset_registry_facade.as_ref(),
+                    &dataset_ref,
+                )
+                .await?;
+                let data_response = self_clone
+                    .get_changelog_projection(source, Default::default())
+                    .await?;
+
+                Ok(data_response.df)
+            }
+        });
 
         Ok(ctx)
     }
@@ -395,7 +401,7 @@ impl QueryService for QueryServiceImpl {
             .try_collect()
             .await?;
 
-        // We don't include datasets into the state, but add them to options
+        // We don't include datasets in the state but add them to options
         let input_datasets = handles
             .into_iter()
             .map(|hdl| {

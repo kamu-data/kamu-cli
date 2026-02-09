@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use datafusion::error::DataFusionError as DFError;
 use datafusion::prelude::*;
 use indoc::{formatdoc, indoc};
-use kamu_core::{GetDataResponse, MockQueryDatasetDataUseCase, QueryDatasetDataUseCase};
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,102 +240,83 @@ async fn test_function_returns_correct_results() {
 
 fn create_session_context() -> SessionContext {
     let ctx = SessionContext::new();
-    kamu_datafusion_udf::ToTableUdtf::register(&ctx, create_mock_query_dataset_data_use_case());
+    kamu_datafusion_udf::ToTableUdtf::register(&ctx, on_resolve_dataset_callback);
     ctx
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn create_mock_query_dataset_data_use_case() -> Arc<dyn QueryDatasetDataUseCase> {
-    let mut mock_query_dataset_data_use_case = MockQueryDatasetDataUseCase::new();
+async fn on_resolve_dataset_callback(
+    dataset_ref: odf::DatasetRef,
+) -> Result<Option<odf::utils::data::DataFrameExt>, kamu_core::QueryError> {
+    enum MockTable {
+        Regular,
+        NoSchema,
+        Unauthorized,
+        NotFound,
+    }
 
-    mock_query_dataset_data_use_case
-        .expect_get_changelog_projection()
-        .returning(|dataset_ref, _options| {
-            enum MockTable {
-                Regular,
-                NoSchema,
-                Unauthorized,
-                NotFound,
+    let dummy_table = match &dataset_ref {
+        odf::DatasetRef::ID(id) => {
+            if *id == *REGULAR_TABLE_DATASET_ID {
+                MockTable::Regular
+            } else if *id == *NO_SCHEMA_TABLE_DATASET_ID {
+                MockTable::NoSchema
+            } else if *id == *UNAUTHORIZED_TABLE_DATASET_ID {
+                MockTable::Unauthorized
+            } else {
+                MockTable::NotFound
             }
+        }
+        odf::DatasetRef::Alias(alias) => match alias.dataset_name.as_str() {
+            "table" => MockTable::Regular,
+            "table-no-schema" => MockTable::NoSchema,
+            "unauthorized-table" => MockTable::Unauthorized,
+            _ => MockTable::NotFound,
+        },
+        odf::DatasetRef::Handle(_) => {
+            unreachable!()
+        }
+    };
 
-            let dummy_table = match dataset_ref {
-                odf::DatasetRef::ID(id) => {
-                    if *id == *REGULAR_TABLE_DATASET_ID {
-                        MockTable::Regular
-                    } else if *id == *NO_SCHEMA_TABLE_DATASET_ID {
-                        MockTable::NoSchema
-                    } else if *id == *UNAUTHORIZED_TABLE_DATASET_ID {
-                        MockTable::Unauthorized
-                    } else {
-                        MockTable::NotFound
-                    }
-                }
-                odf::DatasetRef::Alias(alias) => match alias.dataset_name.as_str() {
-                    "table" => MockTable::Regular,
-                    "table-no-schema" => MockTable::NoSchema,
-                    "unauthorized-table" => MockTable::Unauthorized,
-                    _ => MockTable::NotFound,
-                },
-                odf::DatasetRef::Handle(_) => {
-                    unreachable!()
-                }
-            };
+    let has_data = match dummy_table {
+        MockTable::Regular => true,
+        MockTable::NoSchema => false,
+        MockTable::Unauthorized => {
+            return Err(odf::AccessError::Unauthorized("Dataset inaccessible".into()).into());
+        }
+        MockTable::NotFound => {
+            return Err(odf::DatasetNotFoundError {
+                dataset_ref: dataset_ref.clone(),
+            }
+            .into());
+        }
+    };
 
-            let has_data = match dummy_table {
-                MockTable::Regular => true,
-                MockTable::NoSchema => false,
-                MockTable::Unauthorized => {
-                    return Err(
-                        odf::AccessError::Unauthorized("Dataset inaccessible".into()).into(),
-                    );
-                }
-                MockTable::NotFound => {
-                    return Err(odf::DatasetNotFoundError {
-                        dataset_ref: dataset_ref.clone(),
-                    }
-                    .into());
-                }
-            };
+    Ok(has_data.then(|| {
+        // +--------+----+------+------------+
+        // | offset | op | city | population |
+        // +--------+----+------+------------+
+        // | 0      | +A | a    | 1000       |
+        // | 1      | +A | b    | 2000       |
+        // | 2      | +A | c    | 3000       |
+        // | 3      | -C | b    | 2000       |
+        // | 4      | +C | b    | 2500       |
+        // | 5      | -C | a    | 1000       |
+        // | 6      | +C | a    | 1500       |
+        // | 7      | -R | a    | 1500       |
+        // +--------+----+------+------------+
+        let df = dataframe!(
+            "offset" => [0, 1, 2, 3, 4, 5, 6, 7],
+            "op" => [0, 0, 0, 2, 3, 2, 3, 1],
+            "city" => ["a", "b", "c", "b", "b", "a", "a", "a"],
+            "population" => [1000, 2000, 3000, 2000, 2500, 1000, 1500, 1500],
+        )
+        .unwrap();
 
-            Ok(GetDataResponse {
-                df: has_data.then(|| {
-                    // +--------+----+------+------------+
-                    // | offset | op | city | population |
-                    // +--------+----+------+------------+
-                    // | 0      | +A | a    | 1000       |
-                    // | 1      | +A | b    | 2000       |
-                    // | 2      | +A | c    | 3000       |
-                    // | 3      | -C | b    | 2000       |
-                    // | 4      | +C | b    | 2500       |
-                    // | 5      | -C | a    | 1000       |
-                    // | 6      | +C | a    | 1500       |
-                    // | 7      | -R | a    | 1500       |
-                    // +--------+----+------+------------+
-                    let df = dataframe!(
-                        "offset" => [0, 1, 2, 3, 4, 5, 6, 7],
-                        "op" => [0, 0, 0, 2, 3, 2, 3, 1],
-                        "city" => ["a", "b", "c", "b", "b", "a", "a", "a"],
-                        "population" => [1000, 2000, 3000, 2000, 2500, 1000, 1500, 1500],
-                    )
-                    .unwrap();
-
-                    odf::utils::data::changelog::project(
-                        df.into(),
-                        &["city".to_string()],
-                        &Default::default(),
-                    )
-                    .unwrap()
-                }),
-                source: kamu_datasets::ResolvedDataset::new(
-                    Arc::new(odf::dataset::MockDataset::new()),
-                    odf::metadata::testing::handle(&"foo", &"bar", odf::DatasetKind::Root),
-                ),
-                block_hash: odf::Multihash::from_digest_sha3_256(b"head"),
-            })
-        });
-
-    Arc::new(mock_query_dataset_data_use_case)
+        odf::utils::data::changelog::project(df.into(), &["city".to_string()], &Default::default())
+            .unwrap()
+    }))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
