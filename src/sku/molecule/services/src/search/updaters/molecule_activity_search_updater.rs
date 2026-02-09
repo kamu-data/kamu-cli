@@ -50,6 +50,7 @@ impl MoleculeActivitySearchUpdater {
         let activity_document = index_activity_from_data_room_publication_record(
             &published_message.molecule_account_id,
             &published_message.activity_record,
+            published_message.system_time,
             published_message.event_time,
             published_message.offset,
         );
@@ -99,12 +100,13 @@ impl MessageConsumerT<MoleculeActivityMessage> for MoleculeActivitySearchUpdater
 
         match message {
             MoleculeActivityMessage::Published(published_message) => {
-                self.handle_published_message(ctx, published_message)
-                    .await?;
+                self.handle_published_message(ctx, published_message).await
+            }
+            MoleculeActivityMessage::WriteRequested(_) => {
+                // No action required
+                Ok(())
             }
         }
-
-        Ok(())
     }
 }
 

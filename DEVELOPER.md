@@ -163,7 +163,7 @@ Typical commands to work with migrations include:
 
 Typical commands to work with Elasticsearch engine locally:
 * `make elasticsearch-setup-http` - starts Elasticsearch and Kibana, connected to each other (use this one by default)
-* `make elasticsearch-setup-https` - the same, but enables HTTPS/TLS communcations (for experiments only, requires changing URLs in tests)
+* `make elasticsearch-setup-https` - the same, but enables HTTPS/TLS communications (for experiments only, requires changing URLs in tests)
 * `make elasticsearch-stop` - stops Elasticsearch and Kibana, but does not remove a container volume, so data survives the restart
 * `make elasticsearch-clean` - stops Elasticsearch and Kibana, and additionally wipes container volumes, guaranteeing clean data after restart
 * `make elasticsearch-test-gc` - runs cleanup of all test indices in the local Elasticsearch instance
@@ -239,7 +239,7 @@ cargo nextest run -p opendatafabric
 #### Artifact reuse (shared target dir)
 Working on `kamu` often involves switching between multiple related repositories that depend on a similar set of crates. To avoid wasting a lot of time and disk space recompiling them it is advisable to setup a shared `/target` directory.
 
-For example if you have projects layed out like so:
+For example, if you have projects laid out like so:
 ```sh
 /home/me/code/kamu/
   /kamu-cli

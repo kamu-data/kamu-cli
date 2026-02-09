@@ -45,7 +45,7 @@ pub struct MoleculeDataRoomActivity {
 
     pub version: u32,
 
-    // NOTE: This should be odf::AccountID, but kept as String for safety.
+    // NOTE: This should be odf::AccountID but kept as String for safety.
     pub change_by: String,
 
     // TODO: Communicate: we need to agree on its values
@@ -182,6 +182,30 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
     pub categories: Vec<String>,
 
     pub tags: Vec<String>,
+}
+
+impl MoleculeDataRoomActivityPayloadRecord {
+    fn total_size_bytes(&self) -> usize {
+        let stack_size = size_of::<Self>();
+        let heap_size = self.ipnft_uid.len()
+            + self.path.len()
+            + self.change_by.len()
+            + self.access_level.len()
+            + self.content_type.as_ref().map_or(0, |s| s.0.len())
+            + self.description.as_ref().map_or(0, String::len)
+            + self.categories.iter().fold(0, |acc, s| acc + s.len())
+            + self.tags.iter().fold(0, |acc, s| acc + s.len());
+
+        stack_size + heap_size
+    }
+
+    pub fn roughly_estimated_size_in_bytes(&self) -> usize {
+        // NOTE: We take with margin, as we don't aim to reproduce the same calculation
+        //       as during ingesting (read as Parquet data).
+        //
+        //       Most importantly, no less.
+        self.total_size_bytes() * 3
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

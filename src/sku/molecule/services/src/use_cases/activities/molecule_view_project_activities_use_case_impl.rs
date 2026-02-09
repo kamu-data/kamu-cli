@@ -47,12 +47,12 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             fut: Fut,
         ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError>
         where
-            Fut: std::future::Future<
-                    Output = Result<
-                        MoleculeProjectActivityListing,
-                        MoleculeViewDataRoomActivitiesError,
-                    >,
+            Fut: Future<
+                Output = Result<
+                    MoleculeProjectActivityListing,
+                    MoleculeViewDataRoomActivitiesError,
                 >,
+            >,
         {
             if enabled {
                 fut.await
@@ -124,7 +124,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
-        // Get read access to data room
+        // Get read access to the data room
         let data_room_reader = self
             .accessor_factory
             .reader(&molecule_project.data_room_dataset_id.as_local_ref())
@@ -371,34 +371,40 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                     entity_schemas,
                     source: SearchRequestSourceSpec::All,
                     filter: Some(filter),
-                    sort: sort!(molecule_schema::fields::SYSTEM_TIME, desc),
+                    sort: sort!(molecule_schema::fields::EVENT_TIME, desc),
                     page: pagination.into(),
                 },
             )
             .await
             .int_err()?;
 
-        Ok(MoleculeProjectActivityListing {
-            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
-            list: search_results
-                .hits
-                .into_iter()
-                .map(|hit| match hit.schema_name {
-                    activity_schema::SCHEMA_NAME => {
-                        MoleculeDataRoomActivity::from_search_index_json(hit.source)
-                            .map(MoleculeProjectActivity::DataRoomActivity)
-                    }
-                    announcement_schema::SCHEMA_NAME => {
-                        MoleculeAnnouncement::from_search_index_json(hit.id, hit.source)
-                            .map(MoleculeProjectActivity::Announcement)
-                    }
-                    _ => Err(InternalError::new(format!(
-                        "Unexpected schema name: {schema_name}",
-                        schema_name = hit.schema_name
-                    ))),
-                })
-                .collect::<Result<Vec<_>, InternalError>>()?,
-        })
+        let list = search_results
+            .hits
+            .into_iter()
+            .map(|hit| match hit.schema_name {
+                activity_schema::SCHEMA_NAME => {
+                    MoleculeDataRoomActivity::from_search_index_json(hit.source)
+                        .map(MoleculeProjectActivity::DataRoomActivity)
+                }
+                announcement_schema::SCHEMA_NAME => {
+                    MoleculeAnnouncement::from_search_index_json(hit.id, hit.source)
+                        .map(MoleculeProjectActivity::Announcement)
+                }
+                _ => Err(InternalError::new(format!(
+                    "Unexpected schema name: {schema_name}",
+                    schema_name = hit.schema_name
+                ))),
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?;
+
+        let total_count = if let Some(total_hits) = search_results.total_hits {
+            usize::try_from(total_hits).unwrap()
+        } else {
+            // NOTE: fallback
+            list.len()
+        };
+
+        Ok(MoleculeProjectActivityListing { total_count, list })
     }
 }
 

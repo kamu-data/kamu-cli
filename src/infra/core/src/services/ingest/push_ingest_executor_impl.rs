@@ -46,7 +46,7 @@ impl PushIngestExecutorImpl {
         target: &ResolvedDataset,
         incoming_size: u64,
     ) -> Result<(), kamu_accounts::QuotaError> {
-        // In single-tenant mode aliases does not carry account names; skip quota check
+        // In single-tenant mode aliases do not carry account names; skip quota check
         // in that case
         let Some(account_name) = target.get_alias().account_name.as_ref() else {
             assert!(
@@ -187,8 +187,11 @@ impl PushIngestExecutorImpl {
 
         match stage_result {
             Ok(staged) => {
-                let estimated_size = Self::estimate_staged_size(&staged)?;
-                self.ensure_quota(&target, estimated_size).await?;
+                if !args.opts.skip_quota_check {
+                    let estimated_size = Self::estimate_staged_size(&staged)?;
+                    self.ensure_quota(&target, estimated_size).await?;
+                }
+
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let system_time = staged.system_time;

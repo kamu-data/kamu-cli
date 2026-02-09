@@ -17,6 +17,7 @@ use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::MoleculeProjectsService;
+use crate::services::MoleculeDatasetWriterPushNdjsonDataOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,7 +117,13 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         };
 
         let push_res = projects_writer
-            .push_ndjson_data(new_changelog_record.to_bytes(), source_event_time)
+            .push_ndjson_data(
+                new_changelog_record.to_bytes(),
+                MoleculeDatasetWriterPushNdjsonDataOptions {
+                    source_event_time,
+                    skip_quota_check: false,
+                },
+            )
             .await
             .int_err()?;
 

@@ -54,6 +54,7 @@ async fn test_push_ingest_data_source_not_found() {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -93,6 +94,7 @@ async fn test_push_ingest_data_from_json() {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -138,6 +140,7 @@ async fn test_push_ingest_data_from_file() {
                     is_ingest_from_upload: true,
                     media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -184,6 +187,7 @@ async fn test_push_ingest_data_execute_multi() {
                 is_ingest_from_upload: false,
                 media_type: None,
                 expected_head: Some(initial_head.clone()),
+                skip_quota_check: false,
             },
         )
         .await

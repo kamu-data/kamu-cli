@@ -48,6 +48,7 @@ pub fn register_dependencies(
     b.add::<MoleculeAnnouncementsServiceImpl>();
     b.add::<MoleculeProjectsServiceImpl>();
     b.add::<MoleculeVersionedFileContentProviderImpl>();
+    b.add::<MoleculeAsyncGlobalActivityWriter>();
 
     b.add::<MoleculeEnableProjectUseCaseImpl>();
     b.add::<MoleculeCreateProjectUseCaseImpl>();

@@ -62,6 +62,7 @@ pub enum MoleculeViewDataRoomActivitiesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum MoleculeProjectActivity {
     DataRoomActivity(MoleculeDataRoomActivity),
     Announcement(MoleculeAnnouncement),

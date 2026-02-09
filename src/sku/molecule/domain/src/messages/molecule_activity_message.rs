@@ -21,19 +21,36 @@ const MOLECULE_ACTIVITY_MESSAGE_OUTBOX_VERSION: u32 = 1;
 /// Represents messages related to the announcements published in Molecule
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum MoleculeActivityMessage {
+    WriteRequested(MoleculeActivityMessageWriteRequested),
     Published(MoleculeActivityMessagePublished),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MoleculeActivityMessage {
+    pub fn write_requested(
+        molecule_subject_account_name: odf::AccountName,
+        molecule_subject_account_id: odf::AccountID,
+        source_event_time: Option<DateTime<Utc>>,
+        activity_record: MoleculeDataRoomActivityPayloadRecord,
+    ) -> Self {
+        Self::WriteRequested(MoleculeActivityMessageWriteRequested {
+            molecule_subject_account_name,
+            molecule_subject_account_id,
+            source_event_time,
+            activity_record,
+        })
+    }
+
     pub fn published(
+        system_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         offset: u64,
         activity_record: MoleculeDataRoomActivityPayloadRecord,
     ) -> Self {
         Self::Published(MoleculeActivityMessagePublished {
+            system_time,
             event_time,
             molecule_account_id,
             offset,
@@ -53,7 +70,18 @@ impl Message for MoleculeActivityMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MoleculeActivityMessageWriteRequested {
+    pub molecule_subject_account_name: odf::AccountName,
+    pub molecule_subject_account_id: odf::AccountID,
+    pub source_event_time: Option<DateTime<Utc>>,
+    pub activity_record: MoleculeDataRoomActivityPayloadRecord,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeActivityMessagePublished {
+    pub system_time: DateTime<Utc>,
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub offset: u64,

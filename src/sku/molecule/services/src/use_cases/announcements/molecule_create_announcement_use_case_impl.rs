@@ -16,6 +16,7 @@ use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::MoleculeAnnouncementsService;
+use crate::services::MoleculeDatasetWriterPushNdjsonDataOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -114,7 +115,13 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         let push_res = global_announcements_writer
-            .push_ndjson_data(global_announcement_record.to_bytes(), source_event_time)
+            .push_ndjson_data(
+                global_announcement_record.to_bytes(),
+                MoleculeDatasetWriterPushNdjsonDataOptions {
+                    source_event_time,
+                    skip_quota_check: false,
+                },
+            )
             .await?;
 
         assert!(matches!(push_res, PushIngestResult::Updated { .. }));
@@ -130,7 +137,13 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
         let push_res = project_announcements_writer
-            .push_ndjson_data(project_announcement_record.to_bytes(), source_event_time)
+            .push_ndjson_data(
+                project_announcement_record.to_bytes(),
+                MoleculeDatasetWriterPushNdjsonDataOptions {
+                    source_event_time,
+                    skip_quota_check: false,
+                },
+            )
             .await?;
 
         match push_res {

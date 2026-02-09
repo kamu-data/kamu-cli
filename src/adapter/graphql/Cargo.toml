@@ -127,6 +127,7 @@ time-source = { workspace = true }
 
 bon = { version = "3", default-features = false }
 oop = "0.0.2"
+paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }
