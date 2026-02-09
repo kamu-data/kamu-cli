@@ -363,6 +363,13 @@ impl QueryServiceImpl {
         let self_clone = (*self).cheap_clone();
 
         kamu_datafusion_udf::ToTableUdtf::register(&ctx, move |dataset_ref| {
+            // NOTE: In practice, this callback will only be invoked once,
+            //       but since the datafusion::TableFunctionImpl::call(&self) interface
+            //       does not consume self, we cannot use AsyncFnOnce inside
+            //       ToTableUdtf.
+            //
+            //       Therefore, to satisfy the borrow checker, we need to make
+            //       a second clone. Fortunately, this is a cheap operation.
             let self_clone = self_clone.cheap_clone();
             async move {
                 let source = helpers::resolve_dataset_for_querying(
