@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.258.0] - 2026-02-09
 ### Changed
 - Using new library for application config that:
   - Improves `kamu config` subcommand behavior
