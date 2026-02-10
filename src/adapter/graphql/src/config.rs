@@ -11,9 +11,6 @@
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Config {
-    #[serde(default)]
-    pub molecule_api_v1_enabled: bool,
-}
+pub struct Config {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
