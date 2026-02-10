@@ -714,10 +714,7 @@ pub fn configure_server_catalog(
 
     b.add::<UploadServiceLocal>();
 
-    b.add_value(
-        kamu_adapter_graphql::GqlFeatureFlags::new()
-            .with_feature(kamu_adapter_graphql::GqlFeature::MoleculeApiV1),
-    );
+    b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,

@@ -8,18 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{EmptySubscription, Object, value};
-use indoc::indoc;
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_adapter_graphql::*;
 use pretty_assertions::assert_eq;
-
-use crate::utils::GraphQLQueryRequest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn logged_in_guard_logged() {
+async fn test_logged_in_guard_logged() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(CurrentAccountSubject::new_test())
         .build();
@@ -72,7 +68,7 @@ async fn logged_in_guard_logged() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn logged_in_guard_anonymous() {
+async fn test_logged_in_guard_anonymous() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
@@ -160,8 +156,10 @@ async fn logged_in_guard_anonymous() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: Uncomment when a new feature will be added
+/*
 #[tokio::test]
-async fn feature_enabled_guard_with_feature_enabled() {
+async fn test_feature_enabled_guard_with_feature_enabled() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(GqlFeatureFlags::new().with_feature(GqlFeature::MoleculeApiV1))
         .build();
@@ -184,11 +182,14 @@ async fn feature_enabled_guard_with_feature_enabled() {
         })
     );
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: Uncomment when a new feature will be added
+/*
 #[tokio::test]
-async fn feature_enabled_guard_with_feature_disabled() {
+async fn test_feature_enabled_guard_with_feature_disabled() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(GqlFeatureFlags::new())
         .build();
@@ -210,6 +211,7 @@ async fn feature_enabled_guard_with_feature_disabled() {
         ["Feature 'molecule_api_v1' is disabled"]
     );
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -226,11 +228,6 @@ impl TestQuery {
 
     async fn unguarded_query(&self) -> u32 {
         2
-    }
-
-    #[graphql(guard = "FeatureEnabledGuard::new(GqlFeature::MoleculeApiV1)")]
-    async fn molecule_v1(&self) -> &str {
-        "temporary works"
     }
 }
 

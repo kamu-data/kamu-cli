@@ -7,27 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_molecule_domain::{
-    MoleculeDisableProjectError,
-    MoleculeDisableProjectUseCase,
-    MoleculeEnableProjectError,
-    MoleculeEnableProjectUseCase,
-    MoleculeFindProjectError,
-    MoleculeFindProjectUseCase,
-};
+use kamu_molecule_domain::*;
 use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
-use crate::mutations::molecule_mut::v1;
 use crate::mutations::molecule_mut::v2::{MoleculeProjectMutV2, MoleculeProjectMutationResultV2};
 use crate::prelude::*;
+use crate::queries::molecule::v2::MoleculeProjectV2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-pub struct MoleculeMutV2 {
-    v1: v1::MoleculeMutV1,
-}
+pub struct MoleculeMutV2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,10 +33,43 @@ impl MoleculeMutV2 {
         ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: U256,
-    ) -> Result<v1::CreateProjectResult> {
-        self.v1
-            .create_project(ctx, ipnft_symbol, ipnft_uid, ipnft_address, ipnft_token_id)
+    ) -> Result<CreateProjectResult> {
+        if ipnft_uid != format!("{ipnft_address}_{}", ipnft_token_id.as_ref()) {
+            return Err(Error::new("Inconsistent ipnft info").into());
+        }
+
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let (time_source, create_project_uc) =
+            from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeCreateProjectUseCase);
+
+        let project = match create_project_uc
+            .execute(
+                &molecule_subject,
+                Some(time_source.now()),
+                ipnft_symbol,
+                ipnft_uid,
+                ipnft_address,
+                ipnft_token_id.as_ref().clone(),
+            )
             .await
+        {
+            Ok(project_entity) => MoleculeProjectV2::new(project_entity),
+            Err(MoleculeCreateProjectError::Conflict { project }) => {
+                let project = MoleculeProjectV2::new(project);
+                return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
+                    project,
+                }));
+            }
+            Err(MoleculeCreateProjectError::Access(e)) => return Err(GqlError::Access(e)),
+            Err(e @ MoleculeCreateProjectError::Internal(_)) => {
+                return Err(e.int_err().into());
+            }
+        };
+
+        Ok(CreateProjectResult::Success(CreateProjectSuccess {
+            project,
+        }))
     }
 
     /// Retracts a project from the `projects` dataset.
@@ -129,6 +152,53 @@ impl MoleculeMutV2 {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum CreateProjectResult {
+    Success(CreateProjectSuccess),
+    Conflict(CreateProjectErrorConflict),
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateProjectSuccess {
+    pub project: MoleculeProjectV2,
+}
+#[ComplexObject]
+impl CreateProjectSuccess {
+    async fn is_success(&self) -> bool {
+        true
+    }
+    async fn message(&self) -> String {
+        String::new()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateProjectErrorConflict {
+    project: MoleculeProjectV2,
+}
+#[ComplexObject]
+impl CreateProjectErrorConflict {
+    async fn is_success(&self) -> bool {
+        false
+    }
+    async fn message(&self) -> String {
+        format!(
+            "Conflict with existing project {} ({})",
+            self.project.entity.ipnft_symbol, self.project.entity.ipnft_uid,
+        )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlError {

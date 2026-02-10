@@ -51,6 +51,7 @@ impl GraphQLQueryRequest {
         .await
     }
 
+    #[expect(unused)]
     pub(crate) async fn execute_without_data_loaders<Query, Mutation, Subscription>(
         self,
         schema: &async_graphql::Schema<Query, Mutation, Subscription>,
