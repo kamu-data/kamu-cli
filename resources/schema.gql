@@ -567,11 +567,6 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
-"""
-A big integer scalar type.
-"""
-scalar BigInt
-
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -959,7 +954,7 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 }
 
 type CreateProjectErrorConflict implements CreateProjectResult {
-	project: MoleculeProject!
+	project: MoleculeProjectV2!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -970,7 +965,7 @@ interface CreateProjectResult {
 }
 
 type CreateProjectSuccess implements CreateProjectResult {
-	project: MoleculeProject!
+	project: MoleculeProjectV2!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -3174,29 +3169,6 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 
 type Molecule {
 	"""
-	Looks up the project.
-	
-	Shortcut for `v1 { project }`.
-	"""
-	project(ipnftUid: String!): MoleculeProject @deprecated(reason: "Use `v2 { project }` instead")
-	"""
-	List the registered projects.
-	
-	Shortcut for `v1 { projects }`.
-	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection! @deprecated(reason: "Use `v2 { projects }` instead")
-	"""
-	Latest activity events across all projects in reverse chronological
-	order.
-	
-	Shortcut for `v1 { activity }`.
-	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection! @deprecated(reason: "Use `v2 { activity }` instead")
-	"""
-	1-st Molecule API version (query).
-	"""
-	v1: MoleculeV1! @deprecated(reason: "Use `v2` instead")
-	"""
 	2-nd Molecule API version (query).
 	"""
 	v2: MoleculeV2!
@@ -3514,31 +3486,9 @@ input MoleculeEncryptionMetadataInput {
 
 type MoleculeMut {
 	"""
-	Shortcut for `v1 { create_project() }`.
-	"""
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult! @deprecated(reason: "Use `v2 { create_project() }` instead")
-	"""
-	Looks up the project
-	
-	Shortcut for `v1 { project() }`.
-	"""
-	project(ipnftUid: String!): MoleculeProjectMut @deprecated(reason: "Use `v2 { project }` instead")
-	"""
-	1-st Molecule API version (mutation).
-	"""
-	v1: MoleculeMutV1! @deprecated(reason: "Use `v2` instead")
-	"""
 	2-nd Molecule API version (mutation).
 	"""
 	v2: MoleculeMutV2!
-}
-
-type MoleculeMutV1 {
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
-	"""
-	Looks up the project
-	"""
-	project(ipnftUid: String!): MoleculeProjectMut
 }
 
 type MoleculeMutV2 {
@@ -3557,172 +3507,12 @@ type MoleculeMutV2 {
 	project(ipnftUid: String!): MoleculeProjectMutV2
 }
 
-type MoleculeProject {
-	"""
-	System time when this project was created/updated
-	"""
-	systemTime: DateTime!
-	"""
-	Event time when this project was created/updated
-	"""
-	eventTime: DateTime!
-	"""
-	Symbolic name of the project
-	"""
-	ipnftSymbol: String!
-	"""
-	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-	"""
-	ipnftUid: String!
-	"""
-	Address of the IPNFT contract
-	"""
-	ipnftAddress: String!
-	"""
-	Token ID withing the IPNFT contract
-	"""
-	ipnftTokenId: BigInt!
-	"""
-	Project's organizational account
-	"""
-	account: Account!
-	"""
-	Project's data room dataset
-	"""
-	dataRoom: Dataset!
-	"""
-	Project's announcements dataset
-	"""
-	announcements: Dataset!
-	"""
-	Project's activity events in reverse chronological order
-	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
-}
-
 input MoleculeProjectActivityFilters {
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
 	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 	byKinds: [MoleculeActivityKindInput!]
-}
-
-type MoleculeProjectConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [MoleculeProject!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [MoleculeProjectEdge!]!
-}
-
-type MoleculeProjectEdge {
-	node: MoleculeProject!
-}
-
-interface MoleculeProjectEvent {
-	project: MoleculeProject!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectEventAnnouncement implements MoleculeProjectEvent {
-	"""
-	Associated project
-	"""
-	project: MoleculeProject!
-	"""
-	Announcement record
-	"""
-	announcement: JSON!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectEventConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [MoleculeProjectEvent!]!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [MoleculeProjectEventEdge!]!
-}
-
-type MoleculeProjectEventDataRoomEntryAdded implements MoleculeProjectEvent {
-	"""
-	Associated project
-	"""
-	project: MoleculeProject!
-	"""
-	Collection entry
-	"""
-	entry: CollectionEntry!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectEventDataRoomEntryRemoved implements MoleculeProjectEvent {
-	"""
-	Associated project
-	"""
-	project: MoleculeProject!
-	"""
-	Collection entry
-	"""
-	entry: CollectionEntry!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectEventDataRoomEntryUpdated implements MoleculeProjectEvent {
-	"""
-	Associated project
-	"""
-	project: MoleculeProject!
-	"""
-	Collection entry
-	"""
-	newEntry: CollectionEntry!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectEventEdge {
-	node: MoleculeProjectEvent!
-}
-
-type MoleculeProjectEventFileUpdated implements MoleculeProjectEvent {
-	"""
-	Associated project
-	"""
-	project: MoleculeProject!
-	"""
-	Versioned file dataset
-	"""
-	dataset: Dataset!
-	"""
-	New file version entry
-	"""
-	newEntry: VersionedFileEntry!
-	systemTime: DateTime!
-}
-
-type MoleculeProjectMut {
-	"""
-	Creates an announcement record for the project
-	"""
-	createAnnouncement(		headline: String!,		body: String!,
-		"""
-		List of dataset DIDs to link
-		"""
-		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
-	): CreateAnnouncementResult!
 }
 
 type MoleculeProjectMutV2 {
@@ -3858,22 +3648,6 @@ type MoleculeSemanticSearchHitConnection {
 
 type MoleculeSemanticSearchHitEdge {
 	node: MoleculeSemanticSearchHit!
-}
-
-type MoleculeV1 {
-	"""
-	Looks up the project
-	"""
-	project(ipnftUid: String!): MoleculeProject
-	"""
-	List the registered projects
-	"""
-	projects(page: Int, perPage: Int): MoleculeProjectConnection!
-	"""
-	Latest activity events across all projects in reverse chronological
-	order
-	"""
-	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
 }
 
 type MoleculeV2 {
@@ -5559,10 +5333,6 @@ type Webhooks {
 	eventTypes: [String!]!
 }
 
-"""
-Marks an element of a GraphQL schema as no longer supported.
-"""
-directive @deprecated(reason: String = "No longer supported") on FIELD_DEFINITION | ARGUMENT_DEFINITION | INPUT_FIELD_DEFINITION | ENUM_VALUE
 """
 Directs the executor to include this field or fragment only when the `if` argument is true.
 """

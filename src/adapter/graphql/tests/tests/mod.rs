@@ -13,7 +13,6 @@ mod test_accounts;
 mod test_auth;
 mod test_error_handling;
 mod test_gql_account_quotas;
-pub mod test_gql_custom_molecule_v1;
 mod test_gql_custom_molecule_v2;
 mod test_gql_data;
 mod test_gql_dataset_adapter_collection;

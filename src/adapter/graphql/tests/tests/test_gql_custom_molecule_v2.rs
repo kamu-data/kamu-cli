@@ -73,34 +73,42 @@ const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
 const CREATE_PROJECT: &str = indoc!(
     r#"
-    mutation (
-        $ipnftSymbol: String!,
-        $ipnftUid: String!,
-        $ipnftAddress: String!,
-        $ipnftTokenId: Int!,
-    ) {
-        molecule {
-            v2 {
-                createProject(
-                    ipnftSymbol: $ipnftSymbol,
-                    ipnftUid: $ipnftUid,
-                    ipnftAddress: $ipnftAddress,
-                    ipnftTokenId: $ipnftTokenId,
-                ) {
-                    isSuccess
-                    message
-                    __typename
-                    ... on CreateProjectSuccess {
-                        project {
-                            account { id accountName }
-                            ipnftUid
-                            dataRoom { id alias }
-                            announcements { id alias }
-                        }
-                    }
+    mutation ($ipnftSymbol: String!, $ipnftUid: String!, $ipnftAddress: String!, $ipnftTokenId: Int!) {
+      molecule {
+        v2 {
+          createProject(
+            ipnftSymbol: $ipnftSymbol
+            ipnftUid: $ipnftUid
+            ipnftAddress: $ipnftAddress
+            ipnftTokenId: $ipnftTokenId
+          ) {
+            isSuccess
+            message
+            __typename
+            ... on CreateProjectSuccess {
+              project {
+                account {
+                  id
+                  accountName
                 }
+                ipnftUid
+                dataRoom {
+                  dataset {
+                    id
+                    alias
+                  }
+                }
+                announcements {
+                  dataset {
+                    id
+                    alias
+                  }
+                }
+              }
             }
+          }
         }
+      }
     }
     "#
 );
@@ -514,7 +522,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let data_room_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["id"]
+                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["dataset"]["id"]
                         .as_str()
                         .unwrap(),
                 )
@@ -526,7 +534,8 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let announcements_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["id"]
+                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["dataset"]
+                        ["id"]
                         .as_str()
                         .unwrap(),
                 )
@@ -738,8 +747,12 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
     let res = &res.data.into_json().unwrap()["molecule"]["v2"]["createProject"];
     let project_account_id = res["project"]["account"]["id"].as_str().unwrap();
     let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
-    let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
-    let announcements_did = res["project"]["announcements"]["id"].as_str().unwrap();
+    let data_room_did = res["project"]["dataRoom"]["dataset"]["id"]
+        .as_str()
+        .unwrap();
+    let announcements_did = res["project"]["announcements"]["dataset"]["id"]
+        .as_str()
+        .unwrap();
     assert_ne!(project_account_id, harness.molecule_account_id.to_string());
     pretty_assertions::assert_eq!(project_account_name, "molecule.vitafast");
     pretty_assertions::assert_eq!(
@@ -755,12 +768,16 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                 },
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "dataRoom": {
-                    "id": data_room_did,
-                    "alias": format!("{project_account_name}/data-room"),
+                    "dataset": {
+                        "id": data_room_did,
+                        "alias": format!("{project_account_name}/data-room"),
+                    }
                 },
                 "announcements": {
-                    "id": announcements_did,
-                    "alias": format!("{project_account_name}/announcements"),
+                    "dataset": {
+                        "id": announcements_did,
+                        "alias": format!("{project_account_name}/announcements"),
+                    },
                 },
             },
         }),
@@ -4144,7 +4161,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     assert!(create_res.is_ok(), "{create_res:#?}");
 
     let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]
-        ["project"]["dataRoom"]["id"]
+        ["project"]["dataRoom"]["dataset"]["id"]
         .as_str()
         .unwrap()
         .to_string();

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod molecule_mut;
-pub mod v1;
 pub mod v2;
 
 pub use molecule_mut::*;

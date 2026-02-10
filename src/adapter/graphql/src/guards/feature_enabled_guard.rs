@@ -18,8 +18,7 @@ use crate::prelude::*;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum GqlFeature {
-    /// Molecule API v1 (deprecated) enabled
-    MoleculeApiV1,
+    // NOTE: Reserved for future usage
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

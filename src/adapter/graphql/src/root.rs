@@ -78,7 +78,7 @@ impl Query {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> Molecule {
-        Molecule::default()
+        Molecule
     }
 }
 
@@ -113,7 +113,7 @@ impl Mutation {
 
     /// Temporary: Molecule-specific functionality group
     async fn molecule(&self) -> MoleculeMut {
-        MoleculeMut::default()
+        MoleculeMut
     }
 
     /// Collaboration-related functionality group
