@@ -12,6 +12,7 @@ use std::sync::Arc;
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{
+    GetChangelogProjectionOptions,
     GetDataOptions,
     GetDataResponse,
     QueryDatasetDataUseCase,
@@ -126,6 +127,25 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
 
         // Perform get data multi query
         self.query_service.get_data_multi(sources).await
+    }
+
+    #[tracing::instrument(level = "debug", name = QueryDatasetDataUseCaseImpl_get_changelog_projection, skip_all, fields(%dataset_ref))]
+    async fn get_changelog_projection(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        // Resolve source dataset with ReBAC check
+        let source = helpers::resolve_dataset_for_querying(
+            self.rebac_dataset_registry_facade.as_ref(),
+            dataset_ref,
+        )
+        .await?;
+
+        // Perform get data query
+        self.query_service
+            .get_changelog_projection(source, options)
+            .await
     }
 }
 
