@@ -48,7 +48,9 @@ async fn test_malformed_argument() {
                 "message": "Failed to parse \"AccountName\": Value '????' is not a valid AccountName",
                 "path": ["datasets", "byAccountName"],
             }],
-            "data": null
+            "data": {
+                "datasets": null,
+            }
         })
     );
 }
@@ -127,7 +129,9 @@ async fn test_internal_error() {
                 "message": "Internal error",
                 "path": ["auth", "accountDetails"],
             }],
-            "data": null
+            "data": {
+                "auth": null,
+            }
         })
     );
 }
