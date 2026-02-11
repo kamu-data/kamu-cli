@@ -120,7 +120,7 @@ kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-elasticsearch = { workspace = true }
 kamu-search-cache-inmem = { workspace = true }
-kamu-search-cache-postgres ={ workspace = true }
+kamu-search-cache-postgres = { workspace = true }
 kamu-search-cache-sqlite = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
@@ -183,11 +183,27 @@ mime = "0.3"
 mime_guess = "2"
 
 # Config
-duration-string = { version = "0.5", features = ["serde"] }
-merge = "0.2"
+setty = { version = "0.3", features = [
+    "derive-clone",
+    "derive-debug",
+    "derive-partial-eq",
+    "derive-deserialize",
+    "derive-serialize",
+    "derive-jsonschema",
+    "case-fields-camel",
+    "case-enums-pascal",
+    "case-enums-any",
+    "fmt-json",
+    "fmt-yaml",
+    "fmt-yaml-arbitrary-precision-hack",
+    "types-chrono",
+    "types-duration-string",
+    "types-url",
+    "gen-jsonschema",
+    "gen-markdown",
+] }
 serde = { version = "1", features = ["derive"] }
-serde_with = "3"
-serde_yaml = "0.9"
+serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 
 # Tracing / logging / telemetry / metrics
 prometheus = { version = "0.14", default-features = false }
@@ -230,7 +246,10 @@ secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = ["std"] }
-tokio = { version = "1", default-features = false, features = ["io-util", "io-std"] }
+tokio = { version = "1", default-features = false, features = [
+    "io-util",
+    "io-std",
+] }
 tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"

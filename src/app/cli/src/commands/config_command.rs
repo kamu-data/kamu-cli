@@ -10,41 +10,7 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use crate::config::{ConfigScope, ConfigService};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// List
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[dill::component]
-#[dill::interface(dyn Command)]
-pub struct ConfigListCommand {
-    config_svc: Arc<ConfigService>,
-
-    #[dill::component(explicit)]
-    user: bool,
-
-    #[dill::component(explicit)]
-    with_defaults: bool,
-}
-
-#[async_trait::async_trait(?Send)]
-impl Command for ConfigListCommand {
-    async fn run(&self) -> Result<(), CLIError> {
-        let result = self.config_svc.list(
-            if self.user {
-                ConfigScope::User
-            } else {
-                ConfigScope::Flattened
-            },
-            self.with_defaults,
-        );
-
-        println!("{result}");
-
-        Ok(())
-    }
-}
+use crate::config::{ConfigObjectFormat, ConfigScope, ConfigService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Get
@@ -56,28 +22,36 @@ pub struct ConfigGetCommand {
     config_svc: Arc<ConfigService>,
 
     #[dill::component(explicit)]
-    user: bool,
+    path: Option<String>,
+
+    #[dill::component(explicit)]
+    scope: ConfigScope,
 
     #[dill::component(explicit)]
     with_defaults: bool,
 
     #[dill::component(explicit)]
-    key: String,
+    output_format: ConfigObjectFormat,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigGetCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let scope = if self.user {
-            ConfigScope::User
+        if let Some(path) = &self.path {
+            if let Some(value) =
+                self.config_svc
+                    .get(path, self.scope, self.with_defaults, self.output_format)?
+            {
+                println!("{value}");
+            } else {
+                return Err(CLIError::usage_error(format!("Path {path} not found")));
+            }
         } else {
-            ConfigScope::Flattened
-        };
+            let result =
+                self.config_svc
+                    .list(self.scope, self.with_defaults, self.output_format)?;
 
-        if let Some(value) = self.config_svc.get(&self.key, scope, self.with_defaults) {
-            println!("{value}");
-        } else {
-            return Err(CLIError::usage_error(format!("Key {} not found", self.key)));
+            println!("{result}");
         }
 
         Ok(())
@@ -94,31 +68,31 @@ pub struct ConfigSetCommand {
     config_svc: Arc<ConfigService>,
 
     #[dill::component(explicit)]
-    user: bool,
-
-    #[dill::component(explicit)]
-    key: String,
+    path: String,
 
     #[dill::component(explicit)]
     value: Option<String>,
+
+    #[dill::component(explicit)]
+    scope: ConfigScope,
+
+    #[dill::component(explicit)]
+    input_format: ConfigObjectFormat,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigSetCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let scope = if self.user {
-            ConfigScope::User
-        } else {
-            ConfigScope::Workspace
-        };
+        let scope = self.scope;
 
         if let Some(value) = &self.value {
-            self.config_svc.set(&self.key, value, scope)?;
+            self.config_svc
+                .set(&self.path, value, self.input_format, scope)?;
 
             eprintln!(
                 "{} {} {} {} {} {} {}",
                 console::style("Set").green().bold(),
-                self.key,
+                self.path,
                 console::style("to").green().bold(),
                 value,
                 console::style("in").green().bold(),
@@ -126,12 +100,12 @@ impl Command for ConfigSetCommand {
                 console::style("scope").green().bold(),
             );
         } else {
-            self.config_svc.unset(&self.key, scope)?;
+            self.config_svc.unset(&self.path, scope)?;
 
             eprintln!(
                 "{} {} {} {} {}",
                 console::style("Removed").green().bold(),
-                self.key,
+                self.path,
                 console::style("from").green().bold(),
                 format!("{scope:?}").to_lowercase(),
                 console::style("scope").green().bold(),

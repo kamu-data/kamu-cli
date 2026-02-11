@@ -187,8 +187,26 @@ Display current configuration combined from all config files
 
 **Options:**
 
+* `--scope <SC>` — Which configs to use
+
+  Default value: `combined`
+
+  Possible values:
+  - `user`:
+    Includes only config in user home directory
+  - `workspace`:
+    Includes only current workspace config
+  - `combined`:
+    Includes configs in workspace, parent directories, and user home dir
+
 * `--user` — Show only user scope configuration
 * `--with-defaults` — Show configuration with all default values applied
+* `-o`, `--output-format <FMT>` — Serialization format of the returned object
+
+  Default value: `yaml`
+
+  Possible values: `yaml`, `json`
+
 
 
 
@@ -196,7 +214,7 @@ Display current configuration combined from all config files
 
 Get current configuration value
 
-**Usage:** `kamu config get [OPTIONS] <CFGKEY>`
+**Usage:** `kamu config get [OPTIONS] [CFGKEY]`
 
 **Arguments:**
 
@@ -204,8 +222,26 @@ Get current configuration value
 
 **Options:**
 
+* `--scope <SC>` — Which configs to use
+
+  Default value: `combined`
+
+  Possible values:
+  - `user`:
+    Includes only config in user home directory
+  - `workspace`:
+    Includes only current workspace config
+  - `combined`:
+    Includes configs in workspace, parent directories, and user home dir
+
 * `--user` — Operate on the user scope configuration file
 * `--with-defaults` — Get default value if config option is not explicitly set
+* `-o`, `--output-format <FMT>` — Serialization format of the returned object
+
+  Default value: `yaml`
+
+  Possible values: `yaml`, `json`
+
 
 
 
@@ -222,7 +258,25 @@ Set or unset configuration value
 
 **Options:**
 
+* `--scope <SC>` — Which configs to consider
+
+  Default value: `combined`
+
+  Possible values:
+  - `user`:
+    Includes only config in user home directory
+  - `workspace`:
+    Includes only current workspace config
+  - `combined`:
+    Includes configs in workspace, parent directories, and user home dir
+
 * `--user` — Operate on the user scope configuration file
+* `-i`, `--input-format <FMT>` — Serialization format of the provided object
+
+  Default value: `yaml`
+
+  Possible values: `yaml`, `json`
+
 
 
 

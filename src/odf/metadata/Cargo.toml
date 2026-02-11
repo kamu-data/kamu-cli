@@ -31,6 +31,7 @@ sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
 sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
 testing = ["dep:rand", "did-pkh"]
+schemars = ["multiformats/schemars", "dep:schemars"]
 utoipa = ["multiformats/utoipa", "dep:utoipa"]
 
 
@@ -61,8 +62,11 @@ base64 = { version = "0.22", default-features = false, features = ["std"] }
 flatbuffers = "25"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
-serde_with = "3"
-serde_yaml = "0.9"
+serde_with = { version = "3", default-features = false, features = [
+    "std",
+    "macros",
+] }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # gRPC
 prost = { version = "0.14", default-features = false, features = [
@@ -80,6 +84,9 @@ arrow = { optional = true, version = "57", default-features = false, features = 
     "ipc",
 ] }
 rand = { optional = true, version = "0.9", default-features = false }
+schemars = { optional = true, version = "1", default-features = false, features = [
+    "derive",
+] }
 sqlx = { optional = true, version = "0.8", default-features = false }
 ssi-caips = { optional = true, version = "0.2", default-features = false, features = [
     "eip",

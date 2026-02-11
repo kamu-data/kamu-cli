@@ -32,7 +32,7 @@ impl SparkLivyServerFactory {
         listener: Option<&dyn PullImageListener>,
     ) -> Result<(), ImagePullError> {
         self.container_runtime
-            .ensure_image(self.jupyter_config.livy_image.as_ref().unwrap(), listener)
+            .ensure_image(&self.jupyter_config.livy_image, listener)
             .await?;
 
         Ok(())
@@ -52,7 +52,7 @@ impl SparkLivyServerFactory {
 
         let container = self
             .container_runtime
-            .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
+            .run_attached(&self.jupyter_config.livy_image)
             .random_container_name_with_prefix("kamu-livy-")
             .hostname("kamu-livy")
             .maybe(network.is_some(), |c| c.network(network.unwrap()))

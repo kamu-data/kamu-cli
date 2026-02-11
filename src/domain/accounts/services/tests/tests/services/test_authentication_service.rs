@@ -83,7 +83,7 @@ async fn test_account_not_created_in_restrict_anonymous_mode() {
     let catalog_opts = CatalogOpts {
         mock_outbox: MockOutbox::new(),
         auth_config_maybe: Some(AuthConfig {
-            allow_anonymous: Some(false),
+            allow_anonymous: false,
             ..AuthConfig::default()
         }),
     };

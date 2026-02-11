@@ -199,7 +199,6 @@ class "CommitDatasetEventUseCaseImpl"
 class "CompactDatasetUseCaseImpl"
 class "CompactionExecutorImpl"
 class "CompactionPlannerImpl"
-class "Config" <<singleton>>
 class "ConfigService"
 class "ConfirmDeleteService"
 class "ContainerRuntime"
@@ -269,6 +268,7 @@ class "GetDatasetDownstreamDependenciesUseCaseImpl"
 class "GetDatasetSchemaUseCaseImpl"
 class "GetDatasetUpstreamDependenciesUseCaseImpl"
 class "GithubAuthenticationConfig" <<singleton>>
+class "GqlConfig" <<singleton>>
 class "HttpSourceConfig" <<singleton>>
 class "Interact" <<singleton>>
 class "IpfsClient" <<singleton>>

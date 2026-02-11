@@ -40,6 +40,7 @@ testing = [
     "odf-storage/testing",
     "odf-data-utils?/testing",
 ]
+schemars = ["odf-metadata/schemars"]
 utoipa = ["odf-metadata/utoipa"]
 
 

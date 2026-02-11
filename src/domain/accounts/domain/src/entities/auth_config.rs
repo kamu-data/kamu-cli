@@ -7,39 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use merge::Merge;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
-
 use crate::PredefinedAccountsConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = merge::option::overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct AuthConfig {
-    pub allow_anonymous: Option<bool>,
-    pub users: Option<PredefinedAccountsConfig>,
+    #[config(default = true)]
+    pub allow_anonymous: bool,
+
+    #[config(default)]
+    pub users: PredefinedAccountsConfig,
 }
 
 impl AuthConfig {
     pub fn sample() -> Self {
         Self {
-            allow_anonymous: Some(true),
-            users: Some(PredefinedAccountsConfig::sample()),
+            allow_anonymous: true,
+            users: PredefinedAccountsConfig::default(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self {
-            allow_anonymous: Some(true),
-            users: Some(PredefinedAccountsConfig::default()),
-        }
-    }
-}

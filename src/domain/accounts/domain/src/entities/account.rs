@@ -75,7 +75,7 @@ impl From<&AccountConfig> for Account {
             display_name: account_config.get_display_name(),
             account_type: account_config.account_type,
             avatar_url: account_config.avatar_url.clone(),
-            registered_at: account_config.registered_at,
+            registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
             provider: account_config.provider.clone(),
             provider_identity_key: account_config.account_name.to_string(),
         }
@@ -84,7 +84,7 @@ impl From<&AccountConfig> for Account {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),

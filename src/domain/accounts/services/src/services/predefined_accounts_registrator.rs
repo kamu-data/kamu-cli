@@ -92,9 +92,7 @@ impl PredefinedAccountsRegistrator {
             AccountPropertyName::IsAdmin,
             AccountPropertyName::CanProvisionAccounts,
         ] {
-            let value = if let Some(predefined_properties) = &account_config.properties
-                && predefined_properties.contains(&name.into())
-            {
+            let value = if account_config.properties.contains(&name.into()) {
                 boolean_property_value(true)
             } else {
                 self.default_account_properties.as_property_value(name)

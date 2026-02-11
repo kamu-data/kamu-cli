@@ -66,7 +66,7 @@ impl Command for UICommand {
             self.predefined_accounts_config.as_ref(),
             self.file_upload_limit_config.as_ref(),
             self.dataset_env_vars_config.is_enabled(),
-            self.auth_config.as_ref().allow_anonymous.unwrap(),
+            self.auth_config.allow_anonymous,
             self.address,
             self.port,
             self.password_policy_config.as_ref(),

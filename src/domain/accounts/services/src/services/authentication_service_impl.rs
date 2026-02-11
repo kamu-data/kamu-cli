@@ -264,7 +264,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
-                if !self.auth_config.allow_anonymous.unwrap() {
+                if !self.auth_config.allow_anonymous {
                     return Err(LoginError::RestrictedLogin);
                 }
 

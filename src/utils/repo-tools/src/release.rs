@@ -77,6 +77,8 @@ fn main() {
     update_openapi_schema(Path::new("resources/openapi.json"), &new_version);
     update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
 
+    update_config_schema(Path::new("resources/config-schema.json"), &new_version);
+
     update_web_ui_version_for_release(Path::new(".github/workflows/release.yaml"));
 }
 
@@ -127,6 +129,27 @@ fn update_openapi_schema(path: &Path, new_version: &Version) {
     let new_text = re
         .replace(&text, |_: &Captures| {
             format!("\"version\": \"{new_version}\"")
+        })
+        .to_string();
+
+    pretty_assertions::assert_ne!(text, new_text);
+    std::fs::write(path, new_text).expect("Failed to write to schema file");
+}
+
+fn update_config_schema(path: &Path, new_version: &Version) {
+    let text = std::fs::read_to_string(path).expect("Could not read the schema file");
+
+    let re = regex::Regex::new(r#""userAgent": "kamu-cli/\d+\.\d+\.\d+""#).unwrap();
+    let new_text = re
+        .replace_all(&text, |_: &Captures| {
+            format!("\"userAgent\": \"kamu-cli/{new_version}\"")
+        })
+        .to_string();
+
+    let re = regex::Regex::new(r#""default": "kamu-cli/\d+\.\d+\.\d+""#).unwrap();
+    let new_text = re
+        .replace_all(&new_text, |_: &Captures| {
+            format!("\"default\": \"kamu-cli/{new_version}\"")
         })
         .to_string();
 

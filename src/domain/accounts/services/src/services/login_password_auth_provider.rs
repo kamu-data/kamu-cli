@@ -17,18 +17,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(setty::Config, setty::Default)]
 pub struct PasswordPolicyConfig {
+    #[config(default = MIN_PASSWORD_LENGTH)]
     pub min_new_password_length: usize,
-}
-
-impl Default for PasswordPolicyConfig {
-    fn default() -> Self {
-        Self {
-            min_new_password_length: MIN_PASSWORD_LENGTH,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

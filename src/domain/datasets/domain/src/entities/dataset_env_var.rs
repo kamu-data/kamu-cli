@@ -10,10 +10,7 @@
 use chrono::{DateTime, Utc};
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
 use internal_error::ErrorIntoInternal;
-use merge::Merge;
 use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,12 +153,11 @@ impl DatasetEnvVarValue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[skip_serializing_none]
-#[derive(Debug, Default, Clone, Merge, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[merge(strategy = merge::option::overwrite_none)]
+#[derive(setty::Config, setty::Default)]
 pub struct DatasetEnvVarsConfig {
-    pub enabled: Option<bool>,
+    #[config(default = false)]
+    pub enabled: bool,
+
     /// Represents the encryption key for the dataset env vars. This field is
     /// required if `enabled` is `true` or `None`.
     ///
@@ -169,12 +165,9 @@ pub struct DatasetEnvVarsConfig {
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
     /// digits (0-9).
     ///
-    /// # Example
-    /// ```
-    /// let config = DatasetEnvVarsConfig {
-    ///     enabled: Some(true),
-    ///     encryption_key:
-    /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
+    /// To generate use:
+    /// ```sh
+    /// tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
     /// ```
     pub encryption_key: Option<String>,
 }
@@ -182,16 +175,13 @@ pub struct DatasetEnvVarsConfig {
 impl DatasetEnvVarsConfig {
     pub fn sample() -> Self {
         Self {
-            enabled: Some(true),
+            enabled: true,
             encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
         }
     }
 
     pub fn is_enabled(&self) -> bool {
-        if let Some(enabled) = self.enabled
-            && enabled
-            && self.encryption_key.is_some()
-        {
+        if self.enabled && self.encryption_key.is_some() {
             return true;
         }
         false

@@ -55,7 +55,7 @@ pretty_assertions = { version = "1", default-features = false, features = [
 ] }
 reqwest = { version = "0.12", default-features = false }
 serde_json = { version = "1", default-features = false }
-serde_yaml = { version = "0.9" }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 tempfile = { version = "3" }
 tokio = { version = "1", default-features = false, features = [
     "macros",

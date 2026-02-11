@@ -113,6 +113,7 @@ use like::ILike;
 macro_rules! newtype_str {
     ($typ:ident, $parse:expr, $visitor:ident) => {
         #[derive(Debug, Clone, Eq)]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub struct $typ(Arc<str>);
 
         impl $typ {

@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use dill::*;
-use merge::Merge;
+use internal_error::*;
 use odf::metadata::serde::yaml::Manifest;
+use setty::format::Format;
 
 use crate::config::models::*;
 use crate::error::CLIError;
@@ -22,6 +21,31 @@ use crate::{NotInWorkspace, WorkspaceLayout};
 
 const CONFIG_VERSION: i32 = 1;
 pub const CONFIG_FILENAME: &str = ".kamuconfig";
+const CONFIG_PATH_ENV_VAR: &str = "KAMU_CONFIG";
+const CONFIG_PREFIX_ENV_VAR: &str = "KAMU_CONFIG__";
+const CONFIG_SEPARATOR_ENV_VAR: &str = "__";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum ConfigObjectFormat {
+    Yaml,
+    Json,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, Copy, clap::ValueEnum)]
+pub enum ConfigScope {
+    /// Includes only config in user home directory
+    User,
+
+    /// Includes only current workspace config
+    Workspace,
+
+    /// Includes configs in workspace, parent directories, and user home dir
+    Combined,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +53,7 @@ pub struct ConfigService {
     workspace_kamu_dir: PathBuf,
 }
 
-#[component(pub)]
+#[dill::component(pub)]
 impl ConfigService {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
@@ -37,253 +61,230 @@ impl ConfigService {
         }
     }
 
-    pub fn load(&self, scope: ConfigScope) -> CLIConfig {
-        match scope {
-            ConfigScope::Flattened => self.load_flattened(),
-            _ => {
-                let config_path = &self.path_for_scope(scope);
-                if !config_path.exists() {
-                    CLIConfig::new()
-                } else {
-                    self.load_from(config_path)
-                }
-            }
-        }
+    pub fn load(&self, scope: ConfigScope) -> Result<CLIConfig, CLIError> {
+        let paths = self.read_paths_for_scope(scope);
+        self.load_from(&paths)
     }
 
-    pub fn load_with_defaults(&self, scope: ConfigScope) -> CLIConfig {
-        let mut config = self.load(scope);
-        config.merge(CLIConfig::default());
-        config
+    pub fn load_from(&self, paths: &[PathBuf]) -> Result<CLIConfig, CLIError> {
+        let fig = self.get_config_object(paths);
+        let mut cfg = fig.extract().map_err(CLIError::usage_error_from)?;
+
+        // TODO: Consider how to incorporate this into `setty`
+        cfg.engine.datafusion_embedded.merge_with_defaults();
+
+        Ok(cfg)
     }
 
-    fn load_flattened(&self) -> CLIConfig {
-        let mut to_load: Vec<PathBuf> = Vec::new();
-        let mut current: &Path = &self.workspace_kamu_dir;
+    pub fn list(
+        &self,
+        scope: ConfigScope,
+        with_defaults: bool,
+        output_format: ConfigObjectFormat,
+    ) -> Result<String, CLIError> {
+        let paths = self.read_paths_for_scope(scope);
+        let fig = self.get_config_object(&paths);
+        let data = fig.data(with_defaults).int_err()?;
 
-        loop {
-            let conf = current.join(CONFIG_FILENAME);
-            if conf.exists() {
-                to_load.push(conf);
-            }
-            if let Some(parent) = current.parent() {
-                current = parent;
-            } else {
-                break;
-            }
-        }
-
-        let user_config = self.path_for_scope(ConfigScope::User);
-        if user_config.exists() && !to_load.contains(&user_config) {
-            to_load.push(user_config);
-        }
-
-        let mut result = CLIConfig::new();
-        for path in to_load {
-            let cfg = self.load_from(&path);
-            result.merge(cfg);
-        }
-
-        result
-    }
-
-    pub fn save(&self, config: CLIConfig, scope: ConfigScope) {
-        let config_path = self.path_for_scope(scope);
-
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(config_path)
-            .unwrap();
-
-        let manifest = Manifest {
-            kind: "CLIConfig".to_owned(),
-            version: CONFIG_VERSION,
-            content: config,
+        let data = match output_format {
+            ConfigObjectFormat::Yaml => setty::format::Yaml::serialize(&data).int_err()?,
+            ConfigObjectFormat::Json => setty::format::Json::serialize(&data).int_err()?,
         };
 
-        serde_yaml::to_writer(file, &manifest).unwrap();
+        Ok(data)
     }
 
-    pub fn get(&self, key: &str, scope: ConfigScope, with_defaults: bool) -> Option<String> {
-        let mut config = self.load(scope);
-        if with_defaults {
-            config.merge(CLIConfig::default());
-        }
-        let config_raw = self.to_raw(&config);
+    pub fn get(
+        &self,
+        path: &str,
+        scope: ConfigScope,
+        with_defaults: bool,
+        output_format: ConfigObjectFormat,
+    ) -> Result<Option<String>, CLIError> {
+        let paths = self.read_paths_for_scope(scope);
+        let fig = self.get_config_object(&paths);
 
-        let mut current = &config_raw;
+        let Some(value) = fig
+            .get_value(path, with_defaults)
+            .map_err(CLIError::usage_error_from)?
+        else {
+            return Ok(None);
+        };
 
-        for subkey in key.split('.') {
-            if let Some(next) = current.get(subkey) {
-                current = next;
-            } else {
-                return None;
-            }
-        }
+        let value = match output_format {
+            ConfigObjectFormat::Yaml => setty::format::Yaml::serialize(&value).int_err()?,
+            ConfigObjectFormat::Json => setty::format::Json::serialize(&value).int_err()?,
+        };
 
-        Some(serde_yaml::to_string(current).unwrap())
+        Ok(Some(value))
     }
 
-    pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), CLIError> {
-        if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(CLIError::usage_error_from(NotInWorkspace));
-        }
+    pub fn set(
+        &self,
+        path: &str,
+        value: &str,
+        input_format: ConfigObjectFormat,
+        scope: ConfigScope,
+    ) -> Result<(), CLIError> {
+        let write_path = self.write_path_for_scope(scope)?;
+        let read_paths = self.read_paths_for_scope(scope);
 
-        let mut buffer = String::new();
+        let fig = self.get_config_object(&read_paths);
 
-        for (nesting, sub_key) in key.split('.').enumerate() {
-            if nesting != 0 {
-                writeln!(buffer).unwrap();
+        // Parse value as YAML - this allows both unqoted strings and JSON
+        let value: setty::Value = match input_format {
+            ConfigObjectFormat::Yaml => {
+                setty::format::Yaml::deserialize(value).map_err(CLIError::usage_error_from)?
             }
-            for _ in 0..nesting {
-                write!(buffer, "  ").unwrap();
+            ConfigObjectFormat::Json => {
+                setty::format::Json::deserialize(value).map_err(CLIError::usage_error_from)?
             }
-            write!(buffer, "{sub_key}:").unwrap();
-        }
-        write!(buffer, " {value}").unwrap();
+        };
 
-        let mut delta: CLIConfig =
-            serde_yaml::from_str(&buffer).map_err(|e| CLIError::usage_error(e.to_string()))?;
-
-        let current = self.load(scope);
-
-        delta.merge(current);
-
-        self.save(delta, scope);
+        // Set with validation
+        fig.set_value::<WithManifest<setty::format::Yaml>>(path, value, &write_path)
+            .map_err(CLIError::usage_error_from)?;
 
         Ok(())
     }
 
-    pub fn unset(&self, key: &str, scope: ConfigScope) -> Result<(), CLIError> {
-        if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(CLIError::usage_error_from(NotInWorkspace));
+    pub fn unset(&self, path: &str, scope: ConfigScope) -> Result<(), CLIError> {
+        let write_path = self.write_path_for_scope(scope)?;
+        let read_paths = self.read_paths_for_scope(scope);
+
+        if !write_path.exists() {
+            return Err(CLIError::usage_error(format!("Path {path} not found")));
         }
 
-        let config_path = self.path_for_scope(scope);
-        if !config_path.exists() {
-            return Err(CLIError::usage_error(format!("Key {key} not found")));
+        let fig = self.get_config_object(&read_paths);
+        if fig
+            .unset_value::<WithManifest<setty::format::Yaml>>(path, &write_path)
+            .map_err(CLIError::usage_error_from)?
+            .is_none()
+        {
+            return Err(CLIError::usage_error(format!("Path {path} not found")));
         }
 
-        let config = self.load_from(&config_path);
-        let mut config_raw = self.to_raw(&config);
-
-        if self.unset_recursive(key, config_raw.as_mapping_mut().unwrap()) {
-            let file = std::fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .create(true)
-                .open(&config_path)
-                .unwrap();
-
-            serde_yaml::to_writer(
-                file,
-                &Manifest {
-                    kind: "CLIConfig".to_owned(),
-                    version: CONFIG_VERSION,
-                    content: config_raw,
-                },
-            )
-            .unwrap();
-
-            Ok(())
-        } else {
-            Err(CLIError::usage_error(format!("Key {key} not found")))
-        }
+        Ok(())
     }
 
-    #[allow(clippy::self_only_used_in_recursion)]
-    fn unset_recursive(&self, key: &str, value: &mut serde_yaml::Mapping) -> bool {
-        if let Some((head, tail)) = key.split_once('.') {
-            let index = serde_yaml::Value::String(head.to_owned());
+    /// Given a prefix like `some.va` would return possible completions, e.g.
+    /// `some.value` and `some.validator`
+    pub fn complete_path(&self, prefix: &str) -> Vec<String> {
+        let fig = self.get_config_object(&[]);
+        fig.complete_path(prefix)
+    }
 
-            if let Some(child) = value.get_mut(&index).and_then(|v| v.as_mapping_mut())
-                && self.unset_recursive(tail, child)
-            {
-                if child.is_empty() {
-                    value.remove(&index);
-                }
-                return true;
-            }
-            false
-        } else {
-            value
-                .remove(serde_yaml::Value::String(key.to_owned()))
-                .is_some()
+    fn read_paths_for_scope(&self, scope: ConfigScope) -> Vec<PathBuf> {
+        // If config specified explicitly - use it
+        if let Ok(path) = std::env::var(CONFIG_PATH_ENV_VAR) {
+            return path.split(',').map(Into::into).collect();
         }
-    }
 
-    pub fn list(&self, scope: ConfigScope, with_defaults: bool) -> String {
-        let mut config = self.load(scope);
-        if with_defaults {
-            config.merge(CLIConfig::default());
-        }
-        serde_yaml::to_string(&config).unwrap()
-    }
+        let mut ret = Vec::new();
 
-    pub fn all_keys(&self) -> Vec<String> {
-        let mut result = Vec::new();
-        let full_config = CLIConfig::sample();
-        let raw_config = self.to_raw(&full_config);
-        self.visit_keys_recursive("", &raw_config, &mut |key| result.push(key));
-        result
-    }
-
-    #[allow(clippy::self_only_used_in_recursion)]
-    fn visit_keys_recursive(
-        &self,
-        prefix: &str,
-        value: &serde_yaml::Value,
-        fun: &mut impl FnMut(String),
-    ) {
-        if let Some(mapping) = value.as_mapping() {
-            for (k, v) in mapping {
-                if let Some(key) = k.as_str() {
-                    let mut full_key = String::with_capacity(prefix.len() + key.len());
-                    full_key.push_str(prefix);
-                    full_key.push_str(key);
-
-                    full_key.push('.');
-                    self.visit_keys_recursive(&full_key, v, fun);
-
-                    full_key.pop();
-                    fun(full_key);
-                }
-            }
-        }
-    }
-
-    fn path_for_scope(&self, scope: ConfigScope) -> PathBuf {
         match scope {
-            // TODO: Respect `XDG_CONFIG_HOME` when working with configs
-            //       https://github.com/kamu-data/kamu-cli/issues/848
-            ConfigScope::User => dirs::home_dir()
-                .expect("Cannot determine user home directory")
-                .join(CONFIG_FILENAME),
-            ConfigScope::Workspace => self.workspace_kamu_dir.join(CONFIG_FILENAME),
-            _ => panic!(),
+            ConfigScope::User => {
+                if let Some(p) = dirs::config_local_dir() {
+                    ret.push(p.join("kamu/config.yaml"));
+                }
+                if let Some(p) = dirs::home_dir() {
+                    ret.push(p.join(CONFIG_FILENAME));
+                }
+            }
+            ConfigScope::Workspace => {
+                ret.push(self.workspace_kamu_dir.join(CONFIG_FILENAME));
+            }
+            ConfigScope::Combined => {
+                ret.push(self.workspace_kamu_dir.join(CONFIG_FILENAME));
+
+                let mut current = self.workspace_kamu_dir.parent();
+                while let Some(cur) = current {
+                    ret.push(cur.join(CONFIG_FILENAME));
+                    current = cur.parent();
+                }
+            }
+        }
+
+        ret.retain(|p| p.is_file());
+        ret.reverse();
+
+        ret
+    }
+
+    fn write_path_for_scope(&self, scope: ConfigScope) -> Result<PathBuf, CLIError> {
+        // If config specified explicitly - use it
+        if let Ok(path) = std::env::var(CONFIG_PATH_ENV_VAR) {
+            return Ok(path.split(',').map(Into::into).next().unwrap());
+        }
+
+        match scope {
+            ConfigScope::Workspace | ConfigScope::Combined => {
+                if !self.workspace_kamu_dir.exists() {
+                    return Err(CLIError::usage_error_from(NotInWorkspace));
+                }
+                Ok(self.workspace_kamu_dir.join(CONFIG_FILENAME))
+            }
+            ConfigScope::User => {
+                let p = dirs::config_local_dir()
+                    .map(|p| p.join("kamu/config.yaml"))
+                    .or_else(|| dirs::home_dir().map(|p| p.join(CONFIG_FILENAME)))
+                    .expect("Cannot determine user config path");
+                Ok(p)
+            }
         }
     }
 
-    fn load_from(&self, config_path: &Path) -> CLIConfig {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .open(config_path)
-            .unwrap();
+    fn get_config_object(&self, paths: &[PathBuf]) -> setty::Config<CLIConfig> {
+        use setty::format::*;
+        use setty::source::*;
 
-        let manifest: Manifest<CLIConfig> = serde_yaml::from_reader(file).unwrap();
+        setty::Config::new()
+            .with_sources(paths.iter().map(File::<WithManifest<Yaml>>::new))
+            .with_source(Env::<Yaml>::new(
+                CONFIG_PREFIX_ENV_VAR,
+                CONFIG_SEPARATOR_ENV_VAR,
+            ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// This [`setty::format::Format`] implementation is used to wrap config objects
+/// with our standard [`Manifest`] for upgradeability
+struct WithManifest<Fmt> {
+    _p: std::marker::PhantomData<Fmt>,
+}
+
+impl<Fmt> setty::format::Format for WithManifest<Fmt>
+where
+    Fmt: setty::format::Format,
+{
+    type ErrorDe = Fmt::ErrorDe;
+    type ErrorSer = Fmt::ErrorSer;
+
+    fn name() -> std::borrow::Cow<'static, str> {
+        format!("{}+manifest", Fmt::name()).into()
+    }
+
+    fn deserialize<T: serde::de::DeserializeOwned>(string: &str) -> Result<T, Self::ErrorDe> {
+        let manifest: Manifest<T> = Fmt::deserialize(string)?;
 
         // TODO: Migrations
         assert_eq!(manifest.kind, "CLIConfig");
         assert_eq!(manifest.version, CONFIG_VERSION);
 
-        manifest.content
+        Ok(manifest.content)
     }
 
-    fn to_raw(&self, config: &CLIConfig) -> serde_yaml::Value {
-        let s = serde_yaml::to_string(config).unwrap();
-        serde_yaml::from_str(&s).unwrap()
+    fn serialize<T: serde::ser::Serialize>(value: &T) -> Result<String, Self::ErrorSer> {
+        let manifest = Manifest {
+            kind: "CLIConfig".to_owned(),
+            version: CONFIG_VERSION,
+            content: value,
+        };
+
+        Fmt::serialize(&manifest)
     }
 }
 

@@ -85,6 +85,7 @@ nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
+setty = { version = "0.3", default-features = false }
 sha3 = "0.10"
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 thiserror = "2"

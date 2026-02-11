@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
@@ -34,7 +34,6 @@ use kamu_flow_system::{
 use kamu_search_services::EmbeddingsProviderImpl;
 use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
 use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
-use merge::Merge as _;
 use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
@@ -132,7 +131,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             (_, true) => WorkspaceStatus::Created(tenancy_config),
         };
 
-        let cli_config = load_config(&workspace_layout);
+        let cli_config = load_config(&workspace_layout)?;
         let current_account =
             AccountService::current_account_indication(args.account.clone(), tenancy_config)
                 .map_err(CLIError::usage_error_from)?;
@@ -550,14 +549,7 @@ pub fn configure_base_catalog(
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
     }
 
-    let incremental_search_indexing = cli_config
-        .search
-        .as_ref()
-        .unwrap()
-        .indexer
-        .as_ref()
-        .unwrap()
-        .incremental_indexing;
+    let incremental_search_indexing = cli_config.search.indexer.incremental_indexing;
 
     kamu_accounts_services::register_dependencies(
         &mut b,
@@ -779,12 +771,12 @@ async fn run_startup_initializations(
 // Config
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn load_config(workspace_layout: &WorkspaceLayout) -> config::CLIConfig {
+fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, CLIError> {
     let config_svc = config::ConfigService::new(workspace_layout);
-    let config = config_svc.load_with_defaults(config::ConfigScope::Flattened);
+    let config = config_svc.load(config::ConfigScope::Combined)?;
 
     tracing::info!(?config, "Loaded configuration");
-    config
+    Ok(config)
 }
 
 pub fn register_config_in_catalog(
@@ -795,139 +787,99 @@ pub fn register_config_in_catalog(
     is_e2e_testing: bool,
 ) -> Result<(), CLIError> {
     // Extra
-    catalog_builder.add_value(config.extra.as_ref().unwrap().graphql.clone());
-
-    let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
+    catalog_builder.add_value(config.extra.graphql.clone());
 
     // Register JupyterConfig used by some commands
-    catalog_builder.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
+    catalog_builder.add_value(config.frontend.jupyter.clone());
 
     // Container runtime configuration
     catalog_builder.add_value(ContainerRuntimeConfig {
-        runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
-        network_ns,
+        runtime: config.engine.runtime,
+        network_ns: config.engine.network_ns,
     });
     //
 
     // Engine configuration
     {
-        let engine_config = config.engine.clone().unwrap();
-        let images_config = engine_config.images.unwrap();
+        let engine_config = config.engine.clone();
+        let images_config = engine_config.images.clone();
 
         catalog_builder.add_value(EngineProvisionerLocalConfig {
             max_concurrency: engine_config.max_concurrency,
-            start_timeout: engine_config.start_timeout.unwrap().into(),
-            shutdown_timeout: engine_config.shutdown_timeout.unwrap().into(),
-            spark_image: images_config.spark.clone().unwrap(),
-            flink_image: images_config.flink.clone().unwrap(),
-            datafusion_image: images_config.datafusion.clone().unwrap(),
-            risingwave_image: images_config.risingwave.clone().unwrap(),
+            start_timeout: engine_config.start_timeout.into(),
+            shutdown_timeout: engine_config.shutdown_timeout.into(),
+            spark_image: images_config.spark,
+            flink_image: images_config.flink,
+            datafusion_image: images_config.datafusion,
+            risingwave_image: images_config.risingwave,
         });
 
         let (ingest_config, batch_query_config, compaction_config) =
-            engine_config.datafusion_embedded.unwrap().into_system()?;
+            engine_config.datafusion_embedded.into_system()?;
         catalog_builder.add_value(ingest_config);
         catalog_builder.add_value(batch_query_config);
         catalog_builder.add_value(compaction_config);
     }
     //
 
-    catalog_builder.add_value(config.source.as_ref().unwrap().to_infra_cfg());
-    catalog_builder.add_value(
-        config
-            .source
-            .as_ref()
-            .unwrap()
-            .http
-            .as_ref()
-            .unwrap()
-            .to_infra_cfg(),
-    );
-    catalog_builder.add_value(
-        config
-            .source
-            .as_ref()
-            .unwrap()
-            .mqtt
-            .as_ref()
-            .unwrap()
-            .to_infra_cfg(),
-    );
-    catalog_builder.add_value(
-        config
-            .source
-            .as_ref()
-            .unwrap()
-            .ethereum
-            .as_ref()
-            .unwrap()
-            .to_infra_cfg(),
-    );
+    catalog_builder.add_value(config.source.to_infra_cfg());
+    catalog_builder.add_value(config.source.http.to_infra_cfg());
+    catalog_builder.add_value(config.source.mqtt.to_infra_cfg());
+    catalog_builder.add_value(config.source.ethereum.to_infra_cfg());
 
     // Identity configuration
-    if let Some(identity_config) = config.identity.as_ref().unwrap().to_infra_cfg() {
+    if let Some(identity_config) = config.identity.to_infra_cfg() {
         catalog_builder.add_value(identity_config);
     }
     //
 
     // IPFS configuration
-    let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
-
     catalog_builder.add_value(odf::dataset::IpfsGateway {
-        url: ipfs_conf.http_gateway.clone().unwrap(),
-        pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
+        url: config.protocol.ipfs.http_gateway.clone(),
+        pre_resolve_dnslink: config.protocol.ipfs.pre_resolve_dnslink,
     });
     catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
     //
 
     // Flight SQL configuration
-    let flight_sql_conf = config
-        .protocol
-        .as_ref()
-        .unwrap()
-        .flight_sql
-        .as_ref()
-        .unwrap();
-    catalog_builder.add_value(flight_sql_conf.to_session_auth_config());
-    catalog_builder.add_value(flight_sql_conf.to_session_caching_config());
+    catalog_builder.add_value(config.protocol.flight_sql.to_session_auth_config());
+    catalog_builder.add_value(config.protocol.flight_sql.to_session_caching_config());
     //
 
     // Tenancy configuration
     if let Some(tenancy_config) = workspace_status.into_tenancy_config() {
-        if tenancy_config == TenancyConfig::MultiTenant {
-            let mut implicit_user_config = PredefinedAccountsConfig::new();
-            implicit_user_config.predefined.push(
-                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                    AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
-                ))
-                .set_display_name(AccountService::default_user_name(
-                    TenancyConfig::MultiTenant,
-                ))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            );
+        let accounts_config = if tenancy_config == TenancyConfig::MultiTenant {
+            let mut accounts_config = config.auth.users.clone();
+
+            let mt_account = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
+                AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
+            ))
+            .set_display_name(AccountService::default_user_name(
+                TenancyConfig::MultiTenant,
+            ))
+            .set_properties(vec![AccountPropertyName::IsAdmin]);
+
+            accounts_config.predefined.push(mt_account);
 
             if is_e2e_testing {
                 let e2e_user_config = AccountConfig::test_config_from_name(
                     odf::AccountName::new_unchecked("e2e-user"),
                 );
 
-                implicit_user_config.predefined.push(e2e_user_config);
+                accounts_config.predefined.push(e2e_user_config);
             }
 
-            use merge::Merge;
-            let mut user_config = config.auth.as_ref().unwrap().users.clone().unwrap();
-            user_config.merge(implicit_user_config);
-            catalog_builder.add_value(user_config);
+            accounts_config
         } else {
-            if let Some(users) = &config.auth.as_ref().unwrap().users {
-                assert!(
-                    users.predefined.is_empty(),
-                    "There cannot be predefined users in a single-tenant workspace"
-                );
-            }
+            assert!(
+                config.auth.users.predefined.is_empty(),
+                "There cannot be predefined users in a single-tenant workspace",
+            );
 
-            catalog_builder.add_value(PredefinedAccountsConfig::single_tenant());
-        }
+            PredefinedAccountsConfig::single_tenant()
+        };
+
+        catalog_builder.add_value(accounts_config);
     } else {
         // No workspace
         catalog_builder.add_value(PredefinedAccountsConfig::new());
@@ -935,53 +887,46 @@ pub fn register_config_in_catalog(
     //
 
     // Uploads configuration
-    let uploads_config = config.uploads.as_ref().unwrap();
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
-        uploads_config.max_file_size_in_mb.unwrap(),
+        config.uploads.max_file_size_in_mb,
     ));
     //
 
     // Dataset env vars configuration
-    catalog_builder.add_value(config.dataset_env_vars.clone().unwrap());
+    catalog_builder.add_value(config.dataset_env_vars.clone());
 
-    let dataset_env_vars_config = config.dataset_env_vars.as_ref().unwrap();
-    match dataset_env_vars_config.encryption_key.as_ref() {
+    match &config.dataset_env_vars.encryption_key {
         None => {
-            match dataset_env_vars_config.enabled.as_ref() {
-                None => {
-                    warn!("Dataset env vars configuration is missing. Feature will be disabled");
-                }
-                Some(true) => panic!("Dataset env vars encryption key is required"),
-                _ => {}
+            if config.dataset_env_vars.enabled {
+                panic!("Dataset env vars encryption key is required");
+            } else {
+                warn!("Dataset env vars configuration is missing. Feature will be disabled");
             }
             catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         Some(encryption_key) => {
-            if let Some(enabled) = &dataset_env_vars_config.enabled
-                && !enabled
-            {
-                warn!("Dataset env vars feature will be disabled");
-                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
-                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
-            } else {
+            if config.dataset_env_vars.enabled {
                 assert!(
                     AesGcmEncryptor::try_new(encryption_key).is_ok(),
                     "Invalid dataset env var encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+            } else {
+                warn!("Dataset env vars feature will be disabled");
+                catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
             }
         }
     }
     //
 
     // Did secret key encryption configuration
-    catalog_builder.add_value(config.did_encryption.clone().unwrap());
+    catalog_builder.add_value(config.did_encryption.clone());
 
-    if let Some(did_encryption_config) = config.did_encryption.as_ref()
-        && let Some(encryption_key) = &did_encryption_config.encryption_key
-        && did_encryption_config.is_enabled()
+    if let Some(encryption_key) = &config.did_encryption.encryption_key
+        && config.did_encryption.is_enabled()
     {
         assert!(
             AesGcmEncryptor::try_new(encryption_key).is_ok(),
@@ -994,23 +939,18 @@ pub fn register_config_in_catalog(
 
     // Quotas limits configuration
     catalog_builder.add_value(QuotaDefaultsConfig {
-        storage: config
-            .quota_defaults
-            .as_ref()
-            .and_then(|q| q.storage)
-            .unwrap_or_default(),
+        storage: config.quota_defaults.storage,
     });
     //
 
     // Authentication configuration
-    catalog_builder.add_value(config.auth.clone().unwrap());
+    catalog_builder.add_value(config.auth.clone());
     //
 
     // Outbox configuration
-    let outbox_config = config.outbox.as_ref().unwrap();
     catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
-        Duration::seconds(outbox_config.awaiting_step_secs.unwrap()),
-        outbox_config.batch_size.unwrap(),
+        Duration::seconds(config.outbox.awaiting_step_secs),
+        config.outbox.batch_size,
     ));
     //
 
@@ -1026,143 +966,72 @@ pub fn register_config_in_catalog(
     //
 
     // Flow system configuration
-    let kamu_flow_system_config = config.flow_system.as_ref().unwrap();
-    let flow_agent_config = kamu_flow_system_config.flow_agent.as_ref().unwrap();
-
-    catalog_builder.add_value(kamu_flow_system::FlowAgentConfig::new(
-        Duration::seconds(flow_agent_config.awaiting_step_secs.unwrap()),
-        Duration::seconds(flow_agent_config.mandatory_throttling_period_secs.unwrap()),
-        if let Some(retry_configs) = flow_agent_config.default_retry_policies.as_ref() {
-            retry_configs
-                .iter()
-                .map(|(flow_type, retry_policy_config)| {
-                    (
-                        flow_type.clone(),
-                        kamu_flow_system::RetryPolicy::new(
-                            retry_policy_config.max_attempts.unwrap_or(0),
-                            retry_policy_config.min_delay_secs.unwrap_or(0),
-                            match retry_policy_config.backoff_type {
-                                Some(config::RetryPolicyConfigBackoffType::Exponential) => {
-                                    kamu_flow_system::RetryBackoffType::Exponential
-                                }
-                                Some(config::RetryPolicyConfigBackoffType::Linear) => {
-                                    kamu_flow_system::RetryBackoffType::Linear
-                                }
-                                Some(
-                                    config::RetryPolicyConfigBackoffType::ExponentialWithJitter,
-                                ) => kamu_flow_system::RetryBackoffType::ExponentialWithJitter,
-                                Some(config::RetryPolicyConfigBackoffType::Fixed) | None => {
-                                    kamu_flow_system::RetryBackoffType::Fixed
-                                }
-                            },
-                        ),
-                    )
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        },
-    ));
-
-    let flow_system_event_agent = kamu_flow_system_config
-        .flow_system_event_agent
-        .as_ref()
-        .unwrap();
-    catalog_builder.add_value(kamu_flow_system::FlowSystemEventAgentConfig {
-        min_debounce_interval: std::time::Duration::from_millis(u64::from(
-            flow_system_event_agent.min_debounce_interval_ms.unwrap(),
-        )),
-        max_listening_timeout: std::time::Duration::from_millis(u64::from(
-            flow_system_event_agent.max_listening_timeout_ms.unwrap(),
-        )),
-        batch_size: flow_system_event_agent.batch_size.unwrap(),
-    });
-
-    let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
-    catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
-        Duration::seconds(i64::from(task_agent_config.checking_interval_secs.unwrap())),
-    ));
+    catalog_builder.add_value(config.flow_system.flow_agent.into_system());
+    catalog_builder.add_value(config.flow_system.flow_system_event_agent.into_system());
+    catalog_builder.add_value(config.flow_system.task_agent.into_system());
 
     // Webhooks configuration
-    let webhooks_config = config.webhooks.clone().unwrap();
-    {
-        let max_consecutive_failures = webhooks_config.max_consecutive_failures.unwrap();
-        assert!(
-            max_consecutive_failures > 0,
-            "Webhooks max_consecutive_failures must be > 0"
-        );
+    assert!(
+        config.webhooks.max_consecutive_failures > 0,
+        "Webhooks max_consecutive_failures must be > 0"
+    );
 
-        match webhooks_config.secret_encryption_key.as_ref() {
-            None => match &webhooks_config.secret_encryption_enabled.as_ref() {
-                None => {
-                    warn!(
-                        "Webhook encryption configuration is missing. Secrets will not be \
-                         encrypted"
-                    );
-                }
-                Some(true) => panic!("Webhook secrets encryption key is required"),
-                _ => {}
-            },
-            Some(encryption_key) => {
-                if let Some(enabled) = &webhooks_config.secret_encryption_enabled
-                    && !enabled
-                {
-                    warn!("Webhook encryption will be disabled");
-                } else {
-                    assert!(
-                        AesGcmEncryptor::try_new(encryption_key).is_ok(),
-                        "Invalid webhook secrets encryption key",
-                    );
-                }
+    match &config.webhooks.secret_encryption_key {
+        None => {
+            if config.webhooks.secret_encryption_enabled {
+                panic!("Webhook secrets encryption key is required")
+            } else {
+                warn!("Webhook encryption configuration is missing. Secrets will not be encrypted");
             }
         }
-
-        catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(
-            max_consecutive_failures,
-            Duration::seconds(i64::from(webhooks_config.delivery_timeout.unwrap())),
-            webhooks_config.secret_encryption_key,
-        ));
+        Some(encryption_key) => {
+            if config.webhooks.secret_encryption_enabled {
+                assert!(
+                    AesGcmEncryptor::try_new(encryption_key).is_ok(),
+                    "Invalid webhook secrets encryption key",
+                );
+            } else {
+                warn!("Webhook encryption will be disabled");
+            }
+        }
     }
 
-    // Search configuration
-    let config::SearchConfig {
-        indexer,
-        embeddings_chunker,
-        embeddings_encoder,
-        repo,
-    } = config.search.clone().unwrap();
+    catalog_builder.add_value(kamu_webhooks::WebhooksConfig::new(
+        config.webhooks.max_consecutive_failures,
+        Duration::seconds(config.webhooks.delivery_timeout.into()),
+        config.webhooks.secret_encryption_key.clone(),
+    ));
+    //
 
-    let indexer = indexer.unwrap_or_default();
+    // Search configuration
     catalog_builder.add_value(kamu_search::SearchIndexerConfig {
-        clear_on_start: indexer.clear_on_start,
+        clear_on_start: config.search.indexer.clear_on_start,
     });
 
     catalog_builder.add::<EmbeddingsProviderImpl>();
 
-    match embeddings_chunker.unwrap_or_default() {
+    match &config.search.embeddings_chunker {
         config::EmbeddingsChunkerConfig::Simple(cfg) => {
             catalog_builder.add::<kamu_search_services::EmbeddingsChunkerSimple>();
             catalog_builder.add_value(kamu_search_services::EmbeddingsChunkerConfigSimple {
-                split_sections: cfg.split_sections.unwrap(),
-                split_paragraphs: cfg.split_paragraphs.unwrap(),
+                split_sections: cfg.split_sections,
+                split_paragraphs: cfg.split_paragraphs,
             });
         }
     }
 
-    match embeddings_encoder.unwrap_or_default() {
-        config::EmbeddingsEncoderConfig::OpenAi(mut cfg) => {
-            cfg.merge(config::EmbeddingsEncoderConfigOpenAi::default());
-
+    match &config.search.embeddings_encoder {
+        config::EmbeddingsEncoderConfig::OpenAi(cfg) => {
             catalog_builder.add::<kamu_search_openai::EmbeddingsEncoderOpenAi>();
             catalog_builder.add_value(kamu_search_openai::EmbeddingsEncoderConfigOpenAI {
-                url: cfg.url,
-                api_key: cfg.api_key.map(Into::into),
-                model_name: cfg.model_name.unwrap(),
-                dimensions: cfg.dimensions.unwrap(),
+                url: cfg.url.clone(),
+                api_key: cfg.api_key.clone().map(Into::into),
+                model_name: cfg.model_name.clone(),
+                dimensions: cfg.dimensions,
             });
         }
 
-        config::EmbeddingsEncoderConfig::Dummy => {
+        config::EmbeddingsEncoderConfig::Dummy(_) => {
             catalog_builder.add::<kamu_search_services::DummyEmbeddingsEncoder>();
         }
     }
@@ -1175,15 +1044,13 @@ pub fn register_config_in_catalog(
     //   containers are used)
     // - lazy init wrapper is unnecessary in server mode
 
-    match repo.unwrap_or_default() {
-        config::SearchRepositoryConfig::Dummy => {
+    match &config.search.repo {
+        config::SearchRepositoryConfig::Dummy(_) => {
             // no lazy init needed for dummy impl
             catalog_builder.add::<kamu_search_services::DummySearchService>();
         }
 
-        config::SearchRepositoryConfig::Elasticsearch(mut cfg) => {
-            cfg.merge(config::SearchRepositoryConfigElasticsearch::default());
-
+        config::SearchRepositoryConfig::Elasticsearch(cfg) => {
             if is_e2e_testing {
                 // TODO: kind of a hack, make lazy init work in e2e tests
                 catalog_builder.add::<kamu_search_services::SearchIndexerImpl>();
@@ -1193,27 +1060,28 @@ pub fn register_config_in_catalog(
             }
             catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchRepository>();
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchClientConfig {
-                url: url::Url::parse(&cfg.url).int_err()?,
-                password: cfg.password,
-                timeout_secs: cfg.timeout_secs.unwrap(),
-                enable_compression: cfg.enable_compression.unwrap(),
-                ca_cert_pem_path: cfg.ca_cert_pem_path.map(std::path::PathBuf::from),
+                url: cfg.url.clone(),
+                password: cfg.password.clone(),
+                timeout_secs: cfg.timeout_secs,
+                enable_compression: cfg.enable_compression,
+                ca_cert_pem_path: cfg.ca_cert_pem_path.as_ref().map(std::path::PathBuf::from),
             });
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchRepositoryConfig {
-                index_prefix: cfg.index_prefix.unwrap(),
-                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
+                index_prefix: cfg.index_prefix.clone(),
+                embedding_dimensions: cfg.embedding_dimensions,
             });
         }
         config::SearchRepositoryConfig::ElasticsearchContainer(cfg) => {
             catalog_builder.add::<kamu_search_services::SearchImplLazyInit>();
             catalog_builder.add::<kamu_search_elasticsearch::ElasticsearchContainerRepository>();
             catalog_builder.add_value(kamu_search_elasticsearch::ElasticsearchContainerConfig {
-                image: cfg.image.unwrap(),
-                start_timeout: cfg.start_timeout.unwrap().into(),
-                embedding_dimensions: cfg.embedding_dimensions.unwrap(),
+                image: cfg.image.clone(),
+                start_timeout: cfg.start_timeout.into(),
+                embedding_dimensions: cfg.embedding_dimensions,
             });
         }
     }
+    //
 
     catalog_builder.add_value(PasswordPolicyConfig::default());
 
