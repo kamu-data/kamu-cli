@@ -12,6 +12,7 @@ use bon::bon;
 use indoc::indoc;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
+use kamu_datasets::DatasetStatisticsRepository;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::*;
 use messaging_outbox::OutboxProvider;
@@ -680,6 +681,129 @@ async fn test_versioned_file_extra_data() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_quota_exceeded() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            ..Default::default()
+        })
+        .build()
+        .await;
+
+    // Create dataset
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("quota-file"),
+        ))
+        .await;
+
+    let set_quota_res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc!(
+            r#"
+            mutation {
+              accounts {
+                me {
+                  quotas {
+                    setAccountQuotas(quotas: { storage: { limitTotalBytes: 3000 } }) {
+                      isSuccess
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+
+    // First upload should fit
+    let first_upload = harness
+        .in_band_upload_versioned_file(&did, base64usnp_encode(b"hello").as_str())
+        .await;
+    assert!(first_upload.is_ok(), "{first_upload:#?}");
+    let _head_v1 = first_upload.data.clone().into_json().unwrap()["datasets"]["byId"]
+        ["asVersionedFile"]["uploadNewVersion"]["newHead"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Record stats for first upload so quota checker sees usage
+    {
+        let repo = harness
+            .catalog_authorized
+            .get_one::<dyn DatasetStatisticsRepository>()
+            .unwrap();
+        let dataset_id = odf::DatasetID::from_did_str(did.as_str()).unwrap();
+        let head_ref = odf::BlockRef::Head;
+        repo.set_dataset_statistics(
+            &dataset_id,
+            &head_ref,
+            kamu_datasets::DatasetStatistics {
+                data_size_bytes: 2900,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    // Second upload should exceed quota
+    let second_upload = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                uploadNewVersion(content: $content) {
+                                    isSuccess
+                                    message
+                                    ... on UpdateVersionErrorQuotaExceeded {
+                                        used
+                                        incoming
+                                        limit
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "content": base64usnp_encode(b"world"),
+            }))),
+        )
+        .await;
+
+    assert!(second_upload.is_ok(), "{second_upload:#?}");
+    let upload_result = second_upload.data.into_json().unwrap()["datasets"]["byId"]
+        ["asVersionedFile"]["uploadNewVersion"]
+        .clone();
+    assert_eq!(upload_result["isSuccess"], json!(false));
+    let msg = upload_result["message"].as_str().unwrap();
+    assert!(
+        msg.contains("Quota exceeded"),
+        "unexpected error message: {msg}"
+    );
+    assert_eq!(upload_result["used"], json!(2900));
+    assert_eq!(upload_result["limit"], json!(3000));
+    assert!(
+        upload_result["incoming"].as_u64().unwrap() > 0,
+        "expected positive incoming size"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -723,7 +847,9 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
-            .add::<UpdateVersionFileUseCaseImpl>()
+            .add::<FindVersionedFileVersionUseCaseImpl>()
+            .add::<UpdateVersionedFileUseCaseImpl>()
+            .add::<ViewVersionedFileHistoryUseCaseImpl>()
             .add::<UploadServiceLocal>()
             .add_value(ServerUrlConfig::new_test(None))
             .add_value(CacheDir::new(cache_dir))

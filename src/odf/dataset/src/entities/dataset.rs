@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// NOTE: Workaround for mockall::automock
+#![expect(clippy::ref_option_ref)]
+
 use ::serde::{Deserialize, Serialize};
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use file_utils::OwnedFile;
 use internal_error::*;
@@ -21,7 +23,8 @@ use crate::{AppendError, BlockRef, MetadataChain};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait]
+#[cfg_attr(feature = "testing", mockall::automock)]
+#[async_trait::async_trait]
 pub trait Dataset: Send + Sync {
     /// Detaches this dataset from any transaction references
     fn detach_from_transaction(&self) {
@@ -31,22 +34,22 @@ pub trait Dataset: Send + Sync {
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
-    async fn commit_event(
+    async fn commit_event<'a>(
         &self,
         event: MetadataEvent,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError>;
 
     /// Helper function to commit [`AddData`] event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_add_data(
+    async fn commit_add_data<'a>(
         &self,
         add_data: AddDataParams,
         data: Option<OwnedFile>,
         checkpoint: Option<CheckpointRef>,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError>;
 
     /// Helper function to commit [`ExecuteTransform`] event into a local
@@ -54,21 +57,21 @@ pub trait Dataset: Send + Sync {
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_execute_transform(
+    async fn commit_execute_transform<'a>(
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
         checkpoint: Option<CheckpointRef>,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError>;
 
     /// Helper function to prepare [`ExecuteTransform`] event without committing
     /// it.
-    async fn prepare_execute_transform(
+    async fn prepare_execute_transform<'a>(
         &self,
         execute_transform: ExecuteTransformParams,
-        data: Option<&OwnedFile>,
-        checkpoint: Option<&CheckpointRef>,
+        data: Option<&'a OwnedFile>,
+        checkpoint: Option<&'a CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError>;
 
     fn get_storage_internal_url(&self) -> &Url;

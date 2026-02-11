@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod account_quota_checker_storage_impl;
 mod blocks;
 mod dataset_account_lifecycle_handler;
 mod dataset_alias_update_handler;
@@ -16,9 +17,11 @@ mod entry;
 mod env;
 mod graph;
 mod odf;
+mod quota_defaults_config;
 mod refs;
 mod statistics;
 
+pub use account_quota_checker_storage_impl::*;
 pub use blocks::*;
 pub use dataset_account_lifecycle_handler::*;
 pub use dataset_alias_update_handler::*;
@@ -28,5 +31,6 @@ pub use entry::*;
 pub use env::*;
 pub use graph::*;
 pub use odf::*;
+pub use quota_defaults_config::*;
 pub use refs::*;
 pub use statistics::*;

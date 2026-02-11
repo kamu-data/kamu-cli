@@ -17,11 +17,19 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_datasets::{
     AlwaysHappyDatasetActionAuthorizer,
     DatasetRegistry,
     DatasetRegistryExt,
     ResolvedDataset,
+};
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    QuotaDefaultsConfig,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -69,6 +77,14 @@ impl TransformTestHarness {
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(QuotaDefaultsConfig::default())
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
@@ -236,6 +252,7 @@ impl TransformTestHarness {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 },
                 None,
             )

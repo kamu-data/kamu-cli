@@ -14,9 +14,17 @@ use bytes::Bytes;
 use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    QuotaDefaultsConfig,
+};
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +54,7 @@ async fn test_push_ingest_data_source_not_found() {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -85,6 +94,7 @@ async fn test_push_ingest_data_from_json() {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -130,6 +140,7 @@ async fn test_push_ingest_data_from_file() {
                     is_ingest_from_upload: true,
                     media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head: None,
+                    skip_quota_check: false,
                 }
             )
             .await,
@@ -176,6 +187,7 @@ async fn test_push_ingest_data_execute_multi() {
                 is_ingest_from_upload: false,
                 media_type: None,
                 expected_head: Some(initial_head.clone()),
+                skip_quota_check: false,
             },
         )
         .await
@@ -186,6 +198,7 @@ async fn test_push_ingest_data_execute_multi() {
             old_head,
             new_head,
             num_blocks,
+            system_time: _,
         } => {
             assert_eq!(old_head, initial_head);
             assert_ne!(new_head, old_head);
@@ -230,6 +243,14 @@ impl PushIngestDataUseCaseHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(QuotaDefaultsConfig::default())
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();

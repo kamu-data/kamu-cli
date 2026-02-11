@@ -13,6 +13,7 @@
 | `identity` | [`IdentityConfig`](#identityconfig) |  | UNSTABLE: Identity configuration |
 | `outbox` | [`OutboxConfig`](#outboxconfig) |  | Messaging outbox configuration |
 | `protocol` | [`ProtocolConfig`](#protocolconfig) |  | Network protocols configuration |
+| `quotaDefaults` | [`QuotaDefaults`](#quotadefaults) |  | Default quotas configured by type |
 | `search` | [`SearchConfig`](#searchconfig) |  | Search configuration |
 | `source` | [`SourceConfig`](#sourceconfig) |  | Source configuration |
 | `uploads` | [`UploadsConfig`](#uploadsconfig) |  | Uploads configuration |
@@ -441,6 +442,13 @@ Base type: `string`
 |---|---|---|---|
 | `flightSql` | [`FlightSqlConfig`](#flightsqlconfig) |  | `FlightSQL` configuration |
 | `ipfs` | [`IpfsConfig`](#ipfsconfig) |  | IPFS configuration |
+
+
+## `QuotaDefaults`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `storage` | `integer` |  |  |
 
 
 ## `RetryPolicyConfig`

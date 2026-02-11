@@ -30,6 +30,7 @@ pub trait DatasetHandleResolver: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct ResolveDatasetHandlesByRefsResponse {
     pub resolved_handles: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub unresolved_refs: Vec<(odf::DatasetRef, DatasetRefUnresolvedError)>,

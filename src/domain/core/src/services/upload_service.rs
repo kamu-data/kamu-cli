@@ -258,7 +258,7 @@ impl<'de> Deserialize<'de> for UploadTokenBase64Json {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 #[error("{message}")]
 pub struct UploadTokenBase64JsonDecodeError {
     pub message: String,

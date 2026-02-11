@@ -175,7 +175,7 @@ impl ProducerConsumptionJob {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper that represents a  consumption of a single message and advancement
+/// A wrapper that represents a consumption of a single message and advancement
 /// of the last consumed record under one DB transaction
 struct ConsumeMessageTransaction {
     catalog: dill::Catalog,

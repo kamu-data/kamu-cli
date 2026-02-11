@@ -20,7 +20,15 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
+use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_datasets::*;
+use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetStatisticsServiceImpl,
+    QuotaDefaultsConfig,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -1400,6 +1408,14 @@ impl CompactTestHarness {
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
@@ -1456,11 +1472,19 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<AccountServiceImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<InMemoryAccountQuotaEventStore>()
+            .add::<AccountQuotaServiceImpl>()
+            .add::<InMemoryDatasetStatisticsRepository>()
+            .add::<DatasetStatisticsServiceImpl>()
+            .add::<AccountQuotaCheckerStorageImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
+            .add_value(QuotaDefaultsConfig::default())
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
@@ -1655,6 +1679,7 @@ impl CompactTestHarness {
                     is_ingest_from_upload: false,
                     media_type: None,
                     expected_head: None,
+                    skip_quota_check: false,
                 },
                 None,
             )

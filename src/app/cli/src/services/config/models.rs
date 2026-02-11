@@ -77,6 +77,10 @@ pub struct CLIConfig {
     #[config(default)]
     pub did_encryption: DidSecretEncryptionConfig,
 
+    /// Default quotas configured by type
+    #[config(default)]
+    pub quota_defaults: QuotaDefaults,
+
     /// Experimental and temporary configuration options
     #[config(default)]
     pub extra: ExtraConfig,
@@ -90,6 +94,16 @@ pub struct CLIConfig {
 pub struct ExtraConfig {
     #[config(default)]
     pub graphql: kamu_adapter_graphql::GqlConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Quota defaults
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, setty::Default)]
+pub struct QuotaDefaults {
+    #[config(default = kamu_datasets_services::DEFAULT_STORAGE_QUOTA_BYTES)]
+    pub storage: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

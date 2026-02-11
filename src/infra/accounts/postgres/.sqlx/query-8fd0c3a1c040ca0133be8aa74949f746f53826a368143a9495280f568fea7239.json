@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO account_quota_events (\n                    account_id,\n                    quota_type,\n                    event_type,\n                    event_payload,\n                    event_time\n                )\n                VALUES ($1, $2, $3, $4, $5)\n                RETURNING id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8fd0c3a1c040ca0133be8aa74949f746f53826a368143a9495280f568fea7239"
+}

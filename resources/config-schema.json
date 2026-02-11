@@ -136,6 +136,13 @@
         }
       }
     },
+    "quotaDefaults": {
+      "description": "Default quotas configured by type",
+      "$ref": "#/$defs/QuotaDefaults",
+      "default": {
+        "storage": 1000000000
+      }
+    },
     "search": {
       "description": "Search configuration",
       "$ref": "#/$defs/SearchConfig",
@@ -1199,6 +1206,18 @@
             "httpGateway": "http://localhost:8080/",
             "preResolveDnslink": true
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "QuotaDefaults": {
+      "type": "object",
+      "properties": {
+        "storage": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 1000000000,
+          "minimum": 0
         }
       },
       "additionalProperties": false

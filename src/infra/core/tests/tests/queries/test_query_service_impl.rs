@@ -31,14 +31,15 @@ use crate::tests::queries::helpers;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_catalog_with_local_workspace(
-    tempdir: &Path,
+    temp_dir: &Path,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
     let base_local_catalog =
-        helpers::create_base_catalog_with_local_workspace(tempdir, dataset_action_authorizer);
+        helpers::create_base_catalog_with_local_workspace(temp_dir, dataset_action_authorizer);
 
     dill::CatalogBuilder::new_chained(&base_local_catalog)
         .add::<QueryServiceImpl>()
+        .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 
@@ -53,6 +54,7 @@ async fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<QueryServiceImpl>()
+        .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 

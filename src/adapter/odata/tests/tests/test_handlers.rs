@@ -16,8 +16,13 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccountQuotaEventStore,
+    InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
+};
 use kamu_accounts_services::{
+    AccountQuotaServiceImpl,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -35,7 +40,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::*;
+use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -436,6 +441,12 @@ impl TestHarness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()
+                .add::<InMemoryAccountQuotaEventStore>()
+                .add::<AccountQuotaServiceImpl>()
+                .add::<InMemoryDatasetStatisticsRepository>()
+                .add::<DatasetStatisticsServiceImpl>()
+                .add::<AccountQuotaCheckerStorageImpl>()
+                .add_value(QuotaDefaultsConfig::default())
                 .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);

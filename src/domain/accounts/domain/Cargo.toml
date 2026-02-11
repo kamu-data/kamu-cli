@@ -31,6 +31,7 @@ testing = ["dep:mockall", "odf/testing"]
 database-common = { workspace = true }
 crypto-utils = { workspace = true }
 email-utils = { workspace = true }
+event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
@@ -59,10 +60,12 @@ reusable = "0.1"
 schemars = { version = "1", default-features = false, features = ["derive"] }
 secrecy = "0.10"
 serde = "1"
+serde_json = { version = "1", default-features = false }
+serde_with = { version = "3", default-features = false }
 setty = { version = "0.3", default-features = false }
 strum = { version = "0.27", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
-uuid = { version = "1", default-features = false, features = ["v4"] }
+uuid = { version = "1", default-features = false, features = ["v4", "serde"] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

@@ -34,12 +34,12 @@ impl SessionContextBuilder {
     ) -> Result<SessionContext, InternalError> {
         assert!(
             options.input_datasets.is_some(),
-            "QueryService should resolve all inputs"
+            "SessionContextBuilder should resolve all inputs"
         );
         for opts in options.input_datasets.as_ref().unwrap().values() {
             assert!(
                 opts.hints.handle.is_some(),
-                "QueryService should pre-resolve handles"
+                "SessionContextBuilder should pre-resolve handles"
             );
         }
 
@@ -64,6 +64,13 @@ impl SessionContextBuilder {
         cfg_if::cfg_if! {
             if #[cfg(feature = "query-extensions-json")] {
                 datafusion_functions_json::register_all(&mut ctx).unwrap();
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "query-extensions-nested-functions")] {
+                // Register array functions (and some others)
+                // https://datafusion.apache.org/user-guide/sql/scalar_functions.html#array-functions
+                datafusion::functions_nested::register_all(&mut ctx).unwrap();
             }
         }
 

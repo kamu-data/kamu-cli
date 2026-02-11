@@ -78,6 +78,14 @@ pub trait QueryService: Send + Sync {
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
+
+    /// Projects the CDC ledger into a state snapshot.
+    /// Uses [`odf::utils::data::changelog::project`] function internally.
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,7 +121,7 @@ pub struct QueryOptionsDataset {
     pub block_hash: Option<odf::Multihash>,
     /// Hints that can help the system to minimize metadata scanning. Be extra
     /// careful that your hints don't influence the actual result of the
-    /// query, as they are not inlcuded in the [`QueryState`] and thus can
+    /// query, as they are not included in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
     pub hints: DatasetQueryHints,
 }
@@ -164,12 +172,33 @@ pub struct QueryStateDataset {
     pub block_hash: odf::Multihash,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GetChangelogProjectionOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+
+    /// Hints that can help the system to minimize metadata scanning.
+    pub hints: ChangelogProjectionHints,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ChangelogProjectionHints {
+    /// Optional pre-resolved primary key.
+    pub primary_key: Option<Vec<String>>,
+
+    /// Optional pre-resolved dataset vocabulary.
+    pub dataset_vocabulary: Option<odf::metadata::DatasetVocabulary>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct GetDataResponse {
     /// A [`DataFrameExt`] that can be used to read schema and access the data.
-    /// `None` when dataset schema was not yet defined. Note that the data
+    /// `None` when the dataset schema was not yet defined. Note that the data
     /// frames are "lazy". They are a representation of a logical query
     /// plan. The actual query is executed only when you pull the resulting
     /// data from it.
@@ -218,6 +247,7 @@ pub enum CreateSessionError {
         #[backtrace]
         odf::metadata::AccessError,
     ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -458,6 +488,14 @@ impl From<DatasetActionUnauthorizedError> for QueryError {
             DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("'{dataset_handle}' has no primary keys")]
+pub struct DatasetHasNoPrimaryKeysError {
+    pub dataset_handle: odf::DatasetHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

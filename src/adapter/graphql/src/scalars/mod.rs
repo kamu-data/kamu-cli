@@ -11,7 +11,9 @@ mod access_token;
 mod account;
 mod auth;
 mod base64;
+mod big_int;
 mod collection_path;
+mod collection_path_v2;
 mod data_batch;
 mod data_query;
 mod data_schema;
@@ -43,13 +45,16 @@ mod os_path;
 mod pagination;
 mod task_id;
 mod task_status;
+mod u256;
 mod webhook_scalars;
 
 pub use access_token::*;
 pub use account::*;
 pub use auth::*;
 pub use base64::*;
+pub use big_int::*;
 pub use collection_path::*;
+pub use collection_path_v2::*;
 pub use data_batch::*;
 pub use data_query::*;
 pub use data_schema::{DataSchema, *};
@@ -81,6 +86,7 @@ pub use os_path::*;
 pub use pagination::*;
 pub use task_id::*;
 pub use task_status::*;
+pub use u256::*;
 pub use webhook_scalars::*;
 
 macro_rules! simple_scalar {

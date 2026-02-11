@@ -148,6 +148,7 @@ pub async fn dataset_ingest_handler(
                 is_ingest_from_upload,
                 media_type,
                 expected_head: None,
+                skip_quota_check: false,
             },
             None,
         )
@@ -162,6 +163,9 @@ pub async fn dataset_ingest_handler(
             }
             PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
                 ApiError::bad_request(e)
+            }
+            PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
+                ApiError::new_forbidden()
             }
             e => e.int_err().api_err(),
         })?;

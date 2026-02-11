@@ -39,10 +39,12 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 ] }
 kamu-flow-system = { workspace = true }
 odf = { workspace = true }
+random-strings = { workspace = true }
 regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
 async-graphql = { version = "7", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "52", default-features = false, features = [] }
 indoc = "2"
@@ -53,11 +55,13 @@ pretty_assertions = { version = "1", default-features = false, features = [
 ] }
 reqwest = { version = "0.12", default-features = false }
 serde_json = { version = "1", default-features = false }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 tempfile = { version = "3" }
 tokio = { version = "1", default-features = false, features = [
     "macros",
     "time",
 ] }
+tokio-retry = "0.3"
 url = { version = "2", default-features = false }
 
 

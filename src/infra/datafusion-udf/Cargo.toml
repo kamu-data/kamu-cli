@@ -1,0 +1,38 @@
+[package]
+name = "kamu-datafusion-udf"
+description = "Kamu UDFs for Apache DataFusion"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+kamu-core = { workspace = true }
+odf = { workspace = true, default-features = false }
+
+datafusion = { version = "52", default-features = false }
+tokio = { version = "1", default-features = false, features = ["rt"] }
+
+
+[dev-dependencies]
+odf = { workspace = true, default-features = false, features = ["datafusion", "testing"] }
+
+indoc = { version = "2" }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
