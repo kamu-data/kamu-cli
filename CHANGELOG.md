@@ -11,6 +11,15 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.259.0] - 2026-02-11
+### Changed
+- Synced with SKU branch extensions:
+  - Account storage quotas
+  - Improvements to collection entries and versioned files handling
+  - Webhook trigger recovery job
+  - GQL data loader corrections and access checks
+  - Numerious little extensions and bug fixes
+
 ## [0.258.0] - 2026-02-09
 ### Changed
 - Using new library for application config that:
