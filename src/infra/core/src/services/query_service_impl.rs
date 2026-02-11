@@ -12,10 +12,11 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use cheap_clone::CheapClone;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use futures::TryStreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{
     DatasetAction,
@@ -27,26 +28,32 @@ use kamu_datasets::{
 use odf::utils::data::DataFrameExt;
 
 use crate::SessionContextBuilder;
+use crate::use_cases::helpers;
 use crate::utils::docker_images;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 #[dill::component]
 #[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
     session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn kamu_auth_rebac::RebacDatasetRegistryFacade>,
 }
 
+impl CheapClone for QueryServiceImpl {}
+
+#[common_macros::method_names_consts]
 impl QueryServiceImpl {
-    /// Unless state is already provided in the options this will attempt to
+    /// Unless state is already provided in the options, this will attempt to
     /// parse the SQL, extract the names of all datasets mentioned in the
     /// query and affix their states in the query options to specific blocks.
     #[expect(clippy::single_match)]
     #[tracing::instrument(
         level = "info",
-        name = "QueryServiceImpl::resolve_query_state",
+        name = QueryServiceImpl_resolve_query_state,
         skip_all
     )]
     async fn resolve_query_state(
@@ -60,7 +67,7 @@ impl QueryServiceImpl {
         let mut new_dataset_opts = BTreeMap::new();
         let mut input_dataset_states = BTreeMap::new();
 
-        // If input datasets options are specified we check access and resolve block
+        // If input datasets options are specified, we check access and resolve block
         // hash if not already provided.
         //
         // Otherwise, we infer the datasets from the query itself.
@@ -80,7 +87,7 @@ impl QueryServiceImpl {
             }
 
             // We skip adding inaccessible datasets to state and options and let the query
-            // fail with "not found" error
+            // fail with the "not found" error
             for id in by_access.authorized_ids {
                 let mut opts = input_dataset_opts.get(&id).unwrap().clone();
 
@@ -137,7 +144,7 @@ impl QueryServiceImpl {
 
             // Some queries like `show tables` will not be affixed to a specific set of
             // datasets and for now require populating session context with all datasets
-            // accessible to the user. We will not include such datasets in the state, but
+            // accessible to the user. We will not include such datasets in the state but
             // will propagate them to [`KamuSchema`] via options.
             let mut is_restricted_set = false;
             let mut needs_schema = false;
@@ -190,7 +197,7 @@ impl QueryServiceImpl {
                     .try_collect()
                     .await?;
 
-                // We don't include datasets into the state, but add them to options
+                // We don't include datasets in the state but add them to options
                 for hdl in handles {
                     new_dataset_opts.insert(
                         hdl.id.clone(),
@@ -208,7 +215,7 @@ impl QueryServiceImpl {
                 }
             } else {
                 // Resolve table references into datasets.
-                // We simply ignore unresolvable, letting query to fail at the execution stage.
+                // We simply ignore unresolvable, letting a query fail at the execution stage.
                 for mut table in table_refs {
                     // Strip possible `kamu.kamu.` prefix
                     while table.0.len() > 1
@@ -248,7 +255,7 @@ impl QueryServiceImpl {
                         .is_action_allowed(&hdl.id, DatasetAction::Read)
                         .await?
                     {
-                        // Ignore this alias and let the query fail with "not found" error
+                        // Ignore this alias and let the query fail with the "not found" error
                         tracing::warn!(?dataset_ref, "Restricting access to unauthorized dataset");
                         continue;
                     }
@@ -343,6 +350,43 @@ impl QueryServiceImpl {
             Ok((head, Some(df.into())))
         }
     }
+
+    async fn session_context(
+        &self,
+        options: QueryOptions,
+    ) -> Result<SessionContext, InternalError> {
+        let ctx = self
+            .session_context_builder
+            .session_context(options)
+            .await?;
+
+        let self_clone = (*self).cheap_clone();
+
+        kamu_datafusion_udf::ToTableUdtf::register(&ctx, move |dataset_ref| {
+            // NOTE: In practice, this callback will only be invoked once,
+            //       but since the datafusion::TableFunctionImpl::call(&self) interface
+            //       does not consume self, we cannot use AsyncFnOnce inside
+            //       ToTableUdtf.
+            //
+            //       Therefore, to satisfy the borrow checker, we need to make
+            //       a second clone. Fortunately, this is a cheap operation.
+            let self_clone = self_clone.cheap_clone();
+            async move {
+                let source = helpers::resolve_dataset_for_querying(
+                    self_clone.rebac_dataset_registry_facade.as_ref(),
+                    &dataset_ref,
+                )
+                .await?;
+                let data_response = self_clone
+                    .get_changelog_projection(source, Default::default())
+                    .await?;
+
+                Ok(data_response.df)
+            }
+        });
+
+        Ok(ctx)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -364,7 +408,7 @@ impl QueryService for QueryServiceImpl {
             .try_collect()
             .await?;
 
-        // We don't include datasets into the state, but add them to options
+        // We don't include datasets in the state but add them to options
         let input_datasets = handles
             .into_iter()
             .map(|hdl| {
@@ -385,7 +429,6 @@ impl QueryService for QueryServiceImpl {
             .collect();
 
         let ctx = self
-            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(input_datasets),
             })
@@ -506,7 +549,6 @@ impl QueryService for QueryServiceImpl {
             .collect();
 
         let ctx = self
-            .session_context_builder
             .session_context(QueryOptions {
                 input_datasets: Some(input_datasets),
             })
@@ -550,10 +592,7 @@ impl QueryService for QueryServiceImpl {
         let (state, new_options) = self.resolve_query_state(statement, options).await?;
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
-        let ctx = self
-            .session_context_builder
-            .session_context(new_options)
-            .await?;
+        let ctx = self.session_context(new_options).await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse {
@@ -585,6 +624,113 @@ impl QueryService for QueryServiceImpl {
                 latest_image: docker_images::RISINGWAVE.to_string(),
             },
         ])
+    }
+
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_changelog_projection, skip_all, fields(hdl=%source.get_handle()))]
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let (head, maybe_df) = self
+            .single_dataset(&source, None, options.block_hash)
+            .await?;
+
+        let Some(df) = maybe_df else {
+            // Dataset has no schema yet.
+            return Ok(GetDataResponse {
+                df: None,
+                source,
+                block_hash: head,
+            });
+        };
+
+        enum PrimaryKeyValue {
+            Preresolved(Vec<String>),
+            NeedToScan,
+        }
+        enum DatasetVocabularyValue {
+            Preresolved(odf::metadata::DatasetVocabulary),
+            NeedToScan,
+        }
+
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
+        // TODO: Remove these visitors once schema contains primary keys -->
+        let mut active_polling_source_visitor =
+            odf::dataset::SearchActivePollingSourceVisitor::new(source.get_kind());
+        let mut active_push_sources_visitor =
+            odf::dataset::SearchActivePushSourcesVisitor::new(source.get_kind());
+        // <--
+
+        let mut visitors =
+            Vec::<&mut dyn odf::dataset::MetadataChainVisitor<Error = _>>::with_capacity(3);
+
+        let primary_key_value = if let Some(value) = options.hints.primary_key {
+            PrimaryKeyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut active_polling_source_visitor);
+            visitors.push(&mut active_push_sources_visitor);
+            PrimaryKeyValue::NeedToScan
+        };
+        let dataset_vocabulary_value = if let Some(value) = options.hints.dataset_vocabulary {
+            DatasetVocabularyValue::Preresolved(value)
+        } else {
+            visitors.push(&mut set_vocab_visitor);
+            DatasetVocabularyValue::NeedToScan
+        };
+
+        use odf::dataset::MetadataChainExt;
+
+        source
+            .as_metadata_chain()
+            .accept_by_interval(&mut visitors, Some(&head), None)
+            .await
+            .int_err()?;
+
+        let primary_key = match primary_key_value {
+            PrimaryKeyValue::Preresolved(value) => value,
+            PrimaryKeyValue::NeedToScan => {
+                // TODO: Revisit once schema contains primary keys
+                let merge_strategy = if let Some(event) = active_polling_source_visitor.into_event()
+                {
+                    // Use the active polling source if any.
+                    Some(event.merge)
+                } else if let Some(event) = active_push_sources_visitor.into_events().pop() {
+                    // Use the (!) last active push source, if any.
+                    // It's OK until the schema starts containing primary keys.
+                    Some(event.merge)
+                } else {
+                    None
+                };
+
+                let Some(primary_key) =
+                    merge_strategy.and_then(odf::metadata::MergeStrategy::primary_key)
+                else {
+                    return Err(DatasetHasNoPrimaryKeysError {
+                        dataset_handle: source.take_handle(),
+                    }
+                    .int_err()
+                    .into());
+                };
+
+                primary_key
+            }
+        };
+        let dataset_vocabulary = match dataset_vocabulary_value {
+            DatasetVocabularyValue::Preresolved(value) => value,
+            DatasetVocabularyValue::NeedToScan => {
+                set_vocab_visitor.into_event().unwrap_or_default().into()
+            }
+        };
+
+        let projection_df =
+            odf::utils::data::changelog::project(df, &primary_key, &dataset_vocabulary)?;
+
+        Ok(GetDataResponse {
+            df: Some(projection_df),
+            source,
+            block_hash: head,
+        })
     }
 }
 

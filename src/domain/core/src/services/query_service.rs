@@ -78,6 +78,14 @@ pub trait QueryService: Send + Sync {
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
+
+    /// Projects the CDC ledger into a state snapshot.
+    /// Uses [`odf::utils::data::changelog::project`] function internally.
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,6 +170,27 @@ pub struct QueryStateDataset {
     /// Last block hash that was considered during the
     /// query planning
     pub block_hash: odf::Multihash,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GetChangelogProjectionOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+
+    /// Hints that can help the system to minimize metadata scanning.
+    pub hints: ChangelogProjectionHints,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ChangelogProjectionHints {
+    /// Optional pre-resolved primary key.
+    pub primary_key: Option<Vec<String>>,
+
+    /// Optional pre-resolved dataset vocabulary.
+    pub dataset_vocabulary: Option<odf::metadata::DatasetVocabulary>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

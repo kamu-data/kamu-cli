@@ -13,7 +13,6 @@ use std::path::Path;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_services::QuotaDefaultsConfig;
 use setty::types::DurationString;
 use url::Url;
 
@@ -78,13 +77,13 @@ pub struct CLIConfig {
     #[config(default)]
     pub did_encryption: DidSecretEncryptionConfig,
 
-    /// Experimental and temporary configuration options
-    #[config(default)]
-    pub extra: ExtraConfig,
-
     /// Default quotas configured by type
     #[config(default)]
     pub quota_defaults: QuotaDefaults,
+
+    /// Experimental and temporary configuration options
+    #[config(default)]
+    pub extra: ExtraConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,25 +100,10 @@ pub struct ExtraConfig {
 // Quota defaults
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(setty::Config)]
+#[derive(setty::Config, setty::Default)]
 pub struct QuotaDefaults {
-    pub storage: Option<u64>,
-}
-
-impl Default for QuotaDefaults {
-    fn default() -> Self {
-        let defaults = QuotaDefaultsConfig::default();
-
-        Self {
-            storage: Some(defaults.storage),
-        }
-    }
-}
-
-impl QuotaDefaults {
-    pub fn sample() -> Self {
-        Self::default()
-    }
+    #[config(default = kamu_datasets_services::DEFAULT_STORAGE_QUOTA_BYTES)]
+    pub storage: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

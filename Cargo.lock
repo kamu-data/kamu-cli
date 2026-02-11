@@ -6836,6 +6836,7 @@ dependencies = [
  "bon",
  "bytes",
  "cfg-if",
+ "cheap-clone",
  "chrono",
  "common-macros",
  "container-runtime",
@@ -6869,6 +6870,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-services",
  "kamu-core",
+ "kamu-datafusion-udf",
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
@@ -6935,6 +6937,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "serde_with",
  "setty",
  "sqlx",
  "strum",
@@ -8059,6 +8062,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-datafusion-udf"
+version = "0.258.0"
+dependencies = [
+ "datafusion",
+ "indoc 2.0.7",
+ "kamu-core",
+ "opendatafabric",
+ "pretty_assertions",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-datasets"
 version = "0.258.0"
 dependencies = [
@@ -8069,6 +8085,7 @@ dependencies = [
  "chrono",
  "crypto-utils",
  "database-common",
+ "derive_more",
  "dill",
  "file-utils",
  "format-utils",
@@ -8204,6 +8221,7 @@ dependencies = [
  "paste",
  "petgraph 0.8.3",
  "pretty_assertions",
+ "rstest",
  "s3-utils",
  "secrecy",
  "serde",
@@ -9685,9 +9703,9 @@ dependencies = [
 
 [[package]]
 name = "nonempty"
-version = "0.10.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "303e8749c804ccd6ca3b428de7fe0d86cb86bc7606bc15291f100fd487960bb8"
+checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
 
 [[package]]
 name = "nu-ansi-term"
@@ -11741,6 +11759,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "replace_with"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11965,6 +11989,32 @@ dependencies = [
  "num-traits",
  "serde",
  "smallvec",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.114",
+ "unicode-ident",
 ]
 
 [[package]]

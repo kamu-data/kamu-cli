@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use kamu_adapter_graphql::scalars::{BigInt, ExtraData, U256};
+use kamu_adapter_graphql::scalars::{BigInt, CollectionPathV2, ExtraData, U256};
 use kamu_adapter_graphql::traits::ResponseExt;
 use pretty_assertions::assert_eq;
 
@@ -336,6 +336,83 @@ async fn test_u256() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_collection_path_v_2() {
+    fn request(variables_as_value: Value) -> Request {
+        Request::new(indoc::indoc!(
+            r#"
+            query ($value: CollectionPathV2!) {
+              collectionPathV2(value: $value)
+            }
+            "#
+        ))
+        .variables(Variables::from_value(variables_as_value))
+    }
+
+    let schema = schema();
+
+    {
+        let res = schema
+            .execute(request(value!({
+                "value": "/path/to/file"
+            })))
+            .await;
+        assert_eq!(
+            value!({
+                "collectionPathV2": "/path/to/file"
+            }),
+            res.data,
+            "{res:?}"
+        );
+    }
+    {
+        // Optional leading /
+        let res = schema
+            .execute(request(value!({
+                "value": "path/to/file"
+            })))
+            .await;
+        assert_eq!(
+            value!({
+                "collectionPathV2": "/path/to/file"
+            }),
+            res.data,
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
+                "value": "%2Fpath%2Fto%2Ffile"
+            })))
+            .await;
+        assert_eq!(
+            value!({
+                "collectionPathV2": "/%2Fpath%2Fto%2Ffile"
+            }),
+            res.data,
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
+                "value": "/path/to/file with spaces"
+            })))
+            .await;
+        assert_eq!(
+            [
+                "Failed to parse \"CollectionPathV2\": Invalid path `/path/to/file with spaces` - \
+                 path must be in the form `/<url-encoded-segment>/<url-encoded-segment>/...`"
+            ],
+            *res.error_messages(),
+            "{res:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct TestScalarQuery;
 
 #[Object]
@@ -349,6 +426,13 @@ impl TestScalarQuery {
     }
 
     async fn u256(&self, value: U256) -> U256 {
+        value
+    }
+
+    async fn collection_path_v_2(
+        &self,
+        value: CollectionPathV2<'static>,
+    ) -> CollectionPathV2<'static> {
         value
     }
 }

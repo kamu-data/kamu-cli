@@ -51,6 +51,20 @@ impl GraphQLQueryRequest {
         .await
     }
 
+    #[expect(unused)]
+    pub(crate) async fn execute_without_data_loaders<Query, Mutation, Subscription>(
+        self,
+        schema: &async_graphql::Schema<Query, Mutation, Subscription>,
+        catalog: &dill::Catalog,
+    ) -> async_graphql::Response
+    where
+        Query: async_graphql::ObjectType + 'static,
+        Mutation: async_graphql::ObjectType + 'static,
+        Subscription: async_graphql::SubscriptionType + 'static,
+    {
+        self.execute_ext(schema, catalog, |r| r).await
+    }
+
     pub(crate) async fn execute_ext<Query, Mutation, Subscription, F>(
         self,
         schema: &async_graphql::Schema<Query, Mutation, Subscription>,

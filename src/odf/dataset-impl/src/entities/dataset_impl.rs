@@ -180,10 +180,10 @@ where
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
-    async fn commit_event(
+    async fn commit_event<'a>(
         &self,
         event: MetadataEvent,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError> {
         // Validate referential consistency
         if opts.check_object_refs
@@ -271,12 +271,12 @@ where
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_add_data(
+    async fn commit_add_data<'a>(
         &self,
         params: AddDataParams,
         data_file: Option<OwnedFile>,
         checkpoint: Option<CheckpointRef>,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(
@@ -320,12 +320,12 @@ where
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_execute_transform(
+    async fn commit_execute_transform<'a>(
         &self,
         execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
         checkpoint: Option<CheckpointRef>,
-        opts: CommitOpts<'_>,
+        opts: CommitOpts<'a>,
     ) -> Result<CommitResult, CommitError> {
         let event = self
             .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint.as_ref())
@@ -349,11 +349,11 @@ where
         .await
     }
 
-    async fn prepare_execute_transform(
+    async fn prepare_execute_transform<'a>(
         &self,
         params: ExecuteTransformParams,
-        data_file: Option<&OwnedFile>,
-        checkpoint: Option<&CheckpointRef>,
+        data_file: Option<&'a OwnedFile>,
+        checkpoint: Option<&'a CheckpointRef>,
     ) -> Result<ExecuteTransform, InternalError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(params.new_offset_interval, data_file, checkpoint)

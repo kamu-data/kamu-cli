@@ -928,7 +928,7 @@ pub fn register_config_in_catalog(
 
     // Quotas limits configuration
     catalog_builder.add_value(QuotaDefaultsConfig {
-        storage: config.quota_defaults.storage.unwrap_or_default(),
+        storage: config.quota_defaults.storage,
     });
     //
 

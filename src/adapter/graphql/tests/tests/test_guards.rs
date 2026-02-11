@@ -15,7 +15,7 @@ use pretty_assertions::assert_eq;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn logged_in_guard_logged() {
+async fn test_logged_in_guard_logged() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(CurrentAccountSubject::new_test())
         .build();
@@ -68,7 +68,7 @@ async fn logged_in_guard_logged() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn logged_in_guard_anonymous() {
+async fn test_logged_in_guard_anonymous() {
     let catalog = dill::CatalogBuilder::new()
         .add_value(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
@@ -153,6 +153,65 @@ async fn logged_in_guard_anonymous() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: Uncomment when a new feature will be added
+/*
+#[tokio::test]
+async fn test_feature_enabled_guard_with_feature_enabled() {
+    let catalog = dill::CatalogBuilder::new()
+        .add_value(GqlFeatureFlags::new().with_feature(GqlFeature::MoleculeApiV1))
+        .build();
+
+    let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription).finish();
+
+    assert_eq!(
+        GraphQLQueryRequest::from(indoc!(
+            r#"
+            query {
+              moleculeV1,
+            }
+            "#
+        ))
+        .execute_without_data_loaders(&schema, &catalog)
+        .await
+        .data,
+        value!({
+            "moleculeV1": "temporary works",
+        })
+    );
+}
+*/
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: Uncomment when a new feature will be added
+/*
+#[tokio::test]
+async fn test_feature_enabled_guard_with_feature_disabled() {
+    let catalog = dill::CatalogBuilder::new()
+        .add_value(GqlFeatureFlags::new())
+        .build();
+
+    let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription).finish();
+
+    assert_eq!(
+        *GraphQLQueryRequest::from(indoc!(
+            r#"
+            query {
+              moleculeV1,
+            }
+            "#
+        ))
+        .expect_error()
+        .execute_without_data_loaders(&schema, &catalog)
+        .await
+        .error_messages(),
+        ["Feature 'molecule_api_v1' is disabled"]
+    );
+}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

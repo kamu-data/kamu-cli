@@ -1214,11 +1214,9 @@
       "type": "object",
       "properties": {
         "storage": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": "integer",
           "format": "uint64",
+          "default": 1000000000,
           "minimum": 0
         }
       },
