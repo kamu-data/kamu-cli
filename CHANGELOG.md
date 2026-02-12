@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.259.1] - 2026-02-12
+### Fixed
+- Sync odf schema to accept odf format
+
 ## [0.259.0] - 2026-02-11
 ### Changed
 - Synced with SKU branch extensions:
