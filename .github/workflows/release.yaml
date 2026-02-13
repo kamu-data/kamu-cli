@@ -63,7 +63,7 @@ jobs:
       # This will be replaced with `cross` for cross-compilation targets
       CARGO: cargo
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
@@ -103,7 +103,7 @@ jobs:
             target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}${{ matrix.binary-ext }} \
             target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
@@ -114,7 +114,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Sets the header for the release description
       - run: echo "" > RELEASE_HEAD.md
@@ -164,7 +164,7 @@ jobs:
     needs: [ create_release ]
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}

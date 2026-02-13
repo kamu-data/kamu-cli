@@ -17,7 +17,7 @@ jobs:
     name: Build Images With Data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Checkout the same commit that the release was built for
           ref: ${{ inputs.release_sha }}
