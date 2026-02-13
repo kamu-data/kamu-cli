@@ -58,7 +58,6 @@ jobs:
         with:
           repository: open-data-fabric/open-data-fabric
           path: open-data-fabric
-          ref: hotfix/dataset-access-check
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt
