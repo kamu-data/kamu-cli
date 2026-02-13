@@ -28,10 +28,14 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 
+        println!("!!!!!!!!!!!!");
+
         let maybe_handle = dataset_handle_data_loader
             .load_one(dataset_ref.clone())
             .await
             .map_err(data_loader_error_mapper)?;
+
+        println!("???? {maybe_handle:#?}");
 
         if let Some(handle) = maybe_handle {
             let account = Account::from_dataset_alias(ctx, &handle.alias)

@@ -124,11 +124,15 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     ) -> Result<HashMap<odf::DatasetRef, Self::Value>, Self::Error> {
         let dataset_refs: Vec<&odf::DatasetRef> = keys.iter().collect();
 
+        println!("{dataset_refs:#?}");
+
         let resolution = self
             .rebac_dataset_registry_facade
             .classify_dataset_refs_by_allowance(&dataset_refs, DatasetAction::Read)
             .await
             .int_err()?;
+
+        println!(">>> {:#?}", resolution.accessible_resolved_refs);
 
         Ok(resolution.accessible_resolved_refs.into_iter().collect())
     }
