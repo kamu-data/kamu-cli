@@ -61,7 +61,8 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Resolve target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
-            .resolve_alias_target(dataset_alias, subject)?;
+            .resolve_alias_target(dataset_alias, subject)
+            .await?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper

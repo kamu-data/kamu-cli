@@ -122,6 +122,9 @@ members = [
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
+    # SKU modules
+    "src/sku/molecule/domain",
+    "src/sku/molecule/services",
     # Apps
     "src/app/cli",
     # E2E
@@ -274,6 +277,10 @@ kamu-adapter-graphql = { version = "0.259.1", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.259.1", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.259.1", path = "src/adapter/odata", default-features = false }
 kamu-adapter-oauth = { version = "0.259.1", path = "src/adapter/oauth", default-features = false }
+
+# SKU modules
+kamu-molecule-domain = { version = "0.259.1", path = "src/sku/molecule/domain", default-features = false }
+kamu-molecule-services = { version = "0.259.1", path = "src/sku/molecule/services", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.259.1", path = "src/e2e/app/cli/common", default-features = false }
