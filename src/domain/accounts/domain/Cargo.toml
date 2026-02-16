@@ -62,7 +62,7 @@ secrecy = "0.10"
 serde = "1"
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
-setty = { version = "0.3", default-features = false }
+setty = { version = "1.0", default-features = false }
 strum = { version = "0.27", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 uuid = { version = "1", default-features = false, features = ["v4", "serde"] }

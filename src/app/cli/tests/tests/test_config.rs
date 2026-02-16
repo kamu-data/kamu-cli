@@ -282,8 +282,7 @@ fn test_config_merging_of_engine_options() {
 #[test]
 fn update_config_schema() {
     let fig = setty::Config::<CLIConfig>::new();
-    let schema = fig.json_schema();
-    let schema = serde_json::to_string_pretty(&schema).unwrap();
+    let schema = fig.json_schema().to_string_pretty();
 
     let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("../../../resources/config-schema.json");

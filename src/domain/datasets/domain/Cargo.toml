@@ -56,7 +56,7 @@ nonempty = { version = "0.12", default-features = false }
 secrecy = "0.10"
 serde = "1"
 serde_json = { version = "1", default-features = false }
-setty = { version = "0.3", default-features = false }
+setty = { version = "1.0", default-features = false }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
