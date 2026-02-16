@@ -10,9 +10,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use internal_error::*;
 use kamu_search::*;
+use time_source::SystemTimeSource;
 use tokio::sync::OnceCell;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,6 +21,7 @@ pub struct EmbeddingsProviderImpl {
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
     embeddings_cache_repo: Arc<dyn EmbeddingsCacheRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
     cached_model: OnceCell<EmbeddingModelRow>,
 }
 
@@ -34,11 +35,13 @@ impl EmbeddingsProviderImpl {
         embeddings_chunker: Arc<dyn EmbeddingsChunker>,
         embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
         embeddings_cache_repo: Arc<dyn EmbeddingsCacheRepository>,
+        time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             embeddings_chunker,
             embeddings_encoder,
             embeddings_cache_repo,
+            time_source,
             cached_model: OnceCell::new(),
         }
     }
@@ -145,11 +148,17 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         tracing::debug!(chunk_count = chunks.len(), "Content chunking completed");
 
-        // 3) Normalize chunks
+        // 3) Normalize chunks and filter out empty ones
         let normalized_chunks: Vec<String> = chunks
             .iter()
             .map(|s| Self::normalize_input_chunk(s))
+            .filter(|s| !s.is_empty())
             .collect();
+
+        if normalized_chunks.is_empty() {
+            tracing::warn!("No non-empty chunks after normalization");
+            return Ok(vec![]);
+        }
 
         tracing::debug!(
             normalized_chunk_count = normalized_chunks.len(),
@@ -232,7 +241,7 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         // 8) Touch stats
         self.embeddings_cache_repo
-            .touch_embeddings(&cache_keys, Utc::now())
+            .touch_embeddings(&cache_keys, self.time_source.now())
             .await
             .int_err()?;
 
@@ -320,7 +329,7 @@ impl EmbeddingsProvider for EmbeddingsProviderImpl {
 
         // 6) Touch stats
         self.embeddings_cache_repo
-            .touch_embeddings(&[cache_key], Utc::now())
+            .touch_embeddings(&[cache_key], self.time_source.now())
             .await
             .int_err()?;
 

@@ -8588,9 +8588,14 @@ dependencies = [
  "async-trait",
  "cheap-clone",
  "chrono",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
+ "kamu-search-cache-repo-tests",
+ "test-group",
+ "test-log",
+ "tokio",
 ]
 
 [[package]]
@@ -8601,11 +8606,25 @@ dependencies = [
  "chrono",
  "common-macros",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
+ "kamu-search-cache-repo-tests",
  "sqlx",
+ "test-group",
+ "test-log",
  "tracing",
+]
+
+[[package]]
+name = "kamu-search-cache-repo-tests"
+version = "0.259.1"
+dependencies = [
+ "chrono",
+ "dill",
+ "kamu-search",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -8616,10 +8635,14 @@ dependencies = [
  "chrono",
  "common-macros",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-search",
+ "kamu-search-cache-repo-tests",
  "sqlx",
+ "test-group",
+ "test-log",
  "tracing",
 ]
 
@@ -8691,10 +8714,13 @@ dependencies = [
  "itertools 0.14.0",
  "kamu-core",
  "kamu-search",
+ "kamu-search-cache-inmem",
  "opendatafabric",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]

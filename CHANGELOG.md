@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Test coverage for search embeddings cache: repository and service layer
+
 ## [0.259.1] - 2026-02-12
 ### Fixed
 - Sync odf schema to accept odf format
