@@ -5902,6 +5902,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "html-escape"
+version = "0.2.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
+dependencies = [
+ "utf8-width",
+]
+
+[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8965,9 +8974,9 @@ dependencies = [
 
 [[package]]
 name = "keccak"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
 dependencies = [
  "cpufeatures",
 ]
@@ -12678,12 +12687,13 @@ dependencies = [
 
 [[package]]
 name = "setty"
-version = "0.3.6"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ac5689bf73516d19f0df92d4400b1541176dd94c3007dfba29207f228324264"
+checksum = "6ff103a2abf8f2e2515395ad65608eced6baae765e28699783e5896b5b91ee4d"
 dependencies = [
  "chrono",
  "duration-string",
+ "html-escape",
  "schemars 1.2.1",
  "serde",
  "serde_json",
@@ -12696,9 +12706,9 @@ dependencies = [
 
 [[package]]
 name = "setty-derive"
-version = "0.3.6"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc0585b73a2f2586fce9254a8b2bab8334f390d7661e9b97ef72e067b72a04aa"
+checksum = "b8e584b5ae9e130e5cac0ddbc8c8032558db1f691631b2384e1d3baf29b522eb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -14485,6 +14495,12 @@ name = "utf8-decode"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca61eb27fa339aa08826a29f03e87b99b4d8f0fc2255306fd266bb1b6a9de498"
+
+[[package]]
+name = "utf8-width"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1292c0d970b54115d14f2492fe0170adf21d68a1de108eebc51c1df4f346a091"
 
 [[package]]
 name = "utf8_iter"

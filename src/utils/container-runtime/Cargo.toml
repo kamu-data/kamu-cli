@@ -42,7 +42,7 @@ tokio = { version = "1", default-features = false, features = [
     "process",
     "parking_lot",
 ] }
-setty = { version = "0.3", default-features = false }
+setty = { version = "1.0", default-features = false }
 tracing = "0.1"
 url = "2"
 
