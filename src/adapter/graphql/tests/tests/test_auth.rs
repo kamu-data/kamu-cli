@@ -58,7 +58,7 @@ async fn test_enabled_login_providers() {
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
         .expect_supported_login_methods()
-        .return_once(|| vec![AccountProvider::OAuthGitHub.into()]);
+        .return_once(|| vec![AccountProvider::OAuthGitHub.to_string()]);
 
     let harness = AuthGQLHarness::new(mock_authentication_service);
     let schema = kamu_adapter_graphql::schema_quiet();

@@ -9,6 +9,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum TenancyConfig {
     #[default]
@@ -25,6 +27,38 @@ impl TenancyConfig {
         match *self {
             TenancyConfig::MultiTenant => odf::DatasetAlias::new(Some(owner_name), dataset_name),
             TenancyConfig::SingleTenant => odf::DatasetAlias::new(None, dataset_name),
+        }
+    }
+
+    pub fn canonical_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
+        match *self {
+            TenancyConfig::MultiTenant => {
+                if alias.account_name.is_none() {
+                    panic!("Multi-tenant tenancy requires dataset alias to have an account name")
+                }
+                alias.clone()
+            }
+            TenancyConfig::SingleTenant => {
+                match alias.account_name.as_ref() {
+                    None => {}
+                    Some(name) if name.as_str() == DEFAULT_ACCOUNT_NAME_STR => {}
+                    Some(_) => panic!(
+                        "Single-tenant tenancy requires dataset alias to not have an account name"
+                    ),
+                }
+                odf::DatasetAlias::new(None, alias.dataset_name.clone())
+            }
+        }
+    }
+
+    pub fn canonical_ref(&self, dataset_ref: &odf::DatasetRef) -> odf::DatasetRef {
+        match dataset_ref {
+            odf::DatasetRef::ID(id) => id.as_local_ref(),
+            odf::DatasetRef::Alias(alias) => self.canonical_alias(alias).into_local_ref(),
+            odf::DatasetRef::Handle(hdl) => {
+                odf::DatasetHandle::new(hdl.id.clone(), self.canonical_alias(&hdl.alias), hdl.kind)
+                    .into_local_ref()
+            }
         }
     }
 
