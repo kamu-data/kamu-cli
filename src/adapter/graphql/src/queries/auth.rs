@@ -35,7 +35,7 @@ impl Auth {
         let providers = authentication_service
             .supported_login_methods()
             .into_iter()
-            .map(kamu_accounts::AccountProvider::from_str)
+            .map(|s| kamu_accounts::AccountProvider::from_str(s.as_str()))
             .map(|res| res.map(Into::into))
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;

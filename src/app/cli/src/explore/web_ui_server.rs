@@ -26,7 +26,6 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
-use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
@@ -102,7 +101,7 @@ impl WebUIServer {
         };
 
         let login_instructions = WebUILoginInstructions {
-            login_method: AccountProvider::Password.to_string(),
+            login_method: AccountProvider::Password.to_string().to_uppercase(),
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
@@ -219,7 +218,6 @@ impl WebUIServer {
             .layer(axum::extract::Extension(web_ui_catalog))
             .layer(axum::extract::Extension(web_ui_runtime_configuration))
             .layer(axum::extract::Extension(ui_configuration))
-            .fallback(unknown_fallback_handler)
             .split_for_parts();
 
         let server_future = Box::pin(

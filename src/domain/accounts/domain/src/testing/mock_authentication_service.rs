@@ -36,7 +36,7 @@ mockall::mock! {
     pub AuthenticationService {}
     #[async_trait::async_trait]
     impl AuthenticationService for AuthenticationService {
-        fn supported_login_methods(&self) -> Vec<&'static str>;
+        fn supported_login_methods(&self) -> Vec<String>;
 
         async fn login(
             &self,

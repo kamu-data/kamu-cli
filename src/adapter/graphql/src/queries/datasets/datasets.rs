@@ -28,8 +28,11 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let dataset_handle_data_loader = utils::get_dataset_handle_data_loader(ctx);
 
+        let tenancy_config = from_catalog_n!(ctx, kamu_core::TenancyConfig);
+        let canonical_dataset_ref = tenancy_config.canonical_ref(dataset_ref);
+
         let maybe_handle = dataset_handle_data_loader
-            .load_one(dataset_ref.clone())
+            .load_one(canonical_dataset_ref)
             .await
             .map_err(data_loader_error_mapper)?;
 
