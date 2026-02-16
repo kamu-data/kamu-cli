@@ -33,9 +33,10 @@ impl TenancyConfig {
     pub fn canonical_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
         match *self {
             TenancyConfig::MultiTenant => {
-                if alias.account_name.is_none() {
-                    panic!("Multi-tenant tenancy requires dataset alias to have an account name")
-                }
+                assert!(
+                    alias.account_name.is_some(),
+                    "Multi-tenant tenancy requires dataset alias to have an account name"
+                );
                 alias.clone()
             }
             TenancyConfig::SingleTenant => {
