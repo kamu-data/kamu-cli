@@ -8714,10 +8714,13 @@ dependencies = [
  "itertools 0.14.0",
  "kamu-core",
  "kamu-search",
+ "kamu-search-cache-inmem",
  "opendatafabric",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "test-log",
+ "time-source",
  "tokio",
  "tracing",
 ]
