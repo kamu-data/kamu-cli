@@ -26,6 +26,7 @@ kamu-search = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
+sha2 = "0.10"
 
 
 [dev-dependencies]

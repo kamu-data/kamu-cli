@@ -21,6 +21,48 @@ database_transactional_test!(
     harness = PostgresEmbeddingsCacheRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_embeddings_batch_empty,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_and_retrieve,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_partial_hits,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_idempotent,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_multi_model_isolation,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_touch_embeddings,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_search_cache_repo_tests::test_evict_older_than,
+    harness = PostgresEmbeddingsCacheRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PostgresEmbeddingsCacheRepositoryHarness {

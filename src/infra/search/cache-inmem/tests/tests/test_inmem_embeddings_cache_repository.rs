@@ -19,6 +19,48 @@ database_transactional_test!(
     harness = InMemoryEmbeddingsCacheRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_embeddings_batch_empty,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_and_retrieve,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_partial_hits,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_idempotent,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_multi_model_isolation,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_touch_embeddings,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_search_cache_repo_tests::test_evict_older_than,
+    harness = InMemoryEmbeddingsCacheRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct InMemoryEmbeddingsCacheRepositoryHarness {

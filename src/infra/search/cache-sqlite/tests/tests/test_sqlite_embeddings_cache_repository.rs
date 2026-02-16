@@ -21,6 +21,48 @@ database_transactional_test!(
     harness = SqliteEmbeddingsCacheRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_embeddings_batch_empty,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_and_retrieve,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_retrieve_partial_hits,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_bulk_upsert_idempotent,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_multi_model_isolation,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_touch_embeddings,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_search_cache_repo_tests::test_evict_older_than,
+    harness = SqliteEmbeddingsCacheRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct SqliteEmbeddingsCacheRepositoryHarness {
