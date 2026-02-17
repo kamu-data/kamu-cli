@@ -722,6 +722,8 @@ type CollectionMut {
 
 scalar CollectionPath
 
+scalar CollectionPathV2
+
 type CollectionProjection {
 	"""
 	Returns an entry at the specified path
@@ -893,6 +895,30 @@ type CreateAccountSuccess implements CreateAccountResult {
 	message: String!
 }
 
+type CreateAnnouncementErrorInvalidAttachment implements CreateAnnouncementResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
+type CreateAnnouncementErrorQuotaExceeded implements CreateAnnouncementResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
+interface CreateAnnouncementResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateAnnouncementSuccess implements CreateAnnouncementResult {
+	"""
+	ID of the newly-created announcement
+	"""
+	announcementId: String!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface CreateDatasetFromSnapshotResult {
 	isSuccess: Boolean!
 	message: String!
@@ -923,6 +949,23 @@ type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDat
 
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	dataset: Dataset!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectErrorConflict implements CreateProjectResult {
+	project: MoleculeProjectV2!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface CreateProjectResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectSuccess implements CreateProjectResult {
+	project: MoleculeProjectV2!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -3126,6 +3169,553 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 	message: String!
 }
 
+type Molecule {
+	"""
+	2-nd Molecule API version (query).
+	"""
+	v2: MoleculeV2!
+}
+
+input MoleculeAccessLevelRuleInput {
+	ipnftUid: String!
+	accessLevels: [String!]!
+}
+
+type MoleculeActivityAnnouncementV2 {
+	announcement: MoleculeAnnouncementEntry!
+}
+
+union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityAnnouncementV2
+
+type MoleculeActivityEventV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeActivityEventV2!]!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeActivityEventV2Edge!]!
+}
+
+type MoleculeActivityEventV2Edge {
+	node: MoleculeActivityEventV2!
+}
+
+type MoleculeActivityFileAddedV2 {
+	entry: MoleculeDataRoomEntry!
+}
+
+type MoleculeActivityFileRemovedV2 {
+	entry: MoleculeDataRoomEntry!
+}
+
+type MoleculeActivityFileUpdatedV2 {
+	entry: MoleculeDataRoomEntry!
+}
+
+enum MoleculeActivityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
+type MoleculeAnnouncementEntry {
+	project: MoleculeProjectV2!
+	systemTime: DateTime!
+	eventTime: DateTime!
+	id: String!
+	headline: String!
+	body: String!
+	attachments: [MoleculeDataRoomEntry!]!
+	accessLevel: String!
+	changeBy: String!
+	categories: [String!]!
+	tags: [String!]!
+}
+
+type MoleculeAnnouncementEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeAnnouncementEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeAnnouncementEntryEdge!]!
+}
+
+type MoleculeAnnouncementEntryEdge {
+	node: MoleculeAnnouncementEntry!
+}
+
+type MoleculeAnnouncements {
+	"""
+	Access the underlying core Dataset
+	"""
+	dataset: Dataset!
+	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFilters): MoleculeAnnouncementEntryConnection!
+	byId(id: String!): MoleculeAnnouncementEntry
+}
+
+type MoleculeAnnouncementsDatasetMutV2 {
+	"""
+	Creates an announcement record for the project.
+	"""
+	create(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [DatasetID!],		accessLevel: String!,		changeBy: String!,		categories: [String!]!,		tags: [String!]!
+	): CreateAnnouncementResult!
+}
+
+input MoleculeAnnouncementsFilters {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
+}
+
+type MoleculeDataRoom {
+	"""
+	Access the underlying core Dataset
+	"""
+	dataset: Dataset!
+	latest: MoleculeDataRoomProjection!
+	asOf(blockHash: Multihash!): MoleculeDataRoomProjection!
+}
+
+input MoleculeDataRoomEntriesFilters {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
+}
+
+type MoleculeDataRoomEntry {
+	"""
+	Backlink to the project
+	"""
+	project: MoleculeProjectV2!
+	"""
+	Access the linked core Dataset
+	"""
+	asDataset: Dataset
+	systemTime: DateTime!
+	eventTime: DateTime!
+	path: CollectionPathV2!
+	ref: DatasetID!
+	changeBy: String!
+	accessLevel: String!
+	asVersionedFile: MoleculeVersionedFile!
+}
+
+type MoleculeDataRoomEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeDataRoomEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeDataRoomEntryEdge!]!
+}
+
+type MoleculeDataRoomEntryEdge {
+	node: MoleculeDataRoomEntry!
+}
+
+interface MoleculeDataRoomFinishUploadFileResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomFinishUploadFileResultSuccess implements MoleculeDataRoomFinishUploadFileResult {
+	entry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface MoleculeDataRoomMoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomMutV2 {
+	"""
+	Allows creating a file, upload a new version, and link a file into the
+	data room via a single transaction. Uploads a new version of content
+	in-band, so should be used only for very small files.
+	"""
+	uploadFile(
+		"""
+		Base64-encoded file content (url-safe, no padding)
+		"""
+		content: Base64Usnp!,		ref: DatasetID,		path: CollectionPathV2,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String,		encryptionMetadata: MoleculeEncryptionMetadataInput
+	): MoleculeDataRoomFinishUploadFileResult!
+	"""
+	Starts the process of uploading a file to the data room.
+	"""
+	startUploadFile(
+		"""
+		Size of the file being uploaded
+		"""
+		contentLength: Int!,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String
+	): StartUploadVersionResult!
+	"""
+	Allows creating a file, upload a new version, and link a file into the
+	data room via a single transaction.
+	"""
+	finishUploadFile(uploadToken: String!, ref: DatasetID, path: CollectionPathV2, accessLevel: String!, changeBy: String!, description: String, categories: [String!], tags: [String!], contentText: String, encryptionMetadata: MoleculeEncryptionMetadataInput): MoleculeDataRoomFinishUploadFileResult!
+	"""
+	Moves an entry in the data room.
+	"""
+	moveEntry(fromPath: CollectionPathV2!, toPath: CollectionPathV2!, changeBy: String!, expectedHead: Multihash): MoleculeDataRoomMoveEntryResult!
+	"""
+	Removes an entry from the data room.
+	"""
+	removeEntry(path: CollectionPathV2!, changeBy: String!, expectedHead: Multihash): MoleculeDataRoomRemoveEntryResult!
+	"""
+	Updates the metadata of a file in the data room.
+	"""
+	updateFileMetadata(		ref: DatasetID!,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String
+	): MoleculeDataRoomUpdateFileMetadataResult!
+}
+
+type MoleculeDataRoomPathOccupied implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult {
+	byEntry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomProjection {
+	entries(pathPrefix: CollectionPathV2, maxDepth: Int, page: Int, perPage: Int, filters: MoleculeDataRoomEntriesFilters): MoleculeDataRoomEntryConnection!
+	entry(path: CollectionPathV2!): MoleculeDataRoomEntry
+}
+
+interface MoleculeDataRoomRemoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateEntryByPathNotFound implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	path: CollectionPathV2!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateEntryByRefNotFound implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface MoleculeDataRoomUpdateFileMetadataResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateFileMetadataResultFileNotFound implements MoleculeDataRoomUpdateFileMetadataResult {
+	ref: DatasetID!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateFileMetadataResultSuccess implements MoleculeDataRoomUpdateFileMetadataResult {
+	entry: MoleculeDataRoomEntry!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateSuccess implements MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult {
+	oldHead: Multihash!
+	newHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type MoleculeEncryptionMetadata {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
+}
+
+input MoleculeEncryptionMetadataInput {
+	dataToEncryptHash: String!
+	accessControlConditions: String!
+	encryptedBy: String!
+	encryptedAt: String!
+	chain: String!
+	litSdkVersion: String!
+	litNetwork: String!
+	templateName: String!
+	contractVersion: String!
+}
+
+type MoleculeMut {
+	"""
+	2-nd Molecule API version (mutation).
+	"""
+	v2: MoleculeMutV2!
+}
+
+type MoleculeMutV2 {
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	"""
+	Retracts a project from the `projects` dataset.
+	History of this project existing will be preserved,
+	its symbol will remain reserved, data will remain intact,
+	but the project will no longer appear in the listing.
+	"""
+	disableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
+	enableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMutV2
+}
+
+input MoleculeProjectActivityFilters {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
+	byKinds: [MoleculeActivityKindInput!]
+}
+
+type MoleculeProjectMutV2 {
+	"""
+	Strongly typed data room mutator
+	"""
+	dataRoom: MoleculeDataRoomMutV2!
+	"""
+	Strongly typed announcements mutator
+	"""
+	announcements: MoleculeAnnouncementsDatasetMutV2!
+}
+
+type MoleculeProjectMutationResultV2 {
+	project: MoleculeProjectMutV2!
+	message: String!
+}
+
+type MoleculeProjectV2 {
+	"""
+	System time when this project was created/updated
+	"""
+	systemTime: DateTime!
+	"""
+	Event time when this project was created/updated
+	"""
+	eventTime: DateTime!
+	"""
+	Symbolic name of the project
+	"""
+	ipnftSymbol: String!
+	"""
+	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+	"""
+	ipnftUid: String!
+	"""
+	Address of the IPNFT contract
+	"""
+	ipnftAddress: String!
+	"""
+	Token ID withing the IPNFT contract
+	"""
+	ipnftTokenId: U256!
+	"""
+	Project's organizational account
+	"""
+	account: Account!
+	"""
+	Strongly typed data room accessor
+	"""
+	dataRoom: MoleculeDataRoom!
+	"""
+	Strongly typed announcements accessor
+	"""
+	announcements: MoleculeAnnouncements!
+	"""
+	Project's activity events in reverse chronological order
+	"""
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
+}
+
+type MoleculeProjectV2Connection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProjectV2!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectV2Edge!]!
+}
+
+type MoleculeProjectV2Edge {
+	node: MoleculeProjectV2!
+}
+
+type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult & MoleculeDataRoomUpdateFileMetadataResult {
+	used: Int
+	incoming: Int
+	limit: Int
+	isSuccess: Boolean!
+	message: String!
+}
+
+enum MoleculeSearchEntityKindInput {
+	FILE
+	ANNOUNCEMENT
+}
+
+input MoleculeSemanticSearchFilters {
+	byIpnftUids: [String!]
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
+	byKinds: [MoleculeSearchEntityKindInput!]
+}
+
+type MoleculeSemanticSearchFoundAnnouncement {
+	announcement: MoleculeAnnouncementEntry!
+	score: Float
+	explanation: JSON
+}
+
+type MoleculeSemanticSearchFoundDataRoomEntry {
+	entry: MoleculeDataRoomEntry!
+	score: Float
+	explanation: JSON
+}
+
+union MoleculeSemanticSearchHit = MoleculeSemanticSearchFoundDataRoomEntry | MoleculeSemanticSearchFoundAnnouncement
+
+type MoleculeSemanticSearchHitConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeSemanticSearchHit!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeSemanticSearchHitEdge!]!
+}
+
+type MoleculeSemanticSearchHitEdge {
+	node: MoleculeSemanticSearchHit!
+}
+
+type MoleculeV2 {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectV2
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectV2Connection!
+	"""
+	Latest activity events across all projects in reverse chronological
+	order
+	"""
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
+	"""
+	Performs a semantic search
+	Using `filters` parameters, a search can be narrowed down to:
+	- a specific set of projects
+	- specific categories and tags
+	- only returning files or announcements
+	"""
+	search(prompt: String!, filters: MoleculeSemanticSearchFilters, page: Int, perPage: Int, explain: Boolean): MoleculeSemanticSearchHitConnection!
+}
+
+type MoleculeVersionedFile {
+	"""
+	Returns the latest versioned file entry, regardless of data room version
+	"""
+	latest: MoleculeVersionedFileEntry
+	"""
+	Returns the versioned file entry that matches the data room entry
+	"""
+	matching: MoleculeVersionedFileEntry!
+	"""
+	Returns particular versioned file entry, regardless of data room version
+	"""
+	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry
+}
+
+type MoleculeVersionedFileEntry {
+	systemTime: DateTime!
+	eventTime: DateTime!
+	version: Int!
+	contentHash: Multihash!
+	contentLength: Int!
+	contentType: String!
+	accessLevel: String!
+	changeBy: String!
+	description: String
+	categories: [String!]!
+	tags: [String!]!
+	contentText: String
+	encryptionMetadata: MoleculeEncryptionMetadata
+	"""
+	Returns encoded content in-band. Should be used for small files only and
+	will return an error if called on large data.
+	"""
+	content: Base64Usnp!
+	"""
+	Returns a direct download URL
+	"""
+	contentUrl: VersionedFileContentDownload!
+}
+
 """
 MQTT quality of service class.
 
@@ -3176,6 +3766,10 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: MoleculeMut!
 	"""
 	Collaboration-related functionality group
 	
@@ -3377,6 +3971,10 @@ type Query {
 	Admin-related functionality group
 	"""
 	admin: Admin!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: Molecule!
 }
 
 enum QueryDialect {
@@ -3752,6 +4350,10 @@ type Search {
 enum SearchEntityName {
 	DATASETS
 	ACCOUNTS
+	MOLECULE_ACTIVITIES
+	MOLECULE_ANNOUNCEMENTS
+	MOLECULE_DATA_ROOM_ENTRIES
+	MOLECULE_PROJECTS
 }
 
 union SearchResult = Dataset
@@ -4289,6 +4891,11 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	message: String!
 }
 
+"""
+256-bit unsigned number. Can be constructed from string.
+"""
+scalar U256
+
 scalar URL
 
 interface UnsetRoleResult {
@@ -4316,14 +4923,14 @@ interface UpdateReadmeResult {
 	message: String!
 }
 
-type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+type UpdateVersionErrorCasFailed implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResult {
 	expectedHead: Multihash!
 	actualHead: Multihash!
 	isSuccess: Boolean!
 	message: String!
 }
 
-type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult & MoleculeDataRoomUpdateFileMetadataResult {
 	message: String!
 	isSuccess: Boolean!
 }

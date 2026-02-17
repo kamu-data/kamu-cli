@@ -1,0 +1,115 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: project-file
+  kind: Root
+  metadata:
+  - kind: SetDataSchema
+    schema:
+      fields:
+      - name: offset
+        type:
+          kind: Int64
+      - name: op
+        type:
+          kind: Int32
+      - name: system_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: event_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: version
+        type:
+          kind: Int32
+        extra:
+          opendatafabric.org/description: Sequential identifier assigned to each entry as new versions are uploaded
+      - name: content_hash
+        type:
+          kind: String
+        extra:
+          opendatafabric.org/description: Hash that references the externally-stored object content
+          opendatafabric.org/type:
+            kind: ObjectLink
+            linkType:
+              kind: Multihash
+      - name: content_length
+        type:
+          kind: Int64
+        extra:
+          opendatafabric.org/description: Size of the linked object in bytes
+      - name: content_type
+        type:
+          kind: Option
+          inner:
+            kind: String
+        extra:
+          opendatafabric.org/description: Media type associated with the linked object
+      - name: molecule_access_level
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: molecule_change_by
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: description
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: categories
+        type:
+          kind: Option
+          inner:
+            kind: List
+            itemType:
+              kind: Option
+              inner:
+                kind: String
+      - name: tags
+        type:
+          kind: Option
+          inner:
+            kind: List
+            itemType:
+              kind: Option
+              inner:
+                kind: String
+      - name: content_text
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: encryption_metadata
+        type:
+          kind: Option
+          inner:
+            kind: String
+      extra:
+        kamu.dev/archetype: VersionedFile
+  - kind: AddPushSource
+    sourceName: default
+    read:
+      kind: NdJson
+      schema:
+      - event_time TIMESTAMP
+      - version INT
+      - content_hash STRING
+      - content_length BIGINT
+      - content_type STRING
+      - molecule_access_level STRING
+      - molecule_change_by STRING
+      - description STRING
+      - categories ARRAY<STRING>
+      - tags ARRAY<STRING>
+      - content_text STRING
+      - encryption_metadata STRING
+    merge:
+      kind: Append

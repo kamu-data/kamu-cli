@@ -46,6 +46,7 @@ kamu-datasets = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
+kamu-molecule-domain = { workspace = true }
 kamu-search = { workspace = true }
 kamu-webhooks = { workspace = true }
 kamu-task-system = { workspace = true }
@@ -109,6 +110,13 @@ kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
+kamu-molecule-services = { workspace = true }
+kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
+    "testing",
+] }
+kamu-search-cache-inmem = { workspace = true }
+kamu-search-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-webhooks = { workspace = true, features = ["testing"] }

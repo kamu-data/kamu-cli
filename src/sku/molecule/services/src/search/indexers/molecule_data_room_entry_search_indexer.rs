@@ -1,0 +1,401 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::LoggedAccount;
+use kamu_molecule_domain::{
+    MoleculeDataRoomEntriesListing,
+    MoleculeDataRoomEntry,
+    MoleculeProject,
+    MoleculeReadVersionedFileEntryUseCase,
+    MoleculeVersionedFileEntry,
+    MoleculeViewDataRoomEntriesMode,
+    MoleculeViewDataRoomEntriesUseCase,
+    MoleculeViewProjectsUseCase,
+    molecule_data_room_entry_search_schema as data_room_entry_schema,
+    molecule_search_schema_common as molecule_schema,
+};
+use kamu_search::{
+    EmbeddingsProvider,
+    SearchFieldUpdate,
+    SearchIndexUpdateOperation,
+    SearchRepository,
+    prepare_semantic_embeddings_document,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const BULK_SIZE: usize = 100;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Indexing helper
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) struct MoleculeDataRoomEntryIndexingHelper<'a> {
+    pub molecule_account_id: &'a odf::AccountID,
+    pub embeddings_provider: &'a dyn EmbeddingsProvider,
+}
+
+impl MoleculeDataRoomEntryIndexingHelper<'_> {
+    pub(crate) async fn index_data_room_entry_from_entity(
+        &self,
+        ipnft_uid: &str,
+        entry: &MoleculeDataRoomEntry,
+        content_text: Option<&String>,
+    ) -> Result<serde_json::Value, InternalError> {
+        let mut index_doc = serde_json::json!({
+            molecule_schema::fields::EVENT_TIME: entry.event_time,
+            molecule_schema::fields::SYSTEM_TIME: entry.system_time,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id.to_string(),
+            molecule_schema::fields::IPNFT_UID: ipnft_uid,
+            molecule_schema::fields::REF: entry.reference,
+            molecule_schema::fields::PATH: entry.path,
+            data_room_entry_schema::fields::DEPTH: entry.path.depth(),
+            molecule_schema::fields::VERSION: entry.denormalized_latest_file_info.version,
+            molecule_schema::fields::CONTENT_TYPE: entry.denormalized_latest_file_info.content_type,
+            molecule_schema::fields::CONTENT_HASH: entry.denormalized_latest_file_info.content_hash,
+            molecule_schema::fields::CONTENT_LENGTH: entry.denormalized_latest_file_info.content_length,
+            data_room_entry_schema::fields::CONTENT_TEXT: content_text,
+            molecule_schema::fields::ACCESS_LEVEL: entry.denormalized_latest_file_info.access_level,
+            molecule_schema::fields::CHANGE_BY: entry.denormalized_latest_file_info.change_by,
+            molecule_schema::fields::DESCRIPTION: entry.denormalized_latest_file_info.description,
+            molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
+            molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
+            kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
+            kamu_search::fields::PRINCIPAL_IDS: vec![ self.molecule_account_id.to_string() ],
+        });
+
+        self.attach_embeddings(
+            &mut index_doc,
+            entry.denormalized_latest_file_info.description.as_ref(),
+            content_text,
+        )
+        .await?;
+
+        Ok(index_doc)
+    }
+
+    async fn attach_embeddings(
+        &self,
+        index_doc: &mut serde_json::Value,
+        description: Option<&String>,
+        content_text: Option<&String>,
+    ) -> Result<(), InternalError> {
+        let index_doc_mut = index_doc.as_object_mut().unwrap();
+
+        let description_update = match description {
+            Some(desc) => SearchFieldUpdate::Present(desc.as_str()),
+            None => SearchFieldUpdate::Absent,
+        };
+
+        let content_text_update = match content_text {
+            Some(text) => SearchFieldUpdate::Present(text.as_str()),
+            None => SearchFieldUpdate::Absent,
+        };
+
+        let embeddings_document = prepare_semantic_embeddings_document(
+            self.embeddings_provider,
+            &[&description_update, &content_text_update],
+        )
+        .await?;
+
+        if let SearchFieldUpdate::Present(v) = embeddings_document {
+            index_doc_mut.insert(
+                kamu_search::fields::SEMANTIC_EMBEDDINGS.to_string(),
+                serde_json::json!(v),
+            );
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Main indexing function
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn index_data_room_entries(
+    organization_account: &LoggedAccount,
+    catalog: &dill::Catalog,
+    repo: &dyn SearchRepository,
+) -> Result<usize, InternalError> {
+    tracing::info!(
+        organization_account_name = organization_account.account_name.as_str(),
+        organization_account_id = organization_account.account_id.to_string(),
+        "Indexing data room entries for Molecule organization account",
+    );
+
+    let dependencies = IndexingDependencies::from_catalog(catalog);
+
+    // Load all projects for the organization account
+    let projects_listing = dependencies
+        .molecule_view_projects_uc
+        .execute(organization_account, None)
+        .await
+        .int_err()?;
+
+    let total_documents_count = process_projects_in_batches(
+        organization_account,
+        &projects_listing.list,
+        &dependencies,
+        repo,
+    )
+    .await?;
+
+    tracing::info!(
+        organization_account_name = organization_account.account_name.as_str(),
+        organization_account_id = organization_account.account_id.to_string(),
+        indexed_documents_count = total_documents_count,
+        "Indexed data room entries for Molecule organization account",
+    );
+
+    Ok(total_documents_count)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+struct IndexingDependencies {
+    molecule_view_projects_uc: Arc<dyn MoleculeViewProjectsUseCase>,
+    molecule_view_data_room_entries_uc: Arc<dyn MoleculeViewDataRoomEntriesUseCase>,
+    molecule_read_versioned_file_entry_uc: Arc<dyn MoleculeReadVersionedFileEntryUseCase>,
+    embeddings_provider: Arc<dyn EmbeddingsProvider>,
+}
+
+impl IndexingDependencies {
+    fn from_catalog(catalog: &dill::Catalog) -> Self {
+        Self {
+            molecule_view_projects_uc: catalog
+                .get_one::<dyn MoleculeViewProjectsUseCase>()
+                .unwrap(),
+            molecule_view_data_room_entries_uc: catalog
+                .get_one::<dyn MoleculeViewDataRoomEntriesUseCase>()
+                .unwrap(),
+            molecule_read_versioned_file_entry_uc: catalog
+                .get_one::<dyn MoleculeReadVersionedFileEntryUseCase>()
+                .unwrap(),
+            embeddings_provider: catalog.get_one::<dyn EmbeddingsProvider>().unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ProjectIndexingData {
+    molecule_subject: kamu_accounts::LoggedAccount,
+    project: MoleculeProject,
+    entries_result: Result<MoleculeDataRoomEntriesListing, InternalError>,
+    versioned_files_map: HashMap<odf::DatasetID, MoleculeVersionedFileEntry>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn process_projects_in_batches(
+    molecule_subject: &LoggedAccount,
+    projects: &[MoleculeProject],
+    dependencies: &IndexingDependencies,
+    repo: &dyn SearchRepository,
+) -> Result<usize, InternalError> {
+    let mut total_documents_count = 0;
+    let mut operations = Vec::new();
+
+    // Process projects sequentially
+    for project in projects {
+        let project_data = load_project_indexing_data(
+            molecule_subject.clone(),
+            project.clone(),
+            dependencies.clone(),
+        )
+        .await;
+
+        index_project_data(project_data, dependencies, &mut operations).await?;
+
+        // Bulk index when we reach or exceed BULK_SIZE
+        if operations.len() >= BULK_SIZE {
+            let batch_size = operations.len();
+            tracing::debug!(
+                documents_count = batch_size,
+                "Bulk indexing data room entries batch",
+            );
+            repo.bulk_update(
+                data_room_entry_schema::SCHEMA_NAME,
+                std::mem::take(&mut operations),
+            )
+            .await?;
+            total_documents_count += batch_size;
+        }
+    }
+
+    // Index remaining documents
+    if !operations.is_empty() {
+        let remaining_count = operations.len();
+        tracing::debug!(
+            documents_count = remaining_count,
+            "Bulk indexing final data room entries batch",
+        );
+        repo.bulk_update(data_room_entry_schema::SCHEMA_NAME, operations)
+            .await?;
+        total_documents_count += remaining_count;
+    }
+
+    Ok(total_documents_count)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn load_project_indexing_data(
+    molecule_subject: kamu_accounts::LoggedAccount,
+    project: MoleculeProject,
+    dependencies: IndexingDependencies,
+) -> ProjectIndexingData {
+    // Load current data room entries for the project
+    let result = dependencies
+        .molecule_view_data_room_entries_uc
+        .execute(
+            &molecule_subject,
+            &project,
+            MoleculeViewDataRoomEntriesMode::LatestSource,
+            None, /* all prefixes */
+            None, /* any depth */
+            None, /* no filters */
+            None, /* no pagination */
+        )
+        .await
+        .map_err(|e| {
+            tracing::warn!(
+                project_ipnft_uid = project.ipnft_uid.as_str(),
+                error = ?e,
+                "Failed to load data room entries for project",
+            );
+            e
+        })
+        .int_err();
+
+    let versioned_files_map = if let Ok(ref entries_listing) = result {
+        load_versioned_files_for_entries(entries_listing, &project.ipnft_uid, &dependencies).await
+    } else {
+        HashMap::new()
+    };
+
+    ProjectIndexingData {
+        molecule_subject,
+        project,
+        entries_result: result,
+        versioned_files_map,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn load_versioned_files_for_entries(
+    entries_listing: &MoleculeDataRoomEntriesListing,
+    project_ipnft_uid: &str,
+    dependencies: &IndexingDependencies,
+) -> HashMap<odf::DatasetID, MoleculeVersionedFileEntry> {
+    use futures::stream::{FuturesUnordered, StreamExt};
+
+    // Write down file+version requests we need to make
+    let file_requests: Vec<_> = entries_listing
+        .list
+        .iter()
+        .map(|entry| {
+            (
+                entry.reference.clone(),
+                entry.denormalized_latest_file_info.version,
+            )
+        })
+        .collect();
+
+    // Load versioned file entries in parallel
+    let mut file_futures = FuturesUnordered::new();
+    for (reference, version) in file_requests {
+        let molecule_read_versioned_file_entry_uc =
+            Arc::clone(&dependencies.molecule_read_versioned_file_entry_uc);
+        let ipnft_uid_for_trace = project_ipnft_uid.to_string();
+
+        file_futures.push(async move {
+            let versioned_file = molecule_read_versioned_file_entry_uc
+                .execute(&reference, Some(version), None)
+                .await
+                .map_err(|e| {
+                    tracing::error!(
+                        project_ipnft_uid = %ipnft_uid_for_trace,
+                        reference = %reference,
+                        version = version,
+                        error = ?e,
+                        "Failed to load versioned file entry matching the data room entry",
+                    );
+                    e
+                })
+                .ok()
+                .flatten();
+            (reference, versioned_file)
+        });
+    }
+
+    // Collect results into a map
+    let mut versioned_files_map = HashMap::new();
+    while let Some((reference, versioned_file)) = file_futures.next().await {
+        if let Some(file) = versioned_file {
+            versioned_files_map.insert(reference, file);
+        }
+    }
+    versioned_files_map
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn index_project_data(
+    project_data: ProjectIndexingData,
+    dependencies: &IndexingDependencies,
+    operations: &mut Vec<SearchIndexUpdateOperation>,
+) -> Result<(), InternalError> {
+    let data_room_entries = project_data.entries_result?;
+
+    // Skip empty rooms
+    if data_room_entries.list.is_empty() {
+        return Ok(());
+    }
+
+    // Create indexing helper
+    let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
+        molecule_account_id: &project_data.molecule_subject.account_id,
+        embeddings_provider: dependencies.embeddings_provider.as_ref(),
+    };
+
+    // Prepare documents for indexing
+    for entry in data_room_entries.list {
+        let content_text = project_data
+            .versioned_files_map
+            .get(&entry.reference)
+            .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
+
+        let document = indexing_helper
+            .index_data_room_entry_from_entity(
+                &project_data.project.ipnft_uid,
+                &entry,
+                content_text,
+            )
+            .await?;
+
+        operations.push(SearchIndexUpdateOperation::Index {
+            id: data_room_entry_schema::unique_id_for_data_room_entry(
+                &project_data.project.ipnft_uid,
+                &entry.path,
+            ),
+            doc: document,
+        });
+    }
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

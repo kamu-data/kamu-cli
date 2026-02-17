@@ -31,7 +31,6 @@ pub async fn authentication_catalogs(
 }
 
 pub struct AuthenticationCatalogsResult {
-    #[expect(dead_code)]
     pub catalog_no_subject: dill::Catalog,
     pub catalog_anonymous: dill::Catalog,
     pub catalog_authorized: dill::Catalog,
