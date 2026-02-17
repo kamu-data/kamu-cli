@@ -476,7 +476,12 @@ type AdminMut {
 }
 
 type AdminSearchMut {
-	resetSearchIndices(entityNames: [String!]): String!
+	resetSearchIndices(entityNames: [SearchEntityName!]): String!
+}
+
+enum SearchEntityName {
+	DATASETS
+	ACCOUNTS
 }
 
 type ApplyRolesMatrixResult {
