@@ -476,7 +476,7 @@ type AdminMut {
 }
 
 type AdminSearchMut {
-	resetSearchIndices: String!
+	resetSearchIndices(entityNames: [String!]): String!
 }
 
 type ApplyRolesMatrixResult {

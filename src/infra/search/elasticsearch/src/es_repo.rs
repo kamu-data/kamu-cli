@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
@@ -32,6 +32,7 @@ pub struct ElasticsearchRepository {
 #[derive(Default)]
 struct State {
     registered_schemas: HashMap<SearchEntitySchemaName, Arc<SearchEntitySchema>>,
+    locked_schemas: HashSet<SearchEntitySchemaName>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +85,11 @@ impl ElasticsearchRepository {
         schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
+        if state.locked_schemas.contains(&schema_name) {
+            return Err(InternalError::new(format!(
+                "Search entity '{schema_name}' is currently being reset. Please retry later.",
+            )));
+        }
         let Some(schema) = state.registered_schemas.get(&schema_name) else {
             return Err(InternalError::new(format!(
                 "Entity schema '{schema_name}' is not registered in the search repository",
@@ -105,6 +111,11 @@ impl ElasticsearchRepository {
         schema_name: SearchEntitySchemaName,
     ) -> Result<String, InternalError> {
         let state = self.state.read().unwrap();
+        if state.locked_schemas.contains(&schema_name) {
+            return Err(InternalError::new(format!(
+                "Search entity '{schema_name}' is currently being reset. Please retry later.",
+            )));
+        }
         let Some(schema) = state.registered_schemas.get(&schema_name) else {
             return Err(InternalError::new(format!(
                 "Entity schema '{schema_name}' is not registered in the search repository",
@@ -129,10 +140,22 @@ impl ElasticsearchRepository {
         if schema_names.is_empty() {
             // If no schema_names specified, use all registered schemas
             for schema in state.registered_schemas.values() {
+                if state.locked_schemas.contains(&schema.schema_name) {
+                    return Err(InternalError::new(format!(
+                        "Search entity '{}' is currently being reset. Please retry later.",
+                        schema.schema_name
+                    )));
+                }
                 schemas.push(Arc::clone(schema));
             }
         } else {
             for schema_name in schema_names {
+                if state.locked_schemas.contains(schema_name) {
+                    return Err(InternalError::new(format!(
+                        "Search entity '{schema_name}' is currently being reset. Please retry \
+                         later.",
+                    )));
+                }
                 let Some(schema) = state.registered_schemas.get(schema_name) else {
                     return Err(InternalError::new(format!(
                         "Entity schema '{schema_name}' is not registered in the search repository",
@@ -263,6 +286,19 @@ impl ElasticsearchRepository {
                 Some(SearchFilterExpr::or_clauses(clauses))
             }
         }
+    }
+
+    fn entity_index_prefix(&self, schema_name: SearchEntitySchemaName) -> String {
+        if self.repo_config.index_prefix.is_empty() {
+            schema_name.to_string()
+        } else {
+            format!("{}-{schema_name}", self.repo_config.index_prefix)
+        }
+    }
+
+    fn delete_registered_schema_state(&self, schema_name: SearchEntitySchemaName) {
+        let mut state = self.state.write().unwrap();
+        state.registered_schemas.remove(&schema_name);
     }
 }
 
@@ -686,6 +722,47 @@ impl SearchRepository for ElasticsearchRepository {
         client.bulk_update(&index_name, operations).await.int_err()
     }
 
+    async fn lock_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
+        let mut state = self.state.write().unwrap();
+        if !state.locked_schemas.insert(schema_name) {
+            return Err(InternalError::new(format!(
+                "Search entity '{schema_name}' is already being reset",
+            )));
+        }
+        Ok(())
+    }
+
+    async fn unlock_schema(
+        &self,
+        schema_name: SearchEntitySchemaName,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.write().unwrap();
+        state.locked_schemas.remove(&schema_name);
+        Ok(())
+    }
+
+    async fn drop_schemas(
+        &self,
+        schema_names: &[SearchEntitySchemaName],
+    ) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+
+        for schema_name in schema_names {
+            let index_prefix = self.entity_index_prefix(schema_name);
+            let index_names = client
+                .list_indices_by_prefix(&index_prefix)
+                .await
+                .int_err()?;
+            if !index_names.is_empty() {
+                let refs = index_names.iter().map(String::as_str).collect::<Vec<_>>();
+                client.delete_indices_bulk(&refs).await.int_err()?;
+            }
+            self.delete_registered_schema_state(schema_name);
+        }
+
+        Ok(())
+    }
+
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_drop_all_schemas, skip_all)]
     async fn drop_all_schemas(&self) -> Result<(), InternalError> {
         let client = self.es_client().await?;
@@ -710,6 +787,7 @@ impl SearchRepository for ElasticsearchRepository {
         {
             let mut state = self.state.write().unwrap();
             state.registered_schemas.clear();
+            state.locked_schemas.clear();
         }
 
         Ok(())

@@ -18,13 +18,19 @@ pub struct AdminSearchMut;
 
 #[Object]
 impl AdminSearchMut {
-    async fn reset_search_indices(&self, ctx: &Context<'_>) -> Result<String> {
+    async fn reset_search_indices(
+        &self,
+        ctx: &Context<'_>,
+        entity_names: Option<Vec<String>>,
+    ) -> Result<String> {
         let background_catalog = from_catalog_n!(ctx, KamuBackgroundCatalog);
         let system_user_catalog = background_catalog.system_user_catalog();
 
         let search_indexer = system_user_catalog.get_one::<dyn SearchIndexer>().unwrap();
 
-        search_indexer.reset_search_indices().await?;
+        search_indexer
+            .reset_search_indices(entity_names.unwrap_or_default())
+            .await?;
         Ok("Ok".to_string())
     }
 }
