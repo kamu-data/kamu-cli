@@ -479,10 +479,10 @@ type AdminSearchMut {
 	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
+"""
+Search entities that can be selectively reindexed by `resetSearchIndices`.
+"""
 enum SearchEntityName {
-	"""
-	Search entities that can be selectively reindexed by `resetSearchIndices`.
-	"""
 	DATASETS
 	ACCOUNTS
 }
