@@ -230,9 +230,20 @@ impl SearchIndexer for SearchIndexerImpl {
             .await;
 
             let unlock_result = self.search_repo.unlock_schema(schema.schema_name).await;
-            unlock_result?;
-
-            reset_result?;
+            match (reset_result, unlock_result) {
+                (Ok(()), Ok(())) => {}
+                (Err(reset_err), Ok(())) => return Err(reset_err),
+                (Ok(()), Err(unlock_err)) => return Err(unlock_err),
+                (Err(reset_err), Err(unlock_err)) => {
+                    tracing::error!(
+                        entity_kind = %schema.schema_name,
+                        error = ?unlock_err,
+                        error_msg = %unlock_err,
+                        "Failed to unlock search entity after reset failure",
+                    );
+                    return Err(reset_err);
+                }
+            }
         }
 
         Ok(())
