@@ -479,14 +479,6 @@ type AdminSearchMut {
 	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
-"""
-Search entities that can be selectively reindexed by `resetSearchIndices`.
-"""
-enum SearchEntityName {
-	DATASETS
-	ACCOUNTS
-}
-
 type ApplyRolesMatrixResult {
 	message: String!
 }
@@ -3755,6 +3747,11 @@ type Search {
 	Useful for autocomplete.
 	"""
 	nameLookup(query: String!, filters: LookupFilters!, page: Int, perPage: Int): NameLookupResultConnection!
+}
+
+enum SearchEntityName {
+	DATASETS
+	ACCOUNTS
 }
 
 union SearchResult = Dataset
