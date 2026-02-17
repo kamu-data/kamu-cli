@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Keep this minimal; add more only when Copilot hits missing native deps.
       - name: Install system dependencies (common Rust)

@@ -20,7 +20,7 @@ jobs:
     name: Lint / Code
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt, clippy
@@ -48,13 +48,13 @@ jobs:
     name: Lint / Codegen
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: kamu-data/kamu-cli
           path: kamu-cli
       - name: Copy rust-toolchain file
         run: cp kamu-cli/rust-toolchain ./rust-toolchain
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: open-data-fabric/open-data-fabric
           path: open-data-fabric
@@ -78,7 +78,7 @@ jobs:
     name: Lint / Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
@@ -180,7 +180,7 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions-rs/toolchain@v1
 

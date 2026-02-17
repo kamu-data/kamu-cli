@@ -34,7 +34,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' ||
       github.event.workflow_run.conclusion == null
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Checkout the same commit that the release was built for
           ref: ${{ github.event.workflow_run.head_sha }}
