@@ -153,22 +153,8 @@ impl SearchRepository for ElasticsearchContainerRepository {
             .await
     }
 
-    async fn lock_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
-        self.inner().await?.lock_schema(schema_name).await
-    }
-
-    async fn unlock_schema(
-        &self,
-        schema_name: SearchEntitySchemaName,
-    ) -> Result<(), InternalError> {
-        self.inner().await?.unlock_schema(schema_name).await
-    }
-
-    async fn drop_schemas(
-        &self,
-        schema_names: &[SearchEntitySchemaName],
-    ) -> Result<(), InternalError> {
-        self.inner().await?.drop_schemas(schema_names).await
+    async fn drop_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
+        self.inner().await?.drop_schema(schema_name).await
     }
 
     async fn drop_all_schemas(&self) -> Result<(), InternalError> {

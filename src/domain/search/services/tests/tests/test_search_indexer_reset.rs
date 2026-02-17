@@ -17,80 +17,44 @@ use kamu_search_services::*;
 
 #[test_log::test(tokio::test)]
 async fn test_reset_search_indices_resets_all_when_entity_names_empty() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let repo = Arc::new(TestSearchRepository::new(events.clone()));
-    let provider = Arc::new(TestSchemaProvider::new(events.clone()));
+    let harness = SearchIndexerResetHarness::new();
 
-    let indexer = SearchIndexerImpl::new(
-        Arc::new(SearchIndexerConfig::default()),
-        repo,
-        vec![provider],
-    );
+    harness.indexer.reset_search_indices(&[]).await.unwrap();
 
-    indexer.reset_search_indices(vec![]).await.unwrap();
-
-    let got = events.lock().unwrap().clone();
-    let expected = vec![
-        "lock:test-a",
+    harness.assert_events(&[
         "drop:test-a",
         "ensure:test-a",
         "index:test-a",
-        "unlock:test-a",
-        "lock:test-b",
         "drop:test-b",
         "ensure:test-b",
         "index:test-b",
-        "unlock:test-b",
-    ];
-    assert_eq!(got, expected);
+    ]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_search_indices_resets_only_requested_entity_name() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let repo = Arc::new(TestSearchRepository::new(events.clone()));
-    let provider = Arc::new(TestSchemaProvider::new(events.clone()));
+    let harness = SearchIndexerResetHarness::new();
 
-    let indexer = SearchIndexerImpl::new(
-        Arc::new(SearchIndexerConfig::default()),
-        repo,
-        vec![provider],
-    );
-
-    indexer
-        .reset_search_indices(vec!["test-b".to_string()])
+    harness
+        .indexer
+        .reset_search_indices(&["test-b"])
         .await
         .unwrap();
 
-    let got = events.lock().unwrap().clone();
-    let expected = vec![
-        "lock:test-b",
-        "drop:test-b",
-        "ensure:test-b",
-        "index:test-b",
-        "unlock:test-b",
-    ];
-    assert_eq!(got, expected);
+    harness.assert_events(&["drop:test-b", "ensure:test-b", "index:test-b"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_reset_search_indices_rejects_unknown_entity_name() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let repo = Arc::new(TestSearchRepository::new(events.clone()));
-    let provider = Arc::new(TestSchemaProvider::new(events.clone()));
+    let harness = SearchIndexerResetHarness::new();
 
-    let indexer = SearchIndexerImpl::new(
-        Arc::new(SearchIndexerConfig::default()),
-        repo,
-        vec![provider],
-    );
-
-    let err = indexer
-        .reset_search_indices(vec!["unknown".to_string()])
+    let err = harness
+        .indexer
+        .reset_search_indices(&["unknown"])
         .await
         .unwrap_err();
     assert!(
@@ -99,7 +63,36 @@ async fn test_reset_search_indices_rejects_unknown_entity_name() {
         "{err}"
     );
 
-    assert!(events.lock().unwrap().is_empty());
+    harness.assert_events(&[]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SearchIndexerResetHarness {
+    indexer: SearchIndexerImpl,
+    events: Arc<Mutex<Vec<String>>>,
+}
+
+impl SearchIndexerResetHarness {
+    fn new() -> Self {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let repo = Arc::new(TestSearchRepository::new(events.clone()));
+        let provider = Arc::new(TestSchemaProvider::new(events.clone()));
+
+        let indexer = SearchIndexerImpl::new(
+            Arc::new(SearchIndexerConfig::default()),
+            repo,
+            vec![provider],
+        );
+
+        Self { indexer, events }
+    }
+
+    fn assert_events(&self, expected: &[&str]) {
+        let got = self.events.lock().unwrap().clone();
+        let expected = expected.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(got, expected);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,35 +221,11 @@ impl SearchRepository for TestSearchRepository {
         unimplemented!()
     }
 
-    async fn lock_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
+    async fn drop_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
         self.events
             .lock()
             .unwrap()
-            .push(format!("lock:{schema_name}"));
-        Ok(())
-    }
-
-    async fn unlock_schema(
-        &self,
-        schema_name: SearchEntitySchemaName,
-    ) -> Result<(), InternalError> {
-        self.events
-            .lock()
-            .unwrap()
-            .push(format!("unlock:{schema_name}"));
-        Ok(())
-    }
-
-    async fn drop_schemas(
-        &self,
-        schema_names: &[SearchEntitySchemaName],
-    ) -> Result<(), InternalError> {
-        for schema_name in schema_names {
-            self.events
-                .lock()
-                .unwrap()
-                .push(format!("drop:{schema_name}"));
-        }
+            .push(format!("drop:{schema_name}"));
         Ok(())
     }
 

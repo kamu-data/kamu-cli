@@ -46,11 +46,10 @@ impl AdminSearchMut {
             .unwrap_or_default()
             .into_iter()
             .map(SearchEntityName::as_schema_name)
-            .map(ToOwned::to_owned)
-            .collect();
+            .collect::<Vec<kamu_search::SearchEntitySchemaName>>();
 
         search_indexer
-            .reset_search_indices(entity_schema_names)
+            .reset_search_indices(&entity_schema_names)
             .await?;
         Ok("Ok".to_string())
     }

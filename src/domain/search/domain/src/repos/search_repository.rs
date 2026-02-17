@@ -41,15 +41,7 @@ pub trait SearchRepository: Send + Sync {
         operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), InternalError>;
 
-    async fn lock_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError>;
-
-    async fn unlock_schema(&self, schema_name: SearchEntitySchemaName)
-    -> Result<(), InternalError>;
-
-    async fn drop_schemas(
-        &self,
-        schema_names: &[SearchEntitySchemaName],
-    ) -> Result<(), InternalError>;
+    async fn drop_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError>;
 
     async fn drop_all_schemas(&self) -> Result<(), InternalError>;
 

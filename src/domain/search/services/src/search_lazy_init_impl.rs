@@ -138,7 +138,10 @@ impl SearchService for SearchImplLazyInit {
 
 #[async_trait::async_trait]
 impl SearchIndexer for SearchImplLazyInit {
-    async fn reset_search_indices(&self, entity_names: Vec<String>) -> Result<(), InternalError> {
+    async fn reset_search_indices(
+        &self,
+        entity_names: &[SearchEntitySchemaName],
+    ) -> Result<(), InternalError> {
         let system_user_catalog = self.background_catalog.system_user_catalog();
 
         let indexer = SearchIndexerImpl::builder()
