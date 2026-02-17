@@ -23,10 +23,10 @@ enum SearchEntityName {
 }
 
 impl SearchEntityName {
-    fn as_schema_name(self) -> String {
+    fn as_schema_name(self) -> &'static str {
         match self {
-            Self::Datasets => kamu_datasets::dataset_search_schema::SCHEMA_NAME.to_string(),
-            Self::Accounts => kamu_accounts::account_search_schema::SCHEMA_NAME.to_string(),
+            Self::Datasets => kamu_datasets::dataset_search_schema::SCHEMA_NAME,
+            Self::Accounts => kamu_accounts::account_search_schema::SCHEMA_NAME,
         }
     }
 }
@@ -46,6 +46,7 @@ impl AdminSearchMut {
             .unwrap_or_default()
             .into_iter()
             .map(SearchEntityName::as_schema_name)
+            .map(ToOwned::to_owned)
             .collect();
 
         search_indexer

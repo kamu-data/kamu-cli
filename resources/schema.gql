@@ -480,6 +480,9 @@ type AdminSearchMut {
 }
 
 enum SearchEntityName {
+	"""
+	Search entities that can be selectively reindexed by `resetSearchIndices`.
+	"""
 	DATASETS
 	ACCOUNTS
 }
