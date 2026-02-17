@@ -183,7 +183,7 @@ mime = "0.3"
 mime_guess = "2"
 
 # Config
-setty = { version = "0.3", features = [
+setty = { version = "1.0", features = [
     "derive-clone",
     "derive-debug",
     "derive-partial-eq",

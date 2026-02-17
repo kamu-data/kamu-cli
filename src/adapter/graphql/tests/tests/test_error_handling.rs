@@ -66,7 +66,7 @@ async fn test_internal_error() {
 
     #[async_trait::async_trait]
     impl kamu_accounts::AuthenticationService for DummyAuthenticationService {
-        fn supported_login_methods(&self) -> Vec<&'static str> {
+        fn supported_login_methods(&self) -> Vec<String> {
             unimplemented!()
         }
 

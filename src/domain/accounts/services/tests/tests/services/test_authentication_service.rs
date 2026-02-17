@@ -42,7 +42,7 @@ async fn test_enabled_login_providers() {
 
     let mut supported_login_methods = authentication_service.supported_login_methods();
     supported_login_methods.sort_unstable();
-    assert_eq!(supported_login_methods, vec!["method-A", "method-B"]);
+    assert_eq!(supported_login_methods, vec!["method-a", "method-b"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

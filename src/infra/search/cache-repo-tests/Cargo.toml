@@ -1,0 +1,33 @@
+[package]
+name = "kamu-search-cache-repo-tests"
+description = "Shared repository tests for Kamu search cache"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+kamu-search = { workspace = true }
+
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.15", default-features = false }
+sha2 = "0.10"
+
+
+[dev-dependencies]
+

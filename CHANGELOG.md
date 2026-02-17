@@ -20,6 +20,22 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [Unreleased]
+### Added
+- Search reset endpoint now allows specifying particular index names
+
+## [0.260.0] - 2026-02-17
+### Added
+- Flow states UX enhancements:
+  - indicating if flow is currently running (tracking "running_since" field)
+  - remembering when flow was manually paused (tracking "paused_at" field)
+  - state listings should not include UNCONFIGURED processes by default,
+     only if those are requested explicitly
+  - manual healing of flow process auto-resumes stopped trigger
+  - rollups support similar filters as listings
+### Changed
+- Test coverage for search embeddings cache: repository and service layer
+
 ## [0.259.1] - 2026-02-12
 ### Fixed
 - Sync odf schema to accept odf format

@@ -16,15 +16,41 @@ use crate::prelude::*;
 
 pub struct AdminSearchMut;
 
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+enum SearchEntityName {
+    Datasets,
+    Accounts,
+}
+
+impl SearchEntityName {
+    fn as_schema_name(self) -> &'static str {
+        match self {
+            Self::Datasets => kamu_datasets::dataset_search_schema::SCHEMA_NAME,
+            Self::Accounts => kamu_accounts::account_search_schema::SCHEMA_NAME,
+        }
+    }
+}
+
 #[Object]
 impl AdminSearchMut {
-    async fn reset_search_indices(&self, ctx: &Context<'_>) -> Result<String> {
+    async fn reset_search_indices(
+        &self,
+        ctx: &Context<'_>,
+        entity_names: Option<Vec<SearchEntityName>>,
+    ) -> Result<String> {
         let background_catalog = from_catalog_n!(ctx, KamuBackgroundCatalog);
         let system_user_catalog = background_catalog.system_user_catalog();
 
         let search_indexer = system_user_catalog.get_one::<dyn SearchIndexer>().unwrap();
+        let entity_schema_names = entity_names
+            .unwrap_or_default()
+            .into_iter()
+            .map(SearchEntityName::as_schema_name)
+            .collect::<Vec<kamu_search::SearchEntitySchemaName>>();
 
-        search_indexer.reset_search_indices().await?;
+        search_indexer
+            .reset_search_indices(&entity_schema_names)
+            .await?;
         Ok("Ok".to_string())
     }
 }

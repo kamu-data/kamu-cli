@@ -9,11 +9,16 @@
 
 use internal_error::InternalError;
 
+use crate::SearchEntitySchemaName;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait SearchIndexer: Send + Sync {
-    async fn reset_search_indices(&self) -> Result<(), InternalError>;
+    async fn reset_search_indices(
+        &self,
+        entity_names: &[SearchEntitySchemaName],
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

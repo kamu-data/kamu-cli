@@ -33,7 +33,7 @@ pub struct AuthenticationServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
-    authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
+    authentication_providers_by_method: HashMap<String, Arc<dyn AuthenticationProvider>>,
     account_service: Arc<dyn AccountService>,
     access_token_svc: Arc<dyn AccessTokenService>,
     outbox: Arc<dyn Outbox>,
@@ -65,7 +65,7 @@ impl AuthenticationServiceImpl {
             let login_method = authentication_provider.provider_name();
 
             let insert_result = authentication_providers_by_method
-                .insert(login_method, authentication_provider.clone());
+                .insert(login_method.to_lowercase(), authentication_provider.clone());
 
             assert!(
                 insert_result.is_none(),
@@ -91,7 +91,10 @@ impl AuthenticationServiceImpl {
         &self,
         login_method: &str,
     ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
-        match self.authentication_providers_by_method.get(login_method) {
+        match self
+            .authentication_providers_by_method
+            .get(&login_method.to_lowercase())
+        {
             Some(provider) => Ok(provider.clone()),
             None => Err(UnsupportedLoginMethodError {
                 method: login_method.into(),
@@ -230,11 +233,11 @@ impl AuthenticationServiceImpl {
 
 #[async_trait::async_trait]
 impl AuthenticationService for AuthenticationServiceImpl {
-    fn supported_login_methods(&self) -> Vec<&'static str> {
+    fn supported_login_methods(&self) -> Vec<String> {
         let mut methods = self
             .authentication_providers_by_method
             .keys()
-            .copied()
+            .cloned()
             .collect::<Vec<_>>();
         methods.sort_unstable();
         methods

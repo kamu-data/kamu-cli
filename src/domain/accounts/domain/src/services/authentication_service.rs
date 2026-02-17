@@ -17,7 +17,7 @@ use crate::{Account, DeviceCode, FindAccountIdByProviderIdentityKeyError, Provid
 
 #[async_trait::async_trait]
 pub trait AuthenticationService: Sync + Send {
-    fn supported_login_methods(&self) -> Vec<&'static str>;
+    fn supported_login_methods(&self) -> Vec<String>;
 
     async fn login(
         &self,
