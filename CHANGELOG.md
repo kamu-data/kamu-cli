@@ -18,8 +18,8 @@ Recommendation: for ease of reading, use the following order:
   - remembering when flow was manually paused (tracking "paused_at" field)
   - state listings should not include UNCONFIGURED processes by default,
      only if those are requested explicitly
-  - Manual healing of flow process auto-resumes stopped trigger
-  - Rollups support similar filters as listings
+  - manual healing of flow process auto-resumes stopped trigger
+  - rollups support similar filters as listings
 ### Changed
 - Test coverage for search embeddings cache: repository and service layer
 
