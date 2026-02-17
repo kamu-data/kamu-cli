@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.260.0] - 2026-02-17
 ### Added
 - Flow states UX enhancements:
   - indicating if flow is currently running (tracking "running_since" field)

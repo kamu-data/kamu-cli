@@ -186,7 +186,7 @@
   &quot;http&quot;: {
     &quot;connectTimeout&quot;: &quot;30s&quot;,
     &quot;maxRedirects&quot;: 10,
-    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.259.1&quot;
+    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.260.0&quot;
   },
   &quot;mqtt&quot;: {
     &quot;brokerIdleTimeout&quot;: &quot;1s&quot;
@@ -1302,7 +1302,7 @@ the resources (for authenticated clients)
 <tr>
 <td><code>userAgent</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;kamu-cli&#x2F;0.259.1&quot;</code></td>
+<td><code class="language-json">&quot;kamu-cli&#x2F;0.260.0&quot;</code></td>
 <td>Value to use for User-Agent header</td>
 </tr>
 </tbody>
@@ -1758,7 +1758,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;connectTimeout&quot;: &quot;30s&quot;,
   &quot;maxRedirects&quot;: 10,
-  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.259.1&quot;
+  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.260.0&quot;
 }</code></pre></td>
 <td>HTTP-specific configuration</td>
 </tr>
