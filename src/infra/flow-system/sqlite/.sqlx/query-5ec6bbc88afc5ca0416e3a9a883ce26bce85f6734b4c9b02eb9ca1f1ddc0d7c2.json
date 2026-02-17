@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE flow_process_states\n                SET\n                    user_intent = $1,\n                    stop_policy_kind = $2,\n                    stop_policy_data = $3,\n                    consecutive_failures = $4,\n                    last_success_at = $5,\n                    last_failure_at = $6,\n                    last_attempt_at = $7,\n                    next_planned_at = $8,\n                    paused_at = $9,\n                    running_since = $10,\n                    auto_stopped_at = $11,\n                    effective_state = $12,\n                    auto_stopped_reason = $13,\n                    updated_at = $14,\n                    last_applied_flow_system_event_id = $15\n                WHERE\n                    flow_type = $16 AND scope_data = $17 AND\n                    last_applied_flow_system_event_id = $18\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 18
+    },
+    "nullable": []
+  },
+  "hash": "5ec6bbc88afc5ca0416e3a9a883ce26bce85f6734b4c9b02eb9ca1f1ddc0d7c2"
+}

@@ -29,6 +29,7 @@ pub enum FlowProcessLifecycleMessage {
     FailureRegistered(FlowProcessFailureRegisteredMessage),
     EffectiveStateChanged(FlowProcessEffectiveStateChangedMessage),
     TriggerAutoStopped(FlowProcessTriggerAutoStoppedMessage),
+    TriggerResumedFromAutoStop(FlowProcessTriggerResumedFromAutoStopMessage),
 }
 
 impl Message for FlowProcessLifecycleMessage {
@@ -77,6 +78,16 @@ impl FlowProcessLifecycleMessage {
             event_time,
             flow_binding,
             reason,
+        })
+    }
+
+    pub fn trigger_resumed_from_auto_stop(
+        event_time: DateTime<Utc>,
+        flow_binding: FlowBinding,
+    ) -> Self {
+        Self::TriggerResumedFromAutoStop(FlowProcessTriggerResumedFromAutoStopMessage {
+            event_time,
+            flow_binding,
         })
     }
 }
@@ -132,6 +143,17 @@ pub struct FlowProcessTriggerAutoStoppedMessage {
 
     /// The reason for auto-stopping
     pub reason: FlowProcessAutoStopReason,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowProcessTriggerResumedFromAutoStopMessage {
+    /// The time at which the event was recorded
+    pub event_time: DateTime<Utc>,
+
+    /// The binding of the flow process to which the flow belongs
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

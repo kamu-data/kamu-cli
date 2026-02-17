@@ -40,7 +40,7 @@ pub async fn test_empty_state_table_initially(catalog: &Catalog) {
     assert!(listing.processes.is_empty());
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 0);
@@ -105,7 +105,7 @@ pub async fn test_index_single_process_in_initial_state(catalog: &Catalog) {
     assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 1);
@@ -202,7 +202,7 @@ pub async fn test_index_single_process_after_immediate_stop(catalog: &Catalog) {
     assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 1);
@@ -331,7 +331,7 @@ pub async fn test_index_single_process_in_failing_state(catalog: &Catalog) {
     assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 1);
@@ -485,7 +485,7 @@ pub async fn test_index_single_process_after_recovery(catalog: &Catalog) {
     assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 1);
@@ -581,7 +581,7 @@ pub async fn test_index_single_process_after_pause(catalog: &Catalog) {
     assert_eq!(listing.processes[0], single_state);
 
     let rollup = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup.total, 1);
@@ -633,7 +633,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
     assert_eq!(listing_before.processes.len(), 1);
 
     let rollup_before = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup_before.total, 1);
@@ -665,7 +665,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
     assert!(listing_after.processes.is_empty());
 
     let rollup_after = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup_after.total, 0);
@@ -801,7 +801,7 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
 
     // Verify rollup counts all three processes
     let rollup_before = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup_before.total, 3);
@@ -851,7 +851,7 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
 
     // Verify rollup shows everything is gone
     let rollup_after = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup_after.total, 0);
@@ -962,7 +962,7 @@ pub async fn test_delete_process_with_history(catalog: &Catalog) {
     assert!(single_state_after.is_none());
 
     let rollup_after = flow_process_state_query
-        .rollup_by_scope(FlowScopeQuery::all(), None, None)
+        .rollup(FlowProcessListFilter::all())
         .await
         .unwrap();
     assert_eq!(rollup_after.total, 0);

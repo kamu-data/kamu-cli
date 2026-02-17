@@ -34,6 +34,8 @@ pub(crate) async fn load_process_state(
             last_failure_at,
             last_attempt_at,
             next_planned_at,
+            paused_at,
+            running_since,
             auto_stopped_at,
             effective_state as "effective_state: FlowProcessEffectiveState",
             auto_stopped_reason as "auto_stopped_reason: FlowProcessAutoStopReason",
