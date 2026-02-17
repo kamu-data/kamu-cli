@@ -8574,7 +8574,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-domain"
-version = "0.259.1"
+version = "0.260.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -8602,7 +8602,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-services"
-version = "0.259.1"
+version = "0.260.0"
 dependencies = [
  "async-trait",
  "bytes",
