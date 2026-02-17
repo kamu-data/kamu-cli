@@ -12,6 +12,8 @@ use std::sync::Arc;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_search::{
+    SearchEntitySchema,
+    SearchEntitySchemaName,
     SearchEntitySchemaProvider,
     SearchIndexer,
     SearchIndexerConfig,
@@ -36,45 +38,115 @@ pub struct SearchIndexerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
+struct TargetSchema<'a> {
+    provider: Arc<dyn SearchEntitySchemaProvider>,
+    schema: &'a SearchEntitySchema,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts]
 impl SearchIndexerImpl {
-    #[tracing::instrument(level = "info", name = SearchIndexerImpl_ensure_indexes_exist, skip_all)]
-    // Public for tests only
-    pub async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
-        // Request schemas from all providers and ensure indexes exist
-        for provider in &self.entity_schema_providers {
-            let schemas = provider.provide_schemas();
-            tracing::info!(
-                schemas_count = schemas.len(),
-                provider_name = provider.provider_name(),
-                "Registering search entity schemas from provider",
-            );
+    fn collect_target_schemas(&self) -> Vec<TargetSchema<'_>> {
+        self.entity_schema_providers
+            .iter()
+            .flat_map(|provider| {
+                provider
+                    .provide_schemas()
+                    .iter()
+                    .map(|schema| TargetSchema {
+                        provider: Arc::clone(provider),
+                        schema,
+                    })
+            })
+            .collect()
+    }
 
-            // Ensure indexes exist for each schema
-            for schema in schemas {
-                match self.search_repo.ensure_entity_index(schema).await {
-                    Ok(outcome) => {
-                        tracing::info!(
-                            entity_kind = %schema.schema_name,
-                            version = schema.version,
-                            outcome = ?outcome,
-                            "Ensured up-to-date search index for entity",
-                        );
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            entity_kind = %schema.schema_name,
-                            error = ?e,
-                            error_msg = %e,
-                            "Failed to ensure search index for entity",
-                        );
-                        return Err(e.int_err());
-                    }
+    fn resolve_target_schemas(
+        &self,
+        entity_names: &[SearchEntitySchemaName],
+    ) -> Result<Vec<TargetSchema<'_>>, InternalError> {
+        let all_targets = self.collect_target_schemas();
+
+        if entity_names.is_empty() {
+            return Ok(all_targets);
+        }
+
+        let targets_by_name = all_targets
+            .iter()
+            .map(|target| (target.schema.schema_name, target.clone()))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        let mut requested_unique = std::collections::BTreeSet::new();
+        requested_unique.extend(entity_names.iter().copied());
+
+        let mut missing = Vec::new();
+        let mut targets = Vec::new();
+        for entity_name in requested_unique {
+            let Some(target) = targets_by_name.get(entity_name) else {
+                missing.push(entity_name);
+                continue;
+            };
+
+            targets.push(target.clone());
+        }
+
+        if !missing.is_empty() {
+            return Err(InternalError::new(format!(
+                "Unknown search entity name(s): {}",
+                missing.join(", ")
+            )));
+        }
+
+        Ok(targets)
+    }
+
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_ensure_target_indexes_exist, skip_all)]
+    async fn ensure_target_indexes_exist(
+        &self,
+        targets: &[TargetSchema<'_>],
+    ) -> Result<(), InternalError> {
+        for target in targets {
+            let schema = target.schema;
+            match self.search_repo.ensure_entity_index(schema).await {
+                Ok(outcome) => {
+                    tracing::info!(
+                        entity_kind = %schema.schema_name,
+                        version = schema.version,
+                        outcome = ?outcome,
+                        "Ensured up-to-date search index for entity",
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        entity_kind = %schema.schema_name,
+                        error = ?e,
+                        error_msg = %e,
+                        "Failed to ensure search index for entity",
+                    );
+                    return Err(e.int_err());
                 }
             }
         }
 
         Ok(())
+    }
+
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_ensure_indexes_exist, skip_all)]
+    // Public for tests only
+    pub async fn ensure_indexes_exist(&self) -> Result<(), InternalError> {
+        let targets = self.resolve_target_schemas(&[])?;
+
+        for provider in &self.entity_schema_providers {
+            tracing::info!(
+                schemas_count = provider.provide_schemas().len(),
+                provider_name = provider.provider_name(),
+                "Registering search entity schemas from provider",
+            );
+        }
+
+        self.ensure_target_indexes_exist(&targets).await
     }
 
     #[tracing::instrument(level = "info", name = SearchIndexerImpl_drop_all_schemas, skip_all)]
@@ -84,46 +156,51 @@ impl SearchIndexerImpl {
 
     #[tracing::instrument(level = "info", name = SearchIndexerImpl_run_indexing, skip_all)]
     async fn run_indexing(&self) -> Result<(), InternalError> {
-        for provider in &self.entity_schema_providers {
-            let schemas = provider.provide_schemas();
-            for schema in schemas {
-                let num_existing_documents = self
-                    .search_repo
-                    .documents_of_kind(schema.schema_name)
-                    .await?;
-                if num_existing_documents == 0 {
-                    tracing::info!(
-                        entity_kind = %schema.schema_name,
-                        "No existing documents found, running full reindexing",
-                    );
-                    match provider
-                        .run_schema_initial_indexing(self.search_repo.clone(), schema)
-                        .await
-                    {
-                        Ok(num_indexed) => {
-                            tracing::info!(
-                                entity_kind = %schema.schema_name,
-                                num_indexed,
-                                "Completed full reindexing of search index for entity",
-                            );
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                entity_kind = %schema.schema_name,
-                                error = ?e,
-                                error_msg = %e,
-                                "Failed to run full reindexing of search index for entity",
-                            );
-                            return Err(e);
-                        }
+        let targets = self.resolve_target_schemas(&[])?;
+        self.run_target_indexing(&targets).await
+    }
+
+    #[tracing::instrument(level = "info", name = SearchIndexerImpl_run_target_indexing, skip_all)]
+    async fn run_target_indexing(&self, targets: &[TargetSchema<'_>]) -> Result<(), InternalError> {
+        for target in targets {
+            let schema = target.schema;
+            let num_existing_documents = self
+                .search_repo
+                .documents_of_kind(schema.schema_name)
+                .await?;
+            if num_existing_documents == 0 {
+                tracing::info!(
+                    entity_kind = %schema.schema_name,
+                    "No existing documents found, running full reindexing",
+                );
+                match target
+                    .provider
+                    .run_schema_initial_indexing(self.search_repo.clone(), schema)
+                    .await
+                {
+                    Ok(num_indexed) => {
+                        tracing::info!(
+                            entity_kind = %schema.schema_name,
+                            num_indexed,
+                            "Completed full reindexing of search index for entity",
+                        );
                     }
-                } else {
-                    tracing::info!(
-                        entity_kind = %schema.schema_name,
-                        num_existing_documents,
-                        "Existing documents found, skipping full reindexing",
-                    );
+                    Err(e) => {
+                        tracing::error!(
+                            entity_kind = %schema.schema_name,
+                            error = ?e,
+                            error_msg = %e,
+                            "Failed to run full reindexing of search index for entity",
+                        );
+                        return Err(e);
+                    }
                 }
+            } else {
+                tracing::info!(
+                    entity_kind = %schema.schema_name,
+                    num_existing_documents,
+                    "Existing documents found, skipping full reindexing",
+                );
             }
         }
 
@@ -137,13 +214,32 @@ impl SearchIndexerImpl {
 #[async_trait::async_trait]
 impl SearchIndexer for SearchIndexerImpl {
     #[tracing::instrument(level = "info", name = SearchIndexerImpl_reset_search_indices, skip_all)]
-    async fn reset_search_indices(&self) -> Result<(), InternalError> {
-        // Drop all existing indexes
-        self.drop_all_schemas().await?;
+    async fn reset_search_indices(
+        &self,
+        entity_names: &[SearchEntitySchemaName],
+    ) -> Result<(), InternalError> {
+        let targets = self.resolve_target_schemas(entity_names)?;
 
-        // Recreate indexes and run full indexing
-        self.ensure_indexes_exist().await?;
-        self.run_indexing().await?;
+        for target in &targets {
+            self.search_repo
+                .drop_schema(target.schema.schema_name)
+                .await?;
+            self.search_repo
+                .ensure_entity_index(target.schema)
+                .await
+                .map_err(ErrorIntoInternal::int_err)?;
+
+            let num_indexed = target
+                .provider
+                .run_schema_initial_indexing(self.search_repo.clone(), target.schema)
+                .await?;
+
+            tracing::info!(
+                entity_kind = %target.schema.schema_name,
+                num_indexed,
+                "Completed full reindexing of search index for entity",
+            );
+        }
 
         Ok(())
     }

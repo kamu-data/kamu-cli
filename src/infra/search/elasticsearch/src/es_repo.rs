@@ -264,6 +264,11 @@ impl ElasticsearchRepository {
             }
         }
     }
+
+    fn delete_registered_schema_state(&self, schema_name: SearchEntitySchemaName) {
+        let mut state = self.state.write().unwrap();
+        state.registered_schemas.remove(&schema_name);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -684,6 +689,28 @@ impl SearchRepository for ElasticsearchRepository {
         let client = self.es_client().await?;
         let index_name = self.resolve_writable_index_name(client, schema_name)?;
         client.bulk_update(&index_name, operations).await.int_err()
+    }
+
+    async fn drop_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
+        let client = self.es_client().await?;
+
+        let index_name = self.resolve_writable_index_name(client, schema_name)?;
+        let exact_index_exists = client
+            .list_indices_by_prefix(&index_name)
+            .await
+            .int_err()?
+            .into_iter()
+            .any(|existing_name| existing_name == index_name);
+
+        if exact_index_exists {
+            client
+                .delete_indices_bulk(&[index_name.as_str()])
+                .await
+                .int_err()?;
+        }
+        self.delete_registered_schema_state(schema_name);
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "debug", name=ElasticsearchRepository_drop_all_schemas, skip_all)]

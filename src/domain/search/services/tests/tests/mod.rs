@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_embeddings_provider_impl;
+mod test_search_indexer_reset;

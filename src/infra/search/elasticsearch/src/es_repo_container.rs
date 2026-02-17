@@ -153,6 +153,10 @@ impl SearchRepository for ElasticsearchContainerRepository {
             .await
     }
 
+    async fn drop_schema(&self, schema_name: SearchEntitySchemaName) -> Result<(), InternalError> {
+        self.inner().await?.drop_schema(schema_name).await
+    }
+
     async fn drop_all_schemas(&self) -> Result<(), InternalError> {
         self.inner().await?.drop_all_schemas().await
     }

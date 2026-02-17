@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Search reset endpoint now allows specifying particular index names
+
 ## [0.260.0] - 2026-02-17
 ### Added
 - Flow states UX enhancements:

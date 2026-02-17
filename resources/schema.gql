@@ -476,7 +476,7 @@ type AdminMut {
 }
 
 type AdminSearchMut {
-	resetSearchIndices: String!
+	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
 type ApplyRolesMatrixResult {
@@ -3747,6 +3747,11 @@ type Search {
 	Useful for autocomplete.
 	"""
 	nameLookup(query: String!, filters: LookupFilters!, page: Int, perPage: Int): NameLookupResultConnection!
+}
+
+enum SearchEntityName {
+	DATASETS
+	ACCOUNTS
 }
 
 union SearchResult = Dataset
