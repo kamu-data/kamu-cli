@@ -194,3 +194,169 @@ pub struct MultiMatchFieldSpec {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use kamu_search::{
+        SearchEntitySchema,
+        SearchEntitySchemaFlags,
+        SearchEntitySchemaUpgradeMode,
+        SearchSchemaField,
+        SearchSchemaFieldRole,
+        TextBoostingOverrides,
+    };
+
+    use super::*;
+
+    const TEST_FIELDS: &[SearchSchemaField] = &[
+        SearchSchemaField {
+            path: "name",
+            role: SearchSchemaFieldRole::Name,
+        },
+        SearchSchemaField {
+            path: "id_hier",
+            role: SearchSchemaFieldRole::Identifier {
+                hierarchical: true,
+                enable_edge_ngrams: true,
+                enable_inner_ngrams: true,
+            },
+        },
+        SearchSchemaField {
+            path: "id_flat",
+            role: SearchSchemaFieldRole::Identifier {
+                hierarchical: false,
+                enable_edge_ngrams: false,
+                enable_inner_ngrams: false,
+            },
+        },
+        SearchSchemaField {
+            path: "description",
+            role: SearchSchemaFieldRole::Description { add_keyword: false },
+        },
+        SearchSchemaField {
+            path: "body",
+            role: SearchSchemaFieldRole::Prose,
+        },
+        SearchSchemaField {
+            path: "created_at",
+            role: SearchSchemaFieldRole::DateTime,
+        },
+    ];
+
+    fn make_schema() -> SearchEntitySchema {
+        SearchEntitySchema {
+            schema_name: "schema",
+            version: 1,
+            upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+            fields: TEST_FIELDS,
+            title_field: "name",
+            flags: SearchEntitySchemaFlags {
+                enable_banning: false,
+                enable_security: false,
+                enable_embeddings: false,
+            },
+        }
+    }
+
+    fn as_boost_map(policy: &MultiMatchPolicy) -> HashMap<&str, f32> {
+        policy
+            .specs
+            .iter()
+            .map(|s| (s.field_name.as_str(), s.boost))
+            .collect()
+    }
+
+    fn assert_boost_eq(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "actual={actual}, expected={expected}"
+        );
+    }
+
+    #[test]
+    fn test_build_full_text_policy() {
+        let policy = MultiMatchPolicyBuilder::build_full_text_policy(
+            &make_schema(),
+            TextBoostingOverrides {
+                name_boost: 2.0,
+                identifier_boost: 1.5,
+                description_boost: 1.2,
+                prose_boost: 0.5,
+            },
+        );
+        let map = as_boost_map(&policy);
+
+        assert_boost_eq(*map.get("name").expect("name boost"), 12.0);
+        assert_boost_eq(*map.get("name.ngram").expect("name ngram boost"), 3.0);
+        assert_boost_eq(
+            *map.get("id_hier.tokens").expect("id_hier tokens boost"),
+            6.0,
+        );
+        assert_boost_eq(*map.get("id_hier.ngram").expect("id_hier ngram boost"), 1.5);
+        assert_boost_eq(
+            *map.get("id_hier.substr").expect("id_hier substr boost"),
+            0.45,
+        );
+        assert_boost_eq(*map.get("id_flat").expect("id_flat boost"), 6.0);
+        assert_boost_eq(*map.get("description").expect("description boost"), 4.2);
+        assert_boost_eq(*map.get("body").expect("body boost"), 0.5);
+        assert!(!map.contains_key("created_at"));
+    }
+
+    #[test]
+    fn test_build_autocomplete_policy() {
+        let policy = MultiMatchPolicyBuilder::build_autocomplete_policy(
+            &make_schema(),
+            TextBoostingOverrides::default(),
+        );
+        let map = as_boost_map(&policy);
+
+        assert_boost_eq(*map.get("name.ngram").expect("name.ngram boost"), 8.0);
+        assert_boost_eq(*map.get("name").expect("name boost"), 2.0);
+        assert_boost_eq(*map.get("id_hier.ngram").expect("id_hier ngram boost"), 5.0);
+        assert_boost_eq(
+            *map.get("id_hier.tokens").expect("id_hier tokens boost"),
+            1.0,
+        );
+        assert_boost_eq(*map.get("id_flat").expect("id_flat boost"), 1.0);
+        assert!(!map.contains_key("description"));
+        assert!(!map.contains_key("body"));
+    }
+
+    #[test]
+    fn test_merge_keeps_max_boost_per_field() {
+        let merged = MultiMatchPolicy::merge(&[
+            MultiMatchPolicy {
+                specs: vec![
+                    MultiMatchFieldSpec {
+                        field_name: "name".to_string(),
+                        boost: 2.0,
+                    },
+                    MultiMatchFieldSpec {
+                        field_name: "description".to_string(),
+                        boost: 1.0,
+                    },
+                ],
+            },
+            MultiMatchPolicy {
+                specs: vec![
+                    MultiMatchFieldSpec {
+                        field_name: "name".to_string(),
+                        boost: 7.0,
+                    },
+                    MultiMatchFieldSpec {
+                        field_name: "body".to_string(),
+                        boost: 0.5,
+                    },
+                ],
+            },
+        ]);
+
+        let map = as_boost_map(&merged);
+        assert_boost_eq(*map.get("name").expect("name boost"), 7.0);
+        assert_boost_eq(*map.get("description").expect("description boost"), 1.0);
+        assert_boost_eq(*map.get("body").expect("body boost"), 0.5);
+    }
+}

@@ -383,3 +383,121 @@ impl ElasticsearchIndexMappings {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_search::{
+        SearchEntitySchema,
+        SearchEntitySchemaFlags,
+        SearchEntitySchemaUpgradeMode,
+        SearchSchemaField,
+        SearchSchemaFieldRole,
+    };
+
+    use super::*;
+
+    const TEST_FIELDS: &[SearchSchemaField] = &[
+        SearchSchemaField {
+            path: "id",
+            role: SearchSchemaFieldRole::Identifier {
+                hierarchical: true,
+                enable_edge_ngrams: true,
+                enable_inner_ngrams: true,
+            },
+        },
+        SearchSchemaField {
+            path: "name",
+            role: SearchSchemaFieldRole::Name,
+        },
+        SearchSchemaField {
+            path: "description",
+            role: SearchSchemaFieldRole::Description { add_keyword: true },
+        },
+        SearchSchemaField {
+            path: "body",
+            role: SearchSchemaFieldRole::Prose,
+        },
+        SearchSchemaField {
+            path: "rank",
+            role: SearchSchemaFieldRole::Integer,
+        },
+    ];
+
+    #[test]
+    fn test_identifier_mapping_respects_all_subfield_toggles() {
+        let mapping = ElasticsearchIndexMappings::map_identifier_field(true, true, true);
+
+        assert_eq!(mapping["type"], "keyword");
+        assert_eq!(mapping["fields"][FIELD_SUFFIX_TOKENS]["type"], "text");
+        assert_eq!(mapping["fields"][FIELD_SUFFIX_NGRAM]["type"], "text");
+        assert_eq!(mapping["fields"][FIELD_SUFFIX_SUBSTR]["type"], "text");
+    }
+
+    #[test]
+    fn test_from_entity_schema_adds_flags_and_title_alias() {
+        let schema = SearchEntitySchema {
+            schema_name: "test-schema",
+            version: 1,
+            upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+            fields: TEST_FIELDS,
+            title_field: "name",
+            flags: SearchEntitySchemaFlags {
+                enable_banning: true,
+                enable_security: true,
+                enable_embeddings: true,
+            },
+        };
+
+        let mappings = ElasticsearchIndexMappings::from_entity_schema(&schema, 384);
+
+        assert_eq!(
+            mappings.mappings_json["properties"]["title"]["type"],
+            "alias"
+        );
+        assert_eq!(
+            mappings.mappings_json["properties"]["title"]["path"],
+            "name"
+        );
+        assert_eq!(
+            mappings.mappings_json["properties"]["is_banned"]["type"],
+            "boolean"
+        );
+        assert_eq!(
+            mappings.mappings_json["properties"]["visibility"]["type"],
+            "keyword"
+        );
+        assert_eq!(
+            mappings.mappings_json["properties"]["principal_ids"]["type"],
+            "keyword"
+        );
+        assert_eq!(
+            mappings.mappings_json["properties"]["semantic_embeddings"]["properties"]["embedding"]
+                ["dims"],
+            384
+        );
+        assert!(mappings.mappings_hash.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn test_hash_json_normalized_stable_for_key_order() {
+        let value_a = serde_json::json!({
+            "b": 1,
+            "a": {
+                "y": 2,
+                "x": 3,
+            }
+        });
+        let value_b = serde_json::json!({
+            "a": {
+                "x": 3,
+                "y": 2,
+            },
+            "b": 1,
+        });
+
+        let hash_a = ElasticsearchIndexMappings::hash_json_normalized(&value_a);
+        let hash_b = ElasticsearchIndexMappings::hash_json_normalized(&value_b);
+
+        assert_eq!(hash_a, hash_b);
+    }
+}

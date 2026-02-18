@@ -409,3 +409,204 @@ impl ElasticsearchQueryBuilder {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_search::{
+        FullTextSearchTermOperator,
+        KnnOptions,
+        SearchFilterExpr,
+        SearchFilterOp,
+        SearchPaginationSpec,
+        SearchRequestSourceSpec,
+        SearchSortDirection,
+        SearchSortSpec,
+        TextSearchOptions,
+        VectorSearchOptions,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_build_listing_query_with_nested_filter_and_default_sort() {
+        let filter = SearchFilterExpr::And(vec![
+            SearchFilterExpr::Field {
+                field: "visibility",
+                op: SearchFilterOp::Eq(serde_json::json!("public")),
+            },
+            SearchFilterExpr::Not(Box::new(SearchFilterExpr::Field {
+                field: "is_banned",
+                op: SearchFilterOp::Eq(serde_json::json!(true)),
+            })),
+        ]);
+
+        let query = ElasticsearchQueryBuilder::build_listing_query(
+            Some(&filter),
+            &SearchRequestSourceSpec::Particular(vec!["name", "visibility"]),
+            &[],
+            &SearchPaginationSpec {
+                limit: 5,
+                offset: 10,
+            },
+        );
+
+        assert_eq!(
+            query["query"]["bool"]["must"]["match_all"],
+            serde_json::json!({})
+        );
+        assert_eq!(
+            query["query"]["bool"]["filter"]["bool"]["must"]
+                .as_array()
+                .expect("must be array")
+                .len(),
+            2
+        );
+        assert_eq!(query["sort"]["_score"]["order"], "desc");
+        assert_eq!(query["_source"], serde_json::json!(["name", "visibility"]));
+        assert_eq!(query["from"], 10);
+        assert_eq!(query["size"], 5);
+    }
+
+    #[test]
+    fn test_build_best_fields_query_applies_highlight_and_explain() {
+        let policy = MultiMatchPolicy {
+            specs: vec![
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "name".to_string(),
+                    boost: 6.0,
+                },
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "description".to_string(),
+                    boost: 3.5,
+                },
+            ],
+        };
+        let sort = [SearchSortSpec::ByField {
+            field: "created_at",
+            direction: SearchSortDirection::Descending,
+            nulls_first: false,
+        }];
+        let options = TextSearchOptions {
+            enable_explain: true,
+            enable_highlighting: true,
+            boosting_overrides: Default::default(),
+        };
+
+        let query = ElasticsearchQueryBuilder::build_best_fields_search_query(
+            "wind power",
+            FullTextSearchTermOperator::And,
+            0.2,
+            &policy,
+            None,
+            &SearchRequestSourceSpec::All,
+            &sort,
+            &SearchPaginationSpec {
+                limit: 20,
+                offset: 0,
+            },
+            &options,
+        );
+
+        assert_eq!(query["query"]["multi_match"]["type"], "best_fields");
+        assert_eq!(query["query"]["multi_match"]["operator"], "and");
+        assert_eq!(
+            query["query"]["multi_match"]["fields"],
+            serde_json::json!(["name^6", "description^3.5"])
+        );
+        assert_eq!(query["sort"][0]["created_at"]["order"], "desc");
+        assert_eq!(query["highlight"]["pre_tags"], serde_json::json!(["<em>"]));
+        assert_eq!(query["explain"], true);
+    }
+
+    #[test]
+    fn test_build_phrase_query_with_filter_and_source_complex() {
+        let phrase_policy = PhraseSearchPolicy {
+            specs: vec![
+                crate::es_helpers::PhraseSearchFieldSpec {
+                    field_name: "name".to_string(),
+                    boost: 8.0,
+                    slop: 1,
+                },
+                crate::es_helpers::PhraseSearchFieldSpec {
+                    field_name: "description".to_string(),
+                    boost: 4.0,
+                    slop: 2,
+                },
+            ],
+        };
+        let filter = SearchFilterExpr::Or(vec![
+            SearchFilterExpr::Field {
+                field: "kind",
+                op: SearchFilterOp::Eq(serde_json::json!("dataset")),
+            },
+            SearchFilterExpr::Field {
+                field: "kind",
+                op: SearchFilterOp::Eq(serde_json::json!("flow")),
+            },
+        ]);
+
+        let query = ElasticsearchQueryBuilder::build_phrase_search_query(
+            "public data",
+            &phrase_policy,
+            Some(&filter),
+            &SearchRequestSourceSpec::Complex {
+                include_patterns: vec!["name*".to_string()],
+                exclude_patterns: vec!["secret*".to_string()],
+            },
+            &SearchPaginationSpec {
+                limit: 7,
+                offset: 3,
+            },
+            &TextSearchOptions::default(),
+        );
+
+        assert_eq!(
+            query["query"]["bool"]["must"]["bool"]["minimum_should_match"],
+            1
+        );
+        assert_eq!(
+            query["query"]["bool"]["must"]["bool"]["should"]
+                .as_array()
+                .expect("should must be array")
+                .len(),
+            2
+        );
+        assert_eq!(query["_source"]["include"], serde_json::json!(["name*"]));
+        assert_eq!(query["_source"]["exclude"], serde_json::json!(["secret*"]));
+    }
+
+    #[test]
+    fn test_build_vector_query_with_filter_and_explain() {
+        let filter = SearchFilterExpr::Field {
+            field: "visibility",
+            op: SearchFilterOp::In(vec![serde_json::json!("public")]),
+        };
+
+        let query = ElasticsearchQueryBuilder::build_vector_search_query(
+            "semantic_embeddings",
+            &[0.1, 0.2, 0.3],
+            Some(&filter),
+            &SearchRequestSourceSpec::None,
+            12,
+            &VectorSearchOptions {
+                knn: KnnOptions {
+                    k: 77,
+                    num_candidates: 501,
+                },
+                enable_explain: true,
+            },
+        );
+
+        assert_eq!(query["track_total_hits"], false);
+        assert_eq!(query["knn"]["field"], "semantic_embeddings.embedding");
+        assert_eq!(query["knn"]["k"], 77);
+        assert_eq!(query["knn"]["num_candidates"], 501);
+        assert_eq!(
+            query["knn"]["filter"]["terms"]["visibility"],
+            serde_json::json!(["public"])
+        );
+        assert_eq!(query["_source"], false);
+        assert_eq!(query["size"], 12);
+        assert_eq!(query["explain"], true);
+    }
+}
