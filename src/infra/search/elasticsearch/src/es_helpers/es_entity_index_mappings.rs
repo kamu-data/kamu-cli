@@ -386,6 +386,7 @@ impl ElasticsearchIndexMappings {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use kamu_search::{
         SearchEntitySchema,
         SearchEntitySchemaFlags,
@@ -393,10 +394,11 @@ mod tests {
         SearchSchemaField,
         SearchSchemaFieldRole,
     };
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
-    const TEST_FIELDS: &[SearchSchemaField] = &[
+    const ALL_FIELDS: &[SearchSchemaField] = &[
         SearchSchemaField {
             path: "id",
             role: SearchSchemaFieldRole::Identifier {
@@ -418,28 +420,384 @@ mod tests {
             role: SearchSchemaFieldRole::Prose,
         },
         SearchSchemaField {
+            path: "tag",
+            role: SearchSchemaFieldRole::Keyword,
+        },
+        SearchSchemaField {
+            path: "created_at",
+            role: SearchSchemaFieldRole::DateTime,
+        },
+        SearchSchemaField {
+            path: "is_active",
+            role: SearchSchemaFieldRole::Boolean,
+        },
+        SearchSchemaField {
             path: "rank",
             role: SearchSchemaFieldRole::Integer,
         },
+        SearchSchemaField {
+            path: "metadata",
+            role: SearchSchemaFieldRole::UnprocessedObject,
+        },
     ];
 
-    #[test]
-    fn test_identifier_mapping_respects_all_subfield_toggles() {
-        let mapping = ElasticsearchIndexMappings::map_identifier_field(true, true, true);
-
-        assert_eq!(mapping["type"], "keyword");
-        assert_eq!(mapping["fields"][FIELD_SUFFIX_TOKENS]["type"], "text");
-        assert_eq!(mapping["fields"][FIELD_SUFFIX_NGRAM]["type"], "text");
-        assert_eq!(mapping["fields"][FIELD_SUFFIX_SUBSTR]["type"], "text");
+    fn assert_json(actual: &serde_json::Value, expected_json: &str) {
+        let expected: serde_json::Value = serde_json::from_str(expected_json).unwrap();
+        assert_eq!(expected, *actual);
     }
 
     #[test]
-    fn test_from_entity_schema_adds_flags_and_title_alias() {
+    fn test_from_entity_schema_covers_all_identifier_and_description_variations() {
         let schema = SearchEntitySchema {
-            schema_name: "test-schema",
+            schema_name: "id-variants",
             version: 1,
             upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
-            fields: TEST_FIELDS,
+            fields: &[
+                SearchSchemaField {
+                    path: "id_none",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: false,
+                        enable_edge_ngrams: false,
+                        enable_inner_ngrams: false,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_tokens",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: true,
+                        enable_edge_ngrams: false,
+                        enable_inner_ngrams: false,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_edge",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: false,
+                        enable_edge_ngrams: true,
+                        enable_inner_ngrams: false,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_inner",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: false,
+                        enable_edge_ngrams: false,
+                        enable_inner_ngrams: true,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_tokens_edge",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: true,
+                        enable_edge_ngrams: true,
+                        enable_inner_ngrams: false,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_tokens_inner",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: true,
+                        enable_edge_ngrams: false,
+                        enable_inner_ngrams: true,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_edge_inner",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: false,
+                        enable_edge_ngrams: true,
+                        enable_inner_ngrams: true,
+                    },
+                },
+                SearchSchemaField {
+                    path: "id_all",
+                    role: SearchSchemaFieldRole::Identifier {
+                        hierarchical: true,
+                        enable_edge_ngrams: true,
+                        enable_inner_ngrams: true,
+                    },
+                },
+                SearchSchemaField {
+                    path: "desc_plain",
+                    role: SearchSchemaFieldRole::Description { add_keyword: false },
+                },
+                SearchSchemaField {
+                    path: "desc_keyword",
+                    role: SearchSchemaFieldRole::Description { add_keyword: true },
+                },
+            ],
+            title_field: "desc_plain",
+            flags: SearchEntitySchemaFlags {
+                enable_banning: false,
+                enable_security: false,
+                enable_embeddings: false,
+            },
+        };
+
+        let mappings = ElasticsearchIndexMappings::from_entity_schema(&schema, 128);
+
+        assert_json(
+            &mappings.mappings_json,
+            indoc!(
+                r#"
+                {
+                  "properties": {
+                    "id_none": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024
+                    },
+                    "id_tokens": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_edge": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_inner": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_tokens_edge": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_tokens_inner": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_edge_inner": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "id_all": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "desc_plain": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html"
+                    },
+                    "desc_keyword": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "normalizer": "kamu_keyword_norm",
+                          "ignore_above": 1024
+                        }
+                      }
+                    },
+                    "title": {
+                      "type": "alias",
+                      "path": "desc_plain"
+                    }
+                  }
+                }
+                "#
+            ),
+        );
+        assert!(mappings.mappings_hash.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn test_from_entity_schema_covers_all_field_types_and_all_flag_variations() {
+        let schema_no_flags = SearchEntitySchema {
+            schema_name: "all-fields-no-flags",
+            version: 1,
+            upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+            fields: ALL_FIELDS,
+            title_field: "name",
+            flags: SearchEntitySchemaFlags {
+                enable_banning: false,
+                enable_security: false,
+                enable_embeddings: false,
+            },
+        };
+
+        let mappings_no_flags =
+            ElasticsearchIndexMappings::from_entity_schema(&schema_no_flags, 384);
+        assert_json(
+            &mappings_no_flags.mappings_json,
+            indoc!(
+                r#"
+                {
+                  "properties": {
+                    "id": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "name": {
+                      "type": "text",
+                      "analyzer": "kamu_name",
+                      "search_analyzer": "kamu_name",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "normalizer": "kamu_keyword_norm",
+                          "ignore_above": 1024
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_name"
+                        }
+                      }
+                    },
+                    "description": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "normalizer": "kamu_keyword_norm",
+                          "ignore_above": 1024
+                        }
+                      }
+                    },
+                    "body": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html",
+                      "term_vector": "with_positions_offsets"
+                    },
+                    "tag": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 256
+                    },
+                    "created_at": {
+                      "type": "date"
+                    },
+                    "is_active": {
+                      "type": "boolean"
+                    },
+                    "rank": {
+                      "type": "integer"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "enabled": false
+                    },
+                    "title": {
+                      "type": "alias",
+                      "path": "name"
+                    }
+                  }
+                }
+                "#
+            ),
+        );
+
+        let schema_all_flags = SearchEntitySchema {
+            schema_name: "all-fields-all-flags",
+            version: 1,
+            upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+            fields: ALL_FIELDS,
             title_field: "name",
             flags: SearchEntitySchemaFlags {
                 enable_banning: true,
@@ -448,56 +806,137 @@ mod tests {
             },
         };
 
-        let mappings = ElasticsearchIndexMappings::from_entity_schema(&schema, 384);
+        let mappings_all_flags =
+            ElasticsearchIndexMappings::from_entity_schema(&schema_all_flags, 384);
+        assert_json(
+            &mappings_all_flags.mappings_json,
+            indoc!(
+                r#"
+                {
+                  "properties": {
+                    "id": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 1024,
+                      "fields": {
+                        "tokens": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_parts",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        },
+                        "substr": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_inner_ngram",
+                          "search_analyzer": "kamu_ident_parts"
+                        }
+                      }
+                    },
+                    "name": {
+                      "type": "text",
+                      "analyzer": "kamu_name",
+                      "search_analyzer": "kamu_name",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "normalizer": "kamu_keyword_norm",
+                          "ignore_above": 1024
+                        },
+                        "ngram": {
+                          "type": "text",
+                          "analyzer": "kamu_ident_edge_ngram",
+                          "search_analyzer": "kamu_name"
+                        }
+                      }
+                    },
+                    "description": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "normalizer": "kamu_keyword_norm",
+                          "ignore_above": 1024
+                        }
+                      }
+                    },
+                    "body": {
+                      "type": "text",
+                      "analyzer": "kamu_english_html",
+                      "search_analyzer": "kamu_english_html",
+                      "term_vector": "with_positions_offsets"
+                    },
+                    "tag": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 256
+                    },
+                    "created_at": {
+                      "type": "date"
+                    },
+                    "is_active": {
+                      "type": "boolean"
+                    },
+                    "rank": {
+                      "type": "integer"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "enabled": false
+                    },
+                    "title": {
+                      "type": "alias",
+                      "path": "name"
+                    },
+                    "is_banned": {
+                      "type": "boolean"
+                    },
+                    "visibility": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 256
+                    },
+                    "principal_ids": {
+                      "type": "keyword",
+                      "normalizer": "kamu_keyword_norm",
+                      "ignore_above": 256
+                    },
+                    "semantic_embeddings": {
+                      "type": "nested",
+                      "properties": {
+                        "chunk_id": {
+                          "type": "keyword"
+                        },
+                        "embedding": {
+                          "type": "dense_vector",
+                          "dims": 384,
+                          "similarity": "cosine",
+                          "index_options": {
+                            "type": "hnsw",
+                            "m": 16,
+                            "ef_construction": 128
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            ),
+        );
 
-        assert_eq!(
-            mappings.mappings_json["properties"]["title"]["type"],
-            "alias"
+        assert!(mappings_no_flags.mappings_hash.starts_with("sha256:"));
+        assert!(mappings_all_flags.mappings_hash.starts_with("sha256:"));
+        assert_ne!(
+            mappings_no_flags.mappings_hash,
+            mappings_all_flags.mappings_hash
         );
-        assert_eq!(
-            mappings.mappings_json["properties"]["title"]["path"],
-            "name"
-        );
-        assert_eq!(
-            mappings.mappings_json["properties"]["is_banned"]["type"],
-            "boolean"
-        );
-        assert_eq!(
-            mappings.mappings_json["properties"]["visibility"]["type"],
-            "keyword"
-        );
-        assert_eq!(
-            mappings.mappings_json["properties"]["principal_ids"]["type"],
-            "keyword"
-        );
-        assert_eq!(
-            mappings.mappings_json["properties"]["semantic_embeddings"]["properties"]["embedding"]
-                ["dims"],
-            384
-        );
-        assert!(mappings.mappings_hash.starts_with("sha256:"));
-    }
-
-    #[test]
-    fn test_hash_json_normalized_stable_for_key_order() {
-        let value_a = serde_json::json!({
-            "b": 1,
-            "a": {
-                "y": 2,
-                "x": 3,
-            }
-        });
-        let value_b = serde_json::json!({
-            "a": {
-                "x": 3,
-                "y": 2,
-            },
-            "b": 1,
-        });
-
-        let hash_a = ElasticsearchIndexMappings::hash_json_normalized(&value_a);
-        let hash_b = ElasticsearchIndexMappings::hash_json_normalized(&value_b);
-
-        assert_eq!(hash_a, hash_b);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
