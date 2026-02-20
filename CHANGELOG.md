@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Search reset endpoint now allows specifying particular index names
+- Extended test coverage for Elasticsearch helpers
+- Added integration tests for Elasticsearch schema/alias/migration logic
 
 ## [0.260.0] - 2026-02-17
 ### Added

@@ -135,6 +135,11 @@ impl ElasticsearchTestContext {
         &self.catalog
     }
 
+    #[inline]
+    pub fn client(&self) -> &ElasticsearchClient {
+        self.client.as_ref()
+    }
+
     pub fn index_prefix(&self) -> &str {
         &self.index_prefix
     }
