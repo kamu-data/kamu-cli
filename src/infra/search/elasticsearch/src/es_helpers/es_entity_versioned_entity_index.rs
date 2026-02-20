@@ -215,6 +215,12 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
     }
 
     fn build_alias_filter_json(&self, schema: &SearchEntitySchema) -> Option<serde_json::Value> {
+        Self::build_alias_filter_json_from_schema(schema)
+    }
+
+    fn build_alias_filter_json_from_schema(
+        schema: &SearchEntitySchema,
+    ) -> Option<serde_json::Value> {
         // Apply automatic banning filter in the alias if enabled in schema.
         // This will make banned documents invisible in search results.
         // Note that the documents will still exist in the index,
@@ -237,31 +243,33 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
     }
 
     pub fn alias_name(&self) -> String {
-        if self.repo_config.index_prefix.is_empty() {
-            self.schema_name.to_string()
+        Self::build_alias_name(self.repo_config, self.schema_name)
+    }
+
+    fn build_alias_name(
+        repo_config: &ElasticsearchRepositoryConfig,
+        schema_name: SearchEntitySchemaName,
+    ) -> String {
+        if repo_config.index_prefix.is_empty() {
+            schema_name.to_string()
         } else {
-            format!(
-                "{prefix}-{schema_name}",
-                prefix = self.repo_config.index_prefix,
-                schema_name = self.schema_name
-            )
+            format!("{}-{schema_name}", repo_config.index_prefix)
         }
     }
 
     pub fn index_name(&self) -> String {
-        if self.repo_config.index_prefix.is_empty() {
-            format!(
-                "{schema_name}-v{ver}",
-                schema_name = self.schema_name,
-                ver = self.version
-            )
+        Self::build_index_name(self.repo_config, self.schema_name, self.version)
+    }
+
+    fn build_index_name(
+        repo_config: &ElasticsearchRepositoryConfig,
+        schema_name: SearchEntitySchemaName,
+        version: u32,
+    ) -> String {
+        if repo_config.index_prefix.is_empty() {
+            format!("{schema_name}-v{version}")
         } else {
-            format!(
-                "{prefix}-{schema_name}-{ver}",
-                prefix = self.repo_config.index_prefix,
-                schema_name = self.schema_name,
-                ver = self.version
-            )
+            format!("{}-{schema_name}-{version}", repo_config.index_prefix)
         }
     }
 
@@ -356,6 +364,114 @@ pub enum EntityIndexEnsureOutcome {
         new_version: u32,
         upgrade_mode: SearchEntitySchemaUpgradeMode,
     },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use kamu_search::{SearchEntitySchema, SearchEntitySchemaFlags, SearchEntitySchemaUpgradeMode};
+
+    use super::*;
+
+    const EMPTY_FIELDS: &[kamu_search::SearchSchemaField] = &[];
+
+    fn test_schema(enable_banning: bool) -> SearchEntitySchema {
+        SearchEntitySchema {
+            schema_name: "dataset",
+            version: 1,
+            upgrade_mode: SearchEntitySchemaUpgradeMode::Reindex,
+            fields: EMPTY_FIELDS,
+            title_field: "title",
+            flags: SearchEntitySchemaFlags {
+                enable_banning,
+                enable_security: false,
+                enable_embeddings: false,
+            },
+        }
+    }
+
+    #[test]
+    fn test_build_alias_name() {
+        let without_prefix = ElasticsearchVersionedEntityIndex::build_alias_name(
+            &ElasticsearchRepositoryConfig {
+                index_prefix: String::new(),
+                embedding_dimensions: 384,
+            },
+            "dataset",
+        );
+        let with_prefix = ElasticsearchVersionedEntityIndex::build_alias_name(
+            &ElasticsearchRepositoryConfig {
+                index_prefix: "kamu".to_string(),
+                embedding_dimensions: 384,
+            },
+            "dataset",
+        );
+
+        assert_eq!(without_prefix, "dataset");
+        assert_eq!(with_prefix, "kamu-dataset");
+    }
+
+    #[test]
+    fn test_build_index_name() {
+        let without_prefix = ElasticsearchVersionedEntityIndex::build_index_name(
+            &ElasticsearchRepositoryConfig {
+                index_prefix: String::new(),
+                embedding_dimensions: 384,
+            },
+            "dataset",
+            7,
+        );
+        let with_prefix = ElasticsearchVersionedEntityIndex::build_index_name(
+            &ElasticsearchRepositoryConfig {
+                index_prefix: "kamu".to_string(),
+                embedding_dimensions: 384,
+            },
+            "dataset",
+            7,
+        );
+
+        assert_eq!(without_prefix, "dataset-v7");
+        assert_eq!(with_prefix, "kamu-dataset-7");
+    }
+
+    #[test]
+    fn test_build_alias_filter_json_from_schema() {
+        let with_banning = ElasticsearchVersionedEntityIndex::build_alias_filter_json_from_schema(
+            &test_schema(true),
+        )
+        .expect("must produce filter");
+        let without_banning =
+            ElasticsearchVersionedEntityIndex::build_alias_filter_json_from_schema(&test_schema(
+                false,
+            ));
+
+        assert_eq!(
+            with_banning,
+            serde_json::json!({
+                "bool": {
+                    "must_not": [{"term": { "is_banned": true }}]
+                }
+            })
+        );
+        assert!(without_banning.is_none());
+    }
+
+    #[test]
+    fn test_index_version_metadata_roundtrip() {
+        let metadata = IndexVersionMetadata {
+            schema_version: 5,
+            mapping_hash: Cow::Borrowed("sha256:abc"),
+        };
+        let json = serde_json::to_value(&metadata).expect("serialize");
+        let decoded =
+            serde_json::from_value::<IndexVersionMetadata<'static>>(json).expect("deserialize");
+
+        assert_eq!(decoded.schema_version, 5);
+        assert_eq!(decoded.mapping_hash, "sha256:abc");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
