@@ -317,3 +317,484 @@ struct Acc {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_search::{RRFOptions, SearchHighlight};
+    use serde_json::json;
+
+    use super::*;
+
+    fn make_hit(
+        schema_name: SearchEntitySchemaName,
+        id: &str,
+        score: Option<f64>,
+        source: serde_json::Value,
+        highlights: Option<Vec<SearchHighlight>>,
+        explanation: Option<serde_json::Value>,
+    ) -> SearchHit {
+        SearchHit {
+            id: id.to_string(),
+            schema_name,
+            score,
+            highlights,
+            source,
+            explanation,
+        }
+    }
+
+    fn make_response(took_ms: u64, timeout: bool, hits: Vec<SearchHit>) -> SearchResponse {
+        SearchResponse {
+            took_ms,
+            timeout,
+            total_hits: Some(999),
+            hits,
+        }
+    }
+
+    fn response_to_json(response: &SearchResponse) -> serde_json::Value {
+        json!({
+            "took_ms": response.took_ms,
+            "timeout": response.timeout,
+            "total_hits": response.total_hits,
+            "hits": response
+                .hits
+                .iter()
+                .map(|hit| {
+                    json!({
+                        "id": hit.id,
+                        "schema_name": hit.schema_name,
+                        "score": hit.score,
+                        "highlights": hit.highlights.as_ref().map(|all| {
+                            all.iter()
+                                .map(|h| {
+                                    json!({
+                                        "field": h.field,
+                                        "best_fragment": h.best_fragment,
+                                    })
+                                })
+                                .collect::<Vec<_>>()
+                        }),
+                        "source": hit.source,
+                        "explanation": hit.explanation,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        })
+    }
+
+    #[test]
+    fn test_combine_search_responses_merges_both_sources_with_full_rrf_explanation() {
+        let rrf_options = RRFOptions {
+            rank_window_size: 100,
+            rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 2.0,
+        };
+
+        let text_response = make_response(
+            11,
+            false,
+            vec![make_hit(
+                "dataset",
+                "doc-1",
+                Some(10.0),
+                json!({"origin": "text"}),
+                Some(vec![SearchHighlight {
+                    field: "title".to_string(),
+                    best_fragment: "text fragment".to_string(),
+                }]),
+                Some(json!({"text": "exp"})),
+            )],
+        );
+
+        let vector_response = make_response(
+            17,
+            false,
+            vec![make_hit(
+                "dataset",
+                "doc-1",
+                Some(0.9),
+                json!({"origin": "vector"}),
+                Some(vec![SearchHighlight {
+                    field: "description".to_string(),
+                    best_fragment: "vector fragment".to_string(),
+                }]),
+                Some(json!({"vector": "exp"})),
+            )],
+        );
+
+        let response = ElasticsearchRRFCombiner::combine_search_responses(
+            text_response,
+            vector_response,
+            rrf_options,
+            10,
+        );
+
+        let expected_score = ElasticsearchRRFCombiner::rrf_inc(60, 1) * 1.0
+            + ElasticsearchRRFCombiner::rrf_inc(60, 1) * 2.0;
+
+        assert_eq!(
+            response_to_json(&response),
+            json!({
+                "took_ms": 17,
+                "timeout": false,
+                "total_hits": null,
+                "hits": [
+                    {
+                        "id": "doc-1",
+                        "schema_name": "dataset",
+                        "score": expected_score,
+                        "highlights": [
+                            {
+                                "field": "title",
+                                "best_fragment": "text fragment",
+                            }
+                        ],
+                        "source": {"origin": "text"},
+                        "explanation": {
+                            "description": "Reciprocal Rank Fusion (RRF) combined score",
+                            "value": expected_score,
+                            "details": [
+                                {
+                                    "description": "Textual search component",
+                                    "rank": 1,
+                                    "weight": 1.0,
+                                    "rrf_contribution": ElasticsearchRRFCombiner::rrf_inc(60, 1) * 1.0,
+                                    "original_score": 10.0,
+                                    "original_explanation": {"text": "exp"},
+                                },
+                                {
+                                    "description": "Vector search component",
+                                    "rank": 1,
+                                    "weight": 2.0,
+                                    "rrf_contribution": ElasticsearchRRFCombiner::rrf_inc(60, 1) * 2.0,
+                                    "original_score": 0.9,
+                                    "original_explanation": {"vector": "exp"},
+                                }
+                            ]
+                        },
+                    }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_combine_search_responses_uses_vector_highlights_if_textual_missing() {
+        let rrf_options = RRFOptions {
+            rank_window_size: 100,
+            rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
+        };
+
+        let text_response = make_response(
+            7,
+            false,
+            vec![make_hit(
+                "dataset",
+                "doc-1",
+                Some(6.0),
+                json!({"origin": "text"}),
+                None,
+                Some(json!({"text": "exp"})),
+            )],
+        );
+
+        let vector_response = make_response(
+            5,
+            false,
+            vec![make_hit(
+                "dataset",
+                "doc-1",
+                Some(0.5),
+                json!({"origin": "vector"}),
+                Some(vec![SearchHighlight {
+                    field: "description".to_string(),
+                    best_fragment: "vector fragment".to_string(),
+                }]),
+                Some(json!({"vector": "exp"})),
+            )],
+        );
+
+        let response = ElasticsearchRRFCombiner::combine_search_responses(
+            text_response,
+            vector_response,
+            rrf_options,
+            10,
+        );
+
+        let expected_score = ElasticsearchRRFCombiner::rrf_inc(60, 1) * 1.0
+            + ElasticsearchRRFCombiner::rrf_inc(60, 1) * 1.0;
+
+        assert_eq!(
+            response_to_json(&response),
+            json!({
+                "took_ms": 7,
+                "timeout": false,
+                "total_hits": null,
+                "hits": [
+                    {
+                        "id": "doc-1",
+                        "schema_name": "dataset",
+                        "score": expected_score,
+                        "highlights": [
+                            {
+                                "field": "description",
+                                "best_fragment": "vector fragment",
+                            }
+                        ],
+                        "source": {"origin": "text"},
+                        "explanation": {
+                            "description": "Reciprocal Rank Fusion (RRF) combined score",
+                            "value": expected_score,
+                            "details": [
+                                {
+                                    "description": "Textual search component",
+                                    "rank": 1,
+                                    "weight": 1.0,
+                                    "rrf_contribution": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                                    "original_score": 6.0,
+                                    "original_explanation": {"text": "exp"},
+                                },
+                                {
+                                    "description": "Vector search component",
+                                    "rank": 1,
+                                    "weight": 1.0,
+                                    "rrf_contribution": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                                    "original_score": 0.5,
+                                    "original_explanation": {"vector": "exp"},
+                                }
+                            ]
+                        },
+                    }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_combine_search_responses_handles_text_only_and_vector_only_without_explanations() {
+        let rrf_options = RRFOptions {
+            rank_window_size: 100,
+            rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
+        };
+
+        let text_response = make_response(
+            3,
+            true,
+            vec![make_hit(
+                "dataset",
+                "text-only",
+                Some(4.0),
+                json!({"kind": "text"}),
+                Some(vec![SearchHighlight {
+                    field: "title".to_string(),
+                    best_fragment: "text only".to_string(),
+                }]),
+                None,
+            )],
+        );
+
+        let vector_response = make_response(
+            9,
+            false,
+            vec![make_hit(
+                "dataset",
+                "vector-only",
+                Some(0.8),
+                json!({"kind": "vector"}),
+                Some(vec![SearchHighlight {
+                    field: "description".to_string(),
+                    best_fragment: "vector only".to_string(),
+                }]),
+                None,
+            )],
+        );
+
+        let response = ElasticsearchRRFCombiner::combine_search_responses(
+            text_response,
+            vector_response,
+            rrf_options,
+            10,
+        );
+
+        assert_eq!(
+            response_to_json(&response),
+            json!({
+                "took_ms": 9,
+                "timeout": true,
+                "total_hits": null,
+                "hits": [
+                    {
+                        "id": "text-only",
+                        "schema_name": "dataset",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": [
+                            {
+                                "field": "title",
+                                "best_fragment": "text only",
+                            }
+                        ],
+                        "source": {"kind": "text"},
+                        "explanation": null,
+                    },
+                    {
+                        "id": "vector-only",
+                        "schema_name": "dataset",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": [
+                            {
+                                "field": "description",
+                                "best_fragment": "vector only",
+                            }
+                        ],
+                        "source": {"kind": "vector"},
+                        "explanation": null,
+                    }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_combine_search_responses_applies_stable_tie_breaker_by_schema_and_id() {
+        let rrf_options = RRFOptions {
+            rank_window_size: 100,
+            rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
+        };
+
+        let text_response = make_response(
+            1,
+            false,
+            vec![make_hit(
+                "z-schema",
+                "z-id",
+                Some(1.0),
+                json!({"from": "text"}),
+                None,
+                None,
+            )],
+        );
+
+        let vector_response = make_response(
+            1,
+            false,
+            vec![make_hit(
+                "a-schema",
+                "a-id",
+                Some(0.1),
+                json!({"from": "vector"}),
+                None,
+                None,
+            )],
+        );
+
+        let response = ElasticsearchRRFCombiner::combine_search_responses(
+            text_response,
+            vector_response,
+            rrf_options,
+            10,
+        );
+
+        assert_eq!(
+            response_to_json(&response),
+            json!({
+                "took_ms": 1,
+                "timeout": false,
+                "total_hits": null,
+                "hits": [
+                    {
+                        "id": "a-id",
+                        "schema_name": "a-schema",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": null,
+                        "source": {"from": "vector"},
+                        "explanation": null,
+                    },
+                    {
+                        "id": "z-id",
+                        "schema_name": "z-schema",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": null,
+                        "source": {"from": "text"},
+                        "explanation": null,
+                    }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_combine_search_responses_respects_limit() {
+        let rrf_options = RRFOptions {
+            rank_window_size: 100,
+            rank_constant: 60,
+            textual_weight: 1.0,
+            vector_weight: 1.0,
+        };
+
+        let text_response = make_response(
+            5,
+            false,
+            vec![
+                make_hit("dataset", "doc-1", Some(9.0), json!({"idx": 1}), None, None),
+                make_hit("dataset", "doc-2", Some(8.0), json!({"idx": 2}), None, None),
+            ],
+        );
+
+        let vector_response = make_response(
+            6,
+            false,
+            vec![make_hit(
+                "dataset",
+                "doc-3",
+                Some(0.4),
+                json!({"idx": 3}),
+                None,
+                None,
+            )],
+        );
+
+        let response = ElasticsearchRRFCombiner::combine_search_responses(
+            text_response,
+            vector_response,
+            rrf_options,
+            2,
+        );
+
+        assert_eq!(
+            response_to_json(&response),
+            json!({
+                "took_ms": 6,
+                "timeout": false,
+                "total_hits": null,
+                "hits": [
+                    {
+                        "id": "doc-1",
+                        "schema_name": "dataset",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": null,
+                        "source": {"idx": 1},
+                        "explanation": null,
+                    },
+                    {
+                        "id": "doc-3",
+                        "schema_name": "dataset",
+                        "score": ElasticsearchRRFCombiner::rrf_inc(60, 1),
+                        "highlights": null,
+                        "source": {"idx": 3},
+                        "explanation": null,
+                    }
+                ]
+            })
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

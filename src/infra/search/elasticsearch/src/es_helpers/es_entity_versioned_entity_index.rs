@@ -472,16 +472,6 @@ mod tests {
         assert_eq!(decoded.schema_version, 5);
         assert_eq!(decoded.mapping_hash, "sha256:abc");
     }
-
-    #[test]
-    #[ignore = "Pending live-ES migration coverage via testing harness"]
-    fn test_migration_scenarios_plan_created_new() {}
-
-    #[test]
-    #[ignore = "Pending live-ES migration coverage via testing harness"]
-    fn test_migration_scenarios_upgrade_reindex() {}
-
-    #[test]
-    #[ignore = "Pending live-ES migration coverage via testing harness"]
-    fn test_migration_scenarios_breaking_recreate_and_drift() {}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
