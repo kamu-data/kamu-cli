@@ -13,6 +13,21 @@ use crate::es_helpers::{FIELD_SUFFIX_NGRAM, FIELD_SUFFIX_SUBSTR, FIELD_SUFFIX_TO
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const FULL_TEXT_NAME_BOOST_COEFF: f32 = 6.0;
+const FULL_TEXT_NAME_NGRAM_BOOST_COEFF: f32 = 1.5;
+const FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF: f32 = 4.0;
+const FULL_TEXT_IDENTIFIER_NGRAM_BOOST_COEFF: f32 = 1.0;
+const FULL_TEXT_IDENTIFIER_SUBSTR_BOOST_COEFF: f32 = 0.3;
+const FULL_TEXT_DESCRIPTION_BOOST_COEFF: f32 = 3.5;
+const FULL_TEXT_PROSE_BOOST_COEFF: f32 = 1.0;
+
+const AUTOCOMPLETE_NAME_NGRAM_BOOST_COEFF: f32 = 8.0;
+const AUTOCOMPLETE_NAME_BOOST_COEFF: f32 = 2.0;
+const AUTOCOMPLETE_IDENTIFIER_NGRAM_BOOST_COEFF: f32 = 5.0;
+const AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF: f32 = 1.0;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MultiMatchPolicyBuilder {}
 
 impl MultiMatchPolicyBuilder {
@@ -27,11 +42,12 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 6.0 * text_boosting_overrides.name_boost,
+                        boost: FULL_TEXT_NAME_BOOST_COEFF * text_boosting_overrides.name_boost,
                     });
                     specs.push(MultiMatchFieldSpec {
                         field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                        boost: 1.5 * text_boosting_overrides.name_boost,
+                        boost: FULL_TEXT_NAME_NGRAM_BOOST_COEFF
+                            * text_boosting_overrides.name_boost,
                     });
                 }
 
@@ -43,26 +59,30 @@ impl MultiMatchPolicyBuilder {
                     if *hierarchical {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_TOKENS),
-                            boost: 4.0 * text_boosting_overrides.identifier_boost,
+                            boost: FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     } else {
                         specs.push(MultiMatchFieldSpec {
                             field_name: field.path.to_string(),
-                            boost: 4.0 * text_boosting_overrides.identifier_boost,
+                            boost: FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     }
 
                     if *enable_edge_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                            boost: 1.0 * text_boosting_overrides.identifier_boost,
+                            boost: FULL_TEXT_IDENTIFIER_NGRAM_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     }
 
                     if *enable_inner_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_SUBSTR),
-                            boost: 0.3 * text_boosting_overrides.identifier_boost,
+                            boost: FULL_TEXT_IDENTIFIER_SUBSTR_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     }
                 }
@@ -70,14 +90,15 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Description { .. } => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 3.5 * text_boosting_overrides.description_boost,
+                        boost: FULL_TEXT_DESCRIPTION_BOOST_COEFF
+                            * text_boosting_overrides.description_boost,
                     });
                 }
 
                 SearchSchemaFieldRole::Prose => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 1.0 * text_boosting_overrides.prose_boost,
+                        boost: FULL_TEXT_PROSE_BOOST_COEFF * text_boosting_overrides.prose_boost,
                     });
                 }
 
@@ -105,11 +126,12 @@ impl MultiMatchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(MultiMatchFieldSpec {
                         field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                        boost: 8.0 * text_boosting_overrides.name_boost,
+                        boost: AUTOCOMPLETE_NAME_NGRAM_BOOST_COEFF
+                            * text_boosting_overrides.name_boost,
                     });
                     specs.push(MultiMatchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 2.0 * text_boosting_overrides.name_boost,
+                        boost: AUTOCOMPLETE_NAME_BOOST_COEFF * text_boosting_overrides.name_boost,
                     });
                 }
 
@@ -121,18 +143,21 @@ impl MultiMatchPolicyBuilder {
                     if *enable_edge_ngrams {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_NGRAM),
-                            boost: 5.0 * text_boosting_overrides.identifier_boost,
+                            boost: AUTOCOMPLETE_IDENTIFIER_NGRAM_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     }
                     if *hierarchical {
                         specs.push(MultiMatchFieldSpec {
                             field_name: format!("{}.{}", field.path, FIELD_SUFFIX_TOKENS),
-                            boost: 1.0 * text_boosting_overrides.identifier_boost,
+                            boost: AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     } else {
                         specs.push(MultiMatchFieldSpec {
                             field_name: field.path.to_string(),
-                            boost: 1.0 * text_boosting_overrides.identifier_boost,
+                            boost: AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF
+                                * text_boosting_overrides.identifier_boost,
                         });
                     }
                 }
@@ -199,14 +224,7 @@ pub struct MultiMatchFieldSpec {
 mod tests {
     use std::collections::HashMap;
 
-    use kamu_search::{
-        SearchEntitySchema,
-        SearchEntitySchemaFlags,
-        SearchEntitySchemaUpgradeMode,
-        SearchSchemaField,
-        SearchSchemaFieldRole,
-        TextBoostingOverrides,
-    };
+    use kamu_search::*;
 
     use super::*;
 
@@ -243,6 +261,35 @@ mod tests {
             path: "created_at",
             role: SearchSchemaFieldRole::DateTime,
         },
+        SearchSchemaField {
+            path: "kind",
+            role: SearchSchemaFieldRole::Keyword,
+        },
+        SearchSchemaField {
+            path: "is_public",
+            role: SearchSchemaFieldRole::Boolean,
+        },
+        SearchSchemaField {
+            path: "rank",
+            role: SearchSchemaFieldRole::Integer,
+        },
+        SearchSchemaField {
+            path: "raw_payload",
+            role: SearchSchemaFieldRole::UnprocessedObject,
+        },
+    ];
+
+    const FULL_TEXT_EXCLUDED_FIELDS: &[&str] =
+        &["created_at", "kind", "is_public", "rank", "raw_payload"];
+
+    const AUTOCOMPLETE_EXCLUDED_FIELDS: &[&str] = &[
+        "description",
+        "body",
+        "created_at",
+        "kind",
+        "is_public",
+        "rank",
+        "raw_payload",
     ];
 
     fn make_schema() -> SearchEntitySchema {
@@ -277,52 +324,198 @@ mod tests {
 
     #[test]
     fn test_build_full_text_policy() {
+        const NAME_BOOST_OVERRIDE: f32 = 2.0;
+        const IDENTIFIER_BOOST_OVERRIDE: f32 = 1.5;
+        const DESCRIPTION_BOOST_OVERRIDE: f32 = 1.2;
+        const PROSE_BOOST_OVERRIDE: f32 = 0.5;
+
         let policy = MultiMatchPolicyBuilder::build_full_text_policy(
             &make_schema(),
             TextBoostingOverrides {
-                name_boost: 2.0,
-                identifier_boost: 1.5,
-                description_boost: 1.2,
-                prose_boost: 0.5,
+                name_boost: NAME_BOOST_OVERRIDE,
+                identifier_boost: IDENTIFIER_BOOST_OVERRIDE,
+                description_boost: DESCRIPTION_BOOST_OVERRIDE,
+                prose_boost: PROSE_BOOST_OVERRIDE,
             },
         );
         let map = as_boost_map(&policy);
 
-        assert_boost_eq(*map.get("name").expect("name boost"), 12.0);
-        assert_boost_eq(*map.get("name.ngram").expect("name ngram boost"), 3.0);
+        assert_boost_eq(
+            *map.get("name").expect("name boost"),
+            FULL_TEXT_NAME_BOOST_COEFF * NAME_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("name.ngram").expect("name ngram boost"),
+            FULL_TEXT_NAME_NGRAM_BOOST_COEFF * NAME_BOOST_OVERRIDE,
+        );
         assert_boost_eq(
             *map.get("id_hier.tokens").expect("id_hier tokens boost"),
-            6.0,
+            FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
         );
-        assert_boost_eq(*map.get("id_hier.ngram").expect("id_hier ngram boost"), 1.5);
+        assert_boost_eq(
+            *map.get("id_hier.ngram").expect("id_hier ngram boost"),
+            FULL_TEXT_IDENTIFIER_NGRAM_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
+        );
         assert_boost_eq(
             *map.get("id_hier.substr").expect("id_hier substr boost"),
-            0.45,
+            FULL_TEXT_IDENTIFIER_SUBSTR_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
         );
-        assert_boost_eq(*map.get("id_flat").expect("id_flat boost"), 6.0);
-        assert_boost_eq(*map.get("description").expect("description boost"), 4.2);
-        assert_boost_eq(*map.get("body").expect("body boost"), 0.5);
-        assert!(!map.contains_key("created_at"));
+        assert_boost_eq(
+            *map.get("id_flat").expect("id_flat boost"),
+            FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("description").expect("description boost"),
+            FULL_TEXT_DESCRIPTION_BOOST_COEFF * DESCRIPTION_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("body").expect("body boost"),
+            FULL_TEXT_PROSE_BOOST_COEFF * PROSE_BOOST_OVERRIDE,
+        );
+
+        for field_name in FULL_TEXT_EXCLUDED_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_full_text_policy_without_overrides() {
+        const DEFAULT_BOOST_OVERRIDE: f32 = 1.0;
+
+        let policy = MultiMatchPolicyBuilder::build_full_text_policy(
+            &make_schema(),
+            TextBoostingOverrides::default(),
+        );
+        let map = as_boost_map(&policy);
+
+        assert_boost_eq(
+            *map.get("name").expect("name boost"),
+            FULL_TEXT_NAME_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("name.ngram").expect("name ngram boost"),
+            FULL_TEXT_NAME_NGRAM_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.tokens").expect("id_hier tokens boost"),
+            FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.ngram").expect("id_hier ngram boost"),
+            FULL_TEXT_IDENTIFIER_NGRAM_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.substr").expect("id_hier substr boost"),
+            FULL_TEXT_IDENTIFIER_SUBSTR_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_flat").expect("id_flat boost"),
+            FULL_TEXT_IDENTIFIER_MAIN_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("description").expect("description boost"),
+            FULL_TEXT_DESCRIPTION_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("body").expect("body boost"),
+            FULL_TEXT_PROSE_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+
+        for field_name in FULL_TEXT_EXCLUDED_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
     }
 
     #[test]
     fn test_build_autocomplete_policy() {
+        const DEFAULT_BOOST_OVERRIDE: f32 = 1.0;
+
         let policy = MultiMatchPolicyBuilder::build_autocomplete_policy(
             &make_schema(),
             TextBoostingOverrides::default(),
         );
         let map = as_boost_map(&policy);
 
-        assert_boost_eq(*map.get("name.ngram").expect("name.ngram boost"), 8.0);
-        assert_boost_eq(*map.get("name").expect("name boost"), 2.0);
-        assert_boost_eq(*map.get("id_hier.ngram").expect("id_hier ngram boost"), 5.0);
+        assert_boost_eq(
+            *map.get("name.ngram").expect("name.ngram boost"),
+            AUTOCOMPLETE_NAME_NGRAM_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("name").expect("name boost"),
+            AUTOCOMPLETE_NAME_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.ngram").expect("id_hier ngram boost"),
+            AUTOCOMPLETE_IDENTIFIER_NGRAM_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
         assert_boost_eq(
             *map.get("id_hier.tokens").expect("id_hier tokens boost"),
-            1.0,
+            AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
         );
-        assert_boost_eq(*map.get("id_flat").expect("id_flat boost"), 1.0);
-        assert!(!map.contains_key("description"));
-        assert!(!map.contains_key("body"));
+        assert_boost_eq(
+            *map.get("id_flat").expect("id_flat boost"),
+            AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+
+        for field_name in AUTOCOMPLETE_EXCLUDED_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_autocomplete_policy_with_overrides() {
+        const NAME_BOOST_OVERRIDE: f32 = 1.7;
+        const IDENTIFIER_BOOST_OVERRIDE: f32 = 2.5;
+        const DESCRIPTION_BOOST_OVERRIDE: f32 = 0.3;
+        const PROSE_BOOST_OVERRIDE: f32 = 0.2;
+
+        let policy = MultiMatchPolicyBuilder::build_autocomplete_policy(
+            &make_schema(),
+            TextBoostingOverrides {
+                name_boost: NAME_BOOST_OVERRIDE,
+                identifier_boost: IDENTIFIER_BOOST_OVERRIDE,
+                description_boost: DESCRIPTION_BOOST_OVERRIDE,
+                prose_boost: PROSE_BOOST_OVERRIDE,
+            },
+        );
+        let map = as_boost_map(&policy);
+
+        assert_boost_eq(
+            *map.get("name.ngram").expect("name.ngram boost"),
+            AUTOCOMPLETE_NAME_NGRAM_BOOST_COEFF * NAME_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("name").expect("name boost"),
+            AUTOCOMPLETE_NAME_BOOST_COEFF * NAME_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.ngram").expect("id_hier ngram boost"),
+            AUTOCOMPLETE_IDENTIFIER_NGRAM_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_hier.tokens").expect("id_hier tokens boost"),
+            AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
+        );
+        assert_boost_eq(
+            *map.get("id_flat").expect("id_flat boost"),
+            AUTOCOMPLETE_IDENTIFIER_MAIN_BOOST_COEFF * IDENTIFIER_BOOST_OVERRIDE,
+        );
+
+        for field_name in AUTOCOMPLETE_EXCLUDED_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
     }
 
     #[test]
@@ -360,3 +553,5 @@ mod tests {
         assert_boost_eq(*map.get("body").expect("body boost"), 0.5);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

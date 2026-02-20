@@ -11,6 +11,16 @@ use kamu_search::{SearchEntitySchema, SearchSchemaFieldRole, TextBoostingOverrid
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const NAME_PHRASE_BOOST_COEFF: f32 = 8.0;
+const DESCRIPTION_PHRASE_BOOST_COEFF: f32 = 4.0;
+const PROSE_PHRASE_BOOST_COEFF: f32 = 1.0;
+
+const NAME_PHRASE_SLOP_CAP: u32 = 1;
+const DESCRIPTION_PHRASE_SLOP_CAP: u32 = 2;
+const PROSE_PHRASE_SLOP_CAP: u32 = 6;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct PhraseSearchPolicyBuilder {}
 
 impl PhraseSearchPolicyBuilder {
@@ -26,24 +36,25 @@ impl PhraseSearchPolicyBuilder {
                 SearchSchemaFieldRole::Name => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 8.0 * text_boosting_overrides.name_boost,
-                        slop: std::cmp::min(user_slop, 1),
+                        boost: NAME_PHRASE_BOOST_COEFF * text_boosting_overrides.name_boost,
+                        slop: std::cmp::min(user_slop, NAME_PHRASE_SLOP_CAP),
                     });
                 }
 
                 SearchSchemaFieldRole::Description { .. } => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 4.0 * text_boosting_overrides.description_boost,
-                        slop: std::cmp::min(user_slop, 2),
+                        boost: DESCRIPTION_PHRASE_BOOST_COEFF
+                            * text_boosting_overrides.description_boost,
+                        slop: std::cmp::min(user_slop, DESCRIPTION_PHRASE_SLOP_CAP),
                     });
                 }
 
                 SearchSchemaFieldRole::Prose => {
                     specs.push(PhraseSearchFieldSpec {
                         field_name: field.path.to_string(),
-                        boost: 1.0 * text_boosting_overrides.prose_boost,
-                        slop: std::cmp::min(user_slop, 6),
+                        boost: PROSE_PHRASE_BOOST_COEFF * text_boosting_overrides.prose_boost,
+                        slop: std::cmp::min(user_slop, PROSE_PHRASE_SLOP_CAP),
                     });
                 }
 
@@ -123,14 +134,7 @@ pub struct PhraseSearchFieldSpec {
 mod tests {
     use std::collections::HashMap;
 
-    use kamu_search::{
-        SearchEntitySchema,
-        SearchEntitySchemaFlags,
-        SearchEntitySchemaUpgradeMode,
-        SearchSchemaField,
-        SearchSchemaFieldRole,
-        TextBoostingOverrides,
-    };
+    use kamu_search::*;
 
     use super::*;
 
@@ -159,6 +163,31 @@ mod tests {
             path: "kind",
             role: SearchSchemaFieldRole::Keyword,
         },
+        SearchSchemaField {
+            path: "is_public",
+            role: SearchSchemaFieldRole::Boolean,
+        },
+        SearchSchemaField {
+            path: "rank",
+            role: SearchSchemaFieldRole::Integer,
+        },
+        SearchSchemaField {
+            path: "created_at",
+            role: SearchSchemaFieldRole::DateTime,
+        },
+        SearchSchemaField {
+            path: "raw_payload",
+            role: SearchSchemaFieldRole::UnprocessedObject,
+        },
+    ];
+
+    const NON_PHRASE_FIELDS: &[&str] = &[
+        "id",
+        "kind",
+        "is_public",
+        "rank",
+        "created_at",
+        "raw_payload",
     ];
 
     fn make_schema() -> SearchEntitySchema {
@@ -192,35 +221,91 @@ mod tests {
     }
 
     #[test]
-    fn test_build_policy_respects_role_selection_and_slop_caps() {
+    fn test_build_policy_defaults_to_zero_slop_without_overrides() {
+        const USER_SLOP: u32 = 0;
+        const DEFAULT_BOOST_OVERRIDE: f32 = 1.0;
+
         let policy = PhraseSearchPolicyBuilder::build_policy(
             &make_schema(),
-            10,
+            USER_SLOP,
+            TextBoostingOverrides::default(),
+        );
+
+        let map = as_map(&policy);
+
+        let (name_boost, name_slop) = map.get("name").expect("name policy");
+        assert_boost_eq(
+            *name_boost,
+            NAME_PHRASE_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_eq!(*name_slop, USER_SLOP);
+
+        let (description_boost, description_slop) =
+            map.get("description").expect("description policy");
+        assert_boost_eq(
+            *description_boost,
+            DESCRIPTION_PHRASE_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_eq!(*description_slop, USER_SLOP);
+
+        let (body_boost, body_slop) = map.get("body").expect("body policy");
+        assert_boost_eq(
+            *body_boost,
+            PROSE_PHRASE_BOOST_COEFF * DEFAULT_BOOST_OVERRIDE,
+        );
+        assert_eq!(*body_slop, USER_SLOP);
+
+        for field_name in NON_PHRASE_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_policy_respects_role_selection_and_slop_caps() {
+        const USER_SLOP: u32 = 10;
+        const NAME_BOOST_OVERRIDE: f32 = 1.5;
+        const DESCRIPTION_BOOST_OVERRIDE: f32 = 2.0;
+        const PROSE_BOOST_OVERRIDE: f32 = 0.5;
+        const IDENTIFIER_BOOST_OVERRIDE: f32 = 3.0;
+
+        let policy = PhraseSearchPolicyBuilder::build_policy(
+            &make_schema(),
+            USER_SLOP,
             TextBoostingOverrides {
-                name_boost: 1.5,
-                description_boost: 2.0,
-                prose_boost: 0.5,
-                identifier_boost: 3.0,
+                name_boost: NAME_BOOST_OVERRIDE,
+                description_boost: DESCRIPTION_BOOST_OVERRIDE,
+                prose_boost: PROSE_BOOST_OVERRIDE,
+                identifier_boost: IDENTIFIER_BOOST_OVERRIDE,
             },
         );
 
         let map = as_map(&policy);
 
         let (name_boost, name_slop) = map.get("name").expect("name policy");
-        assert_boost_eq(*name_boost, 12.0);
-        assert_eq!(*name_slop, 1);
+        assert_boost_eq(*name_boost, NAME_PHRASE_BOOST_COEFF * NAME_BOOST_OVERRIDE);
+        assert_eq!(*name_slop, NAME_PHRASE_SLOP_CAP);
 
         let (description_boost, description_slop) =
             map.get("description").expect("description policy");
-        assert_boost_eq(*description_boost, 8.0);
-        assert_eq!(*description_slop, 2);
+        assert_boost_eq(
+            *description_boost,
+            DESCRIPTION_PHRASE_BOOST_COEFF * DESCRIPTION_BOOST_OVERRIDE,
+        );
+        assert_eq!(*description_slop, DESCRIPTION_PHRASE_SLOP_CAP);
 
         let (body_boost, body_slop) = map.get("body").expect("body policy");
-        assert_boost_eq(*body_boost, 0.5);
-        assert_eq!(*body_slop, 6);
+        assert_boost_eq(*body_boost, PROSE_PHRASE_BOOST_COEFF * PROSE_BOOST_OVERRIDE);
+        assert_eq!(*body_slop, PROSE_PHRASE_SLOP_CAP);
 
-        assert!(!map.contains_key("id"));
-        assert!(!map.contains_key("kind"));
+        for field_name in NON_PHRASE_FIELDS {
+            assert!(
+                !map.contains_key(field_name),
+                "unexpected policy for {field_name}"
+            );
+        }
     }
 
     #[test]
@@ -266,3 +351,5 @@ mod tests {
         assert_eq!(*body_slop, 6);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

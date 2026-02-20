@@ -126,25 +126,21 @@ mod tests {
 
     #[test]
     fn test_strip_internal_suffix() {
-        assert_eq!(
-            ElasticsearchHighlightExtractor::strip_internal_suffix("title.keyword"),
-            "title"
-        );
-        assert_eq!(
-            ElasticsearchHighlightExtractor::strip_internal_suffix("title.ngram"),
-            "title"
-        );
-        assert_eq!(
-            ElasticsearchHighlightExtractor::strip_internal_suffix("title.substr"),
-            "title"
-        );
-        assert_eq!(
-            ElasticsearchHighlightExtractor::strip_internal_suffix("title.tokens"),
-            "title"
-        );
-        assert_eq!(
-            ElasticsearchHighlightExtractor::strip_internal_suffix("title"),
-            "title"
-        );
+        let test_cases = vec![
+            ("title.keyword", "title"),
+            ("title.ngram", "title"),
+            ("title.substr", "title"),
+            ("title.tokens", "title"),
+            ("title", "title"),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                ElasticsearchHighlightExtractor::strip_internal_suffix(input),
+                expected
+            );
+        }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
