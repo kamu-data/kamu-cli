@@ -14,8 +14,11 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Search reset endpoint now allows specifying particular index names
-- Extended test coverage for Elasticsearch helpers
-- Added integration tests for Elasticsearch schema/alias/migration logic
+- Search test coverage improvements:
+  - Extended test coverage for Elasticsearch helpers
+  - Added integration tests for Elasticsearch schema/alias/migration logic
+  - Added test coverage for vector and hybrid search methods on the example of datasets,
+     and using pre-generated real OpenAI semantic embeddings
 
 ## [0.260.0] - 2026-02-17
 ### Added
