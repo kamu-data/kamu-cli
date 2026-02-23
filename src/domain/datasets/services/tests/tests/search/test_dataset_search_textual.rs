@@ -10,16 +10,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bon::bon;
 use kamu_accounts::{AccountConfig, PredefinedAccountsConfig};
 use kamu_core::TenancyConfig;
-use kamu_datasets::{ResolvedDataset, dataset_search_schema};
-use kamu_search::*;
-use kamu_search_elasticsearch::testing::{ElasticsearchTestContext, SearchTestResponse};
+use kamu_datasets::ResolvedDataset;
+use kamu_search_elasticsearch::testing::ElasticsearchTestContext;
 use odf::metadata::testing::MetadataFactory;
 
-use super::es_dataset_base_harness::ElasticsearchDatasetBaseHarness;
-use crate::tests::search::es_dataset_base_harness::PredefinedDatasetsConfig;
+use super::dataset_search_harness::DatasetSearchHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -901,88 +898,6 @@ async fn test_dataset_search_visibility(ctx: Arc<ElasticsearchTestContext>) {
         res.ids(),
         vec![dataset_ids[0].to_string(), dataset_ids[1].to_string()]
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[oop::extend(ElasticsearchDatasetBaseHarness, es_dataset_base_use_case_harness)]
-struct DatasetSearchHarness {
-    es_dataset_base_use_case_harness: ElasticsearchDatasetBaseHarness,
-}
-
-#[bon]
-impl DatasetSearchHarness {
-    #[builder]
-    pub async fn new(
-        ctx: Arc<ElasticsearchTestContext>,
-        tenancy_config: TenancyConfig,
-        maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
-        maybe_predefined_datasets_config: Option<PredefinedDatasetsConfig>,
-    ) -> Self {
-        let es_dataset_base_use_case_harness = ElasticsearchDatasetBaseHarness::builder()
-            .ctx(ctx)
-            .tenancy_config(tenancy_config)
-            .maybe_predefined_accounts_config(maybe_predefined_accounts_config)
-            .maybe_predefined_datasets_config(maybe_predefined_datasets_config)
-            .build()
-            .await;
-
-        Self {
-            es_dataset_base_use_case_harness,
-        }
-    }
-
-    async fn search_dataset(&self, query: &str) -> SearchTestResponse {
-        self.synchronize().await;
-
-        let seach_response = self
-            .search_repo()
-            .text_search(
-                SearchSecurityContext::Unrestricted,
-                TextSearchRequest {
-                    intent: TextSearchIntent::make_full_text(query),
-                    entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
-                    source: SearchRequestSourceSpec::None,
-                    filter: None,
-                    secondary_sort: sort!(kamu_search::fields::TITLE),
-                    page: SearchPaginationSpec {
-                        limit: 100,
-                        offset: 0,
-                    },
-                    options: TextSearchOptions::default(),
-                },
-            )
-            .await
-            .unwrap();
-
-        SearchTestResponse(seach_response)
-    }
-
-    pub async fn view_datasets_index_as(&self, account_id: &odf::AccountID) -> SearchTestResponse {
-        self.synchronize().await;
-
-        let seach_response = self
-            .search_repo()
-            .listing_search(
-                SearchSecurityContext::Restricted {
-                    current_principal_ids: vec![account_id.to_string()],
-                },
-                ListingSearchRequest {
-                    entity_schemas: vec![dataset_search_schema::SCHEMA_NAME],
-                    source: SearchRequestSourceSpec::All,
-                    filter: None,
-                    sort: sort!(dataset_search_schema::fields::DATASET_NAME),
-                    page: SearchPaginationSpec {
-                        limit: 100,
-                        offset: 0,
-                    },
-                },
-            )
-            .await
-            .unwrap();
-
-        SearchTestResponse(seach_response)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

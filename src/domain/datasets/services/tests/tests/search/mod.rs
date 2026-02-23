@@ -9,5 +9,9 @@
 
 pub mod es_dataset_base_harness;
 
+mod dataset_search_harness;
+mod dataset_search_semantic_harness;
 mod test_dataset_indexing;
-mod test_dataset_search;
+mod test_dataset_search_hybrid;
+mod test_dataset_search_textual;
+mod test_dataset_search_vector;
