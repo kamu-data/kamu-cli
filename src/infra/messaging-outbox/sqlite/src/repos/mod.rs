@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod sqlite_message_store_wakeup_detector;
 mod sqlite_outbox_message_consumption_repository;
 mod sqlite_outbox_message_repository;
 
+pub use sqlite_message_store_wakeup_detector::*;
 pub use sqlite_outbox_message_consumption_repository::*;
 pub use sqlite_outbox_message_repository::*;

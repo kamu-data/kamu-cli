@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod message_store_wakeup_detector;
 mod outbox_message_consumption_repository;
 mod outbox_message_repository;
 
+pub use message_store_wakeup_detector::*;
 pub use outbox_message_consumption_repository::*;
 pub use outbox_message_repository::*;

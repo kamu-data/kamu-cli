@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
@@ -18,10 +17,10 @@ use kamu_flow_system::{
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
-    FlowSystemEventStoreWakeHint,
 };
+use kamu_messaging_outbox_postgres::PostgresMessageStoreWakeupDetector;
+use messaging_outbox::MessageStoreWakeupDetector;
 use sqlx::Postgres;
-use sqlx::postgres::PgListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +29,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowSystemEventBridge {
-    pool: Arc<sqlx::PgPool>,
-    listener: tokio::sync::Mutex<Option<PgListener>>,
+    wakeup_detector: PostgresMessageStoreWakeupDetector,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,42 +40,8 @@ pub struct PostgresFlowSystemEventBridge {
 impl PostgresFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
         Self {
-            pool,
-            listener: tokio::sync::Mutex::new(None),
+            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
         }
-    }
-
-    async fn try_create_listener(&self) -> Option<PgListener> {
-        match PgListener::connect_with(&self.pool).await {
-            Ok(mut l) => match l.listen(NOTIFY_CHANNEL_NAME).await {
-                Ok(_) => Some(l),
-                Err(e) => {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        "Failed to listen on channel '{NOTIFY_CHANNEL_NAME}'",
-                    );
-                    None
-                }
-            },
-            Err(e) => {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Failed to connect to PgListener"
-                );
-                None
-            }
-        }
-    }
-
-    fn calculate_retry_delay(
-        &self,
-        deadline: tokio::time::Instant,
-        min_debounce_interval: Duration,
-    ) -> Duration {
-        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        std::cmp::min(min_debounce_interval, remaining)
     }
 }
 
@@ -85,103 +49,9 @@ impl PostgresFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
-    #[tracing::instrument(level = "debug", skip_all, fields(timeout, min_debounce_interval))]
-    async fn wait_wake(
-        &self,
-        timeout: Duration,
-        min_debounce_interval: Duration,
-    ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
-        let deadline = tokio::time::Instant::now() + timeout;
-
-        loop {
-            // Try to get or create a listener
-            let mut listener = match self.listener.lock().await.take() {
-                Some(existing_listener) => existing_listener,
-                None => {
-                    // No listener available, try to create one
-                    match self.try_create_listener().await {
-                        Some(new_listener) => new_listener,
-                        None => {
-                            // Failed to create listener, wait for min_debounce_interval and then
-                            // sleep for remaining timeout if any
-                            let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
-                            if !delay.is_zero() {
-                                tokio::time::sleep(delay).await;
-                            }
-
-                            // Check if we still have time left after the delay
-                            let remaining_after_delay =
-                                deadline.saturating_duration_since(tokio::time::Instant::now());
-                            if remaining_after_delay.is_zero() {
-                                return Ok(FlowSystemEventStoreWakeHint::Timeout);
-                            }
-
-                            // Continue to next iteration to try again
-                            continue;
-                        }
-                    }
-                }
-            };
-
-            // Calculate remaining timeout for this iteration
-            let remaining_timeout = deadline.saturating_duration_since(tokio::time::Instant::now());
-            if remaining_timeout.is_zero() {
-                // Timeout exceeded, put listener back and return
-                *self.listener.lock().await = Some(listener);
-                return Ok(FlowSystemEventStoreWakeHint::Timeout);
-            }
-
-            // Wait for notification with remaining timeout
-            match tokio::time::timeout(remaining_timeout, listener.recv()).await {
-                // Got a NOTIFY - new events are available
-                Ok(Ok(_notification)) => {
-                    // Optionally debounce by waiting a bit to collect more notifications
-                    if !min_debounce_interval.is_zero() {
-                        let remaining_after_debounce = deadline
-                            .saturating_duration_since(tokio::time::Instant::now())
-                            .saturating_sub(min_debounce_interval);
-
-                        if !remaining_after_debounce.is_zero() {
-                            // Drain additional notifications during debounce period
-                            let _ = tokio::time::timeout(min_debounce_interval, async {
-                                while (listener.recv().await).is_ok() {
-                                    // Just drain, we don't need the payload
-                                    // anymore
-                                }
-                            })
-                            .await;
-                        }
-                    }
-
-                    // Stash the listener back
-                    *self.listener.lock().await = Some(listener);
-
-                    return Ok(FlowSystemEventStoreWakeHint::NewEvents);
-                }
-
-                // Socket/conn error — drop listener and try to reconnect after delay
-                Ok(Err(conn_err)) => {
-                    tracing::error!(
-                        error = ?conn_err,
-                        error_msg = %conn_err,
-                        "PgListener connection error, will attempt to reconnect after delay",
-                    );
-
-                    // Wait for min_debounce_interval before retrying, if we have remaining time
-                    let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
-                    if !delay.is_zero() {
-                        tokio::time::sleep(delay).await;
-                    }
-                    // Loop will try to reconnect
-                }
-
-                // Timed out waiting — stash listener back and return
-                Err(_elapsed) => {
-                    *self.listener.lock().await = Some(listener);
-                    return Ok(FlowSystemEventStoreWakeHint::Timeout);
-                }
-            }
-        }
+    /// Provides event store wakeup detector instance
+    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
+        &self.wakeup_detector
     }
 
     /// Fetch next batch for the given projector; order by global id.

@@ -9,17 +9,17 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
-use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use tokio::sync::broadcast;
+use kamu_messaging_outbox_inmem::InMemoryMessageStoreWakeupDetector;
+use messaging_outbox::MessageStoreWakeupDetector;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventBridge {
     state: Mutex<State>,
-    tx: broadcast::Sender<()>,
+    wakeup_detector: InMemoryMessageStoreWakeupDetector,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,11 +40,11 @@ struct State {
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl InMemoryFlowSystemEventBridge {
     pub fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(1024);
+        let wakeup_detector = InMemoryMessageStoreWakeupDetector::new();
 
         Self {
             state: Mutex::new(State::default()),
-            tx,
+            wakeup_detector,
         }
     }
 
@@ -74,7 +74,7 @@ impl InMemoryFlowSystemEventBridge {
         let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
         // Wake up listeners
-        let _ = self.tx.send(());
+        self.wakeup_detector.notify_new_message_arrived();
 
         max_event_id
     }
@@ -84,34 +84,9 @@ impl InMemoryFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
-    async fn wait_wake(
-        &self,
-        timeout: Duration,
-        _min_debounce_interval: Duration,
-    ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
-        // Subscribe to events broadcast channel
-        let mut rx = self.tx.subscribe();
-
-        // Wait until a new event arrives or timeout elapses
-        // For testing purposes, we keep this simple without complex backoff strategies
-        match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok(())) => {
-                // New event arrived
-                Ok(FlowSystemEventStoreWakeHint::NewEvents)
-            }
-            Ok(Err(broadcast::error::RecvError::Closed)) => {
-                // Sender has been dropped, which should never happen in this case
-                unreachable!("InMemoryFlowSystemEventStore: broadcast channel closed");
-            }
-            Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
-                // We lagged behind, but that's fine, just indicate new events are available
-                Ok(FlowSystemEventStoreWakeHint::NewEvents)
-            }
-            Err(_elapsed) => {
-                // Timeout elapsed
-                Ok(FlowSystemEventStoreWakeHint::Timeout)
-            }
-        }
+    /// Provides event store wakeup detector instance
+    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
+        &self.wakeup_detector
     }
 
     /// Fetch next batch for the given projector; order by global id.

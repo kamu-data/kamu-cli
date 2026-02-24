@@ -24,8 +24,11 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 odf = { workspace = true }
+messaging-outbox = { workspace = true }
 time-source = { workspace = true }
+
 kamu-flow-system = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
 
 async-stream = "0.3.6"
 async-trait = { version = "0.1", default-features = false }

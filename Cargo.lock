@@ -8337,6 +8337,8 @@ dependencies = [
  "futures",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
+ "kamu-messaging-outbox-inmem",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -8362,6 +8364,8 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
+ "kamu-messaging-outbox-postgres",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -8454,6 +8458,8 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
+ "kamu-messaging-outbox-sqlite",
+ "messaging-outbox",
  "opendatafabric",
  "serde_json",
  "sqlx",
@@ -8531,6 +8537,8 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -8563,6 +8571,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
 ]
 
 [[package]]
