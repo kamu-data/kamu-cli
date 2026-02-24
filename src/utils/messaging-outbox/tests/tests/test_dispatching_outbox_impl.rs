@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository;
+use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
@@ -219,6 +219,7 @@ impl DispatchingOutboxHarness {
         b.add::<OutboxDispatchingImpl>();
         b.bind::<dyn Outbox, OutboxDispatchingImpl>();
         b.add::<InMemoryOutboxMessageRepository>();
+        b.add::<InMemoryOutboxMessageBridge>();
         b.add::<SystemTimeSourceDefault>();
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerB>();

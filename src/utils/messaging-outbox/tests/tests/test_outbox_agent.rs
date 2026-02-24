@@ -13,6 +13,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
 use kamu_messaging_outbox_inmem::{
+    InMemoryOutboxMessageBridge,
     InMemoryOutboxMessageConsumptionRepository,
     InMemoryOutboxMessageRepository,
 };
@@ -564,6 +565,7 @@ impl OutboxAgentHarness {
         b.add::<OutboxAgentImpl>();
         b.add::<OutboxAgentMetrics>();
         b.add_value(OutboxConfig::default());
+        b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<InMemoryOutboxMessageConsumptionRepository>();
         b.add::<OutboxTransactionalImpl>();

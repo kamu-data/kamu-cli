@@ -14,12 +14,14 @@ use std::sync::{Arc, Mutex};
 use dill::{Singleton, component, interface, scope};
 use internal_error::InternalError;
 
+use crate::InMemoryOutboxMessageBridge;
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryOutboxMessageRepository {
     state: Arc<Mutex<State>>,
+    event_bridge: Arc<InMemoryOutboxMessageBridge>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,9 +52,10 @@ impl State {
 #[scope(Singleton)]
 #[interface(dyn OutboxMessageRepository)]
 impl InMemoryOutboxMessageRepository {
-    pub fn new() -> Self {
+    pub fn new(event_bridge: Arc<InMemoryOutboxMessageBridge>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
+            event_bridge,
         }
     }
 }
@@ -69,9 +72,13 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
             .latest_message_id_by_producer
             .insert(new_message.producer_name.clone(), message_id);
 
-        guard
-            .messages
-            .insert(message_id, new_message.as_outbox_message(message_id));
+        guard.messages.insert(
+            message_id,
+            new_message.as_outbox_message(message_id, 0 /* tx_id */),
+        );
+
+        self.event_bridge.save_message(&new_message);
+
         Ok(())
     }
 

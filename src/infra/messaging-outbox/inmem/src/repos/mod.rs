@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod inmem_message_store_wakeup_detector;
+mod inmem_outbox_message_bridge;
 mod inmem_outbox_message_consumption_repository;
 mod inmem_outbox_message_repository;
 
 pub use inmem_message_store_wakeup_detector::*;
+pub use inmem_outbox_message_bridge::*;
 pub use inmem_outbox_message_consumption_repository::*;
 pub use inmem_outbox_message_repository::*;

@@ -67,6 +67,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                     r#"
                     SELECT
                         message_id,
+                        tx_id::text::bigint AS "tx_id!: i64",
                         producer_name,
                         content_json,
                         occurred_on,
@@ -88,6 +89,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                     )
                     SELECT
                         m.message_id,
+                        m.tx_id::text::bigint AS "tx_id!: i64",
                         m.producer_name,
                         m.content_json,
                         m.occurred_on,

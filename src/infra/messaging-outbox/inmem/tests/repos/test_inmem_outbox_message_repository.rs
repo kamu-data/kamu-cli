@@ -9,7 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository;
+use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,6 +62,7 @@ impl InMemoryOutboxMessageRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryOutboxMessageRepository>();
+        catalog_builder.add::<InMemoryOutboxMessageBridge>();
 
         Self {
             catalog: catalog_builder.build(),

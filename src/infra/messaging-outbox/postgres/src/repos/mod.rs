@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod postgres_message_store_wakeup_detector;
+mod postgres_outbox_message_bridge;
 mod postgres_outbox_message_consumption_repository;
 mod postgres_outbox_message_repository;
 
 pub use postgres_message_store_wakeup_detector::*;
+pub use postgres_outbox_message_bridge::*;
 pub use postgres_outbox_message_consumption_repository::*;
 pub use postgres_outbox_message_repository::*;

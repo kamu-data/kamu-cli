@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository;
+use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
 use messaging_outbox::{
     Message,
     Outbox,
@@ -113,6 +113,7 @@ impl TransactionalOutboxHarness {
         let mut b = CatalogBuilder::new();
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
+        b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<SystemTimeSourceDefault>();
 

@@ -79,6 +79,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                     r#"
                     SELECT
                         message_id,
+                        0 AS "tx_id!: i64",
                         producer_name,
                         content_json as "content_json: _",
                         occurred_on as "occurred_on: _",
@@ -101,6 +102,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
                     )
                     SELECT
                         m.message_id,
+                        0 AS "tx_id!: i64",
                         m.producer_name,
                         m.content_json as "content_json: _",
                         m.occurred_on as "occurred_on: _",

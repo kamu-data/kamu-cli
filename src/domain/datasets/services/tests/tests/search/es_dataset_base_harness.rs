@@ -26,6 +26,7 @@ use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use kamu_messaging_outbox_inmem::{
+    InMemoryOutboxMessageBridge,
     InMemoryOutboxMessageConsumptionRepository,
     InMemoryOutboxMessageRepository,
 };
@@ -118,6 +119,7 @@ impl ElasticsearchDatasetBaseHarness {
         let indexing_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
             // Outbox repositories
+            b.add::<InMemoryOutboxMessageBridge>();
             b.add::<InMemoryOutboxMessageRepository>();
             b.add::<InMemoryOutboxMessageConsumptionRepository>();
 

@@ -28,6 +28,7 @@ internal-error = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde_json = { version = "1", default-features = false }
@@ -39,6 +40,7 @@ sqlx = { version = "0.8", default-features = false, features = [
     "json",
 ] }
 tokio = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false}
 
 [dev-dependencies]
 database-common-macros = { workspace = true }

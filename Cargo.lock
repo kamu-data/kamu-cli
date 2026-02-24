@@ -8513,6 +8513,7 @@ dependencies = [
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "messaging-outbox",
+ "serde_json",
  "test-group",
  "test-log",
  "tokio",
@@ -8560,6 +8561,7 @@ version = "0.260.1"
 dependencies = [
  "async-stream",
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -8572,6 +8574,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
