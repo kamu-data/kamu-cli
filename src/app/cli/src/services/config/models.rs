@@ -610,7 +610,7 @@ pub struct SearchConfig {
     pub embeddings_chunker: EmbeddingsChunkerConfig,
 
     /// Embeddings encoder configuration
-    #[config(default = EmbeddingsEncoderConfig::OpenAi(EmbeddingsEncoderConfigOpenAi::default()))]
+    #[config(default = EmbeddingsEncoderConfig::Dummy(EmbeddingsEncoderConfigDummy::default()))]
     pub embeddings_encoder: EmbeddingsEncoderConfig,
 
     /// Search repository configuration
