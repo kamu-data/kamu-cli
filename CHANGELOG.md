@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.260.1] - 2026-02-25
 ### Added
 - Search reset endpoint now allows specifying particular index names
 - Search test coverage improvements:
