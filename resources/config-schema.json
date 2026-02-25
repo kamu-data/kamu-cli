@@ -1062,9 +1062,7 @@
         "embeddingsEncoder": {
           "$ref": "#/$defs/EmbeddingsEncoderConfig",
           "default": {
-            "dimensions": 1536,
-            "kind": "OpenAi",
-            "modelName": "text-embedding-ada-002"
+            "kind": "Dummy"
           },
           "description": "Embeddings encoder configuration"
         },
@@ -1441,9 +1439,7 @@
           "splitSections": false
         },
         "embeddingsEncoder": {
-          "dimensions": 1536,
-          "kind": "OpenAi",
-          "modelName": "text-embedding-ada-002"
+          "kind": "Dummy"
         },
         "indexer": {
           "clearOnStart": false,

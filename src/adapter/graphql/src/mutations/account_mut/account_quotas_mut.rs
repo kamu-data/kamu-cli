@@ -80,6 +80,7 @@ pub enum SetAccountQuotasResult {
 }
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct SetAccountQuotasResultSuccess {
     message: String,
 }
@@ -92,6 +93,7 @@ impl SetAccountQuotasResultSuccess {
 }
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct SetAccountQuotasResultInvalidInput {
     message: String,
 }

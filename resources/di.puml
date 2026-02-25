@@ -215,11 +215,10 @@ class "DependencyGraphServiceImpl" <<singleton>>
 class "DidGeneratorDefault"
 class "DidSecretEncryptionConfig" <<singleton>>
 class "DidSecretService"
+class "DummyEmbeddingsEncoder"
 class "DummySearchService"
 class "EmbeddingsChunkerConfigSimple" <<singleton>>
 class "EmbeddingsChunkerSimple"
-class "EmbeddingsEncoderConfigOpenAI" <<singleton>>
-class "EmbeddingsEncoderOpenAi" <<singleton>>
 class "EmbeddingsProviderImpl"
 class "EngineConfigDatafusionEmbeddedBatchQuery" <<singleton>>
 class "EngineConfigDatafusionEmbeddedCompaction" <<singleton>>
@@ -881,8 +880,7 @@ class "WsSmartTransferProtocolClient"
 "SqliteOutboxMessageRepository"  --> "TransactionRefT"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
-"EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
-"EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
+"EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
 "SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"

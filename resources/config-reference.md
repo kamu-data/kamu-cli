@@ -159,9 +159,7 @@
     &quot;splitSections&quot;: false
   },
   &quot;embeddingsEncoder&quot;: {
-    &quot;dimensions&quot;: 1536,
-    &quot;kind&quot;: &quot;OpenAi&quot;,
-    &quot;modelName&quot;: &quot;text-embedding-ada-002&quot;
+    &quot;kind&quot;: &quot;Dummy&quot;
   },
   &quot;indexer&quot;: {
     &quot;clearOnStart&quot;: false,
@@ -1574,9 +1572,7 @@ Base type: `string`
 <td><code>embeddingsEncoder</code></td>
 <td><a href="#embeddingsencoderconfig"><code>EmbeddingsEncoderConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;dimensions&quot;: 1536,
-  &quot;kind&quot;: &quot;OpenAi&quot;,
-  &quot;modelName&quot;: &quot;text-embedding-ada-002&quot;
+  &quot;kind&quot;: &quot;Dummy&quot;
 }</code></pre></td>
 <td>Embeddings encoder configuration</td>
 </tr>

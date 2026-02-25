@@ -3829,10 +3829,12 @@ interface SetAccountQuotasResult {
 
 type SetAccountQuotasResultInvalidInput implements SetAccountQuotasResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type SetAccountQuotasResultSuccess implements SetAccountQuotasResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 input SetAccountQuotasStorageInput {

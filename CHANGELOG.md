@@ -20,7 +20,8 @@ Recommendation: for ease of reading, use the following order:
   - Added test coverage for vector and hybrid search methods on the example of datasets,
      and using pre-generated real OpenAI semantic embeddings
 ### Fixed
-- Default embeddings provider in CLI should be Dummmy, not OpenAI     
+- Default embeddings provider in CLI should be Dummmy, not OpenAI
+- Inaccurate GQL schema extraction for `SetAccountQuotasResult` union
 
 ## [0.260.0] - 2026-02-17
 ### Added
