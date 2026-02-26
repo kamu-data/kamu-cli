@@ -1,6 +1,8 @@
 <div align="center">
 
+<a href="https://kamu.dev" target="_blank">
 <img alt="Kamu: Planet-scale data pipeline" src="docs/readme_files/kamu_logo.png" width=300/>
+</a>
 
 [Website] | [Docs] | [Demo] | [Tutorials] | [Examples] | [FAQ] | [Chat]
 
@@ -16,9 +18,12 @@
 `kamu` *(pronounced [kæmˈuː](https://en.wikipedia.org/wiki/Albert_Camus))* is a command-line tool for management and verifiable processing of dynamic structured data. It's a green-field project that aims to enable **global collaboration on data** on the same scale as seen today in software.
 
 ## Intro
-`kamu` is based on [Open Data Fabric](https://opendatafabric.org) protocol spec introduced here:
+`kamu` is based on [Open Data Fabric](https://opendatafabric.org) protocol.
 <div align="center">
-<a href="https://www.youtube.com/watch?v=ZyiZVfuVM9E"><img alt="Open Data Fabric: Building Block of Collaborative Data" src="https://img.youtube.com/vi/ZyiZVfuVM9E/maxresdefault.jpg" width="60%"/></a>
+<a href="https://www.youtube.com/watch?v=ZyiZVfuVM9E" target="_blank">
+<img alt="Open Data Fabric: Building Block of Collaborative Data" src="https://img.youtube.com/vi/ZyiZVfuVM9E/maxresdefault.jpg" width="60%"/>
+</a>
+<p><i>Introductory video</i></p>
 </div>
 
 You can think of it as:
