@@ -13,9 +13,7 @@
 </p>
 </div>
 
-`kamu` *(pronounced [kæmˈuː](https://en.wikipedia.org/wiki/Albert_Camus))* is a command-line tool for management and verifiable processing of dynamic structured data.
-
-It's a green-field project that aims to enable **global collaboration on data** on the same scale as seen today in software.
+`kamu` *(pronounced [kæmˈuː](https://en.wikipedia.org/wiki/Albert_Camus))* is a command-line tool for management and verifiable processing of dynamic structured data. It's a green-field project that aims to enable **global collaboration on data** on the same scale as seen today in software.
 
 ## Intro
 `kamu` is based on [Open Data Fabric](https://opendatafabric.org) protocol spec introduced here:
