@@ -13,26 +13,25 @@
 </p>
 </div>
 
-## About
-`kamu` *(pronounced [kæmˈuː](https://en.wikipedia.org/wiki/Albert_Camus))* is a command-line tool for management and verifiable processing of structured data.
+`kamu` *(pronounced [kæmˈuː](https://en.wikipedia.org/wiki/Albert_Camus))* is a command-line tool for management and verifiable processing of dynamic structured data.
 
 It's a green-field project that aims to enable **global collaboration on data** on the same scale as seen today in software.
 
-You can think of `kamu` as:
-- ***Local-first data lakehouse*** - a free alternative to Databricks / Snowflake / Microsoft Fabric that can run on your laptop without any accounts, and scale to a large on-prem cluster
+## Intro
+`kamu` is based on [Open Data Fabric](https://opendatafabric.org) protocol spec introduced here:
+<div align="center">
+<a href="https://www.youtube.com/watch?v=ZyiZVfuVM9E"><img alt="Open Data Fabric: Building Block of Collaborative Data" src="https://img.youtube.com/vi/ZyiZVfuVM9E/maxresdefault.jpg" width="60%"/></a>
+</div>
+
+You can think of it as:
+- ***Local-first lakehouse*** - a free alternative to Databricks / Snowflake / Microsoft Fabric that can run on your laptop without any accounts, and scale to a large on-prem cluster
 - ***Kubernetes for data pipelines*** - an *infrastructure-as-code* framework for building ETL pipelines using [wide range of open-source SQL engines](https://docs.kamu.dev/cli/supported-engines/)
 - ***Git for data*** - a tamper-proof ledger that handles data ownership and preserves full history of changes to source data
-- ***Blockchain for data*** - a verifiable computing system for transforming data and recording fine-grain provenance and lineage
+- ***Smart contracts for SQL*** - a verifiable computing system for transforming data and recording fine-grain provenance and lineage
 - ***Peer-to-peer data network*** - a set of [open data formats and protocols](https://github.com/open-data-fabric/open-data-fabric/) for:
   - Non-custodial data sharing
   - Federated querying of global data as if one giant database
   - Processing pipelines that can span across multiple organizations.
-
-
-### Featured Video
-<div align="center">
-<a href="https://www.youtube.com/watch?v=c9UCjJdvJAU"><img alt="Kamu: Unified On/Off-Chain Analytics Tutorial" src="https://img.youtube.com/vi/c9UCjJdvJAU/0.jpg" width="50%"/></a>
-</div>
 
 
 ## Quick Start
