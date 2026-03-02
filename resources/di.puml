@@ -271,9 +271,9 @@ class "ObjectStoreBuilderLocalFs" <<agnostic>>
 class "ObjectStoreRegistryImpl" <<singleton>>
 class "OsoDatasetAuthorizer"
 class "OsoResourceServiceImpl"
+class "OutboxAgentConfig" <<singleton>>
 class "OutboxAgentImpl" <<singleton>>
 class "OutboxAgentMetrics" <<singleton>>
-class "OutboxConfig" <<singleton>>
 class "OutboxDispatchingImpl"
 class "OutboxImmediateImpl"
 class "OutboxTransactionalImpl"
@@ -904,8 +904,9 @@ class "WsSmartTransferProtocolClient"
 "OutboxAgent" <|-- "OutboxAgentImpl"
 "OutboxAgentImpl"  --> "CatalogWeakRef"
 "OutboxAgentImpl" "*" --> "MessageDispatcher"
+"OutboxAgentImpl"  --> "OutboxMessageBridge"
 "OutboxAgentImpl"  --> "OutboxAgentMetrics"
-"OutboxAgentImpl"  --> "OutboxConfig"
+"OutboxAgentImpl"  --> "OutboxAgentConfig"
 "MetricsProvider" <|-- "OutboxAgentMetrics"
 "OutboxDispatchingImpl"  --> "Catalog"
 "OutboxDispatchingImpl"  --> "OutboxImmediateImpl"

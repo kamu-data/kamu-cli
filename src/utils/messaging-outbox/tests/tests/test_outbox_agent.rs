@@ -564,7 +564,7 @@ impl OutboxAgentHarness {
         let mut b = CatalogBuilder::new();
         b.add::<OutboxAgentImpl>();
         b.add::<OutboxAgentMetrics>();
-        b.add_value(OutboxConfig::default());
+        b.add_value(OutboxAgentConfig::local_default());
         b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryOutboxMessageRepository>();
         b.add::<InMemoryOutboxMessageConsumptionRepository>();

@@ -36,9 +36,10 @@ pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgen
 
 pub struct OutboxAgentImpl {
     catalog: CatalogWeakRef,
-    config: Arc<OutboxConfig>,
+    agent_config: Arc<OutboxAgentConfig>,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
     run_lock: tokio::sync::Mutex<()>,
 }
@@ -56,8 +57,9 @@ pub struct OutboxAgentImpl {
 impl OutboxAgentImpl {
     pub fn new(
         catalog: CatalogWeakRef,
-        config: Arc<OutboxConfig>,
+        agent_config: Arc<OutboxAgentConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
+        outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
     ) -> Self {
         let routes_static_info = Arc::new(Self::make_static_routes_info(
@@ -80,9 +82,10 @@ impl OutboxAgentImpl {
 
         Self {
             catalog,
-            config,
+            agent_config,
             routes_static_info,
             producer_consumption_jobs,
+            outbox_message_bridge,
             metrics,
             run_lock: tokio::sync::Mutex::new(()),
         }
@@ -111,26 +114,49 @@ impl OutboxAgentImpl {
             RunMode::SingleIterationOnly => {
                 self.run_consumption_iteration().await?;
             }
-            RunMode::WhileHasTasks => loop {
-                let processed_consumer_tasks_count = self
-                    .run_consumption_iteration()
-                    .instrument(tracing::debug_span!("OutboxAgent::tick"))
+
+            RunMode::WhileHasTasks => {
+                self.run_while_has_tasks().await?;
+            }
+
+            RunMode::MainRelayLoop => {
+                // Initial catchup phase to process all existing messages
+                // before starting the main loop
+                self.run_while_has_tasks()
+                    .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
                     .await?;
 
-                if processed_consumer_tasks_count == 0 {
-                    break;
-                }
-            },
-            RunMode::MainRelayLoop => {
-                let loop_delay = self.config.awaiting_step.to_std().unwrap();
+                // Access wakeup detector
+                let wakeup_detector = self.outbox_message_bridge.wakeup_detector();
 
                 loop {
-                    self.run_consumption_iteration()
-                        .instrument(tracing::debug_span!("OutboxAgent::tick"))
+                    // Wait for push or timeout - let the store handle the backoff strategy
+                    let hint = wakeup_detector
+                        .wait_wake(
+                            self.agent_config.max_listening_timeout,
+                            self.agent_config.min_debounce_interval,
+                        )
                         .await?;
+                    tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-                    tokio::time::sleep(loop_delay).await;
+                    // Process tasks while they are available, to make sure we process all messages
+                    self.run_while_has_tasks().await?;
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
+        loop {
+            let processed_consumer_tasks_count = self
+                .run_consumption_iteration()
+                .instrument(tracing::debug_span!("OutboxAgent::tick"))
+                .await?;
+
+            if processed_consumer_tasks_count == 0 {
+                break;
             }
         }
 
@@ -278,7 +304,7 @@ impl OutboxAgentImpl {
             outbox_message_repository,
             outbox_consumption_repository,
             self.metrics.clone(),
-            usize::try_from(self.config.batch_size).unwrap(),
+            self.agent_config.batch_size,
         );
 
         planner.plan_consumption_tasks_by_producer().await

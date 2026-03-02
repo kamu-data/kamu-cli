@@ -116,12 +116,13 @@
 </tr>
 <tr>
 <td><code>outbox</code></td>
-<td><a href="#outboxconfig"><code>OutboxConfig</code></a></td>
+<td><a href="#outboxagentconfig"><code>OutboxAgentConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;awaitingStepSecs&quot;: 1,
-  &quot;batchSize&quot;: 20
+  &quot;batchSize&quot;: 20,
+  &quot;maxListeningTimeoutMs&quot;: 2000,
+  &quot;minDebounceIntervalMs&quot;: 100
 }</code></pre></td>
-<td>Messaging outbox configuration</td>
+<td>Messaging outbox agent configuration</td>
 </tr>
 <tr>
 <td><code>protocol</code></td>
@@ -1426,21 +1427,27 @@ it usually runs uses host network namespace.
 </tbody>
 </table>
 
-## `OutboxConfig`
+## `OutboxAgentConfig`
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr>
-<td><code>awaitingStepSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">1</code></td>
-<td></td>
-</tr>
-<tr>
 <td><code>batchSize</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>maxListeningTimeoutMs</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">2000</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>minDebounceIntervalMs</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">100</code></td>
 <td></td>
 </tr>
 </tbody>
