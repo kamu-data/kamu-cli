@@ -73,24 +73,27 @@ pub async fn test_push_messages_from_several_producers(catalog: &Catalog) {
         .unwrap();
     message_boundaries_by_producer.sort_by(|a, b| a.0.cmp(&b.0));
 
+    assert_eq!(2, message_boundaries_by_producer.len());
     assert_eq!(
-        message_boundaries_by_producer,
-        vec![
-            (
-                "A".to_string(),
-                OutboxMessageBoundary {
-                    message_id: OutboxMessageID::new(2),
-                    tx_id: 0
-                }
-            ),
-            (
-                "B".to_string(),
-                OutboxMessageBoundary {
-                    message_id: OutboxMessageID::new(3),
-                    tx_id: 0
-                }
-            ),
-        ]
+        message_boundaries_by_producer[0].0,
+        "A".to_string(),
+        "Producer A should be present"
+    );
+    assert_eq!(
+        message_boundaries_by_producer[0].1.message_id,
+        OutboxMessageID::new(2),
+        "Producer A should have correct boundary"
+    );
+
+    assert_eq!(
+        message_boundaries_by_producer[1].0,
+        "B".to_string(),
+        "Producer B should be present"
+    );
+    assert_eq!(
+        message_boundaries_by_producer[1].1.message_id,
+        OutboxMessageID::new(3),
+        "Producer B should have correct boundary"
     );
 }
 

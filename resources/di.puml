@@ -97,7 +97,6 @@ interface "ObjectStoreRegistry" <<i>>
 interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
 interface "OutboxMessageBridge" <<i>>
-interface "OutboxMessageConsumptionRepository" <<i>>
 interface "OutboxMessageRepository" <<i>>
 interface "PasswordHashRepository" <<i>>
 interface "PollingIngestService" <<i>>
@@ -349,7 +348,6 @@ class "SqliteFlowSystemEventBridge" <<agnostic>>
 class "SqliteFlowTriggerEventStore"
 class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
-class "SqliteOutboxMessageConsumptionRepository"
 class "SqliteOutboxMessageRepository"
 class "SqlitePlugin"
 class "SqliteRebacRepository"
@@ -878,8 +876,6 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
-"OutboxMessageConsumptionRepository" <|-- "SqliteOutboxMessageConsumptionRepository"
-"SqliteOutboxMessageConsumptionRepository"  --> "TransactionRefT"
 "OutboxMessageRepository" <|-- "SqliteOutboxMessageRepository"
 "SqliteOutboxMessageRepository"  --> "TransactionRefT"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"

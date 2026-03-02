@@ -7,5 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_sqlite_outbox_message_consumption_repository;
 mod test_sqlite_outbox_message_repository;

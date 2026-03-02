@@ -25,11 +25,7 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_messaging_outbox_inmem::{
-    InMemoryOutboxMessageBridge,
-    InMemoryOutboxMessageConsumptionRepository,
-    InMemoryOutboxMessageRepository,
-};
+use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{
@@ -121,7 +117,6 @@ impl ElasticsearchDatasetBaseHarness {
             // Outbox repositories
             b.add::<InMemoryOutboxMessageBridge>();
             b.add::<InMemoryOutboxMessageRepository>();
-            b.add::<InMemoryOutboxMessageConsumptionRepository>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();

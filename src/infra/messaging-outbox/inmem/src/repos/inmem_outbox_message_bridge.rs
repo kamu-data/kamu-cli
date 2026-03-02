@@ -33,10 +33,10 @@ struct State {
     next_pos: HashMap<ChannelKey, usize>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct ChannelKey {
-    producer_name: &'static str,
-    consumer_name: &'static str,
+    producer_name: String,
+    consumer_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,19 +87,23 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
     async fn fetch_next_batch(
         &self,
         _: &dill::Catalog,
-        producer_name: &'static str,
-        consumer_name: &'static str,
+        producer_name: &str,
+        consumer_name: &str,
         batch_size: usize,
     ) -> Result<Vec<OutboxMessage>, InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let channel_key = ChannelKey {
-            producer_name,
-            consumer_name,
+            producer_name: producer_name.to_string(),
+            consumer_name: consumer_name.to_string(),
         };
 
         let pos = state.next_pos.get(&channel_key).copied().unwrap_or(0);
-        let applied = state.applied.entry(channel_key).or_default().clone();
+        let applied = state
+            .applied
+            .entry(channel_key.clone())
+            .or_default()
+            .clone();
 
         let mut res = Vec::with_capacity(batch_size);
         let mut i = pos;
@@ -120,20 +124,47 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         Ok(res)
     }
 
+    fn list_consumption_boundaries(
+        &self,
+        _transactional_catalog: &dill::Catalog,
+    ) -> OutboxMessageConsumptionBoundariesStream<'_> {
+        let boundaries = {
+            let guard = self.state.lock().unwrap();
+            guard
+                .applied
+                .iter()
+                .map(|(channel_key, applied)| {
+                    Ok(OutboxMessageConsumptionBoundary {
+                        producer_name: channel_key.producer_name.clone(),
+                        consumer_name: channel_key.consumer_name.clone(),
+                        last_consumed_message_id: applied
+                            .iter()
+                            .last()
+                            .copied()
+                            .unwrap_or(OutboxMessageID::new(0)),
+                        last_tx_id: 0, // no tx_id in-memory
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+
+        Box::pin(tokio_stream::iter(boundaries))
+    }
+
     /// Mark these messages as applied for this producer-consumer pair
     /// (should be idempotent!).
     async fn mark_applied(
         &self,
         _: &dill::Catalog,
-        producer_name: &'static str,
-        consumer_name: &'static str,
+        producer_name: &str,
+        consumer_name: &str,
         message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
     ) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let channel_key = ChannelKey {
-            producer_name,
-            consumer_name,
+            producer_name: producer_name.to_string(),
+            consumer_name: consumer_name.to_string(),
         };
 
         // In-memory implementation does not care about

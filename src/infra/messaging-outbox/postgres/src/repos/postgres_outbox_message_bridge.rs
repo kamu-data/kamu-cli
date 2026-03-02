@@ -11,13 +11,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
-use internal_error::{InternalError, ResultIntoInternal};
-use messaging_outbox::{
-    MessageStoreWakeupDetector,
-    OutboxMessage,
-    OutboxMessageBridge,
-    OutboxMessageID,
-};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use messaging_outbox::*;
 use sqlx::Postgres;
 
 use crate::PostgresMessageStoreWakeupDetector;
@@ -64,8 +59,8 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
     async fn fetch_next_batch(
         &self,
         transaction_catalog: &dill::Catalog,
-        producer_name: &'static str,
-        consumer_name: &'static str,
+        producer_name: &str,
+        consumer_name: &str,
         batch_size: usize,
     ) -> Result<Vec<OutboxMessage>, InternalError> {
         let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
@@ -134,13 +129,46 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         Ok(events)
     }
 
+    fn list_consumption_boundaries(
+        &self,
+        transactional_catalog: &dill::Catalog,
+    ) -> OutboxMessageConsumptionBoundariesStream<'_> {
+        let transaction: Arc<TransactionRefT<Postgres>> = transactional_catalog.get_one().unwrap();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query_as!(
+                OutboxMessageConsumptionBoundary,
+                r#"
+                SELECT
+                    consumer_name,
+                    producer_name,
+                    last_consumed_message_id,
+                    last_tx_id::text::bigint AS "last_tx_id!: i64"
+                FROM outbox_message_consumptions
+                "#,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+            while let Some(consumption) = query_stream.try_next().await? {
+                yield Ok(consumption);
+            }
+        })
+    }
+
     /// Mark these events as applied for this projector (idempotent).
     #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name))]
     async fn mark_applied(
         &self,
         transaction_catalog: &dill::Catalog,
-        producer_name: &'static str,
-        consumer_name: &'static str,
+        producer_name: &str,
+        consumer_name: &str,
         message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
     ) -> Result<(), InternalError> {
         if message_ids_with_tx_ids.is_empty() {

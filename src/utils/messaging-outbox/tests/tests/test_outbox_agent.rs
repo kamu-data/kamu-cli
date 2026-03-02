@@ -12,11 +12,7 @@ use std::sync::{Arc, Mutex};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
-use kamu_messaging_outbox_inmem::{
-    InMemoryOutboxMessageBridge,
-    InMemoryOutboxMessageConsumptionRepository,
-    InMemoryOutboxMessageRepository,
-};
+use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
@@ -264,23 +260,23 @@ async fn test_deliver_messages_with_partial_consumption() {
 
     // Let's assume some initial partial boundaries
     harness
-        .outbox_consumption_repository
-        .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-            producer_name: TEST_PRODUCER_C.to_string(),
-            consumer_name: "TestMessageConsumerC1".to_string(),
-            last_consumed_message_id: OutboxMessageID::new(2),
-            last_tx_id: 0,
-        })
+        .outbox_message_bridge
+        .mark_applied(
+            &harness.catalog,
+            TEST_PRODUCER_C,
+            "TestMessageConsumerC1",
+            &[(OutboxMessageID::new(2), 0)],
+        )
         .await
         .unwrap();
     harness
-        .outbox_consumption_repository
-        .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-            producer_name: TEST_PRODUCER_C.to_string(),
-            consumer_name: "TestMessageConsumerC2".to_string(),
-            last_consumed_message_id: OutboxMessageID::new(4),
-            last_tx_id: 0,
-        })
+        .outbox_message_bridge
+        .mark_applied(
+            &harness.catalog,
+            TEST_PRODUCER_C,
+            "TestMessageConsumerC2",
+            &[(OutboxMessageID::new(4), 0)],
+        )
         .await
         .unwrap();
 
@@ -557,7 +553,7 @@ struct OutboxAgentHarness {
     catalog: Catalog,
     outbox_agent: Arc<dyn OutboxAgent>,
     outbox: Arc<dyn Outbox>,
-    outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
 }
 
@@ -569,7 +565,6 @@ impl OutboxAgentHarness {
         b.add_value(OutboxAgentConfig::local_default());
         b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryOutboxMessageRepository>();
-        b.add::<InMemoryOutboxMessageConsumptionRepository>();
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<SystemTimeSourceDefault>();
@@ -590,16 +585,14 @@ impl OutboxAgentHarness {
 
         let outbox_agent = catalog.get_one::<dyn OutboxAgent>().unwrap();
         let outbox = catalog.get_one::<dyn Outbox>().unwrap();
-        let outbox_consumption_repository = catalog
-            .get_one::<dyn OutboxMessageConsumptionRepository>()
-            .unwrap();
+        let outbox_message_bridge = catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
         let metrics = catalog.get_one().unwrap();
 
         Self {
             catalog,
             outbox_agent,
             outbox,
-            outbox_consumption_repository,
+            outbox_message_bridge,
             metrics,
         }
     }
@@ -641,8 +634,8 @@ impl OutboxAgentHarness {
     async fn read_consumption_boundaries(&self) -> Vec<OutboxMessageConsumptionBoundary> {
         use futures::TryStreamExt;
         let mut boundaries: Vec<_> = self
-            .outbox_consumption_repository
-            .list_consumption_boundaries()
+            .outbox_message_bridge
+            .list_consumption_boundaries(&self.catalog)
             .try_collect()
             .await
             .unwrap();

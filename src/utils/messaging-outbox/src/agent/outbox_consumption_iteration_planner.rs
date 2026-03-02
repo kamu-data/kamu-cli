@@ -18,35 +18,33 @@ use super::{
     ProducerConsumptionTask,
     UnconsumedProducerState,
 };
-use crate::{
-    OutboxMessage,
-    OutboxMessageBoundary,
-    OutboxMessageConsumptionRepository,
-    OutboxMessageRepository,
-};
+use crate::{OutboxMessage, OutboxMessageBoundary, OutboxMessageBridge, OutboxMessageRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct OutboxConsumptionIterationPlanner {
+pub(crate) struct OutboxConsumptionIterationPlanner<'a> {
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
+    transactional_catalog: &'a dill::Catalog,
     outbox_message_repository: Arc<dyn OutboxMessageRepository>,
-    outbox_message_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
     messages_batch_size: usize,
 }
 
-impl OutboxConsumptionIterationPlanner {
+impl<'a> OutboxConsumptionIterationPlanner<'a> {
     pub(crate) fn new(
         routes_static_info: Arc<OutboxRoutesStaticInfo>,
+        transactional_catalog: &'a dill::Catalog,
         outbox_message_repository: Arc<dyn OutboxMessageRepository>,
-        outbox_message_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>,
+        outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
         messages_batch_size: usize,
     ) -> Self {
         Self {
             routes_static_info,
+            transactional_catalog,
             outbox_message_repository,
-            outbox_message_consumption_repository,
+            outbox_message_bridge,
             metrics,
             messages_batch_size,
         }
@@ -114,8 +112,8 @@ impl OutboxConsumptionIterationPlanner {
         // Extract consumption boundaries for all routes
         let mut all_boundaries = async move {
             let consumptions_stream = self
-                .outbox_message_consumption_repository
-                .list_consumption_boundaries();
+                .outbox_message_bridge
+                .list_consumption_boundaries(self.transactional_catalog);
 
             use futures::TryStreamExt;
             consumptions_stream.try_collect::<Vec<_>>().await

@@ -20,8 +20,7 @@ use crate::{
     MessageDispatcher,
     OutboxMessage,
     OutboxMessageBoundary,
-    OutboxMessageConsumptionBoundary,
-    OutboxMessageConsumptionRepository,
+    OutboxMessageBridge,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,17 +247,17 @@ impl ConsumeMessageTransaction {
             "Shifting consumption record"
         );
 
-        let consumption_repository = transaction_catalog
-            .get_one::<dyn OutboxMessageConsumptionRepository>()
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
             .unwrap();
 
-        consumption_repository
-            .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-                consumer_name: self.consumer_name.clone(),
-                producer_name: self.message.producer_name.clone(),
-                last_consumed_message_id: self.message.message_id,
-                last_tx_id: self.message.tx_id,
-            })
+        outbox_message_bridge
+            .mark_applied(
+                &transaction_catalog,
+                &self.message.producer_name,
+                &self.consumer_name,
+                &[(self.message.message_id, self.message.tx_id)],
+            )
             .await
             .int_err()?;
 

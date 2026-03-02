@@ -131,7 +131,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge>();
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageRepository>();
-            b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageConsumptionRepository>();
 
             b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
 
@@ -172,7 +171,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>();
-            b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
 
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
@@ -211,7 +209,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageBridge>();
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageRepository>();
-            b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageConsumptionRepository>();
 
             b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
 
@@ -235,7 +232,6 @@ pub fn configure_database_components(
 pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
     b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>();
-    b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
 
     b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
     b.add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>();

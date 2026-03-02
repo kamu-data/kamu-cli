@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                consumer_name,\n                producer_name,\n                last_consumed_message_id,\n                0 AS \"last_tx_id!: i64\"\n            FROM outbox_message_consumptions\n            WHERE consumer_name = $1 and producer_name = $2\n            ",
+  "query": "\n                SELECT\n                    consumer_name,\n                    producer_name,\n                    last_consumed_message_id,\n                    0 AS \"last_tx_id!: i64\"\n                FROM outbox_message_consumptions\n                ",
   "describe": {
     "columns": [
       {
@@ -21,18 +21,18 @@
       {
         "name": "last_tx_id!: i64",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 0
     },
     "nullable": [
       false,
       false,
       false,
-      null
+      false
     ]
   },
-  "hash": "9a57040380dc892ff77e03cbff265c79f23315a6802e01df39d0dfd08bcc8bc0"
+  "hash": "2db895b178c6e839b528a83151e48e4d4f7ae45e489d9f6b884ce504c30b5e4f"
 }

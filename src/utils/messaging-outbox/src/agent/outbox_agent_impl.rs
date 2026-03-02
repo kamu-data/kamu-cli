@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_utils::BackgroundAgent;
-use database_common_macros::transactional_method2;
+use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -169,14 +169,22 @@ impl OutboxAgentImpl {
         }
     }
 
-    #[transactional_method2(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>, outbox_message_repository: Arc<dyn OutboxMessageRepository>)]
+    #[transactional_method]
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
         let base_catalog = self.catalog.upgrade();
 
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap();
+
+        let outbox_message_repository = transaction_catalog
+            .get_one::<dyn OutboxMessageRepository>()
+            .unwrap();
+
         // Load existing consumption records
         use futures::TryStreamExt;
-        let consumptions = outbox_consumption_repository
-            .list_consumption_boundaries()
+        let consumptions = outbox_message_bridge
+            .list_consumption_boundaries(&transaction_catalog)
             .try_collect::<Vec<_>>()
             .await?;
 
@@ -221,13 +229,16 @@ impl OutboxAgentImpl {
                     };
 
                     // Create a new consumption boundary
-                    outbox_consumption_repository
-                        .create_consumption_boundary(OutboxMessageConsumptionBoundary {
-                            consumer_name: consumer_name.clone(),
-                            producer_name: producer_name.clone(),
-                            last_consumed_message_id: last_consumed_boundary.message_id,
-                            last_tx_id: last_consumed_boundary.tx_id,
-                        })
+                    outbox_message_bridge
+                        .mark_applied(
+                            &transaction_catalog,
+                            producer_name,
+                            consumer_name,
+                            &[(
+                                last_consumed_boundary.message_id,
+                                last_consumed_boundary.tx_id,
+                            )],
+                        )
                         .await
                         .int_err()?;
                 }
@@ -295,17 +306,23 @@ impl OutboxAgentImpl {
         Ok(processed_consumer_tasks_counter.load(Ordering::Relaxed))
     }
 
-    #[transactional_method2(
-        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
-        outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>
-    )]
+    #[transactional_method]
     async fn prepare_consumption_iteration(
         &self,
     ) -> Result<HashMap<String, ProducerConsumptionTask>, InternalError> {
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap();
+
+        let outbox_message_repository = transaction_catalog
+            .get_one::<dyn OutboxMessageRepository>()
+            .unwrap();
+
         let planner = OutboxConsumptionIterationPlanner::new(
             self.routes_static_info.clone(),
+            &transaction_catalog,
             outbox_message_repository,
-            outbox_consumption_repository,
+            outbox_message_bridge,
             self.metrics.clone(),
             self.agent_config.batch_size,
         );

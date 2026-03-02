@@ -9,8 +9,6 @@
 
 #![feature(assert_matches)]
 
-mod outbox_message_consumption_repository_test_suite;
 mod outbox_message_repository_test_suite;
 
-pub use outbox_message_consumption_repository_test_suite::*;
 pub use outbox_message_repository_test_suite::*;
