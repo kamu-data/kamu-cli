@@ -20,8 +20,8 @@ use super::{
 };
 use crate::{
     OutboxMessage,
+    OutboxMessageBoundary,
     OutboxMessageConsumptionRepository,
-    OutboxMessageID,
     OutboxMessageRepository,
 };
 
@@ -55,23 +55,24 @@ impl OutboxConsumptionIterationPlanner {
     pub(crate) async fn plan_consumption_tasks_by_producer(
         &self,
     ) -> Result<HashMap<String, ProducerConsumptionTask>, InternalError> {
-        // producer A - message 17
-        // producer B - message 19
-        let latest_message_ids_by_producer = self.select_latest_message_ids_by_producer().await?;
+        // producer A - (message 17, tx 5)
+        // producer B - (message 19, tx 6)
+        let latest_message_boundaries_by_producer =
+            self.select_latest_message_boundaries_by_producer().await?;
 
         // producer A ->
-        //   consumer X -> message 15
-        //   consumer Y -> message 14
+        //   consumer X -> (message 15, tx 4)
+        //   consumer Y -> (message 14, tx 3)
         // producer B ->
-        //   consumer X -> message 12
+        //   consumer X -> (message 12, tx 2)
         let consumption_boundaries_by_producer = self
             .select_latest_consumption_boundaries_by_producer()
             .await?;
 
-        // producer A: >14
-        // producer B: >12
+        // producer A: >(14, tx 3)
+        // producer B: >(12, tx 2)
         let unconsumed_states_by_producer = self.compute_unconsumed_state_by_producer(
-            latest_message_ids_by_producer,
+            latest_message_boundaries_by_producer,
             consumption_boundaries_by_producer,
         );
         if unconsumed_states_by_producer.is_empty() {
@@ -79,8 +80,8 @@ impl OutboxConsumptionIterationPlanner {
         }
 
         // Load portion of unprocessed messages, as specified in filters
-        //   producer A: >14
-        //   producer B: >12
+        //   producer A: >(14, tx 3)
+        //   producer B: >(12, tx 2)
         let unprocessed_messages_by_producer = self
             .load_unprocessed_messages_by_producer(&unconsumed_states_by_producer)
             .await?;
@@ -92,24 +93,24 @@ impl OutboxConsumptionIterationPlanner {
         ))
     }
 
-    async fn select_latest_message_ids_by_producer(
+    async fn select_latest_message_boundaries_by_producer(
         &self,
-    ) -> Result<HashMap<String, OutboxMessageID>, InternalError> {
-        // Extract latest (producer, max message id) relation
-        let latest_message_ids_by_producer = self
+    ) -> Result<HashMap<String, OutboxMessageBoundary>, InternalError> {
+        // Extract latest produced message boundaries for each producer
+        let latest_message_boundaries_by_producer = self
             .outbox_message_repository
-            .get_latest_message_ids_by_producer()
+            .get_latest_message_boundaries_by_producer()
             .await?;
 
         // Convert into map
-        Ok(latest_message_ids_by_producer
+        Ok(latest_message_boundaries_by_producer
             .into_iter()
             .collect::<HashMap<_, _>>())
     }
 
     async fn select_latest_consumption_boundaries_by_producer(
         &self,
-    ) -> Result<HashMap<String, HashMap<String, OutboxMessageID>>, InternalError> {
+    ) -> Result<HashMap<String, HashMap<String, OutboxMessageBoundary>>, InternalError> {
         // Extract consumption boundaries for all routes
         let mut all_boundaries = async move {
             let consumptions_stream = self
@@ -132,7 +133,7 @@ impl OutboxConsumptionIterationPlanner {
                 (
                     producer_name.clone(),
                     producer_boundaries
-                        .map(|b| (b.consumer_name.clone(), b.last_consumed_message_id))
+                        .map(|b| (b.consumer_name.clone(), b.boundary()))
                         .collect(),
                 )
             })
@@ -143,11 +144,16 @@ impl OutboxConsumptionIterationPlanner {
 
     fn compute_unconsumed_state_by_producer(
         &self,
-        latest_message_ids_by_producer: HashMap<String, OutboxMessageID>,
-        mut consumption_boundaries_by_producer: HashMap<String, HashMap<String, OutboxMessageID>>,
+        latest_message_boundaries_by_producer: HashMap<String, OutboxMessageBoundary>,
+        mut consumption_boundaries_by_producer: HashMap<
+            String,
+            HashMap<String, OutboxMessageBoundary>,
+        >,
     ) -> HashMap<String, UnconsumedProducerState> {
         let mut unconsumed_states_by_producers = HashMap::new();
-        for (producer_name, latest_produced_message_id) in latest_message_ids_by_producer {
+        for (producer_name, latest_produced_message_boundary) in
+            latest_message_boundaries_by_producer
+        {
             // Take consumption boundaries for this producer
             let Some(consumption_boundaries_by_consumer) =
                 consumption_boundaries_by_producer.remove(&producer_name)
@@ -165,33 +171,34 @@ impl OutboxConsumptionIterationPlanner {
             };
 
             // Report queue length metrics
-            for (consumer, last_consumed_message_id) in &consumption_boundaries_by_consumer {
-                let queue_length =
-                    latest_produced_message_id.into_inner() - last_consumed_message_id.into_inner();
+            for (consumer, last_consumed_boundary) in &consumption_boundaries_by_consumer {
+                // Note: this is a best effort esimation, as the ordering might be unstable with
+                // concurrent producer transactions, but it should be sufficient for monitoring
+                let queue_length = latest_produced_message_boundary.message_id.into_inner()
+                    - last_consumed_boundary.message_id.into_inner();
                 self.metrics
                     .messages_pending_total
                     .with_label_values(&[&producer_name, consumer])
                     .set(queue_length);
             }
 
-            // Determine the earliest message ID that was processed by consumers
-            let maybe_processed_boundary_id = self.determine_processed_boundary_id(
-                consumer_names,
-                &consumption_boundaries_by_consumer,
-            );
+            // Determine the earliest message boundary that was processed by consumers
+            let maybe_processed_boundary = self
+                .determine_processed_boundary(consumer_names, &consumption_boundaries_by_consumer);
 
             // Was there an advancement?
-            if let Some(processed_boundary_id) = maybe_processed_boundary_id
-                && processed_boundary_id < latest_produced_message_id
+            if let Some(processed_boundary) = maybe_processed_boundary
+                && processed_boundary < latest_produced_message_boundary
             {
                 tracing::debug!(
                     %producer_name,
-                    %processed_boundary_id,
+                    last_message_id = %processed_boundary.message_id,
+                    last_tx_id = %processed_boundary.tx_id,
                     "Selected unsatisfied boundary message for producer",
                 );
 
                 let consumption_state = UnconsumedProducerState {
-                    processed_boundary_id,
+                    processed_boundary,
                     consumption_boundaries_by_consumer,
                 };
 
@@ -202,30 +209,30 @@ impl OutboxConsumptionIterationPlanner {
         unconsumed_states_by_producers
     }
 
-    fn determine_processed_boundary_id(
+    fn determine_processed_boundary(
         &self,
         consumer_names: &[String],
-        consumption_boundaries: &HashMap<String, OutboxMessageID>,
-    ) -> Option<OutboxMessageID> {
-        let mut earliest_seen_id: Option<OutboxMessageID> = None;
+        consumption_boundaries: &HashMap<String, OutboxMessageBoundary>,
+    ) -> Option<OutboxMessageBoundary> {
+        let mut earliest_seen_boundary: Option<OutboxMessageBoundary> = None;
 
         for consumer in consumer_names {
-            if let Some(boundary_id) = consumption_boundaries.get(consumer) {
-                match earliest_seen_id {
+            if let Some(boundary) = consumption_boundaries.get(consumer) {
+                match earliest_seen_boundary {
                     Some(id) => {
-                        if *boundary_id < id {
-                            earliest_seen_id = Some(*boundary_id);
+                        if *boundary < id {
+                            earliest_seen_boundary = Some(*boundary);
                         }
                     }
-                    None => earliest_seen_id = Some(*boundary_id),
+                    None => earliest_seen_boundary = Some(*boundary),
                 }
             } else {
                 // We are seeing a new consumer, a full synchronization is a must
-                return Some(OutboxMessageID::new(0));
+                return Some(OutboxMessageBoundary::default());
             }
         }
 
-        earliest_seen_id
+        earliest_seen_boundary
     }
 
     async fn load_unprocessed_messages_by_producer(
@@ -236,10 +243,7 @@ impl OutboxConsumptionIterationPlanner {
         let boundaries_by_producer: Vec<_> = unconsumed_state_by_producer
             .iter()
             .map(|(producer_name, consumption_state)| {
-                (
-                    producer_name.clone(),
-                    consumption_state.processed_boundary_id,
-                )
+                (producer_name.clone(), consumption_state.processed_boundary)
             })
             .collect();
 

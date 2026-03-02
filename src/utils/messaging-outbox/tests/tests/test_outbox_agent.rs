@@ -269,6 +269,7 @@ async fn test_deliver_messages_with_partial_consumption() {
             producer_name: TEST_PRODUCER_C.to_string(),
             consumer_name: "TestMessageConsumerC1".to_string(),
             last_consumed_message_id: OutboxMessageID::new(2),
+            last_tx_id: 0,
         })
         .await
         .unwrap();
@@ -278,6 +279,7 @@ async fn test_deliver_messages_with_partial_consumption() {
             producer_name: TEST_PRODUCER_C.to_string(),
             consumer_name: "TestMessageConsumerC2".to_string(),
             last_consumed_message_id: OutboxMessageID::new(4),
+            last_tx_id: 0,
         })
         .await
         .unwrap();
@@ -630,6 +632,7 @@ impl OutboxAgentHarness {
                     producer_name: pattern.0.to_string(),
                     consumer_name: pattern.1.to_string(),
                     last_consumed_message_id: OutboxMessageID::new(pattern.2),
+                    last_tx_id: 0,
                 })
                 .collect::<Vec<_>>()
         );

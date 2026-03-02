@@ -49,13 +49,18 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
 
     fn get_messages(
         &self,
-        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_> {
-        let (producers, above_ids): (Vec<String>, Vec<i64>) = above_boundaries_by_producer
-            .into_iter()
-            .map(|(p, v)| (p, v.into_inner()))
-            .unzip();
+        let mut producers = Vec::with_capacity(above_boundaries_by_producer.len());
+        let mut above_tx_ids = Vec::with_capacity(above_boundaries_by_producer.len());
+        let mut above_message_ids = Vec::with_capacity(above_boundaries_by_producer.len());
+
+        for (producer_name, boundary) in above_boundaries_by_producer {
+            producers.push(producer_name);
+            above_tx_ids.push(boundary.tx_id);
+            above_message_ids.push(boundary.message_id.into_inner());
+        }
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -73,7 +78,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                         occurred_on,
                         version as "version!"
                     FROM outbox_messages
-                    ORDER BY message_id
+                    ORDER BY tx_id, message_id
                     LIMIT $1
                     "#,
                     i64::try_from(batch_size).unwrap()
@@ -85,7 +90,11 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                     r#"
                     WITH bounds AS (
                         SELECT *
-                        FROM UNNEST($1::text[], $2::bigint[]) AS b(producer_name, above_id)
+                        FROM UNNEST($1::text[], $2::bigint[], $3::bigint[]) AS b(
+                            producer_name,
+                            above_tx_id,
+                            above_message_id
+                        )
                     )
                     SELECT
                         m.message_id,
@@ -96,12 +105,28 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
                         m.version as "version!"
                     FROM outbox_messages AS m
                     JOIN bounds AS b
-                        ON m.producer_name = b.producer_name AND m.message_id > b.above_id
-                    ORDER BY m.message_id
-                    LIMIT $3
+                        ON m.producer_name = b.producer_name
+                        AND (
+                            -- tx_id = 0 is a special case, meaning that we want to get messages
+                            -- with message_id > above_message_id regardless of tx_id
+                            (b.above_tx_id = 0 AND m.message_id > b.above_message_id)
+                            OR (
+                                b.above_tx_id <> 0
+                                AND (
+                                    m.tx_id::text::bigint > b.above_tx_id
+                                    OR (
+                                        m.tx_id::text::bigint = b.above_tx_id
+                                        AND m.message_id > b.above_message_id
+                                    )
+                                )
+                            )
+                        )
+                    ORDER BY m.tx_id, m.message_id
+                    LIMIT $4
                     "#,
                     &producers,
-                    &above_ids,
+                    &above_tx_ids,
+                    &above_message_ids,
                     i64::try_from(batch_size).unwrap()
                 )
                 .fetch(connection_mut)
@@ -114,9 +139,9 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
         })
     }
 
-    async fn get_latest_message_ids_by_producer(
+    async fn get_latest_message_boundaries_by_producer(
         &self,
-    ) -> Result<Vec<(String, OutboxMessageID)>, InternalError> {
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -124,9 +149,20 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
             r#"
             SELECT
                 producer_name,
-                max(message_id) AS max_message_id
-            FROM outbox_messages
-            GROUP BY producer_name
+                message_id AS "message_id!",
+                tx_id::text::bigint AS "tx_id!: i64"
+            FROM (
+                SELECT
+                    producer_name,
+                    message_id,
+                    tx_id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY producer_name
+                        ORDER BY tx_id DESC, message_id DESC
+                    ) AS rn
+                FROM outbox_messages
+            ) ranked
+            WHERE rn = 1
             "#,
         )
         .fetch_all(connection_mut)
@@ -138,7 +174,10 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
             .map(|r| {
                 (
                     r.producer_name,
-                    OutboxMessageID::new(r.max_message_id.unwrap_or(0)),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(r.message_id),
+                        tx_id: r.tx_id,
+                    },
                 )
             })
             .collect())

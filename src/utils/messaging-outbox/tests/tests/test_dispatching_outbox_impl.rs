@@ -255,7 +255,7 @@ impl DispatchingOutboxHarness {
         let outbox_messages: Vec<_> = self
             .outbox_message_repository
             .get_messages(
-                vec![(producer_name.to_owned(), OutboxMessageID::new(0))],
+                vec![(producer_name.to_owned(), OutboxMessageBoundary::default())],
                 10,
             )
             .try_collect()

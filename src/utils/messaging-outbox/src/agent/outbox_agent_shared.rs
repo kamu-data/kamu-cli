@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{MessageDispatcher, MessageSubscription, OutboxMessage, OutboxMessageID};
+use crate::{MessageDispatcher, MessageSubscription, OutboxMessage, OutboxMessageBoundary};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,10 +38,10 @@ impl OutboxRoutesStaticInfo {
 
 pub(crate) struct UnconsumedProducerState {
     /// The earliest last processed message between this producer's consumers
-    pub(crate) processed_boundary_id: OutboxMessageID,
+    pub(crate) processed_boundary: OutboxMessageBoundary,
 
-    /// Last processed message IDs by each consumer
-    pub(crate) consumption_boundaries_by_consumer: HashMap<String, OutboxMessageID>,
+    /// Last processed message boundaries by each consumer
+    pub(crate) consumption_boundaries_by_consumer: HashMap<String, OutboxMessageBoundary>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,8 +50,8 @@ pub(crate) struct ProducerConsumptionTask {
     /// Messages to consume
     pub(crate) unconsumed_messages: Vec<Arc<OutboxMessage>>,
 
-    /// Last processed message IDs by each consumer
-    pub(crate) consumption_boundaries_by_consumer: HashMap<String, OutboxMessageID>,
+    /// Last processed message boundaries by each consumer
+    pub(crate) consumption_boundaries_by_consumer: HashMap<String, OutboxMessageBoundary>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

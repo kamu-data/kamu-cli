@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::OutboxMessageID;
+use crate::{OutboxMessageBoundary, OutboxMessageID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,6 +42,16 @@ pub struct OutboxMessageConsumptionBoundary {
     pub producer_name: String,
     pub consumer_name: String,
     pub last_consumed_message_id: OutboxMessageID,
+    pub last_tx_id: i64,
+}
+
+impl OutboxMessageConsumptionBoundary {
+    pub fn boundary(&self) -> OutboxMessageBoundary {
+        OutboxMessageBoundary {
+            message_id: self.last_consumed_message_id,
+            tx_id: self.last_tx_id,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

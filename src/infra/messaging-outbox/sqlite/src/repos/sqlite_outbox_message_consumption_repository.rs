@@ -34,7 +34,10 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
                 OutboxMessageConsumptionBoundary,
                 r#"
                 SELECT
-                    consumer_name, producer_name, last_consumed_message_id
+                    consumer_name,
+                    producer_name,
+                    last_consumed_message_id,
+                    0 AS "last_tx_id!: i64"
                 FROM outbox_message_consumptions
                 "#,
             )
@@ -61,7 +64,10 @@ impl OutboxMessageConsumptionRepository for SqliteOutboxMessageConsumptionReposi
             OutboxMessageConsumptionBoundary,
             r#"
             SELECT
-                consumer_name, producer_name, last_consumed_message_id
+                consumer_name,
+                producer_name,
+                last_consumed_message_id,
+                0 AS "last_tx_id!: i64"
             FROM outbox_message_consumptions
             WHERE consumer_name = $1 and producer_name = $2
             "#,

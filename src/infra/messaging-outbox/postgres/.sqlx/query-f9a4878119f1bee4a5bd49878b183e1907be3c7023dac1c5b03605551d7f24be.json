@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        message_id,\n                        tx_id::text::bigint AS \"tx_id!: i64\",\n                        producer_name,\n                        content_json,\n                        occurred_on,\n                        version as \"version!\"\n                    FROM outbox_messages\n                    ORDER BY tx_id, message_id\n                    LIMIT $1\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "tx_id!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "producer_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "content_json",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_on",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "version!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f9a4878119f1bee4a5bd49878b183e1907be3c7023dac1c5b03605551d7f24be"
+}

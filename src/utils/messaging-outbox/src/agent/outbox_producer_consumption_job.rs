@@ -19,9 +19,9 @@ use crate::{
     ConsumerFilter,
     MessageDispatcher,
     OutboxMessage,
+    OutboxMessageBoundary,
     OutboxMessageConsumptionBoundary,
     OutboxMessageConsumptionRepository,
-    OutboxMessageID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,13 +95,19 @@ impl ProducerConsumptionJob {
                     continue;
                 }
 
-                // Skip consumers, which are already beyond this message ID
-                let boundary_id = consumption_task
+                // Skip consumers, which are already beyond this message boundary
+                let consumer_boundary = consumption_task
                     .consumption_boundaries_by_consumer
                     .get(consumer_name)
                     .copied()
-                    .unwrap_or_else(|| OutboxMessageID::new(0));
-                if boundary_id < message.message_id {
+                    .unwrap_or_default();
+
+                let message_boundary = OutboxMessageBoundary {
+                    message_id: message.message_id,
+                    tx_id: message.tx_id,
+                };
+
+                if consumer_boundary < message_boundary {
                     // Non-failing consumer which hasn't seen this message is a task to execute
                     consumer_tasks.push((consumer_name.as_str(), &message));
                 }
@@ -251,6 +257,7 @@ impl ConsumeMessageTransaction {
                 consumer_name: self.consumer_name.clone(),
                 producer_name: self.message.producer_name.clone(),
                 last_consumed_message_id: self.message.message_id,
+                last_tx_id: self.message.tx_id,
             })
             .await
             .int_err()?;

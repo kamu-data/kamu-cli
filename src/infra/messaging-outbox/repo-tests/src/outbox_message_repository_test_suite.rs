@@ -14,6 +14,7 @@ use messaging_outbox::{
     Message,
     NewOutboxMessage,
     OutboxMessage,
+    OutboxMessageBoundary,
     OutboxMessageID,
     OutboxMessageRepository,
 };
@@ -26,11 +27,11 @@ const OUTBOX_MESSAGE_VERSION: u32 = 1;
 pub async fn test_no_outbox_messages_initially(catalog: &Catalog) {
     let outbox_message_repo = catalog.get_one::<dyn OutboxMessageRepository>().unwrap();
 
-    let messages_by_producer = outbox_message_repo
-        .get_latest_message_ids_by_producer()
+    let messages_boundaries_by_producer = outbox_message_repo
+        .get_latest_message_boundaries_by_producer()
         .await
         .unwrap();
-    assert_eq!(0, messages_by_producer.len());
+    assert_eq!(0, messages_boundaries_by_producer.len());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,17 +67,29 @@ pub async fn test_push_messages_from_several_producers(catalog: &Catalog) {
         outbox_message_repo.push_message(message).await.unwrap();
     }
 
-    let mut message_ids_by_producer = outbox_message_repo
-        .get_latest_message_ids_by_producer()
+    let mut message_boundaries_by_producer = outbox_message_repo
+        .get_latest_message_boundaries_by_producer()
         .await
         .unwrap();
-    message_ids_by_producer.sort_by(|a, b| a.0.cmp(&b.0));
+    message_boundaries_by_producer.sort_by(|a, b| a.0.cmp(&b.0));
 
     assert_eq!(
-        message_ids_by_producer,
+        message_boundaries_by_producer,
         vec![
-            ("A".to_string(), OutboxMessageID::new(2),),
-            ("B".to_string(), OutboxMessageID::new(3),),
+            (
+                "A".to_string(),
+                OutboxMessageBoundary {
+                    message_id: OutboxMessageID::new(2),
+                    tx_id: 0
+                }
+            ),
+            (
+                "B".to_string(),
+                OutboxMessageBoundary {
+                    message_id: OutboxMessageID::new(3),
+                    tx_id: 0
+                }
+            ),
         ]
     );
 }
@@ -120,7 +133,7 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_messages(vec![("A".to_string(), OutboxMessageID::new(0))], 3)
+        .get_messages(vec![("A".to_string(), OutboxMessageBoundary::default())], 3)
         .try_collect()
         .await
         .unwrap();
@@ -131,7 +144,16 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_messages(vec![("A".to_string(), OutboxMessageID::new(5))], 4)
+        .get_messages(
+            vec![(
+                "A".to_string(),
+                OutboxMessageBoundary {
+                    message_id: OutboxMessageID::new(5),
+                    tx_id: 0,
+                },
+            )],
+            4,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -181,14 +203,32 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_repo
-        .get_messages(vec![("A".to_string(), OutboxMessageID::new(5))], 3)
+        .get_messages(
+            vec![(
+                "A".to_string(),
+                OutboxMessageBoundary {
+                    message_id: OutboxMessageID::new(5),
+                    tx_id: 0,
+                },
+            )],
+            3,
+        )
         .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 0);
 
     let messages: Vec<_> = outbox_message_repo
-        .get_messages(vec![("A".to_string(), OutboxMessageID::new(3))], 6)
+        .get_messages(
+            vec![(
+                "A".to_string(),
+                OutboxMessageBoundary {
+                    message_id: OutboxMessageID::new(3),
+                    tx_id: 0,
+                },
+            )],
+            6,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -288,8 +328,20 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     let messages: Vec<_> = outbox_message_repo
         .get_messages(
             vec![
-                ("A".to_string(), OutboxMessageID::new(11)),
-                ("B".to_string(), OutboxMessageID::new(12)),
+                (
+                    "A".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(11),
+                        tx_id: 0,
+                    },
+                ),
+                (
+                    "B".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(12),
+                        tx_id: 0,
+                    },
+                ),
             ],
             10,
         )
@@ -305,8 +357,20 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     let messages: Vec<_> = outbox_message_repo
         .get_messages(
             vec![
-                ("A".to_string(), OutboxMessageID::new(2)),
-                ("B".to_string(), OutboxMessageID::new(9)),
+                (
+                    "A".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(2),
+                        tx_id: 0,
+                    },
+                ),
+                (
+                    "B".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(9),
+                        tx_id: 0,
+                    },
+                ),
             ],
             4,
         )
@@ -323,8 +387,20 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     let messages: Vec<_> = outbox_message_repo
         .get_messages(
             vec![
-                ("A".to_string(), OutboxMessageID::new(7)),
-                ("B".to_string(), OutboxMessageID::new(3)),
+                (
+                    "A".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(7),
+                        tx_id: 0,
+                    },
+                ),
+                (
+                    "B".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(3),
+                        tx_id: 0,
+                    },
+                ),
             ],
             4,
         )
@@ -341,8 +417,14 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     let messages: Vec<_> = outbox_message_repo
         .get_messages(
             vec![
-                ("A".to_string(), OutboxMessageID::new(10)),
-                ("C".to_string(), OutboxMessageID::new(0)),
+                (
+                    "A".to_string(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(10),
+                        tx_id: 0,
+                    },
+                ),
+                ("C".to_string(), OutboxMessageBoundary::default()),
             ],
             3,
         )
@@ -393,7 +475,7 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
         .unwrap();
 
     let messages: Vec<_> = outbox_message_repo
-        .get_messages(vec![("A".to_string(), OutboxMessageID::new(0))], 3)
+        .get_messages(vec![("A".to_string(), OutboxMessageBoundary::default())], 3)
         .try_collect()
         .await
         .unwrap();

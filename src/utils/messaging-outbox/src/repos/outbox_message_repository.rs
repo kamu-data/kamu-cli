@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageID};
+use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageBoundary};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,13 +19,13 @@ pub trait OutboxMessageRepository: Send + Sync {
 
     fn get_messages(
         &self,
-        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_>;
 
-    async fn get_latest_message_ids_by_producer(
+    async fn get_latest_message_boundaries_by_producer(
         &self,
-    ) -> Result<Vec<(String, OutboxMessageID)>, InternalError>;
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

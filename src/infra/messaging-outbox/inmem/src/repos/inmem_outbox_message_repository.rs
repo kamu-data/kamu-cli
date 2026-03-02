@@ -84,14 +84,13 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
 
     fn get_messages(
         &self,
-        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_> {
         let minimal_above_id = above_boundaries_by_producer
             .iter()
-            .map(|(_, boundary_id)| boundary_id)
+            .map(|(_, boundary)| boundary.message_id) // ignore tx_id for in-memory implementation
             .min()
-            .copied()
             .unwrap_or_else(|| OutboxMessageID::new(0));
 
         let messages = {
@@ -107,9 +106,9 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
                 let matches_filter =
                     above_boundaries_by_producer
                         .iter()
-                        .any(|(producer_name, above_id)| {
+                        .any(|(producer_name, above_boundary)| {
                             message.producer_name == *producer_name
-                                && message.message_id > *above_id
+                                && message.message_id > above_boundary.message_id // ignore tx_id for in-memory implementation
                         });
 
                 if matches_filter || above_boundaries_by_producer.is_empty() {
@@ -126,14 +125,22 @@ impl OutboxMessageRepository for InMemoryOutboxMessageRepository {
         Box::pin(tokio_stream::iter(messages))
     }
 
-    async fn get_latest_message_ids_by_producer(
+    async fn get_latest_message_boundaries_by_producer(
         &self,
-    ) -> Result<Vec<(String, OutboxMessageID)>, InternalError> {
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .latest_message_id_by_producer
             .iter()
-            .map(|e| (e.0.clone(), *(e.1)))
+            .map(|e| {
+                (
+                    e.0.clone(),
+                    OutboxMessageBoundary {
+                        message_id: *(e.1),
+                        tx_id: 0, // ignore tx_id for in-memory implementation
+                    },
+                )
+            })
             .collect())
     }
 }

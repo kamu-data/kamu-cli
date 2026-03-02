@@ -54,7 +54,7 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
 
     fn get_messages(
         &self,
-        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_> {
         let unfiltered = above_boundaries_by_producer.is_empty();
@@ -62,7 +62,8 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         let json_bounds = serde_json::to_string(
             &above_boundaries_by_producer
                 .into_iter()
-                .map(|(p, id)| serde_json::json!({"p": p, "id": id.into_inner()}))
+                // Note: ignore tx_id for SQLite implementation
+                .map(|(p, boundary)| serde_json::json!({"p": p, "id": boundary.message_id.into_inner()}))
                 .collect::<Vec<_>>(),
         )
         .unwrap();
@@ -125,9 +126,9 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
         })
     }
 
-    async fn get_latest_message_ids_by_producer(
+    async fn get_latest_message_boundaries_by_producer(
         &self,
-    ) -> Result<Vec<(String, OutboxMessageID)>, InternalError> {
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -149,7 +150,10 @@ impl OutboxMessageRepository for SqliteOutboxMessageRepository {
             .map(|r| {
                 (
                     r.producer_name.unwrap(),
-                    OutboxMessageID::new(r.max_message_id),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(r.max_message_id),
+                        tx_id: 0, // ignore tx_id for SQLite implementation
+                    },
                 )
             })
             .collect())

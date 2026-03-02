@@ -54,6 +54,7 @@ pub async fn test_create_consumption(catalog: &Catalog) {
         consumer_name: TEST_CONSUMER.to_string(),
         producer_name: TEST_PRODUCER.to_string(),
         last_consumed_message_id: OutboxMessageID::new(5),
+        last_tx_id: 0,
     };
     let res = consumption_repo
         .create_consumption_boundary(boundary.clone())
@@ -98,6 +99,7 @@ pub async fn test_update_existing_consumption(catalog: &Catalog) {
         consumer_name: TEST_CONSUMER.to_string(),
         producer_name: TEST_PRODUCER.to_string(),
         last_consumed_message_id: OutboxMessageID::new(5),
+        last_tx_id: 0,
     };
 
     // Create
@@ -156,6 +158,7 @@ pub async fn test_cannot_update_consumption_before_creation(catalog: &Catalog) {
         consumer_name: TEST_CONSUMER.to_string(),
         producer_name: TEST_PRODUCER.to_string(),
         last_consumed_message_id: OutboxMessageID::new(5),
+        last_tx_id: 0,
     };
 
     // Update without create
@@ -198,6 +201,7 @@ pub async fn test_multiple_boundaries(catalog: &Catalog) {
                 consumer_name: format!("{TEST_CONSUMER}_{consumer_suffix}"),
                 producer_name: format!("{TEST_PRODUCER}_{producer_suffix}"),
                 last_consumed_message_id: OutboxMessageID::new(rng.random()),
+                last_tx_id: 0,
             };
             let res = consumption_repo.create_consumption_boundary(boundary).await;
             assert_matches!(res, Ok(_));
