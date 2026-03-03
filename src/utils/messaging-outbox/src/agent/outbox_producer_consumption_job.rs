@@ -252,11 +252,14 @@ impl ConsumeMessageTransaction {
             .unwrap();
 
         outbox_message_bridge
-            .mark_applied(
+            .mark_consumed(
                 &transaction_catalog,
                 &self.message.producer_name,
                 &self.consumer_name,
-                &[(self.message.message_id, self.message.tx_id)],
+                OutboxMessageBoundary {
+                    message_id: self.message.message_id,
+                    tx_id: self.message.tx_id,
+                },
             )
             .await
             .int_err()?;

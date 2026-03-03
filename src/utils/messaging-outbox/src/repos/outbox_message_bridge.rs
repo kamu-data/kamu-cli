@@ -35,14 +35,13 @@ pub trait OutboxMessageBridge: Send + Sync {
         transaction_catalog: &dill::Catalog,
     ) -> OutboxMessageConsumptionBoundariesStream<'_>;
 
-    /// Mark these messages as applied for this producer-consumer pair
-    /// (should be idempotent!).
-    async fn mark_applied(
+    /// Mark this message boundary as consumed for this producer-consumer pair
+    async fn mark_consumed(
         &self,
         transaction_catalog: &dill::Catalog,
         producer_name: &str,
         consumer_name: &str,
-        message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
+        boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError>;
 }
 

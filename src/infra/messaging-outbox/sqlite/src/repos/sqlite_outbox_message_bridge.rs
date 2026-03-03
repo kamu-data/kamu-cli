@@ -43,13 +43,10 @@ impl SqliteOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for SqliteOutboxMessageBridge {
-    /// Provides event store wakeup detector instance
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
         &self.wakeup_detector
     }
 
-    /// Fetch next batch for the given producer-consumer pair;
-    ///  order by global id.
     #[tracing::instrument(
         level = "debug",
         skip_all,
@@ -145,32 +142,21 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
         })
     }
 
-    /// Mark these messages as applied for this producer-consumer pair
-    /// (should be idempotent!).
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name))]
-    async fn mark_applied(
+    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name, boundary = ?boundary))]
+    async fn mark_consumed(
         &self,
         transaction_catalog: &dill::Catalog,
         producer_name: &str,
         consumer_name: &str,
-        message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
+        boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError> {
-        if message_ids_with_tx_ids.is_empty() {
-            return Ok(());
-        }
-
         let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Use the maximum message_id value from the array to update the boundary
         // Note: in SQLite we ignore the tx_ids as they are not needed
-        let last_message_id = message_ids_with_tx_ids
-            .iter()
-            .map(|(message_id, _)| message_id.into_inner())
-            .max()
-            .unwrap();
+        let last_message_id = boundary.message_id.into_inner();
 
         sqlx::query!(
             r#"

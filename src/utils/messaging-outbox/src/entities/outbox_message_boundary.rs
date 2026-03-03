@@ -34,6 +34,23 @@ impl PartialOrd for OutboxMessageBoundary {
 
 impl Ord for OutboxMessageBoundary {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Order (tx_id, message_id) is critical here.
+        // We must write the highest message_id for the highest tx_id to ensure
+        // idempotency. This means there might be messages with higher message_id
+        // but lower tx_id in this batch.
+        //
+        // I.e.:
+        //   tx-id: 226813, message-id: 7004-7006, 7009-7011, 7013-7018
+        //   tx-id: 226814, message-id: 7003
+        //   tx-id: 226815, message-id: 7007-7008
+        //
+        // Event though the highest message-id is 7018, we must record (226815, 7008) as
+        // the last projected offset. Recording (226813, 7018) would cause
+        // re-processing of messages from tx-id 226814 and 226815!!!
+        //
+        // Similarly, we need lowest message-id for the lowest tx-id that has not been
+        // processed  when reading the set of applied messages
+
         self.tx_id
             .cmp(&other.tx_id)
             .then_with(|| self.message_id.cmp(&other.message_id))

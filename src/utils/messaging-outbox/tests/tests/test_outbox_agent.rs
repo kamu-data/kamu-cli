@@ -261,21 +261,28 @@ async fn test_deliver_messages_with_partial_consumption() {
     // Let's assume some initial partial boundaries
     harness
         .outbox_message_bridge
-        .mark_applied(
+        .mark_consumed(
             &harness.catalog,
             TEST_PRODUCER_C,
             "TestMessageConsumerC1",
-            &[(OutboxMessageID::new(2), 0)],
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(2),
+                tx_id: 0,
+            },
         )
         .await
         .unwrap();
+
     harness
         .outbox_message_bridge
-        .mark_applied(
+        .mark_consumed(
             &harness.catalog,
             TEST_PRODUCER_C,
             "TestMessageConsumerC2",
-            &[(OutboxMessageID::new(4), 0)],
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(4),
+                tx_id: 0,
+            },
         )
         .await
         .unwrap();

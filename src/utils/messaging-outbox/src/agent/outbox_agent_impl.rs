@@ -230,14 +230,11 @@ impl OutboxAgentImpl {
 
                     // Create a new consumption boundary
                     outbox_message_bridge
-                        .mark_applied(
+                        .mark_consumed(
                             &transaction_catalog,
                             producer_name,
                             consumer_name,
-                            &[(
-                                last_consumed_boundary.message_id,
-                                last_consumed_boundary.tx_id,
-                            )],
+                            last_consumed_boundary,
                         )
                         .await
                         .int_err()?;

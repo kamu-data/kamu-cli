@@ -27,8 +27,8 @@ pub struct InMemoryOutboxMessageBridge {
 #[derive(Default)]
 struct State {
     messages: Vec<OutboxMessage>,
-    // channel key -> applied message ids
-    applied: HashMap<ChannelKey, BTreeSet<OutboxMessageID>>,
+    // channel key -> consumed message ids
+    consumed: HashMap<ChannelKey, BTreeSet<OutboxMessageID>>,
     // channel key -> next scan position in `merged`
     next_pos: HashMap<ChannelKey, usize>,
 }
@@ -77,13 +77,10 @@ impl InMemoryOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
-    /// Provides outbox message store wakeup detector instance
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
         &self.wakeup_detector
     }
 
-    /// Fetch next batch for the given producer-consumer pair;
-    ///  order by global id.
     async fn fetch_next_batch(
         &self,
         _: &dill::Catalog,
@@ -99,8 +96,8 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         };
 
         let pos = state.next_pos.get(&channel_key).copied().unwrap_or(0);
-        let applied = state
-            .applied
+        let consumed = state
+            .consumed
             .entry(channel_key.clone())
             .or_default()
             .clone();
@@ -111,7 +108,7 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         while i < state.messages.len() && res.len() < batch_size {
             let e = &state.messages[i];
 
-            if !applied.contains(&e.message_id) {
+            if !consumed.contains(&e.message_id) {
                 res.push(e.clone());
             }
             i += 1;
@@ -131,13 +128,13 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         let boundaries = {
             let guard = self.state.lock().unwrap();
             guard
-                .applied
+                .consumed
                 .iter()
-                .map(|(channel_key, applied)| {
+                .map(|(channel_key, consumed)| {
                     Ok(OutboxMessageConsumptionBoundary {
                         producer_name: channel_key.producer_name.clone(),
                         consumer_name: channel_key.consumer_name.clone(),
-                        last_consumed_message_id: applied
+                        last_consumed_message_id: consumed
                             .iter()
                             .last()
                             .copied()
@@ -151,14 +148,12 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         Box::pin(tokio_stream::iter(boundaries))
     }
 
-    /// Mark these messages as applied for this producer-consumer pair
-    /// (should be idempotent!).
-    async fn mark_applied(
+    async fn mark_consumed(
         &self,
         _: &dill::Catalog,
         producer_name: &str,
         consumer_name: &str,
-        message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
+        boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
@@ -168,10 +163,8 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         };
 
         // In-memory implementation does not care about
-        let set = state.applied.entry(channel_key).or_default();
-        for (id, _) in message_ids_with_tx_ids {
-            set.insert(*id);
-        }
+        let set = state.consumed.entry(channel_key).or_default();
+        set.insert(boundary.message_id);
 
         Ok(())
     }

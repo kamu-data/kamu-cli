@@ -44,13 +44,10 @@ impl PostgresOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for PostgresOutboxMessageBridge {
-    /// Provides event store wakeup detector instance
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
         &self.wakeup_detector
     }
 
-    /// Fetch next batch for the given producer-consumer pair;
-    ///  order by global id.
     #[tracing::instrument(
         level = "debug",
         skip_all,
@@ -162,42 +159,20 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         })
     }
 
-    /// Mark these events as applied for this projector (idempotent).
-    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name))]
-    async fn mark_applied(
+    #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name, boundary = ?boundary))]
+    async fn mark_consumed(
         &self,
         transaction_catalog: &dill::Catalog,
         producer_name: &str,
         consumer_name: &str,
-        message_ids_with_tx_ids: &[(OutboxMessageID, i64)],
+        boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError> {
-        if message_ids_with_tx_ids.is_empty() {
-            return Ok(());
-        }
-
         let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
 
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Order (tx_id, message_id) is critical here.
-        // We must write the highest message_id for the highest tx_id to ensure
-        // idempotency. This means there might be messages with higher message_id
-        // but lower tx_id in this batch.
-        //
-        // I.e.:
-        //   tx-id: 226813, message-id: 7004-7006, 7009-7011, 7013-7018
-        //   tx-id: 226814, message-id: 7003
-        //   tx-id: 226815, message-id: 7007-7008
-        // Event though the highest message-id is 7018, we must record (226815, 7008) as
-        // the last projected offset. Recording (226813, 7018) would cause
-        // re-processing of messages from tx-id 226814 and 226815!!!
-
-        let (last_tx_id, last_message_id) = message_ids_with_tx_ids
-            .iter()
-            .map(|(message_id, tx_id)| (*tx_id, message_id.into_inner()))
-            .max()
-            .unwrap();
+        let (last_tx_id, last_message_id) = (boundary.tx_id, boundary.message_id.into_inner());
 
         sqlx::query!(
             r#"
