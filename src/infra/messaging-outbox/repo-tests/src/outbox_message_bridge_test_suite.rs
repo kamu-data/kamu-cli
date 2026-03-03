@@ -478,31 +478,6 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
     assert_eq!(MessageA::version(), messages[0].version);
 }
 
-fn boundary_from_collected_messages(
-    messages: &[OutboxMessage],
-    producer_name: &str,
-    message_id: i64,
-) -> OutboxMessageBoundary {
-    let boundary_message = messages
-        .iter()
-        .find(|message| {
-            message.producer_name == producer_name
-                && message.message_id == OutboxMessageID::new(message_id)
-        })
-        .unwrap_or_else(|| {
-            panic!("Missing message boundary for producer={producer_name}, message_id={message_id}")
-        });
-
-    boundary_from_message(boundary_message)
-}
-
-fn boundary_from_message(message: &OutboxMessage) -> OutboxMessageBoundary {
-    OutboxMessageBoundary {
-        message_id: message.message_id,
-        tx_id: message.tx_id,
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -526,6 +501,33 @@ struct MessageB {
 impl Message for MessageB {
     fn version() -> u32 {
         OUTBOX_MESSAGE_VERSION
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn boundary_from_collected_messages(
+    messages: &[OutboxMessage],
+    producer_name: &str,
+    message_id: i64,
+) -> OutboxMessageBoundary {
+    let boundary_message = messages
+        .iter()
+        .find(|message| {
+            message.producer_name == producer_name
+                && message.message_id == OutboxMessageID::new(message_id)
+        })
+        .unwrap_or_else(|| {
+            panic!("Missing message boundary for producer={producer_name}, message_id={message_id}")
+        });
+
+    boundary_from_message(boundary_message)
+}
+
+fn boundary_from_message(message: &OutboxMessage) -> OutboxMessageBoundary {
+    OutboxMessageBoundary {
+        message_id: message.message_id,
+        tx_id: message.tx_id,
     }
 }
 
