@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use internal_error::InternalError;
@@ -27,6 +27,7 @@ pub(crate) struct OutboxConsumptionIterationPlanner<'a> {
     transactional_catalog: &'a dill::Catalog,
     outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
+    failed_consumer_names_by_producer: &'a HashMap<String, HashSet<String>>,
     messages_batch_size: usize,
 }
 
@@ -36,6 +37,7 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         transactional_catalog: &'a dill::Catalog,
         outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
+        failed_consumer_names_by_producer: &'a HashMap<String, HashSet<String>>,
         messages_batch_size: usize,
     ) -> Self {
         Self {
@@ -43,6 +45,7 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
             transactional_catalog,
             outbox_message_bridge,
             metrics,
+            failed_consumer_names_by_producer,
             messages_batch_size,
         }
     }
@@ -160,6 +163,21 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
                 continue;
             };
 
+            // Filter out failed consumers, as they are not consuming messages and should
+            // not block the queue
+            let failed_consumer_names = self.failed_consumer_names_by_producer.get(&producer_name);
+            let active_consumer_names = consumer_names
+                .iter()
+                .filter(|consumer_name| {
+                    failed_consumer_names.is_none_or(|failed_consumer_names| {
+                        !failed_consumer_names.contains(*consumer_name)
+                    })
+                })
+                .collect::<Vec<_>>();
+            if active_consumer_names.is_empty() {
+                continue;
+            }
+
             // Report queue length metrics
             for (consumer, last_consumed_boundary) in &consumption_boundaries_by_consumer {
                 // Note: this is a best effort esimation, as the ordering might be unstable with
@@ -173,8 +191,10 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
             }
 
             // Determine the earliest message boundary that was processed by consumers
-            let maybe_processed_boundary = self
-                .determine_processed_boundary(consumer_names, &consumption_boundaries_by_consumer);
+            let maybe_processed_boundary = self.determine_processed_boundary(
+                active_consumer_names.into_iter(),
+                &consumption_boundaries_by_consumer,
+            );
 
             // Was there an advancement?
             if let Some(processed_boundary) = maybe_processed_boundary
@@ -199,9 +219,9 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         unconsumed_states_by_producers
     }
 
-    fn determine_processed_boundary(
+    fn determine_processed_boundary<'b>(
         &self,
-        consumer_names: &[String],
+        consumer_names: impl Iterator<Item = &'b String>,
         consumption_boundaries: &HashMap<String, OutboxMessageBoundary>,
     ) -> Option<OutboxMessageBoundary> {
         let mut earliest_seen_boundary: Option<OutboxMessageBoundary> = None;

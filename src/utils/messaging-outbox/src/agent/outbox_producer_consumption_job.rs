@@ -61,6 +61,11 @@ impl ProducerConsumptionJob {
         &self.producer_name
     }
 
+    pub(crate) fn failed_consumer_names_snapshot(&self) -> HashSet<String> {
+        let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
+        g_failed_consumer_names.clone()
+    }
+
     pub(crate) fn all_consumers_failing(&self) -> bool {
         let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
         assert!(g_failed_consumer_names.len() <= self.consumer_names.len());

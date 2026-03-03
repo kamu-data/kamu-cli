@@ -248,9 +248,29 @@ impl OutboxAgentImpl {
         //  - flushed iteration (i.e. via e2e middleware)
         let _guard = self.run_lock.lock().await;
 
+        // Build a map of failed consumers by producer
+        let failed_consumer_names_by_producer = self
+            .producer_consumption_jobs
+            .iter()
+            .filter_map(|producer_consumption_job| {
+                let failed_consumer_names =
+                    producer_consumption_job.failed_consumer_names_snapshot();
+                if failed_consumer_names.is_empty() {
+                    None
+                } else {
+                    Some((
+                        producer_consumption_job.get_producer_name().to_string(),
+                        failed_consumer_names,
+                    ))
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
         // Read current state of producers and consumptions
         // Prepare consumption tasks for each progressed producer
-        let mut consumption_tasks_by_producer = self.prepare_consumption_iteration().await?;
+        let mut consumption_tasks_by_producer = self
+            .prepare_consumption_iteration(failed_consumer_names_by_producer)
+            .await?;
         let processed_consumer_tasks_counter = Arc::new(AtomicUsize::new(0));
 
         // Select jobs per consumption task, unless consumers are failing already
@@ -300,6 +320,7 @@ impl OutboxAgentImpl {
     #[transactional_method]
     async fn prepare_consumption_iteration(
         &self,
+        failed_consumer_names_by_producer: HashMap<String, HashSet<String>>,
     ) -> Result<HashMap<String, ProducerConsumptionTask>, InternalError> {
         let outbox_message_bridge = transaction_catalog
             .get_one::<dyn OutboxMessageBridge>()
@@ -310,6 +331,7 @@ impl OutboxAgentImpl {
             &transaction_catalog,
             outbox_message_bridge,
             self.metrics.clone(),
+            &failed_consumer_names_by_producer,
             self.agent_config.batch_size,
         );
 
