@@ -480,6 +480,132 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_consumption_boundaries_monotonic_and_isolated(catalog: &Catalog) {
+    let outbox_message_bridge = catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
+
+    for i in 1..=3 {
+        outbox_message_bridge
+            .push_message(
+                catalog,
+                NewOutboxMessage {
+                    producer_name: "A".to_string(),
+                    content_json: serde_json::to_value(&MessageA {
+                        x: i,
+                        y: u64::try_from(i * 10).unwrap(),
+                    })
+                    .unwrap(),
+                    occurred_on: Utc::now(),
+                    version: MessageA::version(),
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    outbox_message_bridge
+        .push_message(
+            catalog,
+            NewOutboxMessage {
+                producer_name: "B".to_string(),
+                content_json: serde_json::to_value(&MessageB {
+                    a: "only-one".to_string(),
+                    b: vec!["x".to_string()],
+                })
+                .unwrap(),
+                occurred_on: Utc::now(),
+                version: MessageB::version(),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        outbox_message_bridge
+            .list_consumption_boundaries(catalog)
+            .await
+            .unwrap()
+            .len(),
+        0
+    );
+
+    let producer_a_messages = outbox_message_bridge
+        .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
+        .await
+        .unwrap();
+    let producer_b_messages = outbox_message_bridge
+        .get_messages_by_producer(catalog, "B", OutboxMessageBoundary::default(), 1)
+        .await
+        .unwrap();
+
+    let a_boundary_1 = boundary_from_message(producer_a_messages.first().unwrap());
+    let a_boundary_2 = boundary_from_message(producer_a_messages.get(1).unwrap());
+    let a_boundary_3 = boundary_from_message(producer_a_messages.get(2).unwrap());
+    let b_boundary_1 = boundary_from_message(producer_b_messages.first().unwrap());
+
+    outbox_message_bridge
+        .mark_consumed(catalog, "A", "consumer-1", a_boundary_2)
+        .await
+        .unwrap();
+
+    let boundaries = outbox_message_bridge
+        .list_consumption_boundaries(catalog)
+        .await
+        .unwrap();
+    assert_eq!(boundaries.len(), 1);
+    assert_eq!(
+        find_consumption_boundary(&boundaries, "A", "consumer-1").boundary(),
+        a_boundary_2
+    );
+
+    outbox_message_bridge
+        .mark_consumed(catalog, "A", "consumer-1", a_boundary_1)
+        .await
+        .unwrap();
+
+    let boundaries = outbox_message_bridge
+        .list_consumption_boundaries(catalog)
+        .await
+        .unwrap();
+    assert_eq!(
+        find_consumption_boundary(&boundaries, "A", "consumer-1").boundary(),
+        a_boundary_2
+    );
+
+    outbox_message_bridge
+        .mark_consumed(catalog, "A", "consumer-1", a_boundary_3)
+        .await
+        .unwrap();
+    outbox_message_bridge
+        .mark_consumed(catalog, "A", "consumer-2", a_boundary_1)
+        .await
+        .unwrap();
+    outbox_message_bridge
+        .mark_consumed(catalog, "B", "consumer-1", b_boundary_1)
+        .await
+        .unwrap();
+
+    let boundaries = outbox_message_bridge
+        .list_consumption_boundaries(catalog)
+        .await
+        .unwrap();
+
+    assert_eq!(boundaries.len(), 3);
+    assert_eq!(
+        find_consumption_boundary(&boundaries, "A", "consumer-1").boundary(),
+        a_boundary_3
+    );
+    assert_eq!(
+        find_consumption_boundary(&boundaries, "A", "consumer-2").boundary(),
+        a_boundary_1
+    );
+    assert_eq!(
+        find_consumption_boundary(&boundaries, "B", "consumer-1").boundary(),
+        b_boundary_1
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MessageA {
     x: i32,
@@ -529,6 +655,24 @@ fn boundary_from_message(message: &OutboxMessage) -> OutboxMessageBoundary {
         message_id: message.message_id,
         tx_id: message.tx_id,
     }
+}
+
+fn find_consumption_boundary<'a>(
+    boundaries: &'a [messaging_outbox::OutboxMessageConsumptionBoundary],
+    producer_name: &str,
+    consumer_name: &str,
+) -> &'a messaging_outbox::OutboxMessageConsumptionBoundary {
+    boundaries
+        .iter()
+        .find(|boundary| {
+            boundary.producer_name == producer_name && boundary.consumer_name == consumer_name
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "Missing consumption boundary for producer={producer_name}, \
+                 consumer={consumer_name}"
+            )
+        })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
