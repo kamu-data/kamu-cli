@@ -129,7 +129,6 @@ impl TransactionalOutboxHarness {
     }
 
     async fn get_saved_messages<TMessage: Message>(&self, producer_name: &str) -> Vec<TMessage> {
-        use futures::TryStreamExt;
         let outbox_messages: Vec<_> = self
             .outbox_message_bridge
             .get_messages_by_producer(
@@ -138,7 +137,6 @@ impl TransactionalOutboxHarness {
                 OutboxMessageBoundary::default(),
                 10,
             )
-            .try_collect()
             .await
             .unwrap();
 

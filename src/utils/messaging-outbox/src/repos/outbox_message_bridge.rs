@@ -30,20 +30,20 @@ pub trait OutboxMessageBridge: Send + Sync {
         message: NewOutboxMessage,
     ) -> Result<(), InternalError>;
 
-    fn get_unprocessed_messages(
+    async fn get_unprocessed_messages(
         &self,
         transaction_catalog: &dill::Catalog,
         above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
-    ) -> OutboxMessageStream<'_>;
+    ) -> Result<Vec<OutboxMessage>, InternalError>;
 
-    fn get_messages_by_producer(
+    async fn get_messages_by_producer(
         &self,
         transaction_catalog: &dill::Catalog,
         producer_name: &str,
         above_boundary: OutboxMessageBoundary,
         batch_size: usize,
-    ) -> OutboxMessageStream<'_>;
+    ) -> Result<Vec<OutboxMessage>, InternalError>;
 
     async fn get_latest_message_boundaries_by_producer(
         &self,
@@ -52,10 +52,10 @@ pub trait OutboxMessageBridge: Send + Sync {
 
     /// List all registered producer-consumer pairs with their last consumed
     /// message id and tx id.
-    fn list_consumption_boundaries(
+    async fn list_consumption_boundaries(
         &self,
         transaction_catalog: &dill::Catalog,
-    ) -> OutboxMessageConsumptionBoundariesStream<'_>;
+    ) -> Result<Vec<OutboxMessageConsumptionBoundary>, InternalError>;
 
     /// Mark this message boundary as consumed for this producer-consumer pair
     async fn mark_consumed(
@@ -66,12 +66,6 @@ pub trait OutboxMessageBridge: Send + Sync {
         boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError>;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type OutboxMessageStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<OutboxMessage, InternalError>> + Send + 'a>,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,15 +85,5 @@ impl OutboxMessageConsumptionBoundary {
         }
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type OutboxMessageConsumptionBoundariesStream<'a> = std::pin::Pin<
-    Box<
-        dyn tokio_stream::Stream<Item = Result<OutboxMessageConsumptionBoundary, InternalError>>
-            + Send
-            + 'a,
-    >,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

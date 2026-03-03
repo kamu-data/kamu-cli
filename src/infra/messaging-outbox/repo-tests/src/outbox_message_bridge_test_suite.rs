@@ -9,7 +9,6 @@
 
 use chrono::Utc;
 use dill::Catalog;
-use futures::TryStreamExt;
 use messaging_outbox::{
     Message,
     NewOutboxMessage,
@@ -146,7 +145,6 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_bridge
         .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
-        .try_collect()
         .await
         .unwrap();
 
@@ -165,7 +163,6 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
             },
             4,
         )
-        .try_collect()
         .await
         .unwrap();
 
@@ -229,7 +226,6 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
             },
             3,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 0);
@@ -244,7 +240,6 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
             },
             6,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 2); // 4, 5
@@ -343,7 +338,6 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
             ],
             15,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 15);
@@ -374,7 +368,6 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
             ],
             10,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 3);
@@ -404,7 +397,6 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
             ],
             4,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 4);
@@ -435,7 +427,6 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
             ],
             4,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 4);
@@ -460,7 +451,6 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
             ],
             3,
         )
-        .try_collect()
         .await
         .unwrap();
     assert_eq!(messages.len(), 3);
@@ -514,7 +504,6 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
 
     let messages: Vec<_> = outbox_message_bridge
         .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
-        .try_collect()
         .await
         .unwrap();
 

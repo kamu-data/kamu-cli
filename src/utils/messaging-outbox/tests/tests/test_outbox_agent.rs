@@ -638,11 +638,9 @@ impl OutboxAgentHarness {
     }
 
     async fn read_consumption_boundaries(&self) -> Vec<OutboxMessageConsumptionBoundary> {
-        use futures::TryStreamExt;
         let mut boundaries: Vec<_> = self
             .outbox_message_bridge
             .list_consumption_boundaries(&self.catalog)
-            .try_collect()
             .await
             .unwrap();
 

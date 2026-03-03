@@ -8517,7 +8517,6 @@ dependencies = [
  "test-group",
  "test-log",
  "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -9544,7 +9543,6 @@ dependencies = [
  "thiserror 2.0.18",
  "time-source",
  "tokio",
- "tokio-stream",
  "tracing",
 ]
 

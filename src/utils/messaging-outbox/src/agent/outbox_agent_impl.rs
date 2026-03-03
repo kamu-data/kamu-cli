@@ -178,10 +178,8 @@ impl OutboxAgentImpl {
             .unwrap();
 
         // Load existing consumption records
-        use futures::TryStreamExt;
         let consumptions = outbox_message_bridge
             .list_consumption_boundaries(&transaction_catalog)
-            .try_collect::<Vec<_>>()
             .await?;
 
         // Fetch latest messages produced by each producer to use as default for new

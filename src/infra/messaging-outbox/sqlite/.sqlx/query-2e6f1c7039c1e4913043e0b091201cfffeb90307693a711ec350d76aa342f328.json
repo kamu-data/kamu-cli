@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                    SELECT\n                        message_id,\n                        0 AS \"tx_id!: i64\",\n                        producer_name,\n                        content_json as \"content_json: _\",\n                        occurred_on as \"occurred_on: _\",\n                        version as \"version!\"\n                    FROM outbox_messages\n                    ORDER BY message_id\n                    LIMIT $1\n                    ",
+  "query": "\n            SELECT\n                message_id,\n                0 AS \"tx_id!: i64\",\n                producer_name,\n                content_json as \"content_json: _\",\n                occurred_on as \"occurred_on: _\",\n                version as \"version!\"\n            FROM outbox_messages\n            WHERE producer_name = $1 AND message_id > $2\n            ORDER BY message_id\n            LIMIT $3\n            ",
   "describe": {
     "columns": [
       {
@@ -11,7 +11,7 @@
       {
         "name": "tx_id!: i64",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Null"
       },
       {
         "name": "producer_name",
@@ -35,16 +35,16 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 3
     },
     "nullable": [
       false,
-      false,
+      null,
       false,
       false,
       false,
       true
     ]
   },
-  "hash": "87f81262cff09690c87f5e4f1dda0cbf537bff80eaa35b3d2e6d8c8f1a00db27"
+  "hash": "2e6f1c7039c1e4913043e0b091201cfffeb90307693a711ec350d76aa342f328"
 }

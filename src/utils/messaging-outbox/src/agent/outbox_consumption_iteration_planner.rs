@@ -107,15 +107,10 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         &self,
     ) -> Result<HashMap<String, HashMap<String, OutboxMessageBoundary>>, InternalError> {
         // Extract consumption boundaries for all routes
-        let mut all_boundaries = async move {
-            let consumptions_stream = self
-                .outbox_message_bridge
-                .list_consumption_boundaries(self.transactional_catalog);
-
-            use futures::TryStreamExt;
-            consumptions_stream.try_collect::<Vec<_>>().await
-        }
-        .await?;
+        let mut all_boundaries = self
+            .outbox_message_bridge
+            .list_consumption_boundaries(self.transactional_catalog)
+            .await?;
 
         // Organize by producer->consumer hierarchically
         use itertools::Itertools;
@@ -243,7 +238,6 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
             .collect();
 
         // Load batch of unprocessed messages, which satisfy filters
-        use futures::TryStreamExt;
         let mut unprocessed_messages = self
             .outbox_message_bridge
             .get_unprocessed_messages(
@@ -251,9 +245,10 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
                 boundaries_by_producer,
                 self.messages_batch_size,
             )
-            .map_ok(Arc::new)
-            .try_collect::<Vec<_>>()
-            .await?;
+            .await?
+            .into_iter()
+            .map(Arc::new)
+            .collect::<Vec<_>>();
 
         // Group messages by producers
         use itertools::Itertools;
