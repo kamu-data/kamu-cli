@@ -48,3 +48,4 @@ kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
+serde = { version = "1", features = ["derive"] }
