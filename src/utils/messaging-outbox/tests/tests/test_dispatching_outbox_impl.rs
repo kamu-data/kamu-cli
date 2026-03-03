@@ -253,9 +253,10 @@ impl DispatchingOutboxHarness {
         use futures::TryStreamExt;
         let outbox_messages: Vec<_> = self
             .outbox_message_bridge
-            .get_messages(
+            .get_messages_by_producer(
                 &self.catalog,
-                vec![(producer_name.to_owned(), OutboxMessageBoundary::default())],
+                producer_name,
+                OutboxMessageBoundary::default(),
                 10,
             )
             .try_collect()

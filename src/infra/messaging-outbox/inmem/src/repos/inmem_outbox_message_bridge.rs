@@ -90,12 +90,17 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         Ok(())
     }
 
-    fn get_messages(
+    fn get_unprocessed_messages(
         &self,
         _transaction_catalog: &dill::Catalog,
         above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_> {
+        assert!(
+            !above_boundaries_by_producer.is_empty(),
+            "get_unprocessed_messages requires non-empty boundaries"
+        );
+
         let minimal_above_id = above_boundaries_by_producer
             .iter()
             .map(|(_, boundary)| boundary.message_id) // ignore tx_id for in-memory implementation
@@ -119,7 +124,7 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
                                 && message.message_id > above_boundary.message_id // ignore tx_id for in-memory implementation
                         });
 
-                if matches_filter || above_boundaries_by_producer.is_empty() {
+                if matches_filter {
                     collected.push(Ok(message.clone()));
                     if collected.len() >= batch_size {
                         break;
@@ -128,6 +133,31 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
             }
 
             collected
+        };
+
+        Box::pin(tokio_stream::iter(messages))
+    }
+
+    fn get_messages_by_producer(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+        producer_name: &str,
+        above_boundary: OutboxMessageBoundary,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_> {
+        let messages = {
+            let state = self.state.lock().unwrap();
+            state
+                .messages
+                .iter()
+                .filter(|message| {
+                    message.producer_name == producer_name
+                        && message.message_id > above_boundary.message_id
+                })
+                .take(batch_size)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
         };
 
         Box::pin(tokio_stream::iter(messages))
@@ -150,38 +180,6 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
                     },
                 )
             })
-            .collect())
-    }
-
-    async fn fetch_next_batch(
-        &self,
-        _: &dill::Catalog,
-        producer_name: &str,
-        consumer_name: &str,
-        batch_size: usize,
-    ) -> Result<Vec<OutboxMessage>, InternalError> {
-        let state = self.state.lock().unwrap();
-
-        let channel_key = ChannelKey {
-            producer_name: producer_name.to_string(),
-            consumer_name: consumer_name.to_string(),
-        };
-
-        let last_consumed_message_id = state
-            .consumed_boundaries
-            .get(&channel_key)
-            .map(|boundary| boundary.message_id)
-            .unwrap_or_else(|| OutboxMessageID::new(0));
-
-        Ok(state
-            .messages
-            .iter()
-            .filter(|message| {
-                message.producer_name == producer_name
-                    && message.message_id > last_consumed_message_id
-            })
-            .take(batch_size)
-            .cloned()
             .collect())
     }
 

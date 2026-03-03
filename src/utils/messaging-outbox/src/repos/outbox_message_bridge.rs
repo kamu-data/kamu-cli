@@ -30,10 +30,18 @@ pub trait OutboxMessageBridge: Send + Sync {
         message: NewOutboxMessage,
     ) -> Result<(), InternalError>;
 
-    fn get_messages(
+    fn get_unprocessed_messages(
         &self,
         transaction_catalog: &dill::Catalog,
         above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_>;
+
+    fn get_messages_by_producer(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_name: &str,
+        above_boundary: OutboxMessageBoundary,
         batch_size: usize,
     ) -> OutboxMessageStream<'_>;
 
@@ -41,16 +49,6 @@ pub trait OutboxMessageBridge: Send + Sync {
         &self,
         transaction_catalog: &dill::Catalog,
     ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError>;
-
-    /// Fetch next batch for the given producer-consumer pair;
-    ///  order by global id.
-    async fn fetch_next_batch(
-        &self,
-        transaction_catalog: &dill::Catalog,
-        producer_name: &str,
-        consumer_name: &str,
-        batch_size: usize,
-    ) -> Result<Vec<OutboxMessage>, InternalError>;
 
     /// List all registered producer-consumer pairs with their last consumed
     /// message id and tx id.

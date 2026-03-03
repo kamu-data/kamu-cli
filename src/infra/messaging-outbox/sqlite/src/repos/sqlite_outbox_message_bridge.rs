@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -81,15 +80,18 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
         Ok(())
     }
 
-    fn get_messages(
+    fn get_unprocessed_messages(
         &self,
         transaction_catalog: &dill::Catalog,
         above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
         batch_size: usize,
     ) -> OutboxMessageStream<'_> {
-        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+        assert!(
+            !above_boundaries_by_producer.is_empty(),
+            "get_unprocessed_messages requires non-empty boundaries"
+        );
 
-        let unfiltered = above_boundaries_by_producer.is_empty();
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
 
         let json_bounds = serde_json::to_string(
             &above_boundaries_by_producer
@@ -108,52 +110,82 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
 
             let batch_size = i64::try_from(batch_size).unwrap();
 
-            let mut stream = if unfiltered {
-                sqlx::query_as!(
-                    OutboxMessageRow,
-                    r#"
+            let mut stream = sqlx::query_as!(
+                OutboxMessageRow,
+                r#"
+                WITH bounds AS (
                     SELECT
-                        message_id,
-                        0 AS "tx_id!: i64",
-                        producer_name,
-                        content_json as "content_json: _",
-                        occurred_on as "occurred_on: _",
-                        version as "version!"
-                    FROM outbox_messages
-                    ORDER BY message_id
-                    LIMIT $1
-                    "#,
-                    batch_size,
-                ).fetch(connection_mut)
-            } else {
-                sqlx::query_as!(
-                    OutboxMessageRow,
-                    r#"
-                    WITH bounds AS (
-                        SELECT
-                            json_extract(value, '$.p')  AS producer_name,
-                            json_extract(value, '$.id') AS above_id
-                        FROM json_each($1)
-                    )
-                    SELECT
-                        m.message_id,
-                        0 AS "tx_id!: i64",
-                        m.producer_name,
-                        m.content_json as "content_json: _",
-                        m.occurred_on as "occurred_on: _",
-                        m.version as "version!"
-                    FROM outbox_messages AS m
-                    JOIN bounds AS b
-                        ON m.producer_name = b.producer_name AND m.message_id > b.above_id
-                    ORDER BY m.message_id
-                    LIMIT $2
-                    "#,
-                    json_bounds,
-                    batch_size
-                ).fetch(connection_mut)
-            };
+                        json_extract(value, '$.p')  AS producer_name,
+                        json_extract(value, '$.id') AS above_id
+                    FROM json_each($1)
+                )
+                SELECT
+                    m.message_id,
+                    0 AS "tx_id!: i64",
+                    m.producer_name,
+                    m.content_json as "content_json: _",
+                    m.occurred_on as "occurred_on: _",
+                    m.version as "version!"
+                FROM outbox_messages AS m
+                JOIN bounds AS b
+                    ON m.producer_name = b.producer_name AND m.message_id > b.above_id
+                ORDER BY m.message_id
+                LIMIT $2
+                "#,
+                json_bounds,
+                batch_size
+            )
+            .fetch(connection_mut);
 
-            while let Some(message_row) = stream.try_next().await.map_err(ErrorIntoInternal::int_err)? {
+            while let Some(message_row) =
+                stream.try_next().await.map_err(ErrorIntoInternal::int_err)?
+            {
+                let message: OutboxMessage = message_row.into();
+                yield Ok(message);
+            }
+        })
+    }
+
+    fn get_messages_by_producer(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_name: &str,
+        above_boundary: OutboxMessageBoundary,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_> {
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+        let producer_name = producer_name.to_string();
+        let above_message_id = above_boundary.message_id.into_inner();
+        let batch_size = i64::try_from(batch_size).unwrap();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let mut stream = sqlx::query_as!(
+                OutboxMessageRow,
+                r#"
+                SELECT
+                    message_id,
+                    0 AS "tx_id!: i64",
+                    producer_name,
+                    content_json as "content_json: _",
+                    occurred_on as "occurred_on: _",
+                    version as "version!"
+                FROM outbox_messages
+                WHERE producer_name = $1 AND message_id > $2
+                ORDER BY message_id
+                LIMIT $3
+                "#,
+                producer_name,
+                above_message_id,
+                batch_size
+            )
+            .fetch(connection_mut);
+
+            while let Some(message_row) =
+                stream.try_next().await.map_err(ErrorIntoInternal::int_err)?
+            {
                 let message: OutboxMessage = message_row.into();
                 yield Ok(message);
             }
@@ -194,68 +226,6 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
                 )
             })
             .collect())
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        fields(producer_name, consumer_name, batch_size)
-    )]
-    async fn fetch_next_batch(
-        &self,
-        transaction_catalog: &dill::Catalog,
-        producer_name: &str,
-        consumer_name: &str,
-        batch_size: usize,
-    ) -> Result<Vec<OutboxMessage>, InternalError> {
-        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
-
-        let mut guard = transaction.lock().await;
-        let connection_mut = guard.connection_mut().await?;
-
-        let limit = i64::try_from(batch_size).unwrap();
-
-        let rows = sqlx::query!(
-            r#"
-            SELECT
-                o.message_id          AS "message_id!",
-                o.producer_name       AS "producer_name!: String",
-                o.occurred_on         AS "occurred_on!: DateTime<Utc>",
-                o.content_json        AS "content_json!: serde_json::Value",
-                o.version             AS "version!"
-
-            FROM outbox_messages o
-            WHERE o.message_id > COALESCE(
-                (
-                    SELECT last_consumed_message_id FROM outbox_message_consumptions
-                    WHERE consumer_name = $1 AND producer_name = $2
-                ),
-                0
-            )
-            ORDER BY o.message_id
-            LIMIT $3;
-            "#,
-            consumer_name,
-            producer_name,
-            limit
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        let events = rows
-            .into_iter()
-            .map(|r| OutboxMessage {
-                message_id: OutboxMessageID::new(r.message_id),
-                tx_id: 0, // tx_id not tracked in SQLite impl
-                producer_name: r.producer_name,
-                occurred_on: r.occurred_on,
-                content_json: r.content_json,
-                version: u32::try_from(r.version).unwrap(),
-            })
-            .collect();
-
-        Ok(events)
     }
 
     fn list_consumption_boundaries(

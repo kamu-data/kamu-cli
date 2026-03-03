@@ -246,7 +246,7 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         use futures::TryStreamExt;
         let mut unprocessed_messages = self
             .outbox_message_bridge
-            .get_messages(
+            .get_unprocessed_messages(
                 self.transactional_catalog,
                 boundaries_by_producer,
                 self.messages_batch_size,

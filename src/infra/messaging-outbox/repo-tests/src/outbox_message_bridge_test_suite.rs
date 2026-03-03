@@ -145,11 +145,7 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
-            catalog,
-            vec![("A".to_string(), OutboxMessageBoundary::default())],
-            3,
-        )
+        .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
         .try_collect()
         .await
         .unwrap();
@@ -160,15 +156,13 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_messages_by_producer(
             catalog,
-            vec![(
-                "A".to_string(),
-                OutboxMessageBoundary {
-                    message_id: OutboxMessageID::new(5),
-                    tx_id: 0,
-                },
-            )],
+            "A",
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(5),
+                tx_id: 0,
+            },
             4,
         )
         .try_collect()
@@ -226,15 +220,13 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
     }
 
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_messages_by_producer(
             catalog,
-            vec![(
-                "A".to_string(),
-                OutboxMessageBoundary {
-                    message_id: OutboxMessageID::new(5),
-                    tx_id: 0,
-                },
-            )],
+            "A",
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(5),
+                tx_id: 0,
+            },
             3,
         )
         .try_collect()
@@ -243,15 +235,13 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
     assert_eq!(messages.len(), 0);
 
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_messages_by_producer(
             catalog,
-            vec![(
-                "A".to_string(),
-                OutboxMessageBoundary {
-                    message_id: OutboxMessageID::new(3),
-                    tx_id: 0,
-                },
-            )],
+            "A",
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(3),
+                tx_id: 0,
+            },
             6,
         )
         .try_collect()
@@ -343,9 +333,16 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     // [13] #14 A (x=20, y=266)
     // [14] #15 B (a="test_10", b=["foo_10", "bar_10"])
 
-    // No filters, reads all messages
+    // Both producers from boundary zero, reads all messages
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(catalog, vec![], 15)
+        .get_unprocessed_messages(
+            catalog,
+            vec![
+                ("A".to_string(), OutboxMessageBoundary::default()),
+                ("B".to_string(), OutboxMessageBoundary::default()),
+            ],
+            15,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -357,7 +354,7 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
 
     // Multiple filters nearby
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_unprocessed_messages(
             catalog,
             vec![
                 (
@@ -387,7 +384,7 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
 
     // Multiple filters long distance, B above window
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_unprocessed_messages(
             catalog,
             vec![
                 (
@@ -418,7 +415,7 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
 
     // Multiple filters some distance, but overlap
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_unprocessed_messages(
             catalog,
             vec![
                 (
@@ -449,7 +446,7 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
 
     // Multiple filters, partially not existing
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
+        .get_unprocessed_messages(
             catalog,
             vec![
                 (
@@ -516,11 +513,7 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
         .unwrap();
 
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages(
-            catalog,
-            vec![("A".to_string(), OutboxMessageBoundary::default())],
-            3,
-        )
+        .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
         .try_collect()
         .await
         .unwrap();
