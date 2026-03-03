@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
+use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use messaging_outbox::*;
 use sqlx::Sqlite;
@@ -45,6 +46,154 @@ impl SqliteOutboxMessageBridge {
 impl OutboxMessageBridge for SqliteOutboxMessageBridge {
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
         &self.wakeup_detector
+    }
+
+    async fn push_message(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        message: NewOutboxMessage,
+    ) -> Result<(), InternalError> {
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        let message_content_json = message.content_json;
+        let message_version: i32 = message
+            .version
+            .try_into()
+            .expect("Version out of range for i32");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO outbox_messages (producer_name, content_json, occurred_on, version)
+                VALUES ($1, $2, $3, $4)
+            "#,
+            message.producer_name,
+            message_content_json,
+            message.occurred_on,
+            message_version,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
+    fn get_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_> {
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+
+        let unfiltered = above_boundaries_by_producer.is_empty();
+
+        let json_bounds = serde_json::to_string(
+            &above_boundaries_by_producer
+                .into_iter()
+                // Note: ignore tx_id for SQLite implementation
+                .map(|(p, boundary)| {
+                    serde_json::json!({"p": p, "id": boundary.message_id.into_inner()})
+                })
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let batch_size = i64::try_from(batch_size).unwrap();
+
+            let mut stream = if unfiltered {
+                sqlx::query_as!(
+                    OutboxMessageRow,
+                    r#"
+                    SELECT
+                        message_id,
+                        0 AS "tx_id!: i64",
+                        producer_name,
+                        content_json as "content_json: _",
+                        occurred_on as "occurred_on: _",
+                        version as "version!"
+                    FROM outbox_messages
+                    ORDER BY message_id
+                    LIMIT $1
+                    "#,
+                    batch_size,
+                ).fetch(connection_mut)
+            } else {
+                sqlx::query_as!(
+                    OutboxMessageRow,
+                    r#"
+                    WITH bounds AS (
+                        SELECT
+                            json_extract(value, '$.p')  AS producer_name,
+                            json_extract(value, '$.id') AS above_id
+                        FROM json_each($1)
+                    )
+                    SELECT
+                        m.message_id,
+                        0 AS "tx_id!: i64",
+                        m.producer_name,
+                        m.content_json as "content_json: _",
+                        m.occurred_on as "occurred_on: _",
+                        m.version as "version!"
+                    FROM outbox_messages AS m
+                    JOIN bounds AS b
+                        ON m.producer_name = b.producer_name AND m.message_id > b.above_id
+                    ORDER BY m.message_id
+                    LIMIT $2
+                    "#,
+                    json_bounds,
+                    batch_size
+                ).fetch(connection_mut)
+            };
+
+            while let Some(message_row) = stream.try_next().await.map_err(ErrorIntoInternal::int_err)? {
+                let message: OutboxMessage = message_row.into();
+                yield Ok(message);
+            }
+        })
+    }
+
+    async fn get_latest_message_boundaries_by_producer(
+        &self,
+        transaction_catalog: &dill::Catalog,
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
+        let transaction: Arc<TransactionRefT<Sqlite>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        let records = sqlx::query!(
+            r#"
+            SELECT
+                producer_name,
+                IFNULL(MAX(message_id), 0) AS max_message_id
+            FROM outbox_messages
+            GROUP BY producer_name
+            "#,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(records
+            .into_iter()
+            .map(|r| {
+                (
+                    r.producer_name.unwrap(),
+                    OutboxMessageBoundary {
+                        message_id: OutboxMessageID::new(r.max_message_id),
+                        tx_id: 0, // ignore tx_id for SQLite implementation
+                    },
+                )
+            })
+            .collect())
     }
 
     #[tracing::instrument(

@@ -13,23 +13,26 @@ use dill::component;
 use internal_error::InternalError;
 use time_source::SystemTimeSource;
 
-use crate::{NewOutboxMessage, Outbox, OutboxMessageRepository};
+use crate::{NewOutboxMessage, Outbox, OutboxMessageBridge};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxTransactionalImpl {
-    outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+    catalog: dill::CatalogWeakRef,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
 impl OutboxTransactionalImpl {
     pub fn new(
-        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+        catalog: dill::CatalogWeakRef,
+        outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            outbox_message_repository,
+            catalog,
+            outbox_message_bridge,
             time_source,
         }
     }
@@ -53,8 +56,8 @@ impl Outbox for OutboxTransactionalImpl {
             version,
         };
 
-        self.outbox_message_repository
-            .push_message(new_outbox_message)
+        self.outbox_message_bridge
+            .push_message(&self.catalog.upgrade(), new_outbox_message)
             .await
     }
 }

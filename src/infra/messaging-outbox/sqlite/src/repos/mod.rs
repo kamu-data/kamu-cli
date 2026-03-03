@@ -9,8 +9,6 @@
 
 mod sqlite_message_store_wakeup_detector;
 mod sqlite_outbox_message_bridge;
-mod sqlite_outbox_message_repository;
 
 pub use sqlite_message_store_wakeup_detector::*;
 pub use sqlite_outbox_message_bridge::*;
-pub use sqlite_outbox_message_repository::*;

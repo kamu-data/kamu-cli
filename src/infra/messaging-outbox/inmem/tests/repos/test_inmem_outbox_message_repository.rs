@@ -9,14 +9,14 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_messages_initially,
-    harness = InMemoryOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_push_messages_from_several_producers,
-    harness = InMemoryOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_push_many_messages_and_read_parts,
-    harness = InMemoryOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_try_reading_above_max,
-    harness = InMemoryOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,19 +49,18 @@ database_transactional_test!(
     storage = inmem,
     fixture =
         kamu_messaging_outbox_repo_tests::test_reading_messages_above_max_with_multiple_producers,
-    harness = InMemoryOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InMemoryOutboxMessageRepositoryHarness {
+struct InMemoryOutboxMessageBridgeHarness {
     catalog: Catalog,
 }
 
-impl InMemoryOutboxMessageRepositoryHarness {
+impl InMemoryOutboxMessageBridgeHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryOutboxMessageRepository>();
         catalog_builder.add::<InMemoryOutboxMessageBridge>();
 
         Self {

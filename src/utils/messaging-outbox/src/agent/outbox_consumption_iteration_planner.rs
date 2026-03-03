@@ -18,14 +18,13 @@ use super::{
     ProducerConsumptionTask,
     UnconsumedProducerState,
 };
-use crate::{OutboxMessage, OutboxMessageBoundary, OutboxMessageBridge, OutboxMessageRepository};
+use crate::{OutboxMessage, OutboxMessageBoundary, OutboxMessageBridge};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct OutboxConsumptionIterationPlanner<'a> {
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     transactional_catalog: &'a dill::Catalog,
-    outbox_message_repository: Arc<dyn OutboxMessageRepository>,
     outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
     messages_batch_size: usize,
@@ -35,7 +34,6 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
     pub(crate) fn new(
         routes_static_info: Arc<OutboxRoutesStaticInfo>,
         transactional_catalog: &'a dill::Catalog,
-        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
         outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
         messages_batch_size: usize,
@@ -43,7 +41,6 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         Self {
             routes_static_info,
             transactional_catalog,
-            outbox_message_repository,
             outbox_message_bridge,
             metrics,
             messages_batch_size,
@@ -96,8 +93,8 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
     ) -> Result<HashMap<String, OutboxMessageBoundary>, InternalError> {
         // Extract latest produced message boundaries for each producer
         let latest_message_boundaries_by_producer = self
-            .outbox_message_repository
-            .get_latest_message_boundaries_by_producer()
+            .outbox_message_bridge
+            .get_latest_message_boundaries_by_producer(self.transactional_catalog)
             .await?;
 
         // Convert into map
@@ -248,8 +245,12 @@ impl<'a> OutboxConsumptionIterationPlanner<'a> {
         // Load batch of unprocessed messages, which satisfy filters
         use futures::TryStreamExt;
         let mut unprocessed_messages = self
-            .outbox_message_repository
-            .get_messages(boundaries_by_producer, self.messages_batch_size)
+            .outbox_message_bridge
+            .get_messages(
+                self.transactional_catalog,
+                boundaries_by_producer,
+                self.messages_batch_size,
+            )
             .map_ok(Arc::new)
             .try_collect::<Vec<_>>()
             .await?;

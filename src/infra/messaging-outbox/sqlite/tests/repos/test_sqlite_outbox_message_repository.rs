@@ -10,7 +10,7 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_sqlite::SqliteOutboxMessageRepository;
+use kamu_messaging_outbox_sqlite::SqliteOutboxMessageBridge;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ use sqlx::SqlitePool;
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_messages_initially,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +26,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_messaging_outbox_repo_tests::test_push_messages_from_several_producers,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +34,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_messaging_outbox_repo_tests::test_push_many_messages_and_read_parts,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_messaging_outbox_repo_tests::test_try_reading_above_max,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ database_transactional_test!(
     storage = sqlite,
     fixture =
         kamu_messaging_outbox_repo_tests::test_reading_messages_above_max_with_multiple_producers,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,21 +59,21 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_messaging_outbox_repo_tests::test_outbox_messages_version,
-    harness = SqliteOutboxMessageRepositoryHarness
+    harness = SqliteOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqliteOutboxMessageRepositoryHarness {
+struct SqliteOutboxMessageBridgeHarness {
     catalog: Catalog,
 }
 
-impl SqliteOutboxMessageRepositoryHarness {
+impl SqliteOutboxMessageBridgeHarness {
     pub fn new(sqlite_pool: SqlitePool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteOutboxMessageRepository>();
+        catalog_builder.add::<SqliteOutboxMessageBridge>();
 
         Self {
             catalog: catalog_builder.build(),

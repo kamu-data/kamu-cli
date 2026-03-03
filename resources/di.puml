@@ -97,7 +97,6 @@ interface "ObjectStoreRegistry" <<i>>
 interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
 interface "OutboxMessageBridge" <<i>>
-interface "OutboxMessageRepository" <<i>>
 interface "PasswordHashRepository" <<i>>
 interface "PollingIngestService" <<i>>
 interface "ProvenanceService" <<i>>
@@ -348,7 +347,6 @@ class "SqliteFlowSystemEventBridge" <<agnostic>>
 class "SqliteFlowTriggerEventStore"
 class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
-class "SqliteOutboxMessageRepository"
 class "SqlitePlugin"
 class "SqliteRebacRepository"
 class "SqliteTaskEventStore"
@@ -876,8 +874,6 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
-"OutboxMessageRepository" <|-- "SqliteOutboxMessageRepository"
-"SqliteOutboxMessageRepository"  --> "TransactionRefT"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
@@ -909,7 +905,8 @@ class "WsSmartTransferProtocolClient"
 "OutboxDispatchingImpl"  --> "OutboxTransactionalImpl"
 "OutboxImmediateImpl"  --> "Catalog"
 "OutboxImmediateImpl" "*" --> "MessageDispatcher"
-"OutboxTransactionalImpl"  --> "OutboxMessageRepository"
+"OutboxTransactionalImpl"  --> "CatalogWeakRef"
+"OutboxTransactionalImpl"  --> "OutboxMessageBridge"
 "OutboxTransactionalImpl"  --> "SystemTimeSource"
 "DatasetStorageUnit" <|-- "DatasetStorageUnitLocalFs"
 "DatasetStorageUnitWriter" <|-- "DatasetStorageUnitLocalFs"

@@ -9,7 +9,13 @@
 
 use internal_error::InternalError;
 
-use crate::{MessageStoreWakeupDetector, OutboxMessage, OutboxMessageBoundary, OutboxMessageID};
+use crate::{
+    MessageStoreWakeupDetector,
+    NewOutboxMessage,
+    OutboxMessage,
+    OutboxMessageBoundary,
+    OutboxMessageID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,6 +23,24 @@ use crate::{MessageStoreWakeupDetector, OutboxMessage, OutboxMessageBoundary, Ou
 pub trait OutboxMessageBridge: Send + Sync {
     /// Provides outbox message store wakeup detector instance
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+
+    async fn push_message(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        message: NewOutboxMessage,
+    ) -> Result<(), InternalError>;
+
+    fn get_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_>;
+
+    async fn get_latest_message_boundaries_by_producer(
+        &self,
+        transaction_catalog: &dill::Catalog,
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError>;
 
     /// Fetch next batch for the given producer-consumer pair;
     ///  order by global id.
@@ -44,6 +68,12 @@ pub trait OutboxMessageBridge: Send + Sync {
         boundary: OutboxMessageBoundary,
     ) -> Result<(), InternalError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type OutboxMessageStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<OutboxMessage, InternalError>> + Send + 'a>,
+>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

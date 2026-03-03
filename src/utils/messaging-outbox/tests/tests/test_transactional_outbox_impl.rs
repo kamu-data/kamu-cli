@@ -11,13 +11,13 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use messaging_outbox::{
     Message,
     Outbox,
     OutboxExt,
     OutboxMessageBoundary,
-    OutboxMessageRepository,
+    OutboxMessageBridge,
     OutboxTransactionalImpl,
 };
 use serde::{Deserialize, Serialize};
@@ -103,9 +103,9 @@ async fn test_transactional_outbox_messages_of_two_types() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TransactionalOutboxHarness {
-    _catalog: Catalog,
+    catalog: Catalog,
     outbox: Arc<dyn Outbox>,
-    outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
 }
 
 impl TransactionalOutboxHarness {
@@ -114,26 +114,26 @@ impl TransactionalOutboxHarness {
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<InMemoryOutboxMessageBridge>();
-        b.add::<InMemoryOutboxMessageRepository>();
         b.add::<SystemTimeSourceDefault>();
 
         let catalog = b.build();
 
         let outbox: Arc<dyn Outbox> = catalog.get_one::<dyn Outbox>().unwrap();
-        let outbox_message_repository = catalog.get_one::<dyn OutboxMessageRepository>().unwrap();
+        let outbox_message_bridge = catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             outbox,
-            outbox_message_repository,
+            outbox_message_bridge,
         }
     }
 
     async fn get_saved_messages<TMessage: Message>(&self, producer_name: &str) -> Vec<TMessage> {
         use futures::TryStreamExt;
         let outbox_messages: Vec<_> = self
-            .outbox_message_repository
+            .outbox_message_bridge
             .get_messages(
+                &self.catalog,
                 vec![(producer_name.to_owned(), OutboxMessageBoundary::default())],
                 10,
             )

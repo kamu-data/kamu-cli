@@ -9,8 +9,6 @@
 
 mod message_store_wakeup_detector;
 mod outbox_message_bridge;
-mod outbox_message_repository;
 
 pub use message_store_wakeup_detector::*;
 pub use outbox_message_bridge::*;
-pub use outbox_message_repository::*;

@@ -177,10 +177,6 @@ impl OutboxAgentImpl {
             .get_one::<dyn OutboxMessageBridge>()
             .unwrap();
 
-        let outbox_message_repository = transaction_catalog
-            .get_one::<dyn OutboxMessageRepository>()
-            .unwrap();
-
         // Load existing consumption records
         use futures::TryStreamExt;
         let consumptions = outbox_message_bridge
@@ -191,8 +187,8 @@ impl OutboxAgentImpl {
         // Fetch latest messages produced by each producer to use as default for new
         // consumers with InitialConsumerBoundary::Latest property
         let latest_message_boundaries_by_producer = {
-            let latest_message_boundaries_by_producer = outbox_message_repository
-                .get_latest_message_boundaries_by_producer()
+            let latest_message_boundaries_by_producer = outbox_message_bridge
+                .get_latest_message_boundaries_by_producer(&transaction_catalog)
                 .await?;
 
             latest_message_boundaries_by_producer
@@ -311,14 +307,9 @@ impl OutboxAgentImpl {
             .get_one::<dyn OutboxMessageBridge>()
             .unwrap();
 
-        let outbox_message_repository = transaction_catalog
-            .get_one::<dyn OutboxMessageRepository>()
-            .unwrap();
-
         let planner = OutboxConsumptionIterationPlanner::new(
             self.routes_static_info.clone(),
             &transaction_catalog,
-            outbox_message_repository,
             outbox_message_bridge,
             self.metrics.clone(),
             self.agent_config.batch_size,

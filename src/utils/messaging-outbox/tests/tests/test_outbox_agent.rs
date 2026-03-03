@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
-use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
@@ -571,7 +571,6 @@ impl OutboxAgentHarness {
         b.add::<OutboxAgentMetrics>();
         b.add_value(OutboxAgentConfig::local_default());
         b.add::<InMemoryOutboxMessageBridge>();
-        b.add::<InMemoryOutboxMessageRepository>();
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<SystemTimeSourceDefault>();

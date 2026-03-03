@@ -107,27 +107,33 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
 
     for i in 1..=10 {
         outbox_message_bridge
-            .push_message(NewOutboxMessage {
-                producer_name: "A".to_string(),
-                content_json: serde_json::to_value(&MessageA {
-                    x: i * 2,
-                    y: u64::try_from(256 + i).unwrap(),
-                })
-                .unwrap(),
-                occurred_on: Utc::now(),
-                version: OUTBOX_MESSAGE_VERSION,
-            })
+            .push_message(
+                catalog,
+                NewOutboxMessage {
+                    producer_name: "A".to_string(),
+                    content_json: serde_json::to_value(&MessageA {
+                        x: i * 2,
+                        y: u64::try_from(256 + i).unwrap(),
+                    })
+                    .unwrap(),
+                    occurred_on: Utc::now(),
+                    version: OUTBOX_MESSAGE_VERSION,
+                },
+            )
             .await
             .unwrap();
     }
 
     outbox_message_bridge
-        .push_message(NewOutboxMessage {
-            producer_name: "dummy".to_string(),
-            content_json: serde_json::to_value("dummy").unwrap(),
-            occurred_on: Utc::now(),
-            version: OUTBOX_MESSAGE_VERSION,
-        })
+        .push_message(
+            catalog,
+            NewOutboxMessage {
+                producer_name: "dummy".to_string(),
+                content_json: serde_json::to_value("dummy").unwrap(),
+                occurred_on: Utc::now(),
+                version: OUTBOX_MESSAGE_VERSION,
+            },
+        )
         .await
         .unwrap();
 
@@ -182,27 +188,33 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
 
     for i in 1..=5 {
         outbox_message_bridge
-            .push_message(NewOutboxMessage {
-                producer_name: "A".to_string(),
-                content_json: serde_json::to_value(&MessageA {
-                    x: i,
-                    y: u64::try_from(i * 2).unwrap(),
-                })
-                .unwrap(),
-                occurred_on: Utc::now(),
-                version: MessageA::version(),
-            })
+            .push_message(
+                catalog,
+                NewOutboxMessage {
+                    producer_name: "A".to_string(),
+                    content_json: serde_json::to_value(&MessageA {
+                        x: i,
+                        y: u64::try_from(i * 2).unwrap(),
+                    })
+                    .unwrap(),
+                    occurred_on: Utc::now(),
+                    version: MessageA::version(),
+                },
+            )
             .await
             .unwrap();
     }
 
     outbox_message_bridge
-        .push_message(NewOutboxMessage {
-            producer_name: "dummy".to_string(),
-            content_json: serde_json::to_value("dummy").unwrap(),
-            occurred_on: Utc::now(),
-            version: OUTBOX_MESSAGE_VERSION,
-        })
+        .push_message(
+            catalog,
+            NewOutboxMessage {
+                producer_name: "dummy".to_string(),
+                content_json: serde_json::to_value("dummy").unwrap(),
+                occurred_on: Utc::now(),
+                version: OUTBOX_MESSAGE_VERSION,
+            },
+        )
         .await
         .unwrap();
 
@@ -261,30 +273,36 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     // Push a mix of messages for A and B producers (10 A, 5 B)
     for i in 1..=10 {
         outbox_message_bridge
-            .push_message(NewOutboxMessage {
-                producer_name: "A".to_string(),
-                content_json: serde_json::to_value(&MessageA {
-                    x: i * 2,
-                    y: u64::try_from(256 + i).unwrap(),
-                })
-                .unwrap(),
-                occurred_on: Utc::now(),
-                version: MessageA::version(),
-            })
+            .push_message(
+                catalog,
+                NewOutboxMessage {
+                    producer_name: "A".to_string(),
+                    content_json: serde_json::to_value(&MessageA {
+                        x: i * 2,
+                        y: u64::try_from(256 + i).unwrap(),
+                    })
+                    .unwrap(),
+                    occurred_on: Utc::now(),
+                    version: MessageA::version(),
+                },
+            )
             .await
             .unwrap();
         if i % 2 == 0 {
             outbox_message_bridge
-                .push_message(NewOutboxMessage {
-                    producer_name: "B".to_string(),
-                    content_json: serde_json::to_value(&MessageB {
-                        a: format!("test_{i}"),
-                        b: vec![format!("foo_{i}"), format!("bar_{i}")],
-                    })
-                    .unwrap(),
-                    occurred_on: Utc::now(),
-                    version: MessageB::version(),
-                })
+                .push_message(
+                    catalog,
+                    NewOutboxMessage {
+                        producer_name: "B".to_string(),
+                        content_json: serde_json::to_value(&MessageB {
+                            a: format!("test_{i}"),
+                            b: vec![format!("foo_{i}"), format!("bar_{i}")],
+                        })
+                        .unwrap(),
+                        occurred_on: Utc::now(),
+                        version: MessageB::version(),
+                    },
+                )
                 .await
                 .unwrap();
         }
@@ -460,21 +478,27 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
     let outbox_message_bridge = catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
 
     outbox_message_bridge
-        .push_message(NewOutboxMessage {
-            producer_name: "dummy".to_string(),
-            content_json: serde_json::to_value("dummy").unwrap(),
-            occurred_on: Utc::now(),
-            version: 0,
-        })
+        .push_message(
+            catalog,
+            NewOutboxMessage {
+                producer_name: "dummy".to_string(),
+                content_json: serde_json::to_value("dummy").unwrap(),
+                occurred_on: Utc::now(),
+                version: 0,
+            },
+        )
         .await
         .unwrap();
     outbox_message_bridge
-        .push_message(NewOutboxMessage {
-            producer_name: "dummy".to_string(),
-            content_json: serde_json::to_value("dummy").unwrap(),
-            occurred_on: Utc::now(),
-            version: 0,
-        })
+        .push_message(
+            catalog,
+            NewOutboxMessage {
+                producer_name: "dummy".to_string(),
+                content_json: serde_json::to_value("dummy").unwrap(),
+                occurred_on: Utc::now(),
+                version: 0,
+            },
+        )
         .await
         .unwrap();
     let actual_message_body = MessageA { x: 1, y: 2 };

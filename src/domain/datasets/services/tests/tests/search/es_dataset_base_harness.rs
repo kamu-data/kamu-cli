@@ -25,7 +25,7 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_messaging_outbox_inmem::{InMemoryOutboxMessageBridge, InMemoryOutboxMessageRepository};
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{
@@ -116,7 +116,6 @@ impl ElasticsearchDatasetBaseHarness {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
             // Outbox repositories
             b.add::<InMemoryOutboxMessageBridge>();
-            b.add::<InMemoryOutboxMessageRepository>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();

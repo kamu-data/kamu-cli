@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use internal_error::InternalError;
@@ -27,10 +27,10 @@ pub struct InMemoryOutboxMessageBridge {
 #[derive(Default)]
 struct State {
     messages: Vec<OutboxMessage>,
-    // channel key -> consumed message ids
-    consumed: HashMap<ChannelKey, BTreeSet<OutboxMessageID>>,
-    // channel key -> next scan position in `merged`
-    next_pos: HashMap<ChannelKey, usize>,
+    // producer -> latest message id
+    latest_message_id_by_producer: HashMap<String, OutboxMessageID>,
+    // channel key -> consumed boundary
+    consumed_boundaries: HashMap<ChannelKey, OutboxMessageBoundary>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -54,22 +54,22 @@ impl InMemoryOutboxMessageBridge {
         }
     }
 
-    pub(crate) fn save_message(&self, new_message: &NewOutboxMessage) -> OutboxMessageID {
+    fn push_message_internal(&self, new_message: NewOutboxMessage) -> OutboxMessage {
         let mut state = self.state.lock().unwrap();
 
-        let message_id = state.messages.len() + 1;
-        let message = new_message.as_outbox_message(
-            OutboxMessageID::new(i64::try_from(message_id).unwrap()),
-            0, /* no tx_id in-memory */
-        );
-        state.messages.push(message);
+        let next_message_id = i64::try_from(state.messages.len() + 1).unwrap();
+        let message_id = OutboxMessageID::new(next_message_id);
 
-        let max_event_id = OutboxMessageID::new(i64::try_from(state.messages.len()).unwrap());
+        let message = new_message.as_outbox_message(message_id, 0 /* no tx_id in-memory */);
+        state
+            .latest_message_id_by_producer
+            .insert(new_message.producer_name, message_id);
+        state.messages.push(message.clone());
 
         // Wake up listeners
         self.wakeup_detector.notify_new_message_arrived();
 
-        max_event_id
+        message
     }
 }
 
@@ -81,6 +81,78 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         &self.wakeup_detector
     }
 
+    async fn push_message(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+        message: NewOutboxMessage,
+    ) -> Result<(), InternalError> {
+        self.push_message_internal(message);
+        Ok(())
+    }
+
+    fn get_messages(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
+        batch_size: usize,
+    ) -> OutboxMessageStream<'_> {
+        let minimal_above_id = above_boundaries_by_producer
+            .iter()
+            .map(|(_, boundary)| boundary.message_id) // ignore tx_id for in-memory implementation
+            .min()
+            .unwrap_or_else(|| OutboxMessageID::new(0));
+
+        let messages = {
+            let state = self.state.lock().unwrap();
+
+            let mut collected = Vec::new();
+            for message in state
+                .messages
+                .iter()
+                .skip_while(|m| m.message_id <= minimal_above_id)
+            {
+                let matches_filter =
+                    above_boundaries_by_producer
+                        .iter()
+                        .any(|(producer_name, above_boundary)| {
+                            message.producer_name == *producer_name
+                                && message.message_id > above_boundary.message_id // ignore tx_id for in-memory implementation
+                        });
+
+                if matches_filter || above_boundaries_by_producer.is_empty() {
+                    collected.push(Ok(message.clone()));
+                    if collected.len() >= batch_size {
+                        break;
+                    }
+                }
+            }
+
+            collected
+        };
+
+        Box::pin(tokio_stream::iter(messages))
+    }
+
+    async fn get_latest_message_boundaries_by_producer(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
+        let state = self.state.lock().unwrap();
+        Ok(state
+            .latest_message_id_by_producer
+            .iter()
+            .map(|(producer_name, message_id)| {
+                (
+                    producer_name.clone(),
+                    OutboxMessageBoundary {
+                        message_id: *message_id,
+                        tx_id: 0, // ignore tx_id for in-memory implementation
+                    },
+                )
+            })
+            .collect())
+    }
+
     async fn fetch_next_batch(
         &self,
         _: &dill::Catalog,
@@ -88,37 +160,29 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         consumer_name: &str,
         batch_size: usize,
     ) -> Result<Vec<OutboxMessage>, InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap();
 
         let channel_key = ChannelKey {
             producer_name: producer_name.to_string(),
             consumer_name: consumer_name.to_string(),
         };
 
-        let pos = state.next_pos.get(&channel_key).copied().unwrap_or(0);
-        let consumed = state
-            .consumed
-            .entry(channel_key.clone())
-            .or_default()
-            .clone();
+        let last_consumed_message_id = state
+            .consumed_boundaries
+            .get(&channel_key)
+            .map(|boundary| boundary.message_id)
+            .unwrap_or_else(|| OutboxMessageID::new(0));
 
-        let mut res = Vec::with_capacity(batch_size);
-        let mut i = pos;
-
-        while i < state.messages.len() && res.len() < batch_size {
-            let e = &state.messages[i];
-
-            if !consumed.contains(&e.message_id) {
-                res.push(e.clone());
-            }
-            i += 1;
-        }
-
-        // Advance the scan cursor to where we stopped scanning.
-        // (Safe because we only ever consume in order.)
-        state.next_pos.insert(channel_key, i);
-
-        Ok(res)
+        Ok(state
+            .messages
+            .iter()
+            .filter(|message| {
+                message.producer_name == producer_name
+                    && message.message_id > last_consumed_message_id
+            })
+            .take(batch_size)
+            .cloned()
+            .collect())
     }
 
     fn list_consumption_boundaries(
@@ -128,18 +192,14 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         let boundaries = {
             let guard = self.state.lock().unwrap();
             guard
-                .consumed
+                .consumed_boundaries
                 .iter()
-                .map(|(channel_key, consumed)| {
+                .map(|(channel_key, consumed_boundary)| {
                     Ok(OutboxMessageConsumptionBoundary {
                         producer_name: channel_key.producer_name.clone(),
                         consumer_name: channel_key.consumer_name.clone(),
-                        last_consumed_message_id: consumed
-                            .iter()
-                            .last()
-                            .copied()
-                            .unwrap_or(OutboxMessageID::new(0)),
-                        last_tx_id: 0, // no tx_id in-memory
+                        last_consumed_message_id: consumed_boundary.message_id,
+                        last_tx_id: consumed_boundary.tx_id,
                     })
                 })
                 .collect::<Vec<_>>()
@@ -162,9 +222,11 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
             consumer_name: consumer_name.to_string(),
         };
 
-        // In-memory implementation does not care about
-        let set = state.consumed.entry(channel_key).or_default();
-        set.insert(boundary.message_id);
+        let entry = state.consumed_boundaries.entry(channel_key).or_default();
+
+        if boundary > *entry {
+            *entry = boundary;
+        }
 
         Ok(())
     }
