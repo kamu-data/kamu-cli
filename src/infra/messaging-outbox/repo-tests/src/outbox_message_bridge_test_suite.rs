@@ -153,16 +153,14 @@ pub async fn test_push_many_messages_and_read_parts(catalog: &Catalog) {
         assert_expected_message_a(message, i32::try_from(i).unwrap());
     }
 
+    let first_five_messages: Vec<_> = outbox_message_bridge
+        .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 5)
+        .await
+        .unwrap();
+    let boundary_after_5 = boundary_from_message(first_five_messages.get(4).unwrap());
+
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages_by_producer(
-            catalog,
-            "A",
-            OutboxMessageBoundary {
-                message_id: OutboxMessageID::new(5),
-                tx_id: 0,
-            },
-            4,
-        )
+        .get_messages_by_producer(catalog, "A", boundary_after_5, 4)
         .await
         .unwrap();
 
@@ -216,30 +214,30 @@ pub async fn test_try_reading_above_max(catalog: &Catalog) {
         assert_eq!(original_message.y, u64::try_from(i * 2).unwrap());
     }
 
+    let latest_boundaries = outbox_message_bridge
+        .get_latest_message_boundaries_by_producer(catalog)
+        .await
+        .unwrap();
+    let boundary_after_5 = latest_boundaries
+        .into_iter()
+        .find(|(producer, _)| producer == "A")
+        .map(|(_, boundary)| boundary)
+        .unwrap();
+
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages_by_producer(
-            catalog,
-            "A",
-            OutboxMessageBoundary {
-                message_id: OutboxMessageID::new(5),
-                tx_id: 0,
-            },
-            3,
-        )
+        .get_messages_by_producer(catalog, "A", boundary_after_5, 3)
         .await
         .unwrap();
     assert_eq!(messages.len(), 0);
 
+    let first_three_messages: Vec<_> = outbox_message_bridge
+        .get_messages_by_producer(catalog, "A", OutboxMessageBoundary::default(), 3)
+        .await
+        .unwrap();
+    let boundary_after_3 = boundary_from_message(first_three_messages.get(2).unwrap());
+
     let messages: Vec<_> = outbox_message_bridge
-        .get_messages_by_producer(
-            catalog,
-            "A",
-            OutboxMessageBoundary {
-                message_id: OutboxMessageID::new(3),
-                tx_id: 0,
-            },
-            6,
-        )
+        .get_messages_by_producer(catalog, "A", boundary_after_3, 6)
         .await
         .unwrap();
     assert_eq!(messages.len(), 2); // 4, 5
@@ -329,7 +327,7 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     // [14] #15 B (a="test_10", b=["foo_10", "bar_10"])
 
     // Both producers from boundary zero, reads all messages
-    let messages: Vec<_> = outbox_message_bridge
+    let all_messages: Vec<_> = outbox_message_bridge
         .get_unprocessed_messages(
             catalog,
             vec![
@@ -340,31 +338,22 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
         )
         .await
         .unwrap();
-    assert_eq!(messages.len(), 15);
-    assert_expected_message_a(&messages[3], 3);
-    assert_expected_message_a(&messages[10], 8);
-    assert_expected_message_b(&messages[8], 6);
-    assert_expected_message_b(&messages[14], 10);
+    assert_eq!(all_messages.len(), 15);
+    assert_expected_message_a(&all_messages[3], 3);
+    assert_expected_message_a(&all_messages[10], 8);
+    assert_expected_message_b(&all_messages[8], 6);
+    assert_expected_message_b(&all_messages[14], 10);
 
     // Multiple filters nearby
+    let boundary_a_after_11 = boundary_from_collected_messages(&all_messages, "A", 11);
+    let boundary_b_after_12 = boundary_from_collected_messages(&all_messages, "B", 12);
+
     let messages: Vec<_> = outbox_message_bridge
         .get_unprocessed_messages(
             catalog,
             vec![
-                (
-                    "A".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(11),
-                        tx_id: 0,
-                    },
-                ),
-                (
-                    "B".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(12),
-                        tx_id: 0,
-                    },
-                ),
+                ("A".to_string(), boundary_a_after_11),
+                ("B".to_string(), boundary_b_after_12),
             ],
             10,
         )
@@ -376,24 +365,15 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     assert_expected_message_b(&messages[2], 10);
 
     // Multiple filters long distance, B above window
+    let boundary_a_after_2 = boundary_from_collected_messages(&all_messages, "A", 2);
+    let boundary_b_after_9 = boundary_from_collected_messages(&all_messages, "B", 9);
+
     let messages: Vec<_> = outbox_message_bridge
         .get_unprocessed_messages(
             catalog,
             vec![
-                (
-                    "A".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(2),
-                        tx_id: 0,
-                    },
-                ),
-                (
-                    "B".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(9),
-                        tx_id: 0,
-                    },
-                ),
+                ("A".to_string(), boundary_a_after_2),
+                ("B".to_string(), boundary_b_after_9),
             ],
             4,
         )
@@ -406,24 +386,15 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     assert_expected_message_a(&messages[3], 6);
 
     // Multiple filters some distance, but overlap
+    let boundary_a_after_7 = boundary_from_collected_messages(&all_messages, "A", 7);
+    let boundary_b_after_3 = boundary_from_collected_messages(&all_messages, "B", 3);
+
     let messages: Vec<_> = outbox_message_bridge
         .get_unprocessed_messages(
             catalog,
             vec![
-                (
-                    "A".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(7),
-                        tx_id: 0,
-                    },
-                ),
-                (
-                    "B".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(3),
-                        tx_id: 0,
-                    },
-                ),
+                ("A".to_string(), boundary_a_after_7),
+                ("B".to_string(), boundary_b_after_3),
             ],
             4,
         )
@@ -436,17 +407,13 @@ pub async fn test_reading_messages_above_max_with_multiple_producers(catalog: &C
     assert_expected_message_a(&messages[3], 7);
 
     // Multiple filters, partially not existing
+    let boundary_a_after_10 = boundary_from_collected_messages(&all_messages, "A", 10);
+
     let messages: Vec<_> = outbox_message_bridge
         .get_unprocessed_messages(
             catalog,
             vec![
-                (
-                    "A".to_string(),
-                    OutboxMessageBoundary {
-                        message_id: OutboxMessageID::new(10),
-                        tx_id: 0,
-                    },
-                ),
+                ("A".to_string(), boundary_a_after_10),
                 ("C".to_string(), OutboxMessageBoundary::default()),
             ],
             3,
@@ -509,6 +476,31 @@ pub async fn test_outbox_messages_version(catalog: &Catalog) {
 
     assert_eq!(1, messages.len());
     assert_eq!(MessageA::version(), messages[0].version);
+}
+
+fn boundary_from_collected_messages(
+    messages: &[OutboxMessage],
+    producer_name: &str,
+    message_id: i64,
+) -> OutboxMessageBoundary {
+    let boundary_message = messages
+        .iter()
+        .find(|message| {
+            message.producer_name == producer_name
+                && message.message_id == OutboxMessageID::new(message_id)
+        })
+        .unwrap_or_else(|| {
+            panic!("Missing message boundary for producer={producer_name}, message_id={message_id}")
+        });
+
+    boundary_from_message(boundary_message)
+}
+
+fn boundary_from_message(message: &OutboxMessage) -> OutboxMessageBoundary {
+    OutboxMessageBoundary {
+        message_id: message.message_id,
+        tx_id: message.tx_id,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

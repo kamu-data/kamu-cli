@@ -123,21 +123,7 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
             FROM outbox_messages AS m
             JOIN bounds AS b
                 ON m.producer_name = b.producer_name
-                AND (
-                    -- tx_id = 0 is a special case, meaning that we want to get messages
-                    -- with message_id > above_message_id regardless of tx_id
-                    (b.above_tx_id = 0 AND m.message_id > b.above_message_id)
-                    OR (
-                        b.above_tx_id <> 0
-                        AND (
-                            m.tx_id::text::bigint > b.above_tx_id
-                            OR (
-                                m.tx_id::text::bigint = b.above_tx_id
-                                AND m.message_id > b.above_message_id
-                            )
-                        )
-                    )
-                )
+                AND (m.tx_id::text::bigint, m.message_id) > (b.above_tx_id, b.above_message_id)
             WHERE
                 -- Ignore rows from txns that might still be in flight ("Usain Bolt")
                 -- while still allowing rows from current transaction.
@@ -187,16 +173,7 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
             FROM outbox_messages
             WHERE
                 producer_name = $1
-                AND (
-                    ($2::bigint = 0 AND message_id > $3)
-                    OR (
-                        $2::bigint <> 0
-                        AND (
-                            tx_id::text::bigint > $2::bigint
-                            OR (tx_id::text::bigint = $2::bigint AND message_id > $3)
-                        )
-                    )
-                )
+                AND (tx_id::text::bigint, message_id) > ($2::bigint, $3)
             ORDER BY tx_id, message_id
             LIMIT $4
             "#,
