@@ -24,12 +24,16 @@ pub trait OutboxMessageBridge: Send + Sync {
     /// Provides outbox message store wakeup detector instance
     fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
 
+    /// Pushes new message to the outbox
     async fn push_message(
         &self,
         transaction_catalog: &dill::Catalog,
         message: NewOutboxMessage,
     ) -> Result<(), InternalError>;
 
+    /// Fetch unprocessed committed messages for all producers;
+    ///   order by (tx_id,  message_id).
+    /// Note: producer boundaries are mandatory
     async fn get_unprocessed_messages(
         &self,
         transaction_catalog: &dill::Catalog,
@@ -37,6 +41,8 @@ pub trait OutboxMessageBridge: Send + Sync {
         batch_size: usize,
     ) -> Result<Vec<OutboxMessage>, InternalError>;
 
+    /// Fetch any messages for this producer that are above the given boundary
+    /// regardless of their processing status; order by (tx_id, message_id).
     async fn get_messages_by_producer(
         &self,
         transaction_catalog: &dill::Catalog,
@@ -45,6 +51,7 @@ pub trait OutboxMessageBridge: Send + Sync {
         batch_size: usize,
     ) -> Result<Vec<OutboxMessage>, InternalError>;
 
+    /// Fetch the latest produced message boundaries for all producers
     async fn get_latest_message_boundaries_by_producer(
         &self,
         transaction_catalog: &dill::Catalog,
