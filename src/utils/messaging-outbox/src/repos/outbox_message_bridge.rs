@@ -31,8 +31,8 @@ pub trait OutboxMessageBridge: Send + Sync {
         message: NewOutboxMessage,
     ) -> Result<(), InternalError>;
 
-    /// Fetch unprocessed committed messages for all producers;
-    ///   order by (tx_id,  message_id).
+    /// Fetch unprocessed committed messages for all producers.
+    /// Messages are ordered by transaction commit order and then by message id.
     /// Note: producer boundaries are mandatory
     async fn get_unprocessed_messages(
         &self,
@@ -42,7 +42,7 @@ pub trait OutboxMessageBridge: Send + Sync {
     ) -> Result<Vec<OutboxMessage>, InternalError>;
 
     /// Fetch any messages for this producer that are above the given boundary
-    /// regardless of their processing status; order by (tx_id, message_id).
+    /// regardless of their processing status.
     async fn get_messages_by_producer(
         &self,
         transaction_catalog: &dill::Catalog,

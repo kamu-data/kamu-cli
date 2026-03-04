@@ -795,8 +795,8 @@
           "$ref": "#/$defs/FlowSystemEventAgentConfig",
           "default": {
             "batchSize": 20,
-            "maxListeningTimeoutMs": 2000,
-            "minDebounceIntervalMs": 100
+            "maxListeningTimeout": "2s",
+            "minDebounceInterval": "100ms"
           }
         },
         "taskAgent": {
@@ -817,17 +817,13 @@
           "minimum": 0,
           "type": "integer"
         },
-        "maxListeningTimeoutMs": {
-          "default": 2000,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
         },
-        "minDebounceIntervalMs": {
-          "default": 100,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
         }
       },
       "type": "object"
@@ -952,17 +948,13 @@
           "minimum": 0,
           "type": "integer"
         },
-        "maxListeningTimeoutMs": {
-          "default": 2000,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
         },
-        "minDebounceIntervalMs": {
-          "default": 100,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
         }
       },
       "type": "object"
@@ -1382,8 +1374,8 @@
         },
         "flowSystemEventAgent": {
           "batchSize": 20,
-          "maxListeningTimeoutMs": 2000,
-          "minDebounceIntervalMs": 100
+          "maxListeningTimeout": "2s",
+          "minDebounceInterval": "100ms"
         },
         "taskAgent": {
           "checkingIntervalSecs": 1
@@ -1410,8 +1402,8 @@
       "$ref": "#/$defs/OutboxAgentConfig",
       "default": {
         "batchSize": 20,
-        "maxListeningTimeoutMs": 2000,
-        "minDebounceIntervalMs": 100
+        "maxListeningTimeout": "2s",
+        "minDebounceInterval": "100ms"
       },
       "description": "Messaging outbox agent configuration"
     },
