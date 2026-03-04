@@ -46,6 +46,7 @@ pub(crate) struct UnconsumedProducerState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub(crate) struct ProducerConsumptionTask {
     /// Messages to consume
     pub(crate) unconsumed_messages: Vec<Arc<OutboxMessage>>,

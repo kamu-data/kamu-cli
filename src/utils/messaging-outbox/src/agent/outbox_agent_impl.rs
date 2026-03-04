@@ -22,14 +22,6 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum RunMode {
-    SingleIterationOnly,
-    WhileHasTasks,
-    MainRelayLoop,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgentStartup";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,46 +101,32 @@ impl OutboxAgentImpl {
         )
     }
 
-    async fn run_with_mode(&self, mode: RunMode) -> Result<(), InternalError> {
-        match mode {
-            RunMode::SingleIterationOnly => {
-                self.run_consumption_iteration().await?;
-            }
+    async fn run_main_relay_loop(&self) -> Result<(), InternalError> {
+        // Initial catchup phase to process all existing messages
+        // before starting the main loop
+        self.run_until_end_of_queue()
+            .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
+            .await?;
 
-            RunMode::WhileHasTasks => {
-                self.run_while_has_tasks().await?;
-            }
+        // Access wakeup detector
+        let wakeup_detector = self.outbox_message_bridge.wakeup_detector();
 
-            RunMode::MainRelayLoop => {
-                // Initial catchup phase to process all existing messages
-                // before starting the main loop
-                self.run_while_has_tasks()
-                    .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
-                    .await?;
+        loop {
+            // Wait for push or timeout - let the store handle the backoff strategy
+            let hint = wakeup_detector
+                .wait_wake(
+                    self.agent_config.max_listening_timeout,
+                    self.agent_config.min_debounce_interval,
+                )
+                .await?;
+            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-                // Access wakeup detector
-                let wakeup_detector = self.outbox_message_bridge.wakeup_detector();
-
-                loop {
-                    // Wait for push or timeout - let the store handle the backoff strategy
-                    let hint = wakeup_detector
-                        .wait_wake(
-                            self.agent_config.max_listening_timeout,
-                            self.agent_config.min_debounce_interval,
-                        )
-                        .await?;
-                    tracing::debug!(hint = ?hint, "Agent woke up with a hint");
-
-                    // Process tasks while they are available, to make sure we process all messages
-                    self.run_while_has_tasks().await?;
-                }
-            }
+            // Process tasks while they are available, to make sure we process all messages
+            self.run_until_end_of_queue().await?;
         }
-
-        Ok(())
     }
 
-    async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
+    async fn run_until_end_of_queue(&self) -> Result<(), InternalError> {
         loop {
             let processed_consumer_tasks_count = self
                 .run_consumption_iteration()
@@ -349,7 +327,9 @@ impl InitOnStartup for OutboxAgentImpl {
         self.debug_outbox_routes();
 
         // Make sure consumption records represent the routes
-        self.init_consumption_records().await
+        self.init_consumption_records().await?;
+
+        Ok(())
     }
 }
 
@@ -362,8 +342,7 @@ impl BackgroundAgent for OutboxAgentImpl {
     }
 
     async fn run(&self) -> Result<(), InternalError> {
-        // Main consumption loop
-        self.run_with_mode(RunMode::MainRelayLoop).await
+        self.run_main_relay_loop().await
     }
 }
 
@@ -373,14 +352,15 @@ impl BackgroundAgent for OutboxAgentImpl {
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
-        self.run_with_mode(RunMode::WhileHasTasks).await
+        self.run_until_end_of_queue().await?;
+        Ok(())
     }
 
     // To be used by tests only!
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_single_iteration_only(&self) -> Result<(), InternalError> {
-        // Run single iteration instead of a loop
-        self.run_with_mode(RunMode::SingleIterationOnly).await
+        self.run_consumption_iteration().await?;
+        Ok(())
     }
 }
 

@@ -67,6 +67,10 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
+        // Note: ignore rows from txns that might still be in flight ("Usain Bolt")
+        // Use pg_visible_in_snapshot instead of xmin threshold to avoid blocking on
+        //  unrelated in-flight transactions (e.g. parallel test runs).
+
         let rows = sqlx::query!(
             r#"
             WITH projected_offsets AS (
@@ -89,8 +93,7 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 event_payload       AS "event_payload!"
             FROM flow_system_events e, projected_offsets
             WHERE
-                -- Ignore rows from txns that might still be in flight ("Usain Bolt")
-                e.tx_id < pg_snapshot_xmin(pg_current_snapshot()) AND (
+                pg_visible_in_snapshot(e.tx_id, pg_current_snapshot()) AND (
                     (
                         -- Same transaction as last projected event, but higher event id
                         e.tx_id = projected_offsets.last_tx_id AND
