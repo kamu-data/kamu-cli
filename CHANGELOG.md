@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.260.2] - 2026-03-04
 ### Changed
 - Optimized Outbox Processing:
   - Replaced the busy-loop polling with a Postgres NOTIFY/LISTEN mechanism.
