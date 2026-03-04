@@ -24,9 +24,13 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-kamu-flow-system = { workspace = true, features = ["sqlx"] }
+messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
+
+kamu-flow-system = { workspace = true, features = ["sqlx"] }
+kamu-messaging-outbox-postgres = { workspace = true }
+
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

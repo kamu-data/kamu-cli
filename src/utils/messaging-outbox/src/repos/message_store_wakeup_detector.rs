@@ -7,31 +7,31 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use std::time::Duration;
 
-use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageID};
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait OutboxMessageRepository: Send + Sync {
-    async fn push_message(&self, message: NewOutboxMessage) -> Result<(), InternalError>;
-
-    fn get_messages(
+pub trait MessageStoreWakeupDetector: Send + Sync {
+    /// Block until there *might* be new message, or timeout elapses.
+    async fn wait_wake(
         &self,
-        above_boundaries_by_producer: Vec<(String, OutboxMessageID)>,
-        batch_size: usize,
-    ) -> OutboxMessageStream<'_>;
-
-    async fn get_latest_message_ids_by_producer(
-        &self,
-    ) -> Result<Vec<(String, OutboxMessageID)>, InternalError>;
+        timeout: Duration,
+        min_debounce_interval: Duration,
+    ) -> Result<MessageStoreWakeHint, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type OutboxMessageStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<OutboxMessage, InternalError>> + Send + 'a>,
->;
+#[derive(Debug)]
+pub enum MessageStoreWakeHint {
+    /// Timeout elapsed without new messages
+    Timeout,
+
+    /// New messages detected
+    NewMessages,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

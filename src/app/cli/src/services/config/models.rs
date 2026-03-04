@@ -49,9 +49,9 @@ pub struct CLIConfig {
     #[config(default)]
     pub identity: IdentityConfig,
 
-    /// Messaging outbox configuration
+    /// Messaging outbox agent configuration
     #[config(default)]
-    pub outbox: OutboxConfig,
+    pub outbox: OutboxAgentConfig,
 
     /// Network protocols configuration
     #[config(default)]
@@ -738,12 +738,25 @@ pub struct UploadsConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(setty::Config, setty::Default)]
-pub struct OutboxConfig {
-    #[config(default = 1)]
-    pub awaiting_step_secs: i64,
+pub struct OutboxAgentConfig {
+    #[config(default_str = "100ms")]
+    pub min_debounce_interval: DurationString,
+
+    #[config(default_str = "2s")]
+    pub max_listening_timeout: DurationString,
 
     #[config(default = 20)]
-    pub batch_size: i64,
+    pub batch_size: usize,
+}
+
+impl OutboxAgentConfig {
+    pub fn into_system(&self) -> messaging_outbox::OutboxAgentConfig {
+        messaging_outbox::OutboxAgentConfig {
+            min_debounce_interval: self.min_debounce_interval.into(),
+            max_listening_timeout: self.max_listening_timeout.into(),
+            batch_size: self.batch_size,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -831,11 +844,11 @@ impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
 // and loopback offset (of batch size * 3)
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemEventAgentConfig {
-    #[config(default = 100)]
-    pub min_debounce_interval_ms: u32,
+    #[config(default_str = "100ms")]
+    pub min_debounce_interval: DurationString,
 
-    #[config(default = 2_000)]
-    pub max_listening_timeout_ms: u32,
+    #[config(default_str = "2s")]
+    pub max_listening_timeout: DurationString,
 
     #[config(default = 20)]
     pub batch_size: usize,
@@ -844,12 +857,8 @@ pub struct FlowSystemEventAgentConfig {
 impl FlowSystemEventAgentConfig {
     pub fn into_system(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
-            min_debounce_interval: std::time::Duration::from_millis(u64::from(
-                self.min_debounce_interval_ms,
-            )),
-            max_listening_timeout: std::time::Duration::from_millis(u64::from(
-                self.max_listening_timeout_ms,
-            )),
+            min_debounce_interval: self.min_debounce_interval.into(),
+            max_listening_timeout: self.max_listening_timeout.into(),
             batch_size: self.batch_size,
         }
     }

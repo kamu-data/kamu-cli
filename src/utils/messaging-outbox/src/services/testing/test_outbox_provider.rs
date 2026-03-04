@@ -53,7 +53,7 @@ impl OutboxProvider {
                     .add::<OutboxDispatchingImpl>()
                     .bind::<dyn crate::Outbox, OutboxDispatchingImpl>()
                     .add::<OutboxAgentImpl>()
-                    .add_value(OutboxConfig::default())
+                    .add_value(OutboxAgentConfig::local_default())
                     .add::<OutboxAgentMetrics>();
             }
         }

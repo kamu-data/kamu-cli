@@ -7,73 +7,69 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_messaging_outbox_postgres::PostgresOutboxMessageRepository;
-use sqlx::PgPool;
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_no_outbox_messages_initially,
-    harness = PostgresOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_push_messages_from_several_producers,
-    harness = PostgresOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = inmem,
     fixture = kamu_messaging_outbox_repo_tests::test_push_many_messages_and_read_parts,
-    harness = PostgresOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_try_reading_above_max,
+    harness = InMemoryOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture =
         kamu_messaging_outbox_repo_tests::test_reading_messages_above_max_with_multiple_producers,
-    harness = PostgresOutboxMessageRepositoryHarness
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = kamu_messaging_outbox_repo_tests::test_try_reading_above_max,
-    harness = PostgresOutboxMessageRepositoryHarness
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_consumption_boundaries_monotonic_and_isolated,
+    harness = InMemoryOutboxMessageBridgeHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-database_transactional_test!(
-    storage = postgres,
-    fixture = kamu_messaging_outbox_repo_tests::test_outbox_messages_version,
-    harness = PostgresOutboxMessageRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct PostgresOutboxMessageRepositoryHarness {
+struct InMemoryOutboxMessageBridgeHarness {
     catalog: Catalog,
 }
 
-impl PostgresOutboxMessageRepositoryHarness {
-    pub fn new(pg_pool: PgPool) -> Self {
+impl InMemoryOutboxMessageBridgeHarness {
+    pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(pg_pool);
-        catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<PostgresOutboxMessageRepository>();
+        catalog_builder.add::<InMemoryOutboxMessageBridge>();
 
         Self {
             catalog: catalog_builder.build(),

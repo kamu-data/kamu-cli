@@ -16,6 +16,7 @@ use crate::OutboxMessageID;
 #[derive(Debug, Clone)]
 pub struct OutboxMessage {
     pub message_id: OutboxMessageID,
+    pub tx_id: i64,
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
@@ -28,6 +29,7 @@ pub struct OutboxMessage {
 #[derive(sqlx::FromRow)]
 pub struct OutboxMessageRow {
     pub message_id: i64,
+    pub tx_id: i64,
     pub producer_name: String,
     pub content_json: serde_json::Value,
     pub occurred_on: DateTime<Utc>,
@@ -39,6 +41,7 @@ impl From<OutboxMessageRow> for OutboxMessage {
     fn from(row: OutboxMessageRow) -> Self {
         OutboxMessage {
             message_id: OutboxMessageID::new(row.message_id),
+            tx_id: row.tx_id,
             producer_name: row.producer_name,
             content_json: row.content_json,
             occurred_on: row.occurred_on,
@@ -60,9 +63,10 @@ pub struct NewOutboxMessage {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl NewOutboxMessage {
-    pub fn as_outbox_message(&self, message_id: OutboxMessageID) -> OutboxMessage {
+    pub fn as_outbox_message(&self, message_id: OutboxMessageID, tx_id: i64) -> OutboxMessage {
         OutboxMessage {
             message_id,
+            tx_id,
             producer_name: self.producer_name.clone(),
             content_json: self.content_json.clone(),
             occurred_on: self.occurred_on,

@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::TransactionRefT;
@@ -18,15 +17,15 @@ use kamu_flow_system::{
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
-    FlowSystemEventStoreWakeHint,
 };
+use kamu_messaging_outbox_sqlite::SqliteMessageStoreWakeupDetector;
+use messaging_outbox::MessageStoreWakeupDetector;
 use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    pool: Arc<sqlx::SqlitePool>,
-    max_seen_event_id: Mutex<EventID>,
+    wakeup_detector: SqliteMessageStoreWakeupDetector,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,28 +36,10 @@ pub struct SqliteFlowSystemEventBridge {
 impl SqliteFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            pool,
-            max_seen_event_id: Mutex::new(EventID::new(0)),
-        }
-    }
-
-    async fn check_for_new_events(&self) -> Result<Option<EventID>, InternalError> {
-        let max_present_event_id = {
-            let (max_present_event_id,): (Option<i64>,) =
-                sqlx::query_as("SELECT MAX(event_id) FROM flow_system_events")
-                    .fetch_one(self.pool.as_ref())
-                    .await
-                    .unwrap_or((None,));
-
-            Ok(EventID::new(max_present_event_id.unwrap_or_default()))
-        }?;
-
-        let mut max_seen_event_id = self.max_seen_event_id.lock().unwrap();
-        if max_present_event_id > *max_seen_event_id {
-            *max_seen_event_id = max_present_event_id;
-            Ok(Some(max_present_event_id))
-        } else {
-            Ok(None)
+            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
+                pool,
+                "SELECT MAX(event_id) FROM flow_system_events",
+            ),
         }
     }
 }
@@ -67,36 +48,9 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
-    #[tracing::instrument(level = "debug", skip_all, fields(timeout, min_debounce_interval))]
-    async fn wait_wake(
-        &self,
-        timeout: Duration,
-        min_debounce_interval: Duration,
-    ) -> Result<FlowSystemEventStoreWakeHint, InternalError> {
-        let deadline = tokio::time::Instant::now() + timeout;
-        let mut poll_interval = min_debounce_interval;
-
-        loop {
-            // Check for new events
-            if let Some(_max_event_id) = self.check_for_new_events().await? {
-                return Ok(FlowSystemEventStoreWakeHint::NewEvents);
-            }
-
-            // Calculate remaining time
-            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-            if remaining.is_zero() {
-                // Timeout elapsed, no new work
-                return Ok(FlowSystemEventStoreWakeHint::Timeout);
-            }
-
-            // Sleep for the shorter of poll_interval or remaining time
-            let sleep_duration = std::cmp::min(poll_interval, remaining);
-            tokio::time::sleep(sleep_duration).await;
-
-            // Increase poll interval for next iteration
-            // (exponential backoff with max limit of timeout)
-            poll_interval = std::cmp::min(poll_interval * 2, timeout);
-        }
+    /// Provides event store wakeup detector instance
+    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
+        &self.wakeup_detector
     }
 
     /// Fetch next batch for the given projector; order by global id.

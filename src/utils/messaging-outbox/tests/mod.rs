@@ -92,6 +92,63 @@ macro_rules! test_message_consumer {
     };
 }
 
-pub(crate) use {test_message_consumer, test_message_type};
+macro_rules! test_message_failing_consumer {
+    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $delivery: ident, $initial_consumer_boundary: ident) => {
+        paste::paste! {
+            #[derive(Default)]
+            struct [<"State" $message_consumer_suffix>] {
+                attempts: usize,
+            }
+
+            struct [<"TestMessageConsumer" $message_consumer_suffix>] {
+                state: Arc<Mutex<[<"State" $message_consumer_suffix>]>>,
+            }
+
+            #[component(pub)]
+            #[scope(Singleton)]
+            #[interface(dyn MessageConsumer)]
+            #[interface(dyn MessageConsumerT<[<TestMessage $message_type_suffix>]>)]
+            #[meta(MessageConsumerMeta {
+                consumer_name: concat!("TestMessageConsumer", stringify!($message_consumer_suffix)),
+                feeding_producers: &[$producer_name],
+                delivery: MessageDeliveryMechanism::$delivery,
+                initial_consumer_boundary: InitialConsumerBoundary::$initial_consumer_boundary,
+            })]
+            impl [<"TestMessageConsumer" $message_consumer_suffix>] {
+                fn new() -> Self {
+                    Self {
+                        state: Arc::new(Mutex::new(Default::default())),
+                    }
+                }
+
+                #[allow(dead_code)]
+                fn attempts(&self) -> usize {
+                    let guard = self.state.lock().unwrap();
+                    guard.attempts
+                }
+            }
+
+            impl MessageConsumer for [<"TestMessageConsumer" $message_consumer_suffix>] {}
+
+            #[async_trait::async_trait]
+            impl MessageConsumerT<[<TestMessage $message_type_suffix>]> for [<"TestMessageConsumer" $message_consumer_suffix>] {
+                async fn consume_message(
+                    &self,
+                    _: &Catalog,
+                    _: &[<TestMessage $message_type_suffix>],
+                ) -> Result<(), InternalError> {
+                    let mut guard = self.state.lock().unwrap();
+                    guard.attempts += 1;
+                    InternalError::bail(concat!(
+                        "Synthetic failure in TestMessageConsumer",
+                        stringify!($message_consumer_suffix)
+                    ))
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use {test_message_consumer, test_message_failing_consumer, test_message_type};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    consumer_name, producer_name, last_consumed_message_id\n                FROM outbox_message_consumptions\n                ",
+  "query": "\n            SELECT\n                consumer_name,\n                producer_name,\n                last_consumed_message_id,\n                last_tx_id::text::bigint AS \"last_tx_id!: i64\"\n            FROM outbox_message_consumptions\n            ",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "last_consumed_message_id",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_tx_id!: i64",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -25,8 +30,9 @@
     "nullable": [
       false,
       false,
-      false
+      false,
+      null
     ]
   },
-  "hash": "2756adcb011760fb903466580bd823ec9ad22989d5974435081c7a3e1924cb21"
+  "hash": "27f185c4403fb31fde587dc434a8a9b378804e6059f1560ba353502d32cae30f"
 }

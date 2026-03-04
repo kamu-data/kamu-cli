@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository;
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
@@ -200,9 +200,9 @@ async fn test_messages_mixed_delivery() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DispatchingOutboxHarness {
-    _catalog: Catalog,
+    catalog: Catalog,
     outbox: Arc<dyn Outbox>,
-    outbox_message_repository: Arc<dyn OutboxMessageRepository>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     test_consumer_a: Arc<TestMessageConsumerA>,
     test_consumer_b: Arc<TestMessageConsumerB>,
     test_consumer_cb: Arc<TestMessageConsumerCB>,
@@ -218,7 +218,7 @@ impl DispatchingOutboxHarness {
         b.add::<OutboxTransactionalImpl>();
         b.add::<OutboxDispatchingImpl>();
         b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-        b.add::<InMemoryOutboxMessageRepository>();
+        b.add::<InMemoryOutboxMessageBridge>();
         b.add::<SystemTimeSourceDefault>();
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerB>();
@@ -232,16 +232,16 @@ impl DispatchingOutboxHarness {
         let catalog = b.build();
 
         let outbox = catalog.get_one::<dyn Outbox>().unwrap();
-        let outbox_message_repository = catalog.get_one::<dyn OutboxMessageRepository>().unwrap();
+        let outbox_message_bridge = catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
         let test_consumer_a = catalog.get_one::<TestMessageConsumerA>().unwrap();
         let test_consumer_b = catalog.get_one::<TestMessageConsumerB>().unwrap();
         let test_consumer_cb = catalog.get_one::<TestMessageConsumerCB>().unwrap();
         let test_consumer_cd = catalog.get_one::<TestMessageConsumerCD>().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             outbox,
-            outbox_message_repository,
+            outbox_message_bridge,
             test_consumer_a,
             test_consumer_b,
             test_consumer_cb,
@@ -250,14 +250,14 @@ impl DispatchingOutboxHarness {
     }
 
     async fn get_saved_messages<TMessage: Message>(&self, producer_name: &str) -> Vec<TMessage> {
-        use futures::TryStreamExt;
         let outbox_messages: Vec<_> = self
-            .outbox_message_repository
-            .get_messages(
-                vec![(producer_name.to_owned(), OutboxMessageID::new(0))],
+            .outbox_message_bridge
+            .get_messages_by_producer(
+                &self.catalog,
+                producer_name,
+                OutboxMessageBoundary::default(),
                 10,
             )
-            .try_collect()
             .await
             .unwrap();
 

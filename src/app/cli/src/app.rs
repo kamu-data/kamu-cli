@@ -937,10 +937,7 @@ pub fn register_config_in_catalog(
     //
 
     // Outbox configuration
-    catalog_builder.add_value(messaging_outbox::OutboxConfig::new(
-        Duration::seconds(config.outbox.awaiting_step_secs),
-        config.outbox.batch_size,
-    ));
+    catalog_builder.add_value(config.outbox.into_system());
     //
 
     // Password hashing mode configuration

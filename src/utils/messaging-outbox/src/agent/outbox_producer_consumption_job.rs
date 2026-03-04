@@ -19,9 +19,8 @@ use crate::{
     ConsumerFilter,
     MessageDispatcher,
     OutboxMessage,
-    OutboxMessageConsumptionBoundary,
-    OutboxMessageConsumptionRepository,
-    OutboxMessageID,
+    OutboxMessageBoundary,
+    OutboxMessageBridge,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +61,11 @@ impl ProducerConsumptionJob {
         &self.producer_name
     }
 
+    pub(crate) fn failed_consumer_names_snapshot(&self) -> HashSet<String> {
+        let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
+        g_failed_consumer_names.clone()
+    }
+
     pub(crate) fn all_consumers_failing(&self) -> bool {
         let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
         assert!(g_failed_consumer_names.len() <= self.consumer_names.len());
@@ -95,13 +99,19 @@ impl ProducerConsumptionJob {
                     continue;
                 }
 
-                // Skip consumers, which are already beyond this message ID
-                let boundary_id = consumption_task
+                // Skip consumers, which are already beyond this message boundary
+                let consumer_boundary = consumption_task
                     .consumption_boundaries_by_consumer
                     .get(consumer_name)
                     .copied()
-                    .unwrap_or_else(|| OutboxMessageID::new(0));
-                if boundary_id < message.message_id {
+                    .unwrap_or_default();
+
+                let message_boundary = OutboxMessageBoundary {
+                    message_id: message.message_id,
+                    tx_id: message.tx_id,
+                };
+
+                if consumer_boundary < message_boundary {
                     // Non-failing consumer which hasn't seen this message is a task to execute
                     consumer_tasks.push((consumer_name.as_str(), &message));
                 }
@@ -242,16 +252,20 @@ impl ConsumeMessageTransaction {
             "Shifting consumption record"
         );
 
-        let consumption_repository = transaction_catalog
-            .get_one::<dyn OutboxMessageConsumptionRepository>()
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
             .unwrap();
 
-        consumption_repository
-            .update_consumption_boundary(OutboxMessageConsumptionBoundary {
-                consumer_name: self.consumer_name.clone(),
-                producer_name: self.message.producer_name.clone(),
-                last_consumed_message_id: self.message.message_id,
-            })
+        outbox_message_bridge
+            .mark_consumed(
+                &transaction_catalog,
+                &self.message.producer_name,
+                &self.consumer_name,
+                OutboxMessageBoundary {
+                    message_id: self.message.message_id,
+                    tx_id: self.message.tx_id,
+                },
+            )
             .await
             .int_err()?;
 
