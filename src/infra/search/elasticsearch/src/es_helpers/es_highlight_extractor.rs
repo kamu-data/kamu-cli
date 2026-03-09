@@ -74,3 +74,73 @@ impl ElasticsearchHighlightExtractor {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_highlights_normalizes_and_deduplicates_fields() {
+        let value = serde_json::json!({
+            "name.ngram": ["<em>pow</em>er"],
+            "name.keyword": ["power"],
+            "description": ["clean <em>energy</em>"],
+        });
+
+        let result = ElasticsearchHighlightExtractor::extract_highlights(&value)
+            .expect("highlights must be present");
+
+        assert_eq!(result.len(), 2);
+        let map: std::collections::HashMap<_, _> = result
+            .into_iter()
+            .map(|h| (h.field, h.best_fragment))
+            .collect();
+        let name_fragment = map.get("name").expect("name highlight");
+        assert!(name_fragment == "<em>pow</em>er" || name_fragment == "power");
+        assert_eq!(
+            map.get("description").expect("description highlight"),
+            "clean <em>energy</em>"
+        );
+    }
+
+    #[test]
+    fn test_extract_highlights_skips_non_array_fragments() {
+        let value = serde_json::json!({
+            "name": "bad-shape",
+            "description": [],
+        });
+
+        let result = ElasticsearchHighlightExtractor::extract_highlights(&value)
+            .expect("highlights must be present");
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].field, "description");
+        assert_eq!(result[0].best_fragment, "");
+    }
+
+    #[test]
+    fn test_extract_highlights_returns_none_for_non_object() {
+        let value = serde_json::json!(["unexpected"]);
+        assert!(ElasticsearchHighlightExtractor::extract_highlights(&value).is_none());
+    }
+
+    #[test]
+    fn test_strip_internal_suffix() {
+        let test_cases = vec![
+            ("title.keyword", "title"),
+            ("title.ngram", "title"),
+            ("title.substr", "title"),
+            ("title.tokens", "title"),
+            ("title", "title"),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                ElasticsearchHighlightExtractor::strip_internal_suffix(input),
+                expected
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

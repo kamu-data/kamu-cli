@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bon::bon;
@@ -24,10 +25,7 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_messaging_outbox_inmem::{
-    InMemoryOutboxMessageConsumptionRepository,
-    InMemoryOutboxMessageRepository,
-};
+use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{
@@ -55,6 +53,48 @@ pub struct ElasticsearchDatasetBaseHarness {
     fixed_time: DateTime<Utc>,
 }
 
+#[derive(Clone)]
+pub struct PrecomputedEmbeddingsConfig {
+    pub dimensions: usize,
+    pub vectors: HashMap<String, Vec<f32>>,
+}
+
+#[dill::component]
+#[dill::interface(dyn EmbeddingsEncoder)]
+struct PrecomputedEmbeddingsEncoder {
+    config: Arc<PrecomputedEmbeddingsConfig>,
+}
+
+#[async_trait::async_trait]
+impl EmbeddingsEncoder for PrecomputedEmbeddingsEncoder {
+    fn model_key(&self) -> EmbeddingModelKey {
+        EmbeddingModelKey {
+            provider: "test-precomputed",
+            name: "dataset-search-fixtures".to_string(),
+            revision: None,
+        }
+    }
+
+    fn dimensions(&self) -> usize {
+        self.config.dimensions
+    }
+
+    async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
+        let mut vectors = Vec::with_capacity(input.len());
+
+        for text in input {
+            let Some(vector) = self.config.vectors.get(&text) else {
+                return Err(InternalError::new(format!(
+                    "Missing precomputed embedding for input: {text}"
+                )));
+            };
+            vectors.push(vector.clone());
+        }
+
+        Ok(vectors)
+    }
+}
+
 #[bon]
 impl ElasticsearchDatasetBaseHarness {
     #[builder]
@@ -63,6 +103,7 @@ impl ElasticsearchDatasetBaseHarness {
         tenancy_config: TenancyConfig,
         predefined_accounts_config: Option<PredefinedAccountsConfig>,
         predefined_datasets_config: Option<PredefinedDatasetsConfig>,
+        precomputed_embeddings_config: Option<PrecomputedEmbeddingsConfig>,
     ) -> Self {
         let fixed_time = Utc::now();
 
@@ -74,8 +115,7 @@ impl ElasticsearchDatasetBaseHarness {
         let indexing_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
             // Outbox repositories
-            b.add::<InMemoryOutboxMessageRepository>();
-            b.add::<InMemoryOutboxMessageConsumptionRepository>();
+            b.add::<InMemoryOutboxMessageBridge>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();
@@ -99,7 +139,12 @@ impl ElasticsearchDatasetBaseHarness {
 
             b.add_value(embeddings_chunker);
             b.bind::<dyn EmbeddingsChunker, MockEmbeddingsChunker>();
-            b.add::<DummyEmbeddingsEncoder>();
+            if let Some(precomputed_embeddings_config) = precomputed_embeddings_config {
+                b.add_value(precomputed_embeddings_config);
+                b.add::<PrecomputedEmbeddingsEncoder>();
+            } else {
+                b.add::<DummyEmbeddingsEncoder>();
+            }
             b.add::<EmbeddingsProviderImpl>();
             b.add::<InMemoryEmbeddingsCacheRepository>();
 

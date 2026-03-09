@@ -63,3 +63,7 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
+indoc = "2"
+pretty_assertions = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

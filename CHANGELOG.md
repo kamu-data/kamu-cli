@@ -20,9 +20,35 @@ Recommendation: for ease of reading, use the following order:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
-## [Unreleased]
+## [0.260.2] - 2026-03-04
+### Changed
+- Optimized Outbox Processing:
+  - Replaced the busy-loop polling with a Postgres NOTIFY/LISTEN mechanism.
+  - Introduced a reusable "Wakeup Detector" abstraction to handle storage-specific notifications 
+      (PG NOTIFY, in-memory broadcasts, or SQLite timeouts).
+  - Updated the Postgres schema with tx_id columns and notification triggers for both messages and consumptions.
+  - Replaced legacy repositories with `OutboxMessageBridge`, utilizing vectorized queries to
+      process multiple producer-consumer pairs simultaneously
+- Enhanced outbox performance & concurrency:
+  - Optimized message fetching using boundary-based lookups (tx_id, message_id), with tx_id as the primary ordering criterion.
+  - Improved burst handling: The outbox now processes multiple consecutive batches upon awakening to clear backlogs faster.
+- Outbox reliability & resilience improvements:
+  - The outbox scheduler now ignores currently failing consumers to prevent processing stalls and head-of-line blocking.
+  - Implemented a mandatory catch-up phase before entering the main event loop.
+  - Significantly expanded test coverage for outbox logic and edge cases.
+
+
+## [0.260.1] - 2026-02-25
 ### Added
 - Search reset endpoint now allows specifying particular index names
+- Search test coverage improvements:
+  - Extended test coverage for Elasticsearch helpers
+  - Added integration tests for Elasticsearch schema/alias/migration logic
+  - Added test coverage for vector and hybrid search methods on the example of datasets,
+     and using pre-generated real OpenAI semantic embeddings
+### Fixed
+- Default embeddings provider in CLI should be Dummmy, not OpenAI
+- Inaccurate GQL schema extraction for `SetAccountQuotasResult` union
 
 ## [0.260.0] - 2026-02-17
 ### Added

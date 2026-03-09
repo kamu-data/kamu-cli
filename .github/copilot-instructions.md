@@ -22,6 +22,7 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - This project uses `cargo nextest` for running tests
 - Run tests with `cargo nextest run` when making changes that could affect functionality
 - Ensure all tests pass before considering changes complete
+- Tests should never refer internal methods or fields directly; use public interfaces for testing
 
 ## Event Modeling Style
 - Prefer using enums for event types to ensure type safety and clarity.

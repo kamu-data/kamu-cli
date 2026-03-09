@@ -124,8 +124,7 @@ interface "ObjectStoreBuilder" <<i>>
 interface "ObjectStoreRegistry" <<i>>
 interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
-interface "OutboxMessageConsumptionRepository" <<i>>
-interface "OutboxMessageRepository" <<i>>
+interface "OutboxMessageBridge" <<i>>
 interface "PasswordHashRepository" <<i>>
 interface "PollingIngestService" <<i>>
 interface "ProvenanceService" <<i>>
@@ -243,11 +242,10 @@ class "DependencyGraphServiceImpl" <<singleton>>
 class "DidGeneratorDefault"
 class "DidSecretEncryptionConfig" <<singleton>>
 class "DidSecretService"
+class "DummyEmbeddingsEncoder"
 class "DummySearchService"
 class "EmbeddingsChunkerConfigSimple" <<singleton>>
 class "EmbeddingsChunkerSimple"
-class "EmbeddingsEncoderConfigOpenAI" <<singleton>>
-class "EmbeddingsEncoderOpenAi" <<singleton>>
 class "EmbeddingsProviderImpl"
 class "EngineConfigDatafusionEmbeddedBatchQuery" <<singleton>>
 class "EngineConfigDatafusionEmbeddedCompaction" <<singleton>>
@@ -339,9 +337,9 @@ class "ObjectStoreBuilderLocalFs" <<agnostic>>
 class "ObjectStoreRegistryImpl" <<singleton>>
 class "OsoDatasetAuthorizer"
 class "OsoResourceServiceImpl"
+class "OutboxAgentConfig" <<singleton>>
 class "OutboxAgentImpl" <<singleton>>
 class "OutboxAgentMetrics" <<singleton>>
-class "OutboxConfig" <<singleton>>
 class "OutboxDispatchingImpl"
 class "OutboxImmediateImpl"
 class "OutboxTransactionalImpl"
@@ -416,8 +414,7 @@ class "SqliteFlowProcessStateRepository"
 class "SqliteFlowSystemEventBridge" <<agnostic>>
 class "SqliteFlowTriggerEventStore"
 class "SqliteOAuthDeviceCodeRepository"
-class "SqliteOutboxMessageConsumptionRepository"
-class "SqliteOutboxMessageRepository"
+class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
 class "SqliteRebacRepository"
 class "SqliteTaskEventStore"
@@ -944,10 +941,8 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowSystemEventBridge"  --> "Pool"
 "FlowTriggerEventStore" <|-- "SqliteFlowTriggerEventStore"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
-"OutboxMessageConsumptionRepository" <|-- "SqliteOutboxMessageConsumptionRepository"
-"SqliteOutboxMessageConsumptionRepository"  --> "TransactionRefT"
-"OutboxMessageRepository" <|-- "SqliteOutboxMessageRepository"
-"SqliteOutboxMessageRepository"  --> "TransactionRefT"
+"OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
+"SqliteOutboxMessageBridge"  --> "Pool"
 "SearchEntitySchemaProvider" <|-- "MoleculeSearchSchemaProvider"
 "MoleculeSearchSchemaProvider"  --> "Catalog"
 "MessageConsumer" <|-- "MoleculeActivitySearchUpdater"
@@ -1069,8 +1064,7 @@ class "WsSmartTransferProtocolClient"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
-"EmbeddingsEncoder" <|-- "EmbeddingsEncoderOpenAi"
-"EmbeddingsEncoderOpenAi"  --> "EmbeddingsEncoderConfigOpenAI"
+"EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
 "SearchService" <|-- "DummySearchService"
 "EmbeddingsChunker" <|-- "EmbeddingsChunkerSimple"
 "EmbeddingsChunkerSimple"  --> "EmbeddingsChunkerConfigSimple"
@@ -1090,15 +1084,17 @@ class "WsSmartTransferProtocolClient"
 "OutboxAgent" <|-- "OutboxAgentImpl"
 "OutboxAgentImpl"  --> "CatalogWeakRef"
 "OutboxAgentImpl" "*" --> "MessageDispatcher"
+"OutboxAgentImpl"  --> "OutboxMessageBridge"
 "OutboxAgentImpl"  --> "OutboxAgentMetrics"
-"OutboxAgentImpl"  --> "OutboxConfig"
+"OutboxAgentImpl"  --> "OutboxAgentConfig"
 "MetricsProvider" <|-- "OutboxAgentMetrics"
 "OutboxDispatchingImpl"  --> "Catalog"
 "OutboxDispatchingImpl"  --> "OutboxImmediateImpl"
 "OutboxDispatchingImpl"  --> "OutboxTransactionalImpl"
 "OutboxImmediateImpl"  --> "Catalog"
 "OutboxImmediateImpl" "*" --> "MessageDispatcher"
-"OutboxTransactionalImpl"  --> "OutboxMessageRepository"
+"OutboxTransactionalImpl"  --> "CatalogWeakRef"
+"OutboxTransactionalImpl"  --> "OutboxMessageBridge"
 "OutboxTransactionalImpl"  --> "SystemTimeSource"
 "DatasetStorageUnit" <|-- "DatasetStorageUnitLocalFs"
 "DatasetStorageUnitWriter" <|-- "DatasetStorageUnitLocalFs"

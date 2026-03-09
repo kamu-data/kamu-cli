@@ -11326,8 +11326,7 @@ impl GraphQLMoleculeV2Harness {
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
             .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100_500))
-            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageRepository>()
-            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageConsumptionRepository>();
+            .add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
 
         kamu_molecule_services::register_dependencies(
             &mut base_builder,

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_utils::BackgroundAgent;
-use database_common_macros::transactional_method2;
+use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -22,23 +22,16 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum RunMode {
-    SingleIterationOnly,
-    WhileHasTasks,
-    MainRelayLoop,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgentStartup";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OutboxAgentImpl {
     catalog: CatalogWeakRef,
-    config: Arc<OutboxConfig>,
+    agent_config: Arc<OutboxAgentConfig>,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
+    outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
     run_lock: tokio::sync::Mutex<()>,
 }
@@ -56,8 +49,9 @@ pub struct OutboxAgentImpl {
 impl OutboxAgentImpl {
     pub fn new(
         catalog: CatalogWeakRef,
-        config: Arc<OutboxConfig>,
+        agent_config: Arc<OutboxAgentConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
+        outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
     ) -> Self {
         let routes_static_info = Arc::new(Self::make_static_routes_info(
@@ -80,9 +74,10 @@ impl OutboxAgentImpl {
 
         Self {
             catalog,
-            config,
+            agent_config,
             routes_static_info,
             producer_consumption_jobs,
+            outbox_message_bridge,
             metrics,
             run_lock: tokio::sync::Mutex::new(()),
         }
@@ -106,31 +101,40 @@ impl OutboxAgentImpl {
         )
     }
 
-    async fn run_with_mode(&self, mode: RunMode) -> Result<(), InternalError> {
-        match mode {
-            RunMode::SingleIterationOnly => {
-                self.run_consumption_iteration().await?;
-            }
-            RunMode::WhileHasTasks => loop {
-                let processed_consumer_tasks_count = self
-                    .run_consumption_iteration()
-                    .instrument(tracing::debug_span!("OutboxAgent::tick"))
-                    .await?;
+    async fn run_main_relay_loop(&self) -> Result<(), InternalError> {
+        // Initial catchup phase to process all existing messages
+        // before starting the main loop
+        self.run_until_end_of_queue()
+            .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
+            .await?;
 
-                if processed_consumer_tasks_count == 0 {
-                    break;
-                }
-            },
-            RunMode::MainRelayLoop => {
-                let loop_delay = self.config.awaiting_step.to_std().unwrap();
+        // Access wakeup detector
+        let wakeup_detector = self.outbox_message_bridge.wakeup_detector();
 
-                loop {
-                    self.run_consumption_iteration()
-                        .instrument(tracing::debug_span!("OutboxAgent::tick"))
-                        .await?;
+        loop {
+            // Wait for push or timeout - let the store handle the backoff strategy
+            let hint = wakeup_detector
+                .wait_wake(
+                    self.agent_config.max_listening_timeout,
+                    self.agent_config.min_debounce_interval,
+                )
+                .await?;
+            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-                    tokio::time::sleep(loop_delay).await;
-                }
+            // Process tasks while they are available, to make sure we process all messages
+            self.run_until_end_of_queue().await?;
+        }
+    }
+
+    async fn run_until_end_of_queue(&self) -> Result<(), InternalError> {
+        loop {
+            let processed_consumer_tasks_count = self
+                .run_consumption_iteration()
+                .instrument(tracing::debug_span!("OutboxAgent::tick"))
+                .await?;
+
+            if processed_consumer_tasks_count == 0 {
+                break;
             }
         }
 
@@ -143,25 +147,27 @@ impl OutboxAgentImpl {
         }
     }
 
-    #[transactional_method2(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>, outbox_message_repository: Arc<dyn OutboxMessageRepository>)]
+    #[transactional_method]
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
         let base_catalog = self.catalog.upgrade();
 
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap();
+
         // Load existing consumption records
-        use futures::TryStreamExt;
-        let consumptions = outbox_consumption_repository
-            .list_consumption_boundaries()
-            .try_collect::<Vec<_>>()
+        let consumptions = outbox_message_bridge
+            .list_consumption_boundaries(&transaction_catalog)
             .await?;
 
         // Fetch latest messages produced by each producer to use as default for new
         // consumers with InitialConsumerBoundary::Latest property
-        let latest_message_ids_by_producer = {
-            let latest_message_ids_by_producer = outbox_message_repository
-                .get_latest_message_ids_by_producer()
+        let latest_message_boundaries_by_producer = {
+            let latest_message_boundaries_by_producer = outbox_message_bridge
+                .get_latest_message_boundaries_by_producer(&transaction_catalog)
                 .await?;
 
-            latest_message_ids_by_producer
+            latest_message_boundaries_by_producer
                 .into_iter()
                 .collect::<HashMap<_, _>>()
         };
@@ -174,31 +180,34 @@ impl OutboxAgentImpl {
 
         // Detect new routes, which are not associated with a consumption record yet
         for (producer_name, consumer_names) in &self.routes_static_info.consumers_by_producers {
-            let latest_produced_message_id_maybe =
-                latest_message_ids_by_producer.get(producer_name);
+            let latest_produced_message_boundary_maybe = latest_message_boundaries_by_producer
+                .get(producer_name)
+                .copied();
             for consumer_name in consumer_names {
                 if !matched_consumptions.contains(&(producer_name, consumer_name)) {
                     // If consumer is not yet registered, and InitialConsumerBoundary is Latest,
                     // we set the last consumed message ID to the latest produced message ID
                     // otherwise, we set it to 0
-                    let last_consumed_message_id = if let Some(consumer_metadata) =
+                    let last_consumed_boundary = if let Some(consumer_metadata) =
                         particular_consumer_metadata_for(&base_catalog, consumer_name)
                         && consumer_metadata.initial_consumer_boundary
                             == InitialConsumerBoundary::Latest
-                        && let Some(latest_produced_message_id) = latest_produced_message_id_maybe
+                        && let Some(latest_produced_message_boundary) =
+                            latest_produced_message_boundary_maybe
                     {
-                        *latest_produced_message_id
+                        latest_produced_message_boundary
                     } else {
-                        OutboxMessageID::new(0)
+                        OutboxMessageBoundary::default()
                     };
 
                     // Create a new consumption boundary
-                    outbox_consumption_repository
-                        .create_consumption_boundary(OutboxMessageConsumptionBoundary {
-                            consumer_name: consumer_name.clone(),
-                            producer_name: producer_name.clone(),
-                            last_consumed_message_id,
-                        })
+                    outbox_message_bridge
+                        .mark_consumed(
+                            &transaction_catalog,
+                            producer_name,
+                            consumer_name,
+                            last_consumed_boundary,
+                        )
                         .await
                         .int_err()?;
                 }
@@ -217,9 +226,29 @@ impl OutboxAgentImpl {
         //  - flushed iteration (i.e. via e2e middleware)
         let _guard = self.run_lock.lock().await;
 
+        // Build a map of failed consumers by producer
+        let failed_consumer_names_by_producer = self
+            .producer_consumption_jobs
+            .iter()
+            .filter_map(|producer_consumption_job| {
+                let failed_consumer_names =
+                    producer_consumption_job.failed_consumer_names_snapshot();
+                if failed_consumer_names.is_empty() {
+                    None
+                } else {
+                    Some((
+                        producer_consumption_job.get_producer_name().to_string(),
+                        failed_consumer_names,
+                    ))
+                }
+            })
+            .collect::<HashMap<_, _>>();
+
         // Read current state of producers and consumptions
         // Prepare consumption tasks for each progressed producer
-        let mut consumption_tasks_by_producer = self.prepare_consumption_iteration().await?;
+        let mut consumption_tasks_by_producer = self
+            .prepare_consumption_iteration(failed_consumer_names_by_producer)
+            .await?;
         let processed_consumer_tasks_counter = Arc::new(AtomicUsize::new(0));
 
         // Select jobs per consumption task, unless consumers are failing already
@@ -266,19 +295,22 @@ impl OutboxAgentImpl {
         Ok(processed_consumer_tasks_counter.load(Ordering::Relaxed))
     }
 
-    #[transactional_method2(
-        outbox_message_repository: Arc<dyn OutboxMessageRepository>,
-        outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>
-    )]
+    #[transactional_method]
     async fn prepare_consumption_iteration(
         &self,
+        failed_consumer_names_by_producer: HashMap<String, HashSet<String>>,
     ) -> Result<HashMap<String, ProducerConsumptionTask>, InternalError> {
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap();
+
         let planner = OutboxConsumptionIterationPlanner::new(
             self.routes_static_info.clone(),
-            outbox_message_repository,
-            outbox_consumption_repository,
+            &transaction_catalog,
+            outbox_message_bridge,
             self.metrics.clone(),
-            usize::try_from(self.config.batch_size).unwrap(),
+            &failed_consumer_names_by_producer,
+            self.agent_config.batch_size,
         );
 
         planner.plan_consumption_tasks_by_producer().await
@@ -295,7 +327,9 @@ impl InitOnStartup for OutboxAgentImpl {
         self.debug_outbox_routes();
 
         // Make sure consumption records represent the routes
-        self.init_consumption_records().await
+        self.init_consumption_records().await?;
+
+        Ok(())
     }
 }
 
@@ -308,8 +342,7 @@ impl BackgroundAgent for OutboxAgentImpl {
     }
 
     async fn run(&self) -> Result<(), InternalError> {
-        // Main consumption loop
-        self.run_with_mode(RunMode::MainRelayLoop).await
+        self.run_main_relay_loop().await
     }
 }
 
@@ -319,14 +352,15 @@ impl BackgroundAgent for OutboxAgentImpl {
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
-        self.run_with_mode(RunMode::WhileHasTasks).await
+        self.run_until_end_of_queue().await?;
+        Ok(())
     }
 
     // To be used by tests only!
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_single_iteration_only(&self) -> Result<(), InternalError> {
-        // Run single iteration instead of a loop
-        self.run_with_mode(RunMode::SingleIterationOnly).await
+        self.run_consumption_iteration().await?;
+        Ok(())
     }
 }
 

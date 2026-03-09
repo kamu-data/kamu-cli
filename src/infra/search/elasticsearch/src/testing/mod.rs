@@ -12,3 +12,10 @@ mod es_test_context;
 
 pub use es_search_base_harness::*;
 pub use es_test_context::*;
+
+pub use crate::es_helpers::{
+    ElasticsearchIndexMappings,
+    ElasticsearchVersionedEntityIndex,
+    EntityIndexEnsureOutcome,
+    IndexVersionMetadata,
+};

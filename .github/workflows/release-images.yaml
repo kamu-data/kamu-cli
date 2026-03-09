@@ -66,5 +66,5 @@ jobs:
           COMMIT_SHA="${{ github.event.workflow_run.head_sha || github.event.inputs.release_sha || github.sha }}"
           gh workflow run \
             release-images-with-data.yaml \
-            --ref "${COMMIT_SHA}" \
+            --ref "master" \
             -f release_sha="${COMMIT_SHA}"

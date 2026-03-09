@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod outbox_message;
+mod outbox_message_boundary;
 mod outbox_message_id;
 
 pub use outbox_message::*;
+pub use outbox_message_boundary::*;
 pub use outbox_message_id::*;

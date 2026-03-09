@@ -7,7 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[cfg(feature = "testing")]
+pub mod es_client;
+#[cfg(not(feature = "testing"))]
 pub(crate) mod es_client;
+
+#[cfg(feature = "testing")]
+pub mod es_helpers;
+#[cfg(not(feature = "testing"))]
 pub(crate) mod es_helpers;
 
 mod es_repo;

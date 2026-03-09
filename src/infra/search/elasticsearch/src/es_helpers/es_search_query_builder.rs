@@ -409,3 +409,428 @@ impl ElasticsearchQueryBuilder {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use kamu_search::*;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    fn assert_query_json(actual: &serde_json::Value, expected_json: &str) {
+        let expected: serde_json::Value = serde_json::from_str(expected_json).unwrap();
+        assert_eq!(expected, *actual);
+    }
+
+    #[test]
+    fn test_build_listing_query_with_nested_filter_and_default_sort() {
+        let filter = SearchFilterExpr::And(vec![
+            SearchFilterExpr::Field {
+                field: "visibility",
+                op: SearchFilterOp::Eq(serde_json::json!("public")),
+            },
+            SearchFilterExpr::Not(Box::new(SearchFilterExpr::Field {
+                field: "is_banned",
+                op: SearchFilterOp::Eq(serde_json::json!(true)),
+            })),
+            SearchFilterExpr::Field {
+                field: "status",
+                op: SearchFilterOp::Ne(serde_json::json!("deleted")),
+            },
+            SearchFilterExpr::Field {
+                field: "created_at",
+                op: SearchFilterOp::Lt(serde_json::json!(1_700_000_000)),
+            },
+            SearchFilterExpr::Field {
+                field: "updated_at",
+                op: SearchFilterOp::Lte(serde_json::json!(1_700_000_001)),
+            },
+            SearchFilterExpr::Field {
+                field: "rank",
+                op: SearchFilterOp::Gt(serde_json::json!(5)),
+            },
+            SearchFilterExpr::Field {
+                field: "rating",
+                op: SearchFilterOp::Gte(serde_json::json!(4.5)),
+            },
+            SearchFilterExpr::Field {
+                field: "kind",
+                op: SearchFilterOp::In(vec![
+                    serde_json::json!("dataset"),
+                    serde_json::json!("flow"),
+                ]),
+            },
+            SearchFilterExpr::Field {
+                field: "namespace",
+                op: SearchFilterOp::Prefix("org.acme".to_string()),
+            },
+            SearchFilterExpr::Or(vec![
+                SearchFilterExpr::Field {
+                    field: "owner",
+                    op: SearchFilterOp::Eq(serde_json::json!("alice")),
+                },
+                SearchFilterExpr::Field {
+                    field: "owner",
+                    op: SearchFilterOp::Eq(serde_json::json!("bob")),
+                },
+            ]),
+        ]);
+
+        let query = ElasticsearchQueryBuilder::build_listing_query(
+            Some(&filter),
+            &SearchRequestSourceSpec::Particular(vec!["name", "visibility"]),
+            &[],
+            &SearchPaginationSpec {
+                limit: 5,
+                offset: 10,
+            },
+        );
+
+        assert_query_json(
+            &query,
+            indoc!(
+                r#"
+                {
+                    "query": {
+                        "bool": {
+                            "must": {
+                                "match_all": {}
+                            },
+                            "filter": {
+                                "bool": {
+                                    "must": [
+                                        { "term": { "visibility": "public" } },
+                                        { "bool": { "must_not": { "term": { "is_banned": true } } } },
+                                        { "bool": { "must_not": { "term": { "status": "deleted" } } } },
+                                        { "range": { "created_at": { "lt": 1700000000 } } },
+                                        { "range": { "updated_at": { "lte": 1700000001 } } },
+                                        { "range": { "rank": { "gt": 5 } } },
+                                        { "range": { "rating": { "gte": 4.5 } } },
+                                        { "terms": { "kind": ["dataset", "flow"] } },
+                                        { "prefix": { "namespace": "org.acme" } },
+                                        {
+                                            "bool": {
+                                                "should": [
+                                                    { "term": { "owner": "alice" } },
+                                                    { "term": { "owner": "bob" } }
+                                                ],
+                                                "minimum_should_match": 1
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "sort": { "_score": { "order": "desc" } },
+                    "_source": ["name", "visibility"],
+                    "from": 10,
+                    "size": 5
+                }
+                "#
+            ),
+        );
+    }
+
+    #[test]
+    fn test_build_best_fields_query_applies_highlight_and_explain() {
+        let policy = MultiMatchPolicy {
+            specs: vec![
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "name".to_string(),
+                    boost: 6.0,
+                },
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "description".to_string(),
+                    boost: 3.5,
+                },
+            ],
+        };
+        let sort = [SearchSortSpec::ByField {
+            field: "created_at",
+            direction: SearchSortDirection::Descending,
+            nulls_first: false,
+        }];
+        let options = TextSearchOptions {
+            enable_explain: true,
+            enable_highlighting: true,
+            boosting_overrides: Default::default(),
+        };
+
+        let query = ElasticsearchQueryBuilder::build_best_fields_search_query(
+            "wind power",
+            FullTextSearchTermOperator::And,
+            0.2,
+            &policy,
+            None,
+            &SearchRequestSourceSpec::All,
+            &sort,
+            &SearchPaginationSpec {
+                limit: 20,
+                offset: 0,
+            },
+            &options,
+        );
+
+        assert_query_json(
+            &query,
+            indoc!(
+                r#"
+                {
+                    "query": {
+                        "multi_match": {
+                            "query": "wind power",
+                            "type": "best_fields",
+                            "operator": "and",
+                            "tie_breaker": 0.2,
+                            "fields": ["name^6", "description^3.5"]
+                        }
+                    },
+                    "sort": [
+                        {
+                            "created_at": {
+                                "order": "desc",
+                                "missing": "_last",
+                                "unmapped_type": "keyword"
+                            }
+                        }
+                    ],
+                    "_source": true,
+                    "from": 0,
+                    "size": 20,
+                    "highlight": {
+                        "pre_tags": ["<em>"],
+                        "post_tags": ["</em>"],
+                        "fields": {
+                            "*": {
+                                "fragment_size": 100,
+                                "number_of_fragments": 1
+                            }
+                        }
+                    },
+                    "explain": true
+                }
+                "#
+            ),
+        );
+    }
+
+    #[test]
+    fn test_build_phrase_query_with_filter_and_source_complex() {
+        let phrase_policy = PhraseSearchPolicy {
+            specs: vec![
+                crate::es_helpers::PhraseSearchFieldSpec {
+                    field_name: "name".to_string(),
+                    boost: 8.0,
+                    slop: 1,
+                },
+                crate::es_helpers::PhraseSearchFieldSpec {
+                    field_name: "description".to_string(),
+                    boost: 4.0,
+                    slop: 2,
+                },
+            ],
+        };
+        let filter = SearchFilterExpr::Or(vec![
+            SearchFilterExpr::Field {
+                field: "kind",
+                op: SearchFilterOp::Eq(serde_json::json!("dataset")),
+            },
+            SearchFilterExpr::Field {
+                field: "kind",
+                op: SearchFilterOp::Eq(serde_json::json!("flow")),
+            },
+        ]);
+
+        let query = ElasticsearchQueryBuilder::build_phrase_search_query(
+            "public data",
+            &phrase_policy,
+            Some(&filter),
+            &SearchRequestSourceSpec::Complex {
+                include_patterns: vec!["name*".to_string()],
+                exclude_patterns: vec!["secret*".to_string()],
+            },
+            &SearchPaginationSpec {
+                limit: 7,
+                offset: 3,
+            },
+            &TextSearchOptions::default(),
+        );
+
+        assert_query_json(
+            &query,
+            indoc!(
+                r#"
+                {
+                    "query": {
+                        "bool": {
+                            "must": {
+                                "bool": {
+                                    "should": [
+                                        {
+                                            "match_phrase": {
+                                                "name": {
+                                                    "query": "public data",
+                                                    "slop": 1,
+                                                    "boost": 8.0
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "match_phrase": {
+                                                "description": {
+                                                    "query": "public data",
+                                                    "slop": 2,
+                                                    "boost": 4.0
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            },
+                            "filter": {
+                                "bool": {
+                                    "should": [
+                                        { "term": { "kind": "dataset" } },
+                                        { "term": { "kind": "flow" } }
+                                    ],
+                                    "minimum_should_match": 1
+                                }
+                            }
+                        }
+                    },
+                    "_source": {
+                        "include": ["name*"],
+                        "exclude": ["secret*"]
+                    },
+                    "from": 3,
+                    "size": 7
+                }
+                "#
+            ),
+        );
+    }
+
+    #[test]
+    fn test_build_vector_query_with_filter_and_explain() {
+        let filter = SearchFilterExpr::Field {
+            field: "visibility",
+            op: SearchFilterOp::In(vec![serde_json::json!("public")]),
+        };
+
+        let query = ElasticsearchQueryBuilder::build_vector_search_query(
+            "semantic_embeddings",
+            &[0.1, 0.2, 0.3],
+            Some(&filter),
+            &SearchRequestSourceSpec::None,
+            12,
+            &VectorSearchOptions {
+                knn: KnnOptions {
+                    k: 77,
+                    num_candidates: 501,
+                },
+                enable_explain: true,
+            },
+        );
+
+        assert_query_json(
+            &query,
+            indoc!(
+                r#"
+                {
+                    "track_total_hits": false,
+                    "knn": {
+                        "field": "semantic_embeddings.embedding",
+                        "query_vector": [0.1, 0.2, 0.3],
+                        "k": 77,
+                        "num_candidates": 501,
+                        "filter": {
+                            "terms": {
+                                "visibility": ["public"]
+                            }
+                        }
+                    },
+                    "_source": false,
+                    "size": 12,
+                    "explain": true
+                }
+                "#
+            ),
+        );
+    }
+
+    #[test]
+    fn test_build_most_fields_query_without_highlight_or_explain() {
+        let policy = MultiMatchPolicy {
+            specs: vec![
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "title".to_string(),
+                    boost: 2.0,
+                },
+                crate::es_helpers::MultiMatchFieldSpec {
+                    field_name: "body".to_string(),
+                    boost: 1.0,
+                },
+            ],
+        };
+        let filter = SearchFilterExpr::Field {
+            field: "namespace",
+            op: SearchFilterOp::Prefix("org.acme".to_string()),
+        };
+
+        let query = ElasticsearchQueryBuilder::build_most_fields_search_query(
+            "green energy",
+            FullTextSearchTermOperator::Or,
+            &policy,
+            Some(&filter),
+            &SearchRequestSourceSpec::All,
+            &[SearchSortSpec::Relevance],
+            &SearchPaginationSpec {
+                limit: 15,
+                offset: 30,
+            },
+            &TextSearchOptions::default(),
+        );
+
+        assert_query_json(
+            &query,
+            indoc!(
+                r#"
+                {
+                  "query": {
+                    "bool": {
+                      "must": {
+                        "multi_match": {
+                          "query": "green energy",
+                          "type": "most_fields",
+                          "operator": "or",
+                          "fields": ["title^2", "body^1"]
+                        }
+                      },
+                      "filter": {
+                        "prefix": {
+                          "namespace": "org.acme"
+                        }
+                      }
+                    }
+                  },
+                  "sort": [
+                    {
+                      "_score": {
+                        "order": "desc"
+                      }
+                    }
+                  ],
+                  "_source": true,
+                  "from": 30,
+                  "size": 15
+                }
+                "#
+            ),
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -795,8 +795,8 @@
           "$ref": "#/$defs/FlowSystemEventAgentConfig",
           "default": {
             "batchSize": 20,
-            "maxListeningTimeoutMs": 2000,
-            "minDebounceIntervalMs": 100
+            "maxListeningTimeout": "2s",
+            "minDebounceInterval": "100ms"
           }
         },
         "taskAgent": {
@@ -817,17 +817,13 @@
           "minimum": 0,
           "type": "integer"
         },
-        "maxListeningTimeoutMs": {
-          "default": 2000,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
         },
-        "minDebounceIntervalMs": {
-          "default": 100,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
         }
       },
       "type": "object"
@@ -866,7 +862,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "default": "kamu-cli/0.260.0",
+          "default": "kamu-cli/0.260.2",
           "description": "Value to use for User-Agent header",
           "type": "string"
         }
@@ -943,18 +939,22 @@
       ],
       "type": "string"
     },
-    "OutboxConfig": {
+    "OutboxAgentConfig": {
       "additionalProperties": false,
       "properties": {
-        "awaitingStepSecs": {
-          "default": 1,
-          "format": "int64",
-          "type": "integer"
-        },
         "batchSize": {
           "default": 20,
-          "format": "int64",
+          "format": "uint",
+          "minimum": 0,
           "type": "integer"
+        },
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
+        },
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
         }
       },
       "type": "object"
@@ -1062,9 +1062,7 @@
         "embeddingsEncoder": {
           "$ref": "#/$defs/EmbeddingsEncoderConfig",
           "default": {
-            "dimensions": 1536,
-            "kind": "OpenAi",
-            "modelName": "text-embedding-ada-002"
+            "kind": "Dummy"
           },
           "description": "Embeddings encoder configuration"
         },
@@ -1214,7 +1212,7 @@
           "default": {
             "connectTimeout": "30s",
             "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.260.0"
+            "userAgent": "kamu-cli/0.260.2"
           },
           "description": "HTTP-specific configuration"
         },
@@ -1376,8 +1374,8 @@
         },
         "flowSystemEventAgent": {
           "batchSize": 20,
-          "maxListeningTimeoutMs": 2000,
-          "minDebounceIntervalMs": 100
+          "maxListeningTimeout": "2s",
+          "minDebounceInterval": "100ms"
         },
         "taskAgent": {
           "checkingIntervalSecs": 1
@@ -1401,12 +1399,13 @@
       "description": "UNSTABLE: Identity configuration"
     },
     "outbox": {
-      "$ref": "#/$defs/OutboxConfig",
+      "$ref": "#/$defs/OutboxAgentConfig",
       "default": {
-        "awaitingStepSecs": 1,
-        "batchSize": 20
+        "batchSize": 20,
+        "maxListeningTimeout": "2s",
+        "minDebounceInterval": "100ms"
       },
-      "description": "Messaging outbox configuration"
+      "description": "Messaging outbox agent configuration"
     },
     "protocol": {
       "$ref": "#/$defs/ProtocolConfig",
@@ -1441,9 +1440,7 @@
           "splitSections": false
         },
         "embeddingsEncoder": {
-          "dimensions": 1536,
-          "kind": "OpenAi",
-          "modelName": "text-embedding-ada-002"
+          "kind": "Dummy"
         },
         "indexer": {
           "clearOnStart": false,
@@ -1467,7 +1464,7 @@
         "http": {
           "connectTimeout": "30s",
           "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.260.0"
+          "userAgent": "kamu-cli/0.260.2"
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"

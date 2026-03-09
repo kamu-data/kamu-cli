@@ -7,33 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
+use std::time::Duration;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct OutboxConfig {
-    /// Defines discretization of the main scheduling loop: how often new data
-    /// is checked and processed
-    pub awaiting_step: Duration,
-    /// Defines maximum number of messages attempted to read in 1 step
-    pub batch_size: i64,
+pub struct OutboxAgentConfig {
+    pub min_debounce_interval: Duration,
+    pub max_listening_timeout: Duration,
+    pub batch_size: usize,
 }
 
-impl OutboxConfig {
-    pub fn new(awaiting_step: Duration, batch_size: i64) -> Self {
+impl OutboxAgentConfig {
+    pub fn local_default() -> Self {
         Self {
-            awaiting_step,
-            batch_size,
+            min_debounce_interval: Duration::from_millis(100),
+            max_listening_timeout: Duration::from_secs(2),
+            batch_size: 20,
         }
     }
-}
 
-impl Default for OutboxConfig {
-    fn default() -> Self {
+    pub fn production_default() -> Self {
         Self {
-            awaiting_step: Duration::seconds(1),
-            batch_size: 20,
+            min_debounce_interval: Duration::from_millis(100),
+            max_listening_timeout: Duration::from_secs(60),
+            batch_size: 100,
         }
     }
 }
