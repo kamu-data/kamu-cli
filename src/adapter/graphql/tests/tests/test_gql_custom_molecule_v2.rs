@@ -11238,6 +11238,357 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_gql_custom_molecule!(test_molecule_v2_activity_announcements_search_disabled_projects);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_v2_activity_announcements_search_disabled_projects(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .search_variant(search_variant)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
+
+    pretty_assertions::assert_eq!(
+        {
+            let res_json = GraphQLQueryRequest::new(
+                CREATE_PROJECT,
+                async_graphql::Variables::from_value(value!({
+                    "ipnftSymbol": "vitafast",
+                    "ipnftUid": PROJECT_1_UID,
+                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                    "ipnftTokenId": "9",
+                })),
+            )
+            .execute(&harness.schema, &harness.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+        },
+        Some(true),
+    );
+
+    // Create a versioned file
+    let project_1_file_1_dataset_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_VERSIONED_FILE,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "path": "/foo.txt",
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                "contentType": "text/plain",
+                "changeBy": USER_1,
+                "accessLevel": "public",
+                "description": "Plain text file (foo)",
+                "categories": ["test-category"],
+                "tags": ["test-tag1", "test-tag2"],
+                "contentText": "hello foo",
+                "encryptionMetadata": {
+                    "dataToEncryptHash": "EM1",
+                    "accessControlConditions": "EM2",
+                    "encryptedBy": "EM3",
+                    "encryptedAt": "EM4",
+                    "chain": "EM5",
+                    "litSdkVersion": "EM6",
+                    "litNetwork": "EM7",
+                    "templateName": "EM8",
+                    "contractVersion": "EM9",
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut upload_file_node =
+            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+        // Extract node for simpler comparison
+        let file_dataset_id = upload_file_node["entry"]["ref"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        pretty_assertions::assert_eq!(
+            upload_file_node,
+            json!({
+                "entry": {
+                    "ref": null, // Extracted above
+                },
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        file_dataset_id
+    };
+
+    // Create an announcement
+    let project_1_announcement_1_id = {
+        let mut res_json = GraphQLQueryRequest::new(
+            CREATE_ANNOUNCEMENT,
+            async_graphql::Variables::from_value(value!({
+                "ipnftUid": PROJECT_1_UID,
+                "headline": "Test announcement 1",
+                "body": "Blah blah 1",
+                "attachments": [],
+                "accessLevel": "public",
+                "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                "categories": ["test-category-1", "test-category-2"],
+                "tags": ["test-tag1", "test-tag2", "test-tag3"],
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        let mut announcement_create_node =
+            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+        // Extract node for simpler comparison
+        let new_announcement_id = announcement_create_node["announcementId"]
+            .take()
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        pretty_assertions::assert_eq!(
+            announcement_create_node,
+            json!({
+                "__typename": "CreateAnnouncementSuccess",
+                "announcementId": null, // Extracted above
+                "isSuccess": true,
+                "message": "",
+            })
+        );
+
+        new_announcement_id
+    };
+
+    harness.synchronize_agents().await;
+
+    // Activities show file upload event and announcement event
+    let expected_activity_node = value!({
+        "activity": {
+            "nodes": [
+                {
+                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "announcement": {
+                        "id": project_1_announcement_1_id,
+                        "headline": "Test announcement 1",
+                        "body": "Blah blah 1",
+                        "attachments": [],
+                        "accessLevel": "public",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "categories": ["test-category-1", "test-category-2"],
+                        "tags": ["test-tag1", "test-tag2", "test-tag3"],
+                    }
+                },
+                {
+                    "__typename": "MoleculeActivityFileAddedV2",
+                    "entry": {
+                        "path": "/foo.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "accessLevel": "public",
+                        "changeBy": USER_1,
+                    }
+                },
+            ]
+        }
+    });
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node
+            }
+        })
+    );
+
+    // Empty search prompt - expect both announcement and file search hits
+
+    let project_1_announcement_1_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundAnnouncement",
+        "announcement": {
+            "accessLevel": "public",
+            "attachments": [],
+            "body": "Blah blah 1",
+            "categories": ["test-category-1", "test-category-2"],
+            "changeBy": USER_1,
+            "headline": "Test announcement 1",
+            "id": project_1_announcement_1_id,
+            "project": {
+                "ipnftUid": PROJECT_1_UID,
+            },
+            "tags": ["test-tag1", "test-tag2", "test-tag3"]
+        }
+    });
+
+    let project_1_file_1_dataset_search_hit_node = json!({
+        "__typename": "MoleculeSemanticSearchFoundDataRoomEntry",
+        "entry": {
+            "accessLevel": "public",
+            "asDataset": {
+                "id": project_1_file_1_dataset_id
+            },
+            "asVersionedFile": {
+                "matching": {
+                    "accessLevel": "public",
+                    "categories": ["test-category"],
+                    "changeBy": USER_1,
+                    "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
+                    "contentText": "hello foo",
+                    "contentType": "text/plain",
+                    "description": "Plain text file (foo)",
+                    "encryptionMetadata": {
+                        "dataToEncryptHash": "EM1",
+                        "accessControlConditions": "EM2",
+                        "encryptedBy": "EM3",
+                        "encryptedAt": "EM4",
+                        "chain": "EM5",
+                        "litSdkVersion": "EM6",
+                        "litNetwork": "EM7",
+                        "templateName": "EM8",
+                        "contractVersion": "EM9",
+                    },
+                    "tags": ["test-tag1", "test-tag2"],
+                    "version": 1
+                }
+            },
+            "changeBy": USER_1,
+            "path": "/foo.txt",
+            "project": {
+                "ipnftUid": PROJECT_1_UID,
+            },
+            "ref": project_1_file_1_dataset_id,
+        }
+    });
+
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("", None).await,
+        json!({
+            "nodes": [
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+
+    // Disable project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    let disable_res = res.data.into_json().unwrap();
+    pretty_assertions::assert_eq!(
+        disable_res["molecule"]["v2"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMutV2" }),
+    );
+
+    harness.synchronize_agents().await;
+
+    // Expect empty activities
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+
+                "v2": {
+                    "activity": {
+                        "nodes": []
+                    }
+                }
+            }
+        })
+    );
+
+    // Expect empty search results (no announcement or file search hits)
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("", None).await,
+        json!({
+            "nodes": [],
+            "totalCount": 2
+        })
+    );
+
+    // Re-enable project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    let enable_res = res.data.into_json().unwrap();
+    pretty_assertions::assert_eq!(
+        enable_res["molecule"]["v2"]["enableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMutV2" }),
+    );
+
+    harness.synchronize_agents().await;
+
+    // Activities show file upload and announcement events again
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v2": expected_activity_node
+            }
+        })
+    );
+
+    // Re-run search query - expect announcement and file search hits again
+    pretty_assertions::assert_eq!(
+        harness.execute_search_query("", None).await,
+        json!({
+            "nodes": [
+                project_1_announcement_1_search_hit_node,
+                project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 2
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

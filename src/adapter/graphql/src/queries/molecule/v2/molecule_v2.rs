@@ -210,42 +210,42 @@ impl MoleculeV2 {
         let nodes = listing
             .list
             .into_iter()
-            .map(|activity| {
+            .filter_map(|activity| {
                 let ipnft_uid = activity.ipnft_uid();
-                let Some(project) = projects_mapping.get(ipnft_uid) else {
-                    return Err(GqlError::gql(format!(
-                        "Project [{ipnft_uid}] unexpectedly not found",
-                    )));
-                };
-
-                match activity {
-                    MoleculeGlobalActivity::DataRoomActivity(data_room_activity_entity) => {
-                        let activity_type = data_room_activity_entity.activity_type;
-                        let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
-                            project,
-                            data_room_activity_entity,
-                        );
-
-                        use MoleculeDataRoomFileActivityType as Type;
-
-                        let activity_event = match activity_type {
-                            Type::Added => MoleculeActivityEventV2::file_added(entry),
-                            Type::Updated => MoleculeActivityEventV2::file_updated(entry),
-                            Type::Removed => MoleculeActivityEventV2::file_removed(entry),
-                        };
-
-                        Ok(activity_event)
-                    }
-                    MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
-                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
-                            project,
-                            announcement_activity_entity,
-                        );
-                        Ok(MoleculeActivityEventV2::announcement(entry))
-                    }
+                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                    Some((activity, project))
+                } else {
+                    tracing::warn!(
+                        "Project [{ipnft_uid}] not found for activity, skipping the activity event"
+                    );
+                    None
                 }
             })
-            .collect::<Result<_, _>>()?;
+            .map(|(activity, project)| match activity {
+                MoleculeGlobalActivity::DataRoomActivity(data_room_activity_entity) => {
+                    let activity_type = data_room_activity_entity.activity_type;
+                    let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                        project,
+                        data_room_activity_entity,
+                    );
+
+                    use MoleculeDataRoomFileActivityType as Type;
+
+                    match activity_type {
+                        Type::Added => MoleculeActivityEventV2::file_added(entry),
+                        Type::Updated => MoleculeActivityEventV2::file_updated(entry),
+                        Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+                    }
+                }
+                MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
+                    let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
+                        project,
+                        announcement_activity_entity,
+                    );
+                    MoleculeActivityEventV2::announcement(entry)
+                }
+            })
+            .collect();
 
         Ok(MoleculeActivityEventV2Connection::new(
             nodes, page, per_page,
@@ -306,40 +306,40 @@ impl MoleculeV2 {
         let nodes = listing
             .list
             .into_iter()
-            .map(|search_hit| {
+            .filter_map(|search_hit| {
                 let ipnft_uid = search_hit.entity.ipnft_uid();
-                let Some(project) = projects_mapping.get(ipnft_uid) else {
-                    return Err(GqlError::gql(format!(
-                        "Project [{ipnft_uid}] unexpectedly not found",
-                    )));
-                };
-
-                match search_hit.entity {
-                    MoleculeSearchHitEntity::DataRoomActivity(data_room_activity) => {
-                        let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
-                            project,
-                            data_room_activity,
-                        );
-                        Ok(MoleculeSemanticSearchHit::data_room_entry(
-                            entry,
-                            search_hit.score,
-                            search_hit.explanation,
-                        ))
-                    }
-                    MoleculeSearchHitEntity::Announcement(announcement) => {
-                        let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
-                            project,
-                            announcement,
-                        );
-                        Ok(MoleculeSemanticSearchHit::announcement(
-                            entry,
-                            search_hit.score,
-                            search_hit.explanation,
-                        ))
-                    }
+                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                    Some((search_hit, project))
+                } else {
+                    tracing::warn!("Project [{ipnft_uid}] not found, skipping the search hit");
+                    None
                 }
             })
-            .collect::<Result<_, _>>()?;
+            .map(|(search_hit, project)| match search_hit.entity {
+                MoleculeSearchHitEntity::DataRoomActivity(data_room_activity) => {
+                    let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
+                        project,
+                        data_room_activity,
+                    );
+                    MoleculeSemanticSearchHit::data_room_entry(
+                        entry,
+                        search_hit.score,
+                        search_hit.explanation,
+                    )
+                }
+                MoleculeSearchHitEntity::Announcement(announcement) => {
+                    let entry = MoleculeAnnouncementEntry::new_from_global_announcement(
+                        project,
+                        announcement,
+                    );
+                    MoleculeSemanticSearchHit::announcement(
+                        entry,
+                        search_hit.score,
+                        search_hit.explanation,
+                    )
+                }
+            })
+            .collect();
 
         Ok(MoleculeSemanticSearchHitConnection::new(
             nodes,
