@@ -15,6 +15,7 @@ mod build_info;
 mod data;
 mod datasets;
 mod flows;
+pub(crate) mod molecule;
 mod search;
 mod tasks;
 mod webhooks;

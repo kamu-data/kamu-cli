@@ -1,0 +1,65 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::{DateTime, Utc};
+use internal_error::InternalError;
+use kamu_accounts::LoggedAccount;
+
+use crate::{MoleculeGetDatasetError, MoleculeProject, ProjectNotFoundError};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait MoleculeEnableProjectUseCase: Send + Sync {
+    async fn execute(
+        &self,
+        molecule_subject: &LoggedAccount,
+        source_event_time: Option<DateTime<Utc>>,
+        ipnft_uid: String,
+    ) -> Result<MoleculeProject, MoleculeEnableProjectError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum MoleculeEnableProjectError {
+    #[error(transparent)]
+    ProjectNotFound(#[from] ProjectNotFoundError),
+
+    #[error(transparent)]
+    NoProjectsDataset(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<MoleculeGetDatasetError> for MoleculeEnableProjectError {
+    fn from(e: MoleculeGetDatasetError) -> Self {
+        match e {
+            MoleculeGetDatasetError::NotFound(err) => {
+                MoleculeEnableProjectError::NoProjectsDataset(err)
+            }
+            MoleculeGetDatasetError::Access(err) => MoleculeEnableProjectError::Access(err),
+            MoleculeGetDatasetError::Internal(err) => MoleculeEnableProjectError::Internal(err),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
