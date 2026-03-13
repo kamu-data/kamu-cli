@@ -3463,27 +3463,37 @@ type MoleculeDataRoomUpdateUpToDate implements MoleculeDataRoomMoveEntryResult {
 }
 
 type MoleculeEncryptionMetadata {
-	dataToEncryptHash: String!
-	accessControlConditions: String!
 	encryptedBy: String!
 	encryptedAt: String!
-	chain: String!
-	litSdkVersion: String!
-	litNetwork: String!
-	templateName: String!
-	contractVersion: String!
+	accessControlConditions: String!
+	encryptionSystem: String
+	dataToEncryptHash: String
+	chain: String
+	litSdkVersion: String
+	litNetwork: String
+	templateName: String
+	contractVersion: String
+	encryptedDek: String
+	iv: String
+	contentHash: String
+	keyId: String
 }
 
 input MoleculeEncryptionMetadataInput {
-	dataToEncryptHash: String!
-	accessControlConditions: String!
 	encryptedBy: String!
 	encryptedAt: String!
-	chain: String!
-	litSdkVersion: String!
-	litNetwork: String!
-	templateName: String!
-	contractVersion: String!
+	accessControlConditions: String!
+	encryptionSystem: String
+	dataToEncryptHash: String
+	chain: String
+	litSdkVersion: String
+	litNetwork: String
+	templateName: String
+	contractVersion: String
+	encryptedDek: String
+	iv: String
+	contentHash: String
+	keyId: String
 }
 
 type MoleculeMut {
