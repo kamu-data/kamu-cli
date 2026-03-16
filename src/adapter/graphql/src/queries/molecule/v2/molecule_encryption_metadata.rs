@@ -18,13 +18,7 @@ pub struct MoleculeEncryptionMetadata {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeEncryptionMetadata {
-    async fn data_to_encrypt_hash(&self) -> &String {
-        &self.entity.data_to_encrypt_hash
-    }
-
-    async fn access_control_conditions(&self) -> &String {
-        &self.entity.access_control_conditions
-    }
+    // Common fields
 
     async fn encrypted_by(&self) -> &String {
         &self.entity.encrypted_by
@@ -34,24 +28,56 @@ impl MoleculeEncryptionMetadata {
         &self.entity.encrypted_at
     }
 
-    async fn chain(&self) -> &String {
-        &self.entity.chain
+    async fn access_control_conditions(&self) -> &String {
+        &self.entity.access_control_conditions
     }
 
-    async fn lit_sdk_version(&self) -> &String {
-        &self.entity.lit_sdk_version
+    async fn encryption_system(&self) -> Option<&String> {
+        self.entity.encryption_system.as_ref()
     }
 
-    async fn lit_network(&self) -> &String {
-        &self.entity.lit_network
+    // Lit-specific
+
+    async fn data_to_encrypt_hash(&self) -> Option<&String> {
+        self.entity.data_to_encrypt_hash.as_ref()
     }
 
-    async fn template_name(&self) -> &String {
-        &self.entity.template_name
+    async fn chain(&self) -> Option<&String> {
+        self.entity.chain.as_ref()
     }
 
-    async fn contract_version(&self) -> &String {
-        &self.entity.contract_version
+    async fn lit_sdk_version(&self) -> Option<&String> {
+        self.entity.lit_sdk_version.as_ref()
+    }
+
+    async fn lit_network(&self) -> Option<&String> {
+        self.entity.lit_network.as_ref()
+    }
+
+    async fn template_name(&self) -> Option<&String> {
+        self.entity.template_name.as_ref()
+    }
+
+    async fn contract_version(&self) -> Option<&String> {
+        self.entity.contract_version.as_ref()
+    }
+
+    // Envelope encryption fields
+
+    async fn encrypted_dek(&self) -> Option<&String> {
+        self.entity.encrypted_dek.as_ref()
+    }
+
+    async fn iv(&self) -> Option<&String> {
+        self.entity.iv.as_ref()
+    }
+
+    async fn content_hash(&self) -> Option<&String> {
+        self.entity.content_hash.as_ref()
+    }
+
+    async fn key_id(&self) -> Option<&String> {
+        self.entity.key_id.as_ref()
     }
 }
 
@@ -65,29 +91,44 @@ impl From<kamu_molecule_domain::MoleculeEncryptionMetadata> for MoleculeEncrypti
 
 #[derive(InputObject)]
 pub struct MoleculeEncryptionMetadataInput {
-    pub data_to_encrypt_hash: String,
-    pub access_control_conditions: String,
+    // Common fields
     pub encrypted_by: String,
     pub encrypted_at: String,
-    pub chain: String,
-    pub lit_sdk_version: String,
-    pub lit_network: String,
-    pub template_name: String,
-    pub contract_version: String,
+    pub access_control_conditions: String,
+    pub encryption_system: Option<String>,
+
+    // Lit-specific
+    pub data_to_encrypt_hash: Option<String>,
+    pub chain: Option<String>,
+    pub lit_sdk_version: Option<String>,
+    pub lit_network: Option<String>,
+    pub template_name: Option<String>,
+    pub contract_version: Option<String>,
+
+    // Envelope encryption fields
+    pub encrypted_dek: Option<String>,
+    pub iv: Option<String>,
+    pub content_hash: Option<String>,
+    pub key_id: Option<String>,
 }
 
 impl From<MoleculeEncryptionMetadataInput> for kamu_molecule_domain::MoleculeEncryptionMetadata {
     fn from(input: MoleculeEncryptionMetadataInput) -> Self {
         Self {
-            data_to_encrypt_hash: input.data_to_encrypt_hash,
-            access_control_conditions: input.access_control_conditions,
             encrypted_by: input.encrypted_by,
             encrypted_at: input.encrypted_at,
+            access_control_conditions: input.access_control_conditions,
+            encryption_system: input.encryption_system,
+            data_to_encrypt_hash: input.data_to_encrypt_hash,
             chain: input.chain,
             lit_sdk_version: input.lit_sdk_version,
             lit_network: input.lit_network,
             template_name: input.template_name,
             contract_version: input.contract_version,
+            encrypted_dek: input.encrypted_dek,
+            iv: input.iv,
+            content_hash: input.content_hash,
+            key_id: input.key_id,
         }
     }
 }

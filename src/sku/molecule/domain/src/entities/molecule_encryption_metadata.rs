@@ -12,15 +12,25 @@
 // TODO: clarify valid values
 #[derive(Clone, Debug)]
 pub struct MoleculeEncryptionMetadata {
-    pub data_to_encrypt_hash: String,
-    pub access_control_conditions: String,
+    // Common fields
     pub encrypted_by: String,
     pub encrypted_at: String,
-    pub chain: String,
-    pub lit_sdk_version: String,
-    pub lit_network: String,
-    pub template_name: String,
-    pub contract_version: String,
+    pub access_control_conditions: String,
+    pub encryption_system: Option<String>,
+
+    // Lit-specific
+    pub data_to_encrypt_hash: Option<String>,
+    pub chain: Option<String>,
+    pub lit_sdk_version: Option<String>,
+    pub lit_network: Option<String>,
+    pub template_name: Option<String>,
+    pub contract_version: Option<String>,
+
+    // Envelope encryption fields
+    pub encrypted_dek: Option<String>,
+    pub iv: Option<String>,
+    pub content_hash: Option<String>,
+    pub key_id: Option<String>,
 }
 
 impl MoleculeEncryptionMetadata {
@@ -39,44 +49,64 @@ pub struct MoleculeEncryptionMetadataRecord {
     // Allow for future record evolution
     pub version: u32,
 
-    pub data_to_encrypt_hash: String,
-    pub access_control_conditions: String,
+    // Common fields
     pub encrypted_by: String,
     pub encrypted_at: String,
-    pub chain: String,
-    pub lit_sdk_version: String,
-    pub lit_network: String,
-    pub template_name: String,
-    pub contract_version: String,
+    pub access_control_conditions: String,
+    pub encryption_system: Option<String>,
+
+    // Lit-specific
+    pub data_to_encrypt_hash: Option<String>,
+    pub chain: Option<String>,
+    pub lit_sdk_version: Option<String>,
+    pub lit_network: Option<String>,
+    pub template_name: Option<String>,
+    pub contract_version: Option<String>,
+
+    // Envelope encryption fields
+    pub encrypted_dek: Option<String>,
+    pub iv: Option<String>,
+    pub content_hash: Option<String>,
+    pub key_id: Option<String>,
 }
 
 impl MoleculeEncryptionMetadataRecord {
     pub fn new(metadata: MoleculeEncryptionMetadata) -> Self {
         Self {
             version: 0,
-            data_to_encrypt_hash: metadata.data_to_encrypt_hash,
-            access_control_conditions: metadata.access_control_conditions,
             encrypted_by: metadata.encrypted_by,
             encrypted_at: metadata.encrypted_at,
+            access_control_conditions: metadata.access_control_conditions,
+            encryption_system: metadata.encryption_system,
+            data_to_encrypt_hash: metadata.data_to_encrypt_hash,
             chain: metadata.chain,
             lit_sdk_version: metadata.lit_sdk_version,
             lit_network: metadata.lit_network,
             template_name: metadata.template_name,
             contract_version: metadata.contract_version,
+            encrypted_dek: metadata.encrypted_dek,
+            iv: metadata.iv,
+            content_hash: metadata.content_hash,
+            key_id: metadata.key_id,
         }
     }
 
     pub fn as_entity(&self) -> MoleculeEncryptionMetadata {
         MoleculeEncryptionMetadata {
-            data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
-            access_control_conditions: self.access_control_conditions.clone(),
             encrypted_by: self.encrypted_by.clone(),
             encrypted_at: self.encrypted_at.clone(),
+            access_control_conditions: self.access_control_conditions.clone(),
+            encryption_system: self.encryption_system.clone(),
+            data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
             chain: self.chain.clone(),
             lit_sdk_version: self.lit_sdk_version.clone(),
             lit_network: self.lit_network.clone(),
             template_name: self.template_name.clone(),
             contract_version: self.contract_version.clone(),
+            encrypted_dek: self.encrypted_dek.clone(),
+            iv: self.iv.clone(),
+            content_hash: self.content_hash.clone(),
+            key_id: self.key_id.clone(),
         }
     }
 }
@@ -89,15 +119,26 @@ mod encryption_metadata_record_serde {
     #[serde(rename_all = "camelCase")]
     struct Helper {
         version: u32,
-        data_to_encrypt_hash: String,
-        access_control_conditions: String,
-        encrypted_by: String,
-        encrypted_at: String,
-        chain: String,
-        lit_sdk_version: String,
-        lit_network: String,
-        template_name: String,
-        contract_version: String,
+
+        // Common fields
+        pub encrypted_by: String,
+        pub encrypted_at: String,
+        pub access_control_conditions: String,
+        pub encryption_system: Option<String>,
+
+        // Lit-specific
+        pub data_to_encrypt_hash: Option<String>,
+        pub chain: Option<String>,
+        pub lit_sdk_version: Option<String>,
+        pub lit_network: Option<String>,
+        pub template_name: Option<String>,
+        pub contract_version: Option<String>,
+
+        // Envelope encryption fields
+        pub encrypted_dek: Option<String>,
+        pub iv: Option<String>,
+        pub content_hash: Option<String>,
+        pub key_id: Option<String>,
     }
 
     impl serde::Serialize for MoleculeEncryptionMetadataRecord {
@@ -107,15 +148,20 @@ mod encryption_metadata_record_serde {
         {
             let helper = Helper {
                 version: self.version,
-                data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
-                access_control_conditions: self.access_control_conditions.clone(),
                 encrypted_by: self.encrypted_by.clone(),
                 encrypted_at: self.encrypted_at.clone(),
+                access_control_conditions: self.access_control_conditions.clone(),
+                encryption_system: self.encryption_system.clone(),
+                data_to_encrypt_hash: self.data_to_encrypt_hash.clone(),
                 chain: self.chain.clone(),
                 lit_sdk_version: self.lit_sdk_version.clone(),
                 lit_network: self.lit_network.clone(),
                 template_name: self.template_name.clone(),
                 contract_version: self.contract_version.clone(),
+                encrypted_dek: self.encrypted_dek.clone(),
+                iv: self.iv.clone(),
+                content_hash: self.content_hash.clone(),
+                key_id: self.key_id.clone(),
             };
 
             let json_value_as_json_string =
@@ -136,15 +182,20 @@ mod encryption_metadata_record_serde {
 
             Ok(Self {
                 version: helper.version,
-                data_to_encrypt_hash: helper.data_to_encrypt_hash,
-                access_control_conditions: helper.access_control_conditions,
                 encrypted_by: helper.encrypted_by,
                 encrypted_at: helper.encrypted_at,
+                access_control_conditions: helper.access_control_conditions,
+                encryption_system: helper.encryption_system,
+                data_to_encrypt_hash: helper.data_to_encrypt_hash,
                 chain: helper.chain,
                 lit_sdk_version: helper.lit_sdk_version,
                 lit_network: helper.lit_network,
                 template_name: helper.template_name,
                 contract_version: helper.contract_version,
+                encrypted_dek: helper.encrypted_dek,
+                iv: helper.iv,
+                content_hash: helper.content_hash,
+                key_id: helper.key_id,
             })
         }
     }

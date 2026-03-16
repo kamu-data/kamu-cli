@@ -465,6 +465,10 @@ test_gql_custom_molecule!(test_molecule_v2_data_room_as_of_block_hash);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+test_gql_custom_molecule!(test_molecule_v2_alternative_encryption_metadata);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_gql_custom_molecule!(test_molecule_v2_announcements_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4014,7 +4018,7 @@ async fn test_molecule_v2_data_room_operations(
             "categories": ["test-category-1", "test-category-2"],
             "content_text": "bye bye bye",
             "description": "Plain text file that was updated... again",
-            "encryption_metadata": "{\"version\":0,\"dataToEncryptHash\":\"EM1\",\"accessControlConditions\":\"EM2\",\"encryptedBy\":\"EM3\",\"encryptedAt\":\"EM4\",\"chain\":\"EM5\",\"litSdkVersion\":\"EM6\",\"litNetwork\":\"EM7\",\"templateName\":\"EM8\",\"contractVersion\":\"EM9\"}",
+            "encryption_metadata": "{\"version\":0,\"encryptedBy\":\"EM3\",\"encryptedAt\":\"EM4\",\"accessControlConditions\":\"EM2\",\"encryptionSystem\":null,\"dataToEncryptHash\":\"EM1\",\"chain\":\"EM5\",\"litSdkVersion\":\"EM6\",\"litNetwork\":\"EM7\",\"templateName\":\"EM8\",\"contractVersion\":\"EM9\",\"encryptedDek\":null,\"iv\":null,\"contentHash\":null,\"keyId\":null}",
             "molecule_access_level": "holders",
             "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
             "tags": ["test-tag1", "test-tag2", "test-tag3"],
@@ -4426,6 +4430,194 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
                                 }
                             }
                         }]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_v2_alternative_encryption_metadata(
+    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+) {
+    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+
+    let harness = GraphQLMoleculeV2Harness::builder()
+        .search_variant(search_variant)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create project (projects dataset is auto-created)
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": ipnft_uid,
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": "9",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        json!(true),
+    );
+
+    const UPLOAD_FILE: &str = indoc!(
+        r#"
+        mutation (
+            $ipnftUid: String!,
+            $path: CollectionPathV2!,
+            $content: Base64Usnp!,
+            $contentType: String!,
+            $changeBy: String!,
+            $accessLevel: String!,
+            $description: String!,
+            $categories: [String!]!,
+            $tags: [String!]!,
+            $contentText: String!,
+            $encryptionMetadata: MoleculeEncryptionMetadataInput!,
+        ) {
+          molecule {
+            v2 {
+              project(ipnftUid: $ipnftUid) {
+                dataRoom {
+                  uploadFile(
+                    path: $path
+                    content: $content
+                    contentType: $contentType
+                    changeBy: $changeBy
+                    accessLevel: $accessLevel
+                    description: $description
+                    categories: $categories
+                    tags: $tags
+                    contentText: $contentText
+                    encryptionMetadata: $encryptionMetadata
+                  ) {
+                    __typename
+                    isSuccess
+                    message
+                    ... on MoleculeDataRoomFinishUploadFileResultSuccess {
+                      entry {
+                        project {
+                          account {
+                            accountName
+                          }
+                        }
+                        path
+                        ref
+                        asVersionedFile {
+                          latest {
+                            version
+                            contentHash
+                            contentType
+                            contentText
+                            changeBy
+                            accessLevel
+                            description
+                            categories
+                            tags
+                            encryptionMetadata {
+                              encryptedBy
+                              encryptedAt
+                              accessControlConditions
+                              encryptionSystem
+                              encryptedDek
+                              iv
+                              contentHash
+                              keyId
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    let res = GraphQLQueryRequest::new(
+        UPLOAD_FILE,
+        async_graphql::Variables::from_value(value!({
+            "ipnftUid": ipnft_uid,
+            "path": "/foo.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            "contentType": "text/plain",
+            "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            "accessLevel": "public",
+            "description": "Plain text file",
+            "categories": ["test-category-1"],
+            "tags": ["test-tag1"],
+            "contentText": "hello",
+            "encryptionMetadata": {
+                "encryptedBy": "encryptedBy-val",
+                "encryptedAt": "encryptedAt-val",
+                "accessControlConditions": "accessControlConditions-val",
+                "encryptionSystem": "encryptionSystem-val",
+                "encryptedDek": "encryptedDek-val",
+                "iv": "iv-val",
+                "contentHash": "contentHash-val",
+                "keyId": "keyId-val",
+            },
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await;
+
+    let res_data = res.data.into_json().unwrap();
+    pretty_assertions::assert_eq!(
+        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        json!(true),
+    );
+    let file_1_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+        ["ref"]
+        .as_str()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        json!({
+            "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
+            "isSuccess": true,
+            "message": "",
+            "entry": {
+                "project": {
+                    "account": {
+                        "accountName": "molecule.vitafast",
+                    }
+                },
+                "path": "/foo.txt",
+                "ref": file_1_did,
+                "asVersionedFile": {
+                    "latest": {
+                        "version": 1,
+                        "contentHash": "f16203338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392",
+                        "contentType": "text/plain",
+                        "contentText": "hello",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                        "accessLevel": "public",
+                        "description": "Plain text file",
+                        "encryptionMetadata": {
+                            "encryptedBy": "encryptedBy-val",
+                            "encryptedAt": "encryptedAt-val",
+                            "accessControlConditions": "accessControlConditions-val",
+                            "encryptionSystem": "encryptionSystem-val",
+                            "encryptedDek": "encryptedDek-val",
+                            "iv": "iv-val",
+                            "contentHash": "contentHash-val",
+                            "keyId": "keyId-val",
+                        },
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1"],
                     }
                 }
             }
