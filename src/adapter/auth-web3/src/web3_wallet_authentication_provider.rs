@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use email_utils::Email;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountProvider,
     AccountType,
@@ -178,15 +179,29 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
         let did_pkh = self.handle_login(&request).await?;
         let wallet_address = did_pkh.wallet_address().to_string();
 
+        // Guarantee of uniqueness for the same wallet address, which can be used across
+        // different networks.
+        let unique_wallet_address_based_ident = {
+            let chain_type = &did_pkh.chain_id().namespace;
+            let chain_id = &did_pkh.chain_id().reference;
+            // Example (eth mainnet): did.pkh.eip155.1
+            format!("did.pkh.{chain_type}.{chain_id}.{wallet_address}")
+        };
+
+        let account_name =
+            odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
+        let email =
+            Email::parse(&format!("{unique_wallet_address_based_ident}@example.com")).int_err()?;
+
         Ok(ProviderLoginResponse {
             account_id: did_pkh.into(),
-            account_name: odf::AccountName::new_unchecked(&wallet_address),
+            account_name,
             // TODO: Wallet-based auth: replace with none
-            email: Email::parse(&format!("{wallet_address}@example.com")).unwrap(),
-            display_name: wallet_address.clone(),
+            email,
+            display_name: wallet_address,
             account_type: AccountType::User,
             avatar_url: None,
-            provider_identity_key: wallet_address,
+            provider_identity_key: unique_wallet_address_based_ident,
         })
     }
 }
