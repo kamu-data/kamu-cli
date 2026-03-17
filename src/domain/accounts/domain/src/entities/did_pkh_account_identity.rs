@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use email_utils::Email;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::AccountDisplayName;
 
@@ -24,7 +27,7 @@ impl DidPkhAccountIdentity {
     /// Derives account identity fields from a did:pkh:ABC.. .
     /// Guarantees uniqueness for the same wallet address across different
     /// networks by incorporating chain type and chain ID.
-    pub fn from_did_pkh(did_pkh: &odf::metadata::DidPkh) -> Self {
+    pub fn from_did_pkh(did_pkh: &odf::metadata::DidPkh) -> Result<Self, InternalError> {
         let wallet_address = did_pkh.wallet_address().to_string();
 
         let unique_wallet_address_based_ident = {
@@ -34,16 +37,17 @@ impl DidPkhAccountIdentity {
             format!("did.pkh.{chain_type}.{chain_id}.{wallet_address}")
         };
 
-        let account_name = odf::AccountName::new_unchecked(&unique_wallet_address_based_ident);
+        let account_name =
+            odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
         let email =
-            Email::parse(&format!("{unique_wallet_address_based_ident}@example.com")).unwrap();
+            Email::parse(&format!("{unique_wallet_address_based_ident}@example.com")).int_err()?;
 
-        Self {
+        Ok(Self {
             provider_identity_key: unique_wallet_address_based_ident,
             account_name,
             email,
             display_name: wallet_address,
-        }
+        })
     }
 }
 

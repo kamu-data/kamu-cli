@@ -112,7 +112,7 @@ async fn test_create_wallet_accounts() {
     let mut mock_outbox = MockOutbox::new();
 
     for did_pkh in &did_pkhs {
-        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh);
+        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh).unwrap();
         expect_outbox_account_created_once(&mut mock_outbox, identity.display_name, identity.email);
     }
 

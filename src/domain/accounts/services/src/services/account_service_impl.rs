@@ -180,7 +180,7 @@ impl AccountService for AccountServiceImpl {
     }
 
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError> {
-        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh);
+        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh)?;
         let new_account = Account {
             id: did_pkh.clone().into(),
             account_name: identity.account_name,

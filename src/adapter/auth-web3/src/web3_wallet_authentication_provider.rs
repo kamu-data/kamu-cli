@@ -176,7 +176,7 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
             .map_err(ProviderLoginError::invalid_credentials)?;
 
         let did_pkh = self.handle_login(&request).await?;
-        let identity = DidPkhAccountIdentity::from_did_pkh(&did_pkh);
+        let identity = DidPkhAccountIdentity::from_did_pkh(&did_pkh)?;
 
         Ok(ProviderLoginResponse {
             account_id: did_pkh.into(),
