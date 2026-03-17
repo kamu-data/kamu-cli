@@ -597,6 +597,15 @@ pub fn configure_base_catalog(
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
+    kamu_molecule_services::register_dependencies(
+        &mut b,
+        kamu_molecule_services::MoleculeDomainDependenciesOptions {
+            incremental_search_indexing,
+        },
+    );
+
+    b.add_value(kamu_molecule_services::domain::MoleculeConfig::default());
+
     explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<AccountLifecycleMessage>(
@@ -696,6 +705,8 @@ pub fn configure_server_catalog(
     }
 
     b.add::<UploadServiceLocal>();
+
+    b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,

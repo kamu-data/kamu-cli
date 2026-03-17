@@ -1,0 +1,109 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: data-room-activity
+  kind: Root
+  metadata:
+  - kind: SetDataSchema
+    schema:
+      fields:
+      - name: offset
+        type:
+          kind: Int64
+      - name: op
+        type:
+          kind: Int32
+      - name: system_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: event_time
+        type:
+          kind: Timestamp
+          unit: Millisecond
+          timezone: UTC
+      - name: activity_type
+        type:
+          kind: String
+      - name: ipnft_uid
+        type:
+          kind: String
+      - name: path
+        type:
+          kind: String
+      - name: ref
+        type:
+          kind: String
+      - name: version
+        type:
+          kind: UInt32
+      - name: molecule_change_by
+        type:
+          kind: String
+      - name: molecule_access_level
+        type:
+          kind: String
+      - name: content_type
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: content_length
+        type:
+          kind: UInt64
+      - name: content_hash
+        type:
+          kind: String
+      - name: description
+        type:
+          kind: Option
+          inner:
+            kind: String
+      - name: categories
+        type:
+          kind: List
+          itemType:
+            kind: String
+      - name: tags
+        type:
+          kind: List
+          itemType:
+            kind: String
+  - kind: AddPushSource
+    sourceName: default
+    read:
+      kind: NdJson
+      schema:
+      - event_time TIMESTAMP
+      - activity_type STRING NOT NULL
+      - ipnft_uid STRING NOT NULL
+      - path STRING NOT NULL
+      - ref STRING NOT NULL
+      - version INT UNSIGNED NOT NULL
+      - molecule_change_by STRING NOT NULL
+      - molecule_access_level STRING NOT NULL
+      - content_type STRING
+      - content_length BIGINT UNSIGNED NOT NULL
+      - content_hash STRING NOT NULL
+      - description STRING
+      - categories Array<STRING> NOT NULL
+      - tags Array<STRING> NOT NULL
+    merge:
+      kind: Append
+  - kind: SetInfo
+    description: Data room activity
+    keywords:
+    - DeSci
+    - BioTech
+    - Funding
+    - Crypto
+  - kind: SetAttachments
+    attachments:
+      kind: Embedded
+      items:
+      - path: README.md
+        content: |
+          # Data room activity
+
+          Dataset containing activity across all project data rooms in single feed.

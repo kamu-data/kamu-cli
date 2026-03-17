@@ -9,12 +9,12 @@
 
 use std::sync::Arc;
 
-use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountProvider,
     AccountType,
     AuthenticationProvider,
+    DidPkhAccountIdentity,
     ProviderLoginError,
     ProviderLoginResponse,
 };
@@ -176,17 +176,17 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
             .map_err(ProviderLoginError::invalid_credentials)?;
 
         let did_pkh = self.handle_login(&request).await?;
-        let wallet_address = did_pkh.wallet_address().to_string();
+        let identity = DidPkhAccountIdentity::from_did_pkh(&did_pkh)?;
 
         Ok(ProviderLoginResponse {
             account_id: did_pkh.into(),
-            account_name: odf::AccountName::new_unchecked(&wallet_address),
+            account_name: identity.account_name,
             // TODO: Wallet-based auth: replace with none
-            email: Email::parse(&format!("{wallet_address}@example.com")).unwrap(),
-            display_name: wallet_address.clone(),
+            email: identity.email,
+            display_name: identity.display_name,
             account_type: AccountType::User,
             avatar_url: None,
-            provider_identity_key: wallet_address,
+            provider_identity_key: identity.provider_identity_key,
         })
     }
 }

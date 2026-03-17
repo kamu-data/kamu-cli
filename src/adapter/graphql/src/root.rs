@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::extensions::*;
+use crate::molecule::Molecule;
+use crate::mutations::molecule_mut::MoleculeMut;
 use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;
@@ -73,6 +75,11 @@ impl Query {
     async fn admin(&self) -> Admin {
         Admin
     }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> Molecule {
+        Molecule
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +109,11 @@ impl Mutation {
     /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
+    }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> MoleculeMut {
+        MoleculeMut
     }
 
     /// Collaboration-related functionality group
