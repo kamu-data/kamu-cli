@@ -7,15 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
 use std::sync::Arc;
 
-use email_utils::Email;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountProvider,
     AccountType,
     AuthenticationProvider,
+    DidPkhAccountIdentity,
     ProviderLoginError,
     ProviderLoginResponse,
 };
@@ -177,31 +176,17 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
             .map_err(ProviderLoginError::invalid_credentials)?;
 
         let did_pkh = self.handle_login(&request).await?;
-        let wallet_address = did_pkh.wallet_address().to_string();
-
-        // Guarantee of uniqueness for the same wallet address, which can be used across
-        // different networks.
-        let unique_wallet_address_based_ident = {
-            let chain_type = &did_pkh.chain_id().namespace;
-            let chain_id = &did_pkh.chain_id().reference;
-            // Example (eth mainnet): did.pkh.eip155.1
-            format!("did.pkh.{chain_type}.{chain_id}.{wallet_address}")
-        };
-
-        let account_name =
-            odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
-        let email =
-            Email::parse(&format!("{unique_wallet_address_based_ident}@example.com")).int_err()?;
+        let identity = DidPkhAccountIdentity::from_did_pkh(&did_pkh)?;
 
         Ok(ProviderLoginResponse {
             account_id: did_pkh.into(),
-            account_name,
+            account_name: identity.account_name,
             // TODO: Wallet-based auth: replace with none
-            email,
-            display_name: wallet_address,
+            email: identity.email,
+            display_name: identity.display_name,
             account_type: AccountType::User,
             avatar_url: None,
-            provider_identity_key: unique_wallet_address_based_ident,
+            provider_identity_key: identity.provider_identity_key,
         })
     }
 }
