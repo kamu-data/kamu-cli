@@ -16,6 +16,7 @@ use crate::AccountDisplayName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct DidPkhAccountIdentity {
     pub provider_identity_key: String,
     pub account_name: odf::AccountName,
@@ -48,6 +49,44 @@ impl DidPkhAccountIdentity {
             email,
             display_name: wallet_address,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use email_utils::Email;
+
+    use crate::DidPkhAccountIdentity;
+
+    #[test]
+    fn test_from_did_pkh() {
+        let did_pkh = odf::metadata::DidPkh::from_did_str(
+            "did:pkh:eip155:1:0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb",
+        )
+        .unwrap();
+
+        let actual = DidPkhAccountIdentity::from_did_pkh(&did_pkh).unwrap();
+        let expected = DidPkhAccountIdentity {
+            provider_identity_key: "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb"
+                .to_string(),
+            account_name: odf::AccountName::from_str(
+                "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb",
+            )
+            .unwrap(),
+            email: Email::parse(
+                "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb@example.com",
+            )
+            .unwrap(),
+            display_name: "0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb".to_string(),
+        };
+
+        assert_eq!(expected, actual);
     }
 }
 
