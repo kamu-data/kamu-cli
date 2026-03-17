@@ -477,17 +477,17 @@ async fn test_create_wallet_accounts() {
                 "message": "Wallet accounts created",
                 "accounts": [
                     {
-                        "accountName": "0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
+                        "accountName": "did.pkh.eip155.1.0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
                         "displayName": "0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
                         "accountProvider": "WEB3_WALLET",
                     },
                     {
-                        "accountName": "0xbf9a00755BB7d2E904b5F569095220c54E742E07",
+                        "accountName": "did.pkh.eip155.1.0xbf9a00755BB7d2E904b5F569095220c54E742E07",
                         "displayName": "0xbf9a00755BB7d2E904b5F569095220c54E742E07",
                         "accountProvider": "WEB3_WALLET",
                     },
                     {
-                        "accountName": "0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
+                        "accountName": "did.pkh.eip155.1.0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
                         "displayName": "0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
                         "accountProvider": "WEB3_WALLET",
                     },
