@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use internal_error::InternalError;
 use serde::{Deserialize, Serialize};
@@ -91,23 +91,23 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UpsertEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError>;
 
     async fn set_account_dataset_relations(
         &self,
         operations: &[SetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), UpsertEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError>;
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError>;
 
     async fn unset_account_dataset_relations(
         &self,
         operations: &[UnsetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), DeleteEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -242,6 +242,31 @@ pub struct AuthorizedAccount {
 pub struct AuthorizedDataset {
     pub dataset_id: odf::DatasetID,
     pub role: AccountToDatasetRelation,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AccountDatasetRelationsMutationResult {
+    pub changed_dataset_ids: HashSet<odf::DatasetID>,
+}
+
+impl AccountDatasetRelationsMutationResult {
+    pub fn from_dataset_id(dataset_id: odf::DatasetID) -> Self {
+        Self {
+            changed_dataset_ids: HashSet::from([dataset_id]),
+        }
+    }
+
+    pub fn new(changed_dataset_ids: HashSet<odf::DatasetID>) -> Self {
+        Self {
+            changed_dataset_ids,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.changed_dataset_ids.is_empty()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

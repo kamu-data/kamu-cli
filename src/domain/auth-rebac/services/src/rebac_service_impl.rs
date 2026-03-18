@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::*;
 use tokio::sync::RwLock;
 
@@ -50,6 +50,46 @@ impl RebacServiceImpl {
             default_account_properties,
             default_dataset_properties,
         }
+    }
+
+    async fn get_current_account_dataset_relations(
+        &self,
+        dataset_ids: &HashSet<odf::DatasetID>,
+    ) -> Result<CurrentAccountDatasetRelations, InternalError> {
+        if dataset_ids.is_empty() {
+            return Ok(CurrentAccountDatasetRelations::default());
+        }
+
+        let dataset_entities = dataset_ids
+            .iter()
+            .map(|id| Entity::new_dataset(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entities_with_relations = self
+            .rebac_repo
+            .get_object_entities_relations(&dataset_entities)
+            .await
+            .int_err()?;
+
+        let mut current_relations = CurrentAccountDatasetRelations::default();
+
+        for EntitiesWithRelation {
+            subject_entity,
+            relation,
+            object_entity,
+        } in entities_with_relations
+        {
+            let account_id = odf::AccountID::from_did_str(&subject_entity.entity_id).int_err()?;
+            let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(relation) => {
+                    current_relations.insert(dataset_id, account_id, relation);
+                }
+            }
+        }
+
+        Ok(current_relations)
     }
 }
 
@@ -279,7 +319,7 @@ impl RebacService for RebacServiceImpl {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UpsertEntitiesRelationsError> {
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError> {
         use odf::metadata::AsStackString;
 
         let account_id_stack = account_id.as_stack_string();
@@ -287,6 +327,16 @@ impl RebacService for RebacServiceImpl {
 
         let dataset_id_stack = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id_stack.as_str());
+
+        let existing_relation = self
+            .rebac_repo
+            .try_get_relation_between_entities(&account_entity, &dataset_entity)
+            .await
+            .int_err()?;
+
+        if existing_relation == Some(Relation::AccountToDataset(relationship)) {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .upsert_entities_relations(&[UpsertEntitiesRelationOperation {
@@ -297,82 +347,143 @@ impl RebacService for RebacServiceImpl {
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::from_dataset_id(
+            dataset_id.clone(),
+        ))
     }
 
     async fn set_account_dataset_relations(
         &self,
         operations: &[SetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), UpsertEntitiesRelationsError> {
-        let upsert_operations = operations
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError> {
+        let dataset_ids = operations
             .iter()
-            .map(|op| {
-                let account_entity = Entity::new_account(op.account_id.to_string());
-                let dataset_entity = Entity::new_dataset(op.dataset_id.to_string());
+            .map(|op| op.dataset_id.as_ref().clone())
+            .collect::<HashSet<_>>();
 
-                UpsertEntitiesRelationOperation {
-                    subject_entity: Cow::Owned(account_entity),
-                    relationship: Relation::AccountToDataset(op.relationship),
-                    object_entity: Cow::Owned(dataset_entity),
-                }
-            })
-            .collect::<Vec<_>>();
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
+            .await
+            .int_err()?;
+
+        let mut upsert_operations = Vec::new();
+        let mut changed_dataset_ids = HashSet::new();
+
+        for op in operations {
+            let account_entity = Entity::new_account(op.account_id.to_string());
+            let dataset_entity = Entity::new_dataset(op.dataset_id.to_string());
+            let relation = Relation::AccountToDataset(op.relationship);
+
+            if current_relations.matches(
+                op.dataset_id.as_ref(),
+                op.account_id.as_ref(),
+                op.relationship,
+            ) {
+                continue;
+            }
+
+            upsert_operations.push(UpsertEntitiesRelationOperation {
+                subject_entity: Cow::Owned(account_entity),
+                relationship: relation,
+                object_entity: Cow::Owned(dataset_entity),
+            });
+            changed_dataset_ids.insert(op.dataset_id.as_ref().clone());
+        }
+
+        if upsert_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .upsert_entities_relations(&upsert_operations)
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::new(
+            changed_dataset_ids,
+        ))
     }
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteEntitiesRelationsError> {
-        let account_entities = account_ids
-            .iter()
-            .map(|id| Entity::new_account(id.to_string()))
-            .collect::<Vec<_>>();
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError> {
+        let dataset_ids = HashSet::from([dataset_id.clone()]);
 
-        let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
-
-        let operations = account_entities
-            .iter()
-            .map(|account_entity| DeleteEntitiesRelationOperation {
-                subject_entity: Cow::Borrowed(account_entity),
-                object_entity: Cow::Borrowed(&dataset_entity),
-            })
-            .collect::<Vec<_>>();
-
-        self.rebac_repo
-            .delete_entities_relations(&operations)
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
             .await
             .int_err()?;
 
-        Ok(())
-    }
+        let mut delete_operations = Vec::new();
 
-    async fn unset_account_dataset_relations(
-        &self,
-        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), DeleteEntitiesRelationsError> {
-        let delete_operations = operations
-            .iter()
-            .map(|op| DeleteEntitiesRelationOperation {
-                subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
-                object_entity: Cow::Owned(Entity::new_dataset(op.dataset_id.to_string())),
-            })
-            .collect::<Vec<_>>();
+        for account_id in account_ids {
+            if !current_relations.contains(dataset_id, account_id) {
+                continue;
+            }
+
+            delete_operations.push(DeleteEntitiesRelationOperation {
+                subject_entity: Cow::Owned(Entity::new_account((*account_id).to_string())),
+                object_entity: Cow::Owned(Entity::new_dataset(dataset_id.to_string())),
+            });
+        }
+
+        if delete_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .delete_entities_relations(&delete_operations)
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::from_dataset_id(
+            dataset_id.clone(),
+        ))
+    }
+
+    async fn unset_account_dataset_relations(
+        &self,
+        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError> {
+        let dataset_ids = operations
+            .iter()
+            .map(|op| op.dataset_id.as_ref().clone())
+            .collect::<HashSet<_>>();
+
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
+            .await
+            .int_err()?;
+
+        let mut delete_operations = Vec::new();
+        let mut changed_dataset_ids = HashSet::new();
+
+        for op in operations {
+            if !current_relations.contains(op.dataset_id.as_ref(), op.account_id.as_ref()) {
+                continue;
+            }
+
+            delete_operations.push(DeleteEntitiesRelationOperation {
+                subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
+                object_entity: Cow::Owned(Entity::new_dataset(op.dataset_id.to_string())),
+            });
+            changed_dataset_ids.insert(op.dataset_id.as_ref().clone());
+        }
+
+        if delete_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
+
+        self.rebac_repo
+            .delete_entities_relations(&delete_operations)
+            .await
+            .int_err()?;
+
+        Ok(AccountDatasetRelationsMutationResult::new(
+            changed_dataset_ids,
+        ))
     }
 
     async fn get_account_dataset_relations(
@@ -507,10 +618,6 @@ impl RebacService for RebacServiceImpl {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 fn map_delete_entity_property_result(
     res: Result<(), DeleteEntityPropertyError>,
 ) -> Result<(), UnsetEntityPropertyError> {
@@ -520,6 +627,46 @@ fn map_delete_entity_property_result(
             DeleteEntityPropertyError::NotFound(_) => Ok(()),
             e @ DeleteEntityPropertyError::Internal(_) => Err(e.int_err().into()),
         },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct CurrentAccountDatasetRelations {
+    relations: HashMap<odf::DatasetID, HashMap<odf::AccountID, AccountToDatasetRelation>>,
+}
+
+impl CurrentAccountDatasetRelations {
+    fn insert(
+        &mut self,
+        dataset_id: odf::DatasetID,
+        account_id: odf::AccountID,
+        relation: AccountToDatasetRelation,
+    ) {
+        self.relations
+            .entry(dataset_id)
+            .or_default()
+            .insert(account_id, relation);
+    }
+
+    fn contains(&self, dataset_id: &odf::DatasetID, account_id: &odf::AccountID) -> bool {
+        self.relations
+            .get(dataset_id)
+            .and_then(|dataset_relations| dataset_relations.get(account_id))
+            .is_some()
+    }
+
+    fn matches(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+        relation: AccountToDatasetRelation,
+    ) -> bool {
+        self.relations
+            .get(dataset_id)
+            .and_then(|dataset_relations| dataset_relations.get(account_id))
+            == Some(&relation)
     }
 }
 
