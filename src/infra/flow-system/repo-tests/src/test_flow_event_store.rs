@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chrono::{Duration, SubsecRound, Utc};
+use chrono::{DateTime, Duration, SubsecRound, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
@@ -2176,6 +2176,7 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
         .get_all_flow_ids_matching_scope_query(
             flow_scope_query,
             &FlowFilters::default(),
+            &FlowOrder::default(),
             PaginationOpts {
                 offset: 0,
                 limit: 100,
@@ -2299,6 +2300,65 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_flow_order_by_scheduled_activation(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+
+    let activation_cause = FlowActivationCause::Manual(FlowActivationCauseManual {
+        activation_time: Utc::now(),
+        initiator_account_id: odf::AccountID::new_seeded_ed25519(b"petya"),
+    });
+
+    let flow_id_latest = flow_generator
+        .make_waiting_flow_scheduled_for(
+            FLOW_TYPE_DATASET_INGEST,
+            activation_cause.clone(),
+            Utc::now() + Duration::minutes(30),
+        )
+        .await;
+    let flow_id_earliest = flow_generator
+        .make_waiting_flow_scheduled_for(
+            FLOW_TYPE_DATASET_INGEST,
+            activation_cause.clone(),
+            Utc::now() + Duration::minutes(10),
+        )
+        .await;
+    let flow_id_middle = flow_generator
+        .make_waiting_flow_scheduled_for(
+            FLOW_TYPE_DATASET_COMPACT,
+            activation_cause,
+            Utc::now() + Duration::minutes(20),
+        )
+        .await;
+
+    let flow_scope_query = FlowScopeDataset::query_for_single_dataset(&dataset_id);
+    let flow_ids: Vec<_> = flow_event_store
+        .get_all_flow_ids_matching_scope_query(
+            flow_scope_query,
+            &FlowFilters {
+                by_flow_statuses: Some(vec![FlowStatus::Waiting]),
+                ..Default::default()
+            },
+            &FlowOrder::scheduled_activation(),
+            PaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+        )
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        flow_ids,
+        vec![flow_id_earliest, flow_id_middle, flow_id_latest]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2458,7 +2518,12 @@ async fn assert_dataset_flow_expectations(
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
+        .get_all_flow_ids_matching_scope_query(
+            flow_scope_query,
+            &filters,
+            &FlowOrder::default(),
+            pagination,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -2476,7 +2541,12 @@ async fn assert_multiple_dataset_flow_expectations(
     let flow_scope_query = FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
+        .get_all_flow_ids_matching_scope_query(
+            flow_scope_query,
+            &filters,
+            &FlowOrder::default(),
+            pagination,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -2499,7 +2569,12 @@ async fn assert_system_flow_expectations(
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
+        .get_all_flow_ids_matching_scope_query(
+            flow_scope_query,
+            &filters,
+            &FlowOrder::default(),
+            pagination,
+        )
         .try_collect()
         .await
         .unwrap();
@@ -2520,7 +2595,7 @@ async fn assert_all_flow_expectations(
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids(&filters, pagination)
+        .get_all_flow_ids(&filters, &FlowOrder::creation_time_desc(), pagination)
         .try_collect()
         .await
         .unwrap();
@@ -2612,6 +2687,39 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow.abort(Utc::now()).unwrap();
 
         flow.save(self.flow_event_store.as_ref()).await.unwrap();
+    }
+
+    async fn make_waiting_flow_scheduled_for(
+        &self,
+        flow_type: &str,
+        initial_activation_cause: FlowActivationCause,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> FlowID {
+        let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
+
+        let mut flow = Flow::new(
+            Utc::now(),
+            flow_id,
+            FlowBinding::new(flow_type, FlowScopeDataset::make_scope(self.dataset_id)),
+            initial_activation_cause,
+            None,
+            None,
+        );
+
+        flow.set_relevant_start_condition(
+            scheduled_for_activation_at,
+            FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                wake_up_at: scheduled_for_activation_at,
+            }),
+        )
+        .unwrap();
+
+        flow.schedule_for_activation(scheduled_for_activation_at, scheduled_for_activation_at)
+            .unwrap();
+
+        flow.save(self.flow_event_store.as_ref()).await.unwrap();
+
+        flow_id
     }
 }
 

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -223,6 +225,99 @@ impl InMemoryFlowEventStore {
             }
         }
     }
+
+    fn latest_event_times(events: &[FlowEvent]) -> HashMap<FlowID, DateTime<Utc>> {
+        let mut latest_event_times = HashMap::new();
+
+        for event in events {
+            match latest_event_times.entry(event.flow_id()) {
+                Entry::Occupied(mut entry) => {
+                    if event.event_time() > *entry.get() {
+                        entry.insert(event.event_time());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(event.event_time());
+                }
+            }
+        }
+
+        latest_event_times
+    }
+
+    fn flow_status_order(status: FlowStatus) -> u8 {
+        match status {
+            FlowStatus::Waiting => 0,
+            FlowStatus::Running => 1,
+            FlowStatus::Retrying => 2,
+            FlowStatus::Finished => 3,
+        }
+    }
+
+    fn compare_optional<T: Ord>(
+        lhs: Option<T>,
+        rhs: Option<T>,
+        direction: FlowOrderDirection,
+    ) -> Ordering {
+        match (lhs, rhs) {
+            (Some(lhs), Some(rhs)) => match direction {
+                FlowOrderDirection::Asc => lhs.cmp(&rhs),
+                FlowOrderDirection::Desc => rhs.cmp(&lhs),
+            },
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
+        }
+    }
+
+    fn compare_ordered_flow_ids(
+        lhs: FlowID,
+        rhs: FlowID,
+        lhs_index: &FlowIndexEntry,
+        rhs_index: &FlowIndexEntry,
+        latest_event_times: &HashMap<FlowID, DateTime<Utc>>,
+        state: &State,
+        order: &FlowOrder,
+    ) -> Ordering {
+        for rule in &order.rules {
+            let ordering = match rule.field {
+                FlowOrderField::Status => {
+                    let lhs = Self::flow_status_order(lhs_index.flow_status);
+                    let rhs = Self::flow_status_order(rhs_index.flow_status);
+                    match rule.direction {
+                        FlowOrderDirection::Asc => lhs.cmp(&rhs),
+                        FlowOrderDirection::Desc => rhs.cmp(&lhs),
+                    }
+                }
+                FlowOrderField::LastEventTime => Self::compare_optional(
+                    latest_event_times.get(&lhs).copied(),
+                    latest_event_times.get(&rhs).copied(),
+                    rule.direction,
+                ),
+                FlowOrderField::ScheduledForActivationAt => Self::compare_optional(
+                    state
+                        .scheduled_for_activation_time_by_flow_id
+                        .get(&lhs)
+                        .copied(),
+                    state
+                        .scheduled_for_activation_time_by_flow_id
+                        .get(&rhs)
+                        .copied(),
+                    rule.direction,
+                ),
+                FlowOrderField::FlowId => match rule.direction {
+                    FlowOrderDirection::Asc => lhs.cmp(&rhs),
+                    FlowOrderDirection::Desc => rhs.cmp(&lhs),
+                },
+            };
+
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+
+        Ordering::Equal
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -392,68 +487,43 @@ impl FlowEventStore for InMemoryFlowEventStore {
         &self,
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
 
-            // Collect FlowID -> Most recent event time, for sorting purposes
-            let recent_events: HashMap<FlowID, DateTime<Utc>> = g.events.iter().fold(
-                HashMap::new(),
-                |mut acc: HashMap<FlowID, DateTime<Utc>>, i: &FlowEvent| {
-                    let event_time = i.event_time();
-                    acc.entry(i.flow_id())
-                        .and_modify(|val| {
-                            if event_time.gt(val) {
-                                *val = event_time;
-                            }
-                        })
-                        .or_insert(event_time);
-                    acc
-                },
-            );
+            let latest_event_times = Self::latest_event_times(&g.events);
 
-            // Split events by type
-            let mut waiting_flows: Vec<_> = vec![];
-            let mut running_flows: Vec<_> = vec![];
-            let mut retrying_flows: Vec<_> = vec![];
-            let mut finished_flows: Vec<_> = vec![];
+            let mut ordered_flows: Vec<_> = g
+                .all_flows
+                .iter()
+                .copied()
+                .filter(|flow_id| {
+                    let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
+                    flow_binding.scope.matches_query(&flow_scope_query)
+                        && g.matches_flow(*flow_id, filters)
+                })
+                .collect();
 
-            for flow_id in &g.all_flows {
-                // Also also apply given filters on this stage in order to reduce amount of
-                // items to process in further steps
-                let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-                if flow_binding.scope.matches_query(&flow_scope_query)
-                    && g.matches_flow(*flow_id, filters)
-                    && let Some(flow) = g.flow_search_index.get(flow_id)
-                {
-                    let item = (flow_id, recent_events.get(flow_id));
-                    match flow.flow_status {
-                        FlowStatus::Waiting => waiting_flows.push(item),
-                        FlowStatus::Running => running_flows.push(item),
-                        FlowStatus::Retrying => retrying_flows.push(item),
-                        FlowStatus::Finished => finished_flows.push(item),
-                    }
-                }
-            }
-            // Sort every group separately
-            waiting_flows.sort_by(|a, b| b.cmp(a));
-            running_flows.sort_by(|a, b| b.cmp(a));
-            retrying_flows.sort_by(|a, b| b.cmp(a));
-            finished_flows.sort_by(|a, b| b.cmp(a));
-
-            let mut ordered_flows = vec![];
-            ordered_flows.append(&mut waiting_flows);
-            ordered_flows.append(&mut running_flows);
-            ordered_flows.append(&mut retrying_flows);
-            ordered_flows.append(&mut finished_flows);
+            ordered_flows.sort_by(|lhs, rhs| {
+                Self::compare_ordered_flow_ids(
+                    *lhs,
+                    *rhs,
+                    g.flow_search_index.get(lhs).unwrap(),
+                    g.flow_search_index.get(rhs).unwrap(),
+                    &latest_event_times,
+                    &g,
+                    order,
+                )
+            });
 
             ordered_flows
-                .iter()
+                .into_iter()
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .map(|(flow_id, _)| Ok(**flow_id))
+                .map(Ok)
                 .collect()
         };
 
@@ -499,18 +569,39 @@ impl FlowEventStore for InMemoryFlowEventStore {
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            g.all_flows
+
+            let latest_event_times = Self::latest_event_times(&g.events);
+
+            let mut flow_ids: Vec<_> = g
+                .all_flows
                 .iter()
-                .rev()
-                .filter(|flow_id| g.matches_flow(**flow_id, filters))
+                .copied()
+                .filter(|flow_id| g.matches_flow(*flow_id, filters))
+                .collect();
+
+            flow_ids.sort_by(|lhs, rhs| {
+                Self::compare_ordered_flow_ids(
+                    *lhs,
+                    *rhs,
+                    g.flow_search_index.get(lhs).unwrap(),
+                    g.flow_search_index.get(rhs).unwrap(),
+                    &latest_event_times,
+                    &g,
+                    order,
+                )
+            });
+
+            flow_ids
+                .into_iter()
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .map(|flow_id| Ok(*flow_id))
+                .map(Ok)
                 .collect()
         };
         Box::pin(futures::stream::iter(flow_ids_page))

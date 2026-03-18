@@ -294,6 +294,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_event_store::test_dataset_flow_order_by_scheduled_activation,
+    harness = PostgresFlowEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_flow_through_retry_attempts,
     harness = PostgresFlowEventStoreHarness
 );

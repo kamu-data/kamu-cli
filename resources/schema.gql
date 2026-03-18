@@ -163,7 +163,7 @@ type AccountFlowProcesses {
 }
 
 type AccountFlowRuns {
-	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters, order: FlowRunOrder): FlowConnection!
 	listDatasetsWithFlow: DatasetConnection!
 }
 
@@ -1340,7 +1340,7 @@ type DatasetFlowProcesses {
 
 type DatasetFlowRuns {
 	getFlow(flowId: FlowID!): GetFlowResult!
-	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters, order: FlowRunOrder): FlowConnection!
 	listFlowInitiators: AccountConnection!
 }
 
@@ -2680,6 +2680,19 @@ input FlowRetryPolicyInput {
 	maxAttempts: Int!
 	minDelay: TimeDeltaInput!
 	backoffType: FlowRetryBackoffType!
+}
+
+enum FlowRunOrder {
+	"""
+	Queue-oriented ordering:
+	- by status: waiting, running, retrying, finished
+	- by most recent activity
+	"""
+	QUEUE
+	"""
+	Earliest scheduled activation first.
+	"""
+	SCHEDULED_FOR_ACTIVATION
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionReactive | FlowStartConditionExecutor
