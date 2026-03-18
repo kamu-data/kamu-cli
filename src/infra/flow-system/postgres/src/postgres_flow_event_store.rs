@@ -36,6 +36,41 @@ impl PostgresFlowEventStore {
         }
     }
 
+    fn flow_order_clause(order: &FlowOrder) -> String {
+        let mut clauses = Vec::with_capacity(order.rules.len());
+
+        for rule in &order.rules {
+            match (rule.field, rule.direction) {
+                (FlowOrderField::Status, FlowOrderDirection::Asc) => {
+                    clauses.push("flow_status ASC".to_string());
+                }
+                (FlowOrderField::Status, FlowOrderDirection::Desc) => {
+                    clauses.push("flow_status DESC".to_string());
+                }
+                (FlowOrderField::LastEventTime, FlowOrderDirection::Asc) => {
+                    clauses.push("last_event_id ASC NULLS LAST".to_string());
+                }
+                (FlowOrderField::LastEventTime, FlowOrderDirection::Desc) => {
+                    clauses.push("last_event_id DESC NULLS LAST".to_string());
+                }
+                (FlowOrderField::ScheduledForActivationAt, FlowOrderDirection::Asc) => {
+                    clauses.push("scheduled_for_activation_at ASC NULLS LAST".to_string());
+                }
+                (FlowOrderField::ScheduledForActivationAt, FlowOrderDirection::Desc) => {
+                    clauses.push("scheduled_for_activation_at DESC NULLS FIRST".to_string());
+                }
+                (FlowOrderField::FlowId, FlowOrderDirection::Asc) => {
+                    clauses.push("flow_id ASC".to_string());
+                }
+                (FlowOrderField::FlowId, FlowOrderDirection::Desc) => {
+                    clauses.push("flow_id DESC".to_string());
+                }
+            }
+        }
+
+        clauses.join(", ")
+    }
+
     async fn register_flow(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Postgres>,
@@ -519,6 +554,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         &self,
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let maybe_initiators = filters
@@ -536,6 +572,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             generate_scope_query_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
 
         let scope_values = form_scope_query_condition_values(flow_scope_query);
+        let order_clause = Self::flow_order_clause(order);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -552,7 +589,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                     AND (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
                     AND (cast($2 as flow_status_type[]) IS NULL OR flow_status = ANY($2))
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
-                ORDER BY flow_status, last_event_id DESC
+                ORDER BY {order_clause}
                 LIMIT $4 OFFSET $5
                 "#,
             );
@@ -659,6 +696,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let maybe_initiators = filters
@@ -668,6 +706,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
         let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
         let maybe_by_flow_types = filters.by_flow_types.clone();
+        let order_clause = Self::flow_order_clause(order);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -676,29 +715,28 @@ impl FlowEventStore for PostgresFlowEventStore {
                 .connection_mut()
                 .await?;
 
-            let mut query_stream = sqlx::query!(
+            let query_str = format!(
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
                     (cast($1 as TEXT[]) IS NULL OR flow_type = ANY($1))
                     AND (cast($2 as flow_status_type[]) IS NULL or flow_status = ANY($2))
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
-                ORDER BY flow_id DESC
+                ORDER BY {order_clause}
                 LIMIT $4 OFFSET $5
                 "#,
-                maybe_by_flow_types.as_deref(),
-                maybe_by_flow_statuses as Option<Vec<FlowStatus>>,
-                maybe_initiators.as_deref(),
-                i64::try_from(pagination.limit).unwrap(),
-                i64::try_from(pagination.offset).unwrap(),
-            ).try_map(|event_row| {
-                let flow_id = event_row.flow_id;
-                Ok(FlowID::try_from(flow_id).unwrap())
-            })
-            .fetch(connection_mut);
+            );
+
+            let mut query_stream = sqlx::query_scalar::<_, i64>(&query_str)
+                .bind(maybe_by_flow_types as Option<Vec<String>>)
+                .bind(maybe_by_flow_statuses as Option<Vec<FlowStatus>>)
+                .bind(maybe_initiators as Option<Vec<String>>)
+                .bind(i64::try_from(pagination.limit).unwrap())
+                .bind(i64::try_from(pagination.offset).unwrap())
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
+                yield Ok(FlowID::try_from(flow_id).unwrap());
             }
         })
     }

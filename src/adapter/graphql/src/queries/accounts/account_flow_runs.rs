@@ -23,6 +23,7 @@ use crate::queries::{
     Flow,
     FlowConnection,
     FlowProcessTypeFilterInput,
+    FlowRunOrder,
     InitiatorFilterInput,
     list_accessible_datasets_with_flows,
     prepare_flows_filter_by_initiator,
@@ -54,6 +55,7 @@ impl<'a> AccountFlowRuns<'a> {
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<AccountFlowFilters>,
+        order: Option<FlowRunOrder>,
     ) -> Result<FlowConnection> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -122,6 +124,7 @@ impl<'a> AccountFlowRuns<'a> {
             .list_scoped_flows(
                 scope_query,
                 dataset_flow_filters,
+                order.map(FlowRunOrder::into_domain).unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
             )
             .await

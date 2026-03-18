@@ -12,7 +12,7 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{FlowFilters, FlowID, FlowScope, FlowScopeQuery, FlowState};
+use crate::{FlowFilters, FlowID, FlowOrder, FlowScope, FlowScopeQuery, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +22,7 @@ pub trait FlowQueryService: Sync + Send {
     /// ordered by creation time from newest to oldest
     async fn list_all_flows(
         &self,
+        order: FlowOrder,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, InternalError>;
 
@@ -32,6 +33,7 @@ pub trait FlowQueryService: Sync + Send {
         &self,
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
+        order: FlowOrder,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, InternalError>;
 

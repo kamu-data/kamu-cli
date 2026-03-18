@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Implemented flexible flow listing ordering at service level + 2 high-level ordering modes in GQL API.
+
 ## [0.260.2] - 2026-03-04
 ### Changed
 - Optimized Outbox Processing:
