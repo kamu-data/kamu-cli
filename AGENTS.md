@@ -1,0 +1,37 @@
+# AGENTS.md
+
+Small project-specific guidance for coding agents working in this repository.
+
+## Validation
+
+- Run `cargo fmt` after edits.
+- Run `make clippy` before considering the task finished.
+- Treat Clippy warnings as errors to fix, not to ignore.
+
+## Tests
+
+- Prefer `cargo nextest run` over `cargo test` for targeted test execution.
+- Prefer workspace-level incremental builds with test filters instead of narrowing by package when possible.
+- Typical pattern:
+
+```bash
+cargo nextest run -E 'test(test_name_here)'
+```
+
+## Postgres / sqlx
+
+- Do not assume Postgres is unavailable.
+- This repo relies local Dockerized Postgres instance for `sqlx` macro validation and related checks.
+- Similarly, there is a local SQLite database created for similar purposes.
+- If a sandbox blocks DB access, rerun the relevant command with the needed permissions rather than changing the workflow.
+
+## Style
+
+- Follow existing Rust style and naming in surrounding code.
+- Prefer inline formatting like `format!("value={value}")`.
+- Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
+
+## Scope
+
+- Keep new guidance here short and repo-specific.
+- Use `.github/copilot-instructions.md` as supporting context, but prefer this file for the highest-signal local workflow notes.
