@@ -198,9 +198,8 @@ fn get_all_crates() -> Vec<PathBuf> {
     let root_cargo_content = std::fs::read_to_string(repo_root.join("Cargo.toml"))
         .expect("Could not read root Cargo.toml file");
 
-    let root_cargo: toml::Value = root_cargo_content
-        .parse()
-        .expect("Failed to parse root Cargo.toml");
+    let root_cargo: toml::Value =
+        toml::from_str(&root_cargo_content).expect("Failed to parse root Cargo.toml");
 
     root_cargo["workspace"]["members"]
         .as_array()

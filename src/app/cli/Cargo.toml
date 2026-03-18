@@ -144,7 +144,7 @@ rumqttc = { optional = true, version = "0.25", default-features = false, feature
 sqlx = { version = "0.8", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
 ] }
-tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
@@ -253,7 +253,7 @@ tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
 whoami = "1.6"
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -273,10 +273,8 @@ test-log = { version = "0.2", features = ["trace"] }
 
 
 [build-dependencies]
-vergen = { version = "8", features = [
+vergen-gitcl = { version = "9.1.0", features = [
     "build",
     "cargo",
-    "git",
-    "gitcl",
     "rustc",
 ] }

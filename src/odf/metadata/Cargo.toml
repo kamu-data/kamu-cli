@@ -88,7 +88,7 @@ schemars = { optional = true, version = "1", default-features = false, features 
     "derive",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }
-ssi-caips = { optional = true, version = "0.2", default-features = false, features = [
+ssi-caips = { optional = true, version = "0.3", default-features = false, features = [
     "eip",
 ] }
 utoipa = { optional = true, version = "5", default-features = false, features = [

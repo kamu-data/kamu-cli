@@ -74,7 +74,7 @@ impl ReaderEsriShapefile {
 
             let geometry: geo_types::Geometry = shape.try_into().int_err()?;
             let geometry = geojson::Geometry {
-                value: geojson::Value::from(&geometry),
+                value: geojson::GeometryValue::from(&geometry),
                 bbox: None,
                 foreign_members: None,
             };

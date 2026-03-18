@@ -87,7 +87,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "deflate",
 ] }
 ringbuf = "0.4"
-zip = { version = "3", default-features = false, features = [
+zip = { version = "8", default-features = false, features = [
     "deflate",
     "bzip2",
     "zstd",
@@ -134,7 +134,7 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
-alloy = { optional = true, version = "1.5", default-features = false, features = [
+alloy = { optional = true, version = "1.7", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",

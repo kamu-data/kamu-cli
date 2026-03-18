@@ -43,7 +43,7 @@ dill = { version = "0.15", default-features = false }
 nutype = { version = "0.6", default-features = false, features = ["serde", "new_unchecked"] }
 rand = { version = "0.9", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }

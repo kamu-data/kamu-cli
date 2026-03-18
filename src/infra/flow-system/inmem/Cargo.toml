@@ -37,7 +37,7 @@ dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 tokio = { version = "1", default-features = false, features = [] }
 tracing = { version = "0.1", default-features = false }
 
