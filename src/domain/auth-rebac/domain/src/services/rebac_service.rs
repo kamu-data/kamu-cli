@@ -8,28 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use internal_error::InternalError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{
-    AccountPropertyName,
-    AccountToDatasetRelation,
-    DatasetPropertyName,
-    DeleteEntitiesRelationsError,
-    EntityNotFoundError,
-    EntityWithRelation,
-    GetObjectEntityRelationsError,
-    PROPERTY_VALUE_BOOLEAN_TRUE,
-    PropertiesCountError,
-    PropertyValue,
-    SetEntityPropertyError,
-    SubjectEntityRelationsError,
-    UpsertEntitiesRelationsError,
-    boolean_property_value,
-};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,13 +28,13 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError>;
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError>;
 
     async fn unset_account_property(
         &self,
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError>;
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError>;
 
     async fn get_account_properties(
         &self,
@@ -62,18 +47,18 @@ pub trait RebacService: Send + Sync {
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError>;
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError>;
 
     async fn unset_dataset_property(
         &self,
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError>;
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError>;
 
     async fn delete_dataset_properties(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeletePropertiesError>;
+    ) -> Result<PropertiesMutationResult, DeletePropertiesError>;
 
     async fn get_dataset_properties(
         &self,
@@ -91,23 +76,23 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UpsertEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError>;
 
     async fn set_account_dataset_relations(
         &self,
         operations: &[SetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), UpsertEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError>;
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError>;
 
     async fn unset_account_dataset_relations(
         &self,
         operations: &[UnsetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), DeleteEntitiesRelationsError>;
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -179,7 +164,7 @@ impl<T: RebacService + ?Sized> RebacServiceExt for T {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AccountProperties {
     pub is_admin: bool,
     pub can_provision_accounts: bool,
@@ -209,7 +194,7 @@ impl AccountProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetProperties {
     pub allows_anonymous_read: bool,
     pub allows_public_read: bool,
@@ -226,11 +211,20 @@ impl DatasetProperties {
             }
         }
     }
+
+    pub fn as_property_value<'a>(&self, name: DatasetPropertyName) -> PropertyValue<'a> {
+        let value = match name {
+            DatasetPropertyName::AllowsAnonymousRead => self.allows_anonymous_read,
+            DatasetPropertyName::AllowsPublicRead => self.allows_public_read,
+        };
+
+        boolean_property_value(value)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthorizedAccount {
     pub account_id: odf::AccountID,
     pub role: AccountToDatasetRelation,
@@ -238,10 +232,56 @@ pub struct AuthorizedAccount {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorizedDataset {
     pub dataset_id: odf::DatasetID,
     pub role: AccountToDatasetRelation,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AccountDatasetRelationsMutationResult {
+    pub changed_dataset_ids: HashSet<odf::DatasetID>,
+}
+
+impl AccountDatasetRelationsMutationResult {
+    pub fn from_dataset_id(dataset_id: odf::DatasetID) -> Self {
+        Self {
+            changed_dataset_ids: HashSet::from([dataset_id]),
+        }
+    }
+
+    pub fn new(changed_dataset_ids: HashSet<odf::DatasetID>) -> Self {
+        Self {
+            changed_dataset_ids,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.changed_dataset_ids.is_empty()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PropertiesMutationResult {
+    pub changed: bool,
+}
+
+impl PropertiesMutationResult {
+    pub fn changed() -> Self {
+        Self { changed: true }
+    }
+
+    pub fn unchanged() -> Self {
+        Self { changed: false }
+    }
+
+    pub fn is_changed(&self) -> bool {
+        self.changed
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

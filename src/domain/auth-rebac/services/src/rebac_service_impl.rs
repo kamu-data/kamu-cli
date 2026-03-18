@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::*;
 use tokio::sync::RwLock;
 
@@ -25,6 +25,47 @@ pub type DefaultDatasetProperties = DatasetProperties;
 #[derive(Default)]
 struct AccountPropertiesCacheState {
     account_properties_cache_map: HashMap<String, AccountProperties>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct CurrentAccountProperties<'a> {
+    current_properties: AccountProperties,
+    default_properties: &'a AccountProperties,
+}
+
+impl CurrentAccountProperties<'_> {
+    fn matches(&self, property_name: AccountPropertyName, property_value: &PropertyValue) -> bool {
+        self.current_properties.as_property_value(property_name) == *property_value
+    }
+
+    fn is_default(&self, property_name: AccountPropertyName) -> bool {
+        self.current_properties.as_property_value(property_name)
+            == self.default_properties.as_property_value(property_name)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct CurrentDatasetProperties<'a> {
+    current_properties: DatasetProperties,
+    default_properties: &'a DatasetProperties,
+    has_explicit_overrides: bool,
+}
+
+impl CurrentDatasetProperties<'_> {
+    fn matches(&self, property_name: DatasetPropertyName, property_value: &PropertyValue) -> bool {
+        self.current_properties.as_property_value(property_name) == *property_value
+    }
+
+    fn is_default(&self, property_name: DatasetPropertyName) -> bool {
+        self.current_properties.as_property_value(property_name)
+            == self.default_properties.as_property_value(property_name)
+    }
+
+    fn has_explicit_overrides(&self) -> bool {
+        self.has_explicit_overrides
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +92,93 @@ impl RebacServiceImpl {
             default_dataset_properties,
         }
     }
+
+    async fn get_current_account_dataset_relations(
+        &self,
+        dataset_ids: &HashSet<odf::DatasetID>,
+    ) -> Result<CurrentAccountDatasetRelations, InternalError> {
+        if dataset_ids.is_empty() {
+            return Ok(CurrentAccountDatasetRelations::default());
+        }
+
+        let dataset_entities = dataset_ids
+            .iter()
+            .map(|id| Entity::new_dataset(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entities_with_relations = self
+            .rebac_repo
+            .get_object_entities_relations(&dataset_entities)
+            .await
+            .int_err()?;
+
+        let mut current_relations = CurrentAccountDatasetRelations::default();
+
+        for EntitiesWithRelation {
+            subject_entity,
+            relation,
+            object_entity,
+        } in entities_with_relations
+        {
+            let account_id = odf::AccountID::from_did_str(&subject_entity.entity_id).int_err()?;
+            let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(relation) => {
+                    current_relations.insert(dataset_id, account_id, relation);
+                }
+            }
+        }
+
+        Ok(current_relations)
+    }
+
+    async fn get_current_account_properties(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<CurrentAccountProperties<'_>, GetPropertiesError> {
+        let current_properties = self.get_account_properties(account_id).await?;
+
+        Ok(CurrentAccountProperties {
+            current_properties,
+            default_properties: self.default_account_properties.as_ref(),
+        })
+    }
+
+    async fn get_current_dataset_properties(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<CurrentDatasetProperties<'_>, GetPropertiesError> {
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
+
+        let entity_properties = self
+            .rebac_repo
+            .get_entity_properties(&dataset_entity)
+            .await
+            .int_err()?;
+
+        let has_explicit_overrides = !entity_properties.is_empty();
+        let current_properties = entity_properties
+            .into_iter()
+            .map(|(name, value)| match name {
+                PropertyName::Dataset(dataset_property_name) => (dataset_property_name, value),
+                PropertyName::Account(_) => unreachable!(),
+            })
+            .fold(
+                (*self.default_dataset_properties).clone(),
+                |mut acc, (name, value)| {
+                    acc.apply(name, &value);
+                    acc
+                },
+            );
+
+        Ok(CurrentDatasetProperties {
+            current_properties,
+            default_properties: self.default_dataset_properties.as_ref(),
+            has_explicit_overrides,
+        })
+    }
 }
 
 #[async_trait::async_trait]
@@ -64,7 +192,15 @@ impl RebacService for RebacServiceImpl {
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError> {
+        let current_properties = self
+            .get_current_account_properties(account_id)
+            .await
+            .int_err()?;
+        if current_properties.matches(property_name, property_value) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let account_id = account_id.to_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -81,16 +217,24 @@ impl RebacService for RebacServiceImpl {
 
         account_properties.apply(property_name, property_value);
 
-        Ok(())
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn unset_account_property(
         &self,
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError> {
         use futures::FutureExt;
         use odf::metadata::AsStackString;
+
+        let current_properties = self
+            .get_current_account_properties(account_id)
+            .await
+            .int_err()?;
+        if current_properties.is_default(property_name) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
 
         let account_id = account_id.as_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -105,7 +249,7 @@ impl RebacService for RebacServiceImpl {
             .account_properties_cache_map
             .remove(account_id.as_str());
 
-        Ok(())
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn get_account_properties(
@@ -157,21 +301,39 @@ impl RebacService for RebacServiceImpl {
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError> {
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if current_properties.matches(property_name, property_value) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
         self.rebac_repo
             .set_entity_property(&dataset_entity, property_name.into(), property_value)
-            .await
+            .await?;
+
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn unset_dataset_property(
         &self,
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError> {
         use futures::FutureExt;
+
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if current_properties.is_default(property_name) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
@@ -179,13 +341,23 @@ impl RebacService for RebacServiceImpl {
         self.rebac_repo
             .delete_entity_property(&dataset_entity, property_name.into())
             .map(map_delete_entity_property_result)
-            .await
+            .await?;
+
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn delete_dataset_properties(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeletePropertiesError> {
+    ) -> Result<PropertiesMutationResult, DeletePropertiesError> {
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if !current_properties.has_explicit_overrides() {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -194,9 +366,11 @@ impl RebacService for RebacServiceImpl {
             .delete_entity_properties(&dataset_entity)
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(PropertiesMutationResult::changed()),
             Err(e) => match e {
-                DeleteEntityPropertiesError::NotFound(_) => Ok(()),
+                DeleteEntityPropertiesError::NotFound(_) => {
+                    Ok(PropertiesMutationResult::unchanged())
+                }
                 e @ DeleteEntityPropertiesError::Internal(_) => Err(e.int_err().into()),
             },
         }
@@ -279,7 +453,7 @@ impl RebacService for RebacServiceImpl {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UpsertEntitiesRelationsError> {
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError> {
         use odf::metadata::AsStackString;
 
         let account_id_stack = account_id.as_stack_string();
@@ -287,6 +461,16 @@ impl RebacService for RebacServiceImpl {
 
         let dataset_id_stack = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id_stack.as_str());
+
+        let existing_relation = self
+            .rebac_repo
+            .try_get_relation_between_entities(&account_entity, &dataset_entity)
+            .await
+            .int_err()?;
+
+        if existing_relation == Some(Relation::AccountToDataset(relationship)) {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .upsert_entities_relations(&[UpsertEntitiesRelationOperation {
@@ -297,82 +481,143 @@ impl RebacService for RebacServiceImpl {
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::from_dataset_id(
+            dataset_id.clone(),
+        ))
     }
 
     async fn set_account_dataset_relations(
         &self,
         operations: &[SetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), UpsertEntitiesRelationsError> {
-        let upsert_operations = operations
+    ) -> Result<AccountDatasetRelationsMutationResult, UpsertEntitiesRelationsError> {
+        let dataset_ids = operations
             .iter()
-            .map(|op| {
-                let account_entity = Entity::new_account(op.account_id.to_string());
-                let dataset_entity = Entity::new_dataset(op.dataset_id.to_string());
+            .map(|op| op.dataset_id.as_ref().clone())
+            .collect::<HashSet<_>>();
 
-                UpsertEntitiesRelationOperation {
-                    subject_entity: Cow::Owned(account_entity),
-                    relationship: Relation::AccountToDataset(op.relationship),
-                    object_entity: Cow::Owned(dataset_entity),
-                }
-            })
-            .collect::<Vec<_>>();
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
+            .await
+            .int_err()?;
+
+        let mut upsert_operations = Vec::new();
+        let mut changed_dataset_ids = HashSet::new();
+
+        for op in operations {
+            let account_entity = Entity::new_account(op.account_id.to_string());
+            let dataset_entity = Entity::new_dataset(op.dataset_id.to_string());
+            let relation = Relation::AccountToDataset(op.relationship);
+
+            if current_relations.matches(
+                op.dataset_id.as_ref(),
+                op.account_id.as_ref(),
+                op.relationship,
+            ) {
+                continue;
+            }
+
+            upsert_operations.push(UpsertEntitiesRelationOperation {
+                subject_entity: Cow::Owned(account_entity),
+                relationship: relation,
+                object_entity: Cow::Owned(dataset_entity),
+            });
+            changed_dataset_ids.insert(op.dataset_id.as_ref().clone());
+        }
+
+        if upsert_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .upsert_entities_relations(&upsert_operations)
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::new(
+            changed_dataset_ids,
+        ))
     }
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteEntitiesRelationsError> {
-        let account_entities = account_ids
-            .iter()
-            .map(|id| Entity::new_account(id.to_string()))
-            .collect::<Vec<_>>();
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError> {
+        let dataset_ids = HashSet::from([dataset_id.clone()]);
 
-        let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
-
-        let operations = account_entities
-            .iter()
-            .map(|account_entity| DeleteEntitiesRelationOperation {
-                subject_entity: Cow::Borrowed(account_entity),
-                object_entity: Cow::Borrowed(&dataset_entity),
-            })
-            .collect::<Vec<_>>();
-
-        self.rebac_repo
-            .delete_entities_relations(&operations)
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
             .await
             .int_err()?;
 
-        Ok(())
-    }
+        let mut delete_operations = Vec::new();
 
-    async fn unset_account_dataset_relations(
-        &self,
-        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
-    ) -> Result<(), DeleteEntitiesRelationsError> {
-        let delete_operations = operations
-            .iter()
-            .map(|op| DeleteEntitiesRelationOperation {
-                subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
-                object_entity: Cow::Owned(Entity::new_dataset(op.dataset_id.to_string())),
-            })
-            .collect::<Vec<_>>();
+        for account_id in account_ids {
+            if !current_relations.contains(dataset_id, account_id) {
+                continue;
+            }
+
+            delete_operations.push(DeleteEntitiesRelationOperation {
+                subject_entity: Cow::Owned(Entity::new_account((*account_id).to_string())),
+                object_entity: Cow::Owned(Entity::new_dataset(dataset_id.to_string())),
+            });
+        }
+
+        if delete_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
 
         self.rebac_repo
             .delete_entities_relations(&delete_operations)
             .await
             .int_err()?;
 
-        Ok(())
+        Ok(AccountDatasetRelationsMutationResult::from_dataset_id(
+            dataset_id.clone(),
+        ))
+    }
+
+    async fn unset_account_dataset_relations(
+        &self,
+        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<AccountDatasetRelationsMutationResult, DeleteEntitiesRelationsError> {
+        let dataset_ids = operations
+            .iter()
+            .map(|op| op.dataset_id.as_ref().clone())
+            .collect::<HashSet<_>>();
+
+        let current_relations = self
+            .get_current_account_dataset_relations(&dataset_ids)
+            .await
+            .int_err()?;
+
+        let mut delete_operations = Vec::new();
+        let mut changed_dataset_ids = HashSet::new();
+
+        for op in operations {
+            if !current_relations.contains(op.dataset_id.as_ref(), op.account_id.as_ref()) {
+                continue;
+            }
+
+            delete_operations.push(DeleteEntitiesRelationOperation {
+                subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
+                object_entity: Cow::Owned(Entity::new_dataset(op.dataset_id.to_string())),
+            });
+            changed_dataset_ids.insert(op.dataset_id.as_ref().clone());
+        }
+
+        if delete_operations.is_empty() {
+            return Ok(AccountDatasetRelationsMutationResult::default());
+        }
+
+        self.rebac_repo
+            .delete_entities_relations(&delete_operations)
+            .await
+            .int_err()?;
+
+        Ok(AccountDatasetRelationsMutationResult::new(
+            changed_dataset_ids,
+        ))
     }
 
     async fn get_account_dataset_relations(
@@ -507,10 +752,6 @@ impl RebacService for RebacServiceImpl {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 fn map_delete_entity_property_result(
     res: Result<(), DeleteEntityPropertyError>,
 ) -> Result<(), UnsetEntityPropertyError> {
@@ -520,6 +761,46 @@ fn map_delete_entity_property_result(
             DeleteEntityPropertyError::NotFound(_) => Ok(()),
             e @ DeleteEntityPropertyError::Internal(_) => Err(e.int_err().into()),
         },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct CurrentAccountDatasetRelations {
+    relations: HashMap<odf::DatasetID, HashMap<odf::AccountID, AccountToDatasetRelation>>,
+}
+
+impl CurrentAccountDatasetRelations {
+    fn insert(
+        &mut self,
+        dataset_id: odf::DatasetID,
+        account_id: odf::AccountID,
+        relation: AccountToDatasetRelation,
+    ) {
+        self.relations
+            .entry(dataset_id)
+            .or_default()
+            .insert(account_id, relation);
+    }
+
+    fn contains(&self, dataset_id: &odf::DatasetID, account_id: &odf::AccountID) -> bool {
+        self.relations
+            .get(dataset_id)
+            .and_then(|dataset_relations| dataset_relations.get(account_id))
+            .is_some()
+    }
+
+    fn matches(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+        relation: AccountToDatasetRelation,
+    ) -> bool {
+        self.relations
+            .get(dataset_id)
+            .and_then(|dataset_relations| dataset_relations.get(account_id))
+            == Some(&relation)
     }
 }
 
