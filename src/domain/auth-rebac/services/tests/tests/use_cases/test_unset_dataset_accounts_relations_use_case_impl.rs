@@ -32,35 +32,78 @@ type Harness = UnsetDatasetAccountsRelationsUseCaseImplHarness;
 async fn test_unset_existing_relation_emits_message() {
     let dataset_id = odf::DatasetID::new_generated_ed25519().1;
     let account_id = odf::AccountID::new_generated_ed25519().1;
+    let remaining_account_id = odf::AccountID::new_generated_ed25519().1;
 
-    let mut outbox = MockOutbox::new();
-    let expected_dataset_id = dataset_id.clone();
-    outbox.expect_post_message_as_json().times(1).returning(
-        move |producer_name, message_as_json, version| {
-            assert_eq!(
-                producer_name,
-                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE
-            );
-            assert_eq!(version, 1);
-            assert!(matches!(
-                serde_json::from_value::<RebacDatasetRelationsMessage>(message_as_json.clone()),
-                Ok(RebacDatasetRelationsMessage::Modified(message))
-                    if message.dataset_id == expected_dataset_id
-            ));
-            Ok(())
-        },
+    let harness = Harness::new_with_expected_modified_message(
+        dataset_id.clone(),
+        vec![(
+            remaining_account_id.clone(),
+            AccountToDatasetRelation::Maintainer,
+        )],
     );
-
-    let harness = Harness::new(outbox);
 
     let _ = harness
         .rebac_service
         .set_account_dataset_relation(&account_id, AccountToDatasetRelation::Reader, &dataset_id)
         .await
         .unwrap();
+    let _ = harness
+        .rebac_service
+        .set_account_dataset_relation(
+            &remaining_account_id,
+            AccountToDatasetRelation::Maintainer,
+            &dataset_id,
+        )
+        .await
+        .unwrap();
 
     assert_matches!(
         harness.use_case.execute(&dataset_id, &[&account_id]).await,
+        Ok(())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_unset_partially_existing_relations_emits_message() {
+    let dataset_id = odf::DatasetID::new_generated_ed25519().1;
+    let existing_account_id = odf::AccountID::new_generated_ed25519().1;
+    let missing_account_id = odf::AccountID::new_generated_ed25519().1;
+    let remaining_account_id = odf::AccountID::new_generated_ed25519().1;
+
+    let harness = Harness::new_with_expected_modified_message(
+        dataset_id.clone(),
+        vec![(
+            remaining_account_id.clone(),
+            AccountToDatasetRelation::Maintainer,
+        )],
+    );
+
+    let _ = harness
+        .rebac_service
+        .set_account_dataset_relation(
+            &existing_account_id,
+            AccountToDatasetRelation::Reader,
+            &dataset_id,
+        )
+        .await
+        .unwrap();
+    let _ = harness
+        .rebac_service
+        .set_account_dataset_relation(
+            &remaining_account_id,
+            AccountToDatasetRelation::Maintainer,
+            &dataset_id,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(&dataset_id, &[&existing_account_id, &missing_account_id])
+            .await,
         Ok(())
     );
 }
@@ -106,6 +149,47 @@ impl UnsetDatasetAccountsRelationsUseCaseImplHarness {
             use_case: catalog.get_one().unwrap(),
             rebac_service: catalog.get_one().unwrap(),
         }
+    }
+
+    fn new_with_expected_modified_message(
+        dataset_id: odf::DatasetID,
+        expected_accounts: Vec<(odf::AccountID, AccountToDatasetRelation)>,
+    ) -> Self {
+        let mut outbox = MockOutbox::new();
+        outbox.expect_post_message_as_json().times(1).returning(
+            move |producer_name, message_as_json, version| {
+                assert_eq!(
+                    producer_name,
+                    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE
+                );
+                assert_eq!(version, 1);
+
+                let mut expected_accounts = expected_accounts
+                    .iter()
+                    .map(|(account_id, role)| (account_id.clone(), *role))
+                    .collect::<Vec<_>>();
+                expected_accounts.sort_by_key(|(account_id, _)| account_id.clone());
+
+                let message =
+                    serde_json::from_value::<RebacDatasetRelationsMessage>(message_as_json.clone())
+                        .unwrap();
+                let RebacDatasetRelationsMessage::Modified(message) = message else {
+                    panic!("unexpected message kind");
+                };
+                let mut actual_accounts = message
+                    .authorized_accounts
+                    .into_iter()
+                    .map(|account| (account.account_id, account.role))
+                    .collect::<Vec<_>>();
+                actual_accounts.sort_by_key(|(account_id, _)| account_id.clone());
+
+                assert_eq!(message.dataset_id, dataset_id);
+                assert_eq!(actual_accounts, expected_accounts);
+                Ok(())
+            },
+        );
+
+        Self::new(outbox)
     }
 }
 

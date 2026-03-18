@@ -19,7 +19,6 @@ use kamu_auth_rebac::{
     ApplyRelationMatrixError,
     DatasetRoleOperation,
     MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-    RebacDatasetPropertiesMessage,
     RebacDatasetRelationsMessage,
     RebacService,
     SetAccountDatasetRelationsOperation,
@@ -136,8 +135,12 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
                     self.outbox
                         .post_message(
                             MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                            RebacDatasetPropertiesMessage::deleted(
+                            RebacDatasetRelationsMessage::modified(
                                 operation.dataset_id.as_ref().clone(),
+                                self.rebac_service
+                                    .get_authorized_accounts(&operation.dataset_id)
+                                    .await
+                                    .int_err()?,
                             ),
                         )
                         .await?;

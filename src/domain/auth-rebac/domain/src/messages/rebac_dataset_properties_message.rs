@@ -18,7 +18,7 @@ const REBAC_DATASET_PROPERTIES_MESSAGE_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents messages related to the lifecycle of an access token
+/// Represents messages about changes in dataset `ReBAC` properties
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RebacDatasetPropertiesMessage {
     /// Message indicating dataset `ReBAC` properties

@@ -8,4 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_apply_account_dataset_relations_use_case_impl;
+mod test_delete_dataset_rebac_properties_use_case_impl;
+mod test_set_dataset_rebac_properties_use_case_impl;
 mod test_unset_dataset_accounts_relations_use_case_impl;

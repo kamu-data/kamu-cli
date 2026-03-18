@@ -29,6 +29,47 @@ struct AccountPropertiesCacheState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct CurrentAccountProperties<'a> {
+    current_properties: AccountProperties,
+    default_properties: &'a AccountProperties,
+}
+
+impl CurrentAccountProperties<'_> {
+    fn matches(&self, property_name: AccountPropertyName, property_value: &PropertyValue) -> bool {
+        self.current_properties.as_property_value(property_name) == *property_value
+    }
+
+    fn is_default(&self, property_name: AccountPropertyName) -> bool {
+        self.current_properties.as_property_value(property_name)
+            == self.default_properties.as_property_value(property_name)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct CurrentDatasetProperties<'a> {
+    current_properties: DatasetProperties,
+    default_properties: &'a DatasetProperties,
+    has_explicit_overrides: bool,
+}
+
+impl CurrentDatasetProperties<'_> {
+    fn matches(&self, property_name: DatasetPropertyName, property_value: &PropertyValue) -> bool {
+        self.current_properties.as_property_value(property_name) == *property_value
+    }
+
+    fn is_default(&self, property_name: DatasetPropertyName) -> bool {
+        self.current_properties.as_property_value(property_name)
+            == self.default_properties.as_property_value(property_name)
+    }
+
+    fn has_explicit_overrides(&self) -> bool {
+        self.has_explicit_overrides
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RebacServiceImpl {
     cache_state: Arc<RwLock<AccountPropertiesCacheState>>,
     rebac_repo: Arc<dyn RebacRepository>,
@@ -91,6 +132,53 @@ impl RebacServiceImpl {
 
         Ok(current_relations)
     }
+
+    async fn get_current_account_properties(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<CurrentAccountProperties<'_>, GetPropertiesError> {
+        let current_properties = self.get_account_properties(account_id).await?;
+
+        Ok(CurrentAccountProperties {
+            current_properties,
+            default_properties: self.default_account_properties.as_ref(),
+        })
+    }
+
+    async fn get_current_dataset_properties(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<CurrentDatasetProperties<'_>, GetPropertiesError> {
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
+
+        let entity_properties = self
+            .rebac_repo
+            .get_entity_properties(&dataset_entity)
+            .await
+            .int_err()?;
+
+        let has_explicit_overrides = !entity_properties.is_empty();
+        let current_properties = entity_properties
+            .into_iter()
+            .map(|(name, value)| match name {
+                PropertyName::Dataset(dataset_property_name) => (dataset_property_name, value),
+                PropertyName::Account(_) => unreachable!(),
+            })
+            .fold(
+                (*self.default_dataset_properties).clone(),
+                |mut acc, (name, value)| {
+                    acc.apply(name, &value);
+                    acc
+                },
+            );
+
+        Ok(CurrentDatasetProperties {
+            current_properties,
+            default_properties: self.default_dataset_properties.as_ref(),
+            has_explicit_overrides,
+        })
+    }
 }
 
 #[async_trait::async_trait]
@@ -104,7 +192,15 @@ impl RebacService for RebacServiceImpl {
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError> {
+        let current_properties = self
+            .get_current_account_properties(account_id)
+            .await
+            .int_err()?;
+        if current_properties.matches(property_name, property_value) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let account_id = account_id.to_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -121,16 +217,24 @@ impl RebacService for RebacServiceImpl {
 
         account_properties.apply(property_name, property_value);
 
-        Ok(())
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn unset_account_property(
         &self,
         account_id: &odf::AccountID,
         property_name: AccountPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError> {
         use futures::FutureExt;
         use odf::metadata::AsStackString;
+
+        let current_properties = self
+            .get_current_account_properties(account_id)
+            .await
+            .int_err()?;
+        if current_properties.is_default(property_name) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
 
         let account_id = account_id.as_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
@@ -145,7 +249,7 @@ impl RebacService for RebacServiceImpl {
             .account_properties_cache_map
             .remove(account_id.as_str());
 
-        Ok(())
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn get_account_properties(
@@ -197,21 +301,39 @@ impl RebacService for RebacServiceImpl {
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
         property_value: &PropertyValue,
-    ) -> Result<(), SetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, SetEntityPropertyError> {
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if current_properties.matches(property_name, property_value) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
         self.rebac_repo
             .set_entity_property(&dataset_entity, property_name.into(), property_value)
-            .await
+            .await?;
+
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn unset_dataset_property(
         &self,
         dataset_id: &odf::DatasetID,
         property_name: DatasetPropertyName,
-    ) -> Result<(), UnsetEntityPropertyError> {
+    ) -> Result<PropertiesMutationResult, UnsetEntityPropertyError> {
         use futures::FutureExt;
+
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if current_properties.is_default(property_name) {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
@@ -219,13 +341,23 @@ impl RebacService for RebacServiceImpl {
         self.rebac_repo
             .delete_entity_property(&dataset_entity, property_name.into())
             .map(map_delete_entity_property_result)
-            .await
+            .await?;
+
+        Ok(PropertiesMutationResult::changed())
     }
 
     async fn delete_dataset_properties(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeletePropertiesError> {
+    ) -> Result<PropertiesMutationResult, DeletePropertiesError> {
+        let current_properties = self
+            .get_current_dataset_properties(dataset_id)
+            .await
+            .int_err()?;
+        if !current_properties.has_explicit_overrides() {
+            return Ok(PropertiesMutationResult::unchanged());
+        }
+
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -234,9 +366,11 @@ impl RebacService for RebacServiceImpl {
             .delete_entity_properties(&dataset_entity)
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(PropertiesMutationResult::changed()),
             Err(e) => match e {
-                DeleteEntityPropertiesError::NotFound(_) => Ok(()),
+                DeleteEntityPropertiesError::NotFound(_) => {
+                    Ok(PropertiesMutationResult::unchanged())
+                }
                 e @ DeleteEntityPropertiesError::Internal(_) => Err(e.int_err().into()),
             },
         }
