@@ -3094,6 +3094,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "constcat"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d3e02915a2cea4d74caa8681e2d44b1c3254bdbf17d11d41d587ff858832c"
+
+[[package]]
 name = "container-runtime"
 version = "0.260.2"
 dependencies = [
@@ -6945,6 +6951,7 @@ dependencies = [
  "base32",
  "bon",
  "chrono",
+ "constcat",
  "crc32fast",
  "crypto-utils",
  "database-common",
@@ -6958,9 +6965,11 @@ dependencies = [
  "mockall",
  "nutype",
  "opendatafabric",
+ "pretty_assertions",
  "rand 0.9.2",
  "random-strings",
  "reusable",
+ "rstest",
  "schemars 1.2.1",
  "secrecy",
  "serde",

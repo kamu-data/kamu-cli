@@ -29,19 +29,30 @@ impl DidPkhAccountIdentity {
     /// Guarantees uniqueness for the same wallet address across different
     /// networks by incorporating chain type and chain ID.
     pub fn from_did_pkh(did_pkh: &odf::metadata::DidPkh) -> Result<Self, InternalError> {
+        const DID_PKH_IDENT_PREFIX: &str = "did.pkh.";
+
         let wallet_address = did_pkh.wallet_address().to_string();
 
         let unique_wallet_address_based_ident = {
             let chain_type = &did_pkh.chain_id().namespace;
             let chain_id = &did_pkh.chain_id().reference;
             // Example (eth mainnet): did.pkh.eip155.1.0x...
-            format!("did.pkh.{chain_type}.{chain_id}.{wallet_address}")
+            format!("{DID_PKH_IDENT_PREFIX}{chain_type}.{chain_id}.{wallet_address}")
         };
 
         let account_name =
             odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
-        let email =
-            Email::parse(&format!("{unique_wallet_address_based_ident}@example.com")).int_err()?;
+        let email = {
+            let user = &unique_wallet_address_based_ident;
+            let user = if user.len() > 64 {
+                // If user length exceeds the limit, remove the prefix
+                &user[DID_PKH_IDENT_PREFIX.len()..]
+            } else {
+                user
+            };
+
+            Email::parse(&format!("{user}@example.com")).int_err()?
+        };
 
         Ok(Self {
             provider_identity_key: unique_wallet_address_based_ident,
@@ -60,30 +71,52 @@ impl DidPkhAccountIdentity {
 mod tests {
     use std::str::FromStr;
 
+    use constcat::concat as const_concat;
     use email_utils::Email;
+    use pretty_assertions::assert_eq;
 
     use crate::DidPkhAccountIdentity;
 
-    #[test]
-    fn test_from_did_pkh() {
-        let did_pkh = odf::metadata::DidPkh::from_did_str(
-            "did:pkh:eip155:1:0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb",
-        )
-        .unwrap();
+    struct FromDidPkhTestCase {
+        input_did_str: &'static str,
+        expected_identity_key_and_account_name: &'static str,
+        expected_email: &'static str,
+        expected_display_name: &'static str,
+    }
+
+    const WALLET_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+
+    #[rstest::rstest]
+    #[case(FromDidPkhTestCase {
+        input_did_str: const_concat!("did:pkh:eip155:1:", WALLET_ADDRESS),
+        expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.1.", WALLET_ADDRESS),
+        expected_email: const_concat!("did.pkh.eip155.1.", WALLET_ADDRESS, "@example.com"),
+        expected_display_name: WALLET_ADDRESS,
+    })]
+    #[case(FromDidPkhTestCase {
+        input_did_str: const_concat!("did:pkh:eip155:11155111:", WALLET_ADDRESS),
+        expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.11155111.", WALLET_ADDRESS),
+        // NOTE: intentionally without prefix
+        expected_email: const_concat!("eip155.11155111.", WALLET_ADDRESS, "@example.com"),
+        expected_display_name: WALLET_ADDRESS,
+    })]
+    fn test_from_did_pkh(
+        #[case] FromDidPkhTestCase {
+            input_did_str,
+            expected_identity_key_and_account_name,
+            expected_email,
+            expected_display_name,
+        }: FromDidPkhTestCase,
+    ) {
+        let did_pkh = odf::metadata::DidPkh::from_did_str(input_did_str).unwrap();
 
         let actual = DidPkhAccountIdentity::from_did_pkh(&did_pkh).unwrap();
         let expected = DidPkhAccountIdentity {
-            provider_identity_key: "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb"
-                .to_string(),
-            account_name: odf::AccountName::from_str(
-                "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb",
-            )
-            .unwrap(),
-            email: Email::parse(
-                "did.pkh.eip155.1.0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb@example.com",
-            )
-            .unwrap(),
-            display_name: "0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb".to_string(),
+            provider_identity_key: expected_identity_key_and_account_name.to_string(),
+            account_name: odf::AccountName::from_str(expected_identity_key_and_account_name)
+                .unwrap(),
+            email: Email::parse(expected_email).unwrap(),
+            display_name: expected_display_name.to_string(),
         };
 
         assert_eq!(expected, actual);

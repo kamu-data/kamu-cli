@@ -73,3 +73,6 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 ] }
 
 [dev-dependencies]
+constcat = { version = "0.6", default-features = false, features = [] }
+pretty_assertions = { version = "1", default-features = false, features = [] }
+rstest = { version = "0.26", default-features = false, features = [] }
