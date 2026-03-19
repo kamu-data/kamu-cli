@@ -29,28 +29,26 @@ impl DidPkhAccountIdentity {
     /// Guarantees uniqueness for the same wallet address across different
     /// networks by incorporating chain type and chain ID.
     pub fn from_did_pkh(did_pkh: &odf::metadata::DidPkh) -> Result<Self, InternalError> {
-        const DID_PKH_IDENT_PREFIX: &str = "did.pkh.";
-
         let wallet_address = did_pkh.wallet_address().to_string();
 
         let unique_wallet_address_based_ident = {
             let chain_type = &did_pkh.chain_id().namespace;
             let chain_id = &did_pkh.chain_id().reference;
             // Example (eth mainnet): did.pkh.eip155.1.0x...
-            format!("{DID_PKH_IDENT_PREFIX}{chain_type}.{chain_id}.{wallet_address}")
+            format!("did.pkh.{chain_type}.{chain_id}.{wallet_address}")
         };
 
         let account_name =
             odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
+        // NOTE: we use uuid because the username is limited to 64 characters per RFC,
+        //       which doesn't always suit us. Besides, this email is a placeholder.
         let email = {
-            let user = &unique_wallet_address_based_ident;
-            let user = if user.len() > 64 {
-                // If user length exceeds the limit, remove the prefix
-                &user[DID_PKH_IDENT_PREFIX.len()..]
-            } else {
-                user
-            };
+            use uuid::Uuid;
 
+            let user = Uuid::new_v5(
+                &Uuid::NAMESPACE_URL,
+                unique_wallet_address_based_ident.as_bytes(),
+            );
             Email::parse(&format!("{user}@example.com")).int_err()?
         };
 
@@ -87,17 +85,17 @@ mod tests {
     const WALLET_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 
     #[rstest::rstest]
+    // EVM:
     #[case(FromDidPkhTestCase {
         input_did_str: const_concat!("did:pkh:eip155:1:", WALLET_ADDRESS),
         expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.1.", WALLET_ADDRESS),
-        expected_email: const_concat!("did.pkh.eip155.1.", WALLET_ADDRESS, "@example.com"),
+        expected_email: "8b64fc46-d223-5eee-94ab-ef34d398c23c@example.com",
         expected_display_name: WALLET_ADDRESS,
     })]
     #[case(FromDidPkhTestCase {
         input_did_str: const_concat!("did:pkh:eip155:11155111:", WALLET_ADDRESS),
         expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.11155111.", WALLET_ADDRESS),
-        // NOTE: intentionally without prefix
-        expected_email: const_concat!("eip155.11155111.", WALLET_ADDRESS, "@example.com"),
+        expected_email: "39a3abbd-0c97-53c9-9128-1de56f21bbdb@example.com",
         expected_display_name: WALLET_ADDRESS,
     })]
     fn test_from_did_pkh(
