@@ -8596,6 +8596,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-resources"
+version = "0.261.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "serde",
+ "thiserror 2.0.18",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-search"
 version = "0.261.0"
 dependencies = [
