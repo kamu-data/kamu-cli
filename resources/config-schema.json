@@ -862,7 +862,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "default": "kamu-cli/0.260.2",
+          "default": "kamu-cli/0.261.0",
           "description": "Value to use for User-Agent header",
           "type": "string"
         }
@@ -1212,7 +1212,7 @@
           "default": {
             "connectTimeout": "30s",
             "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.260.2"
+            "userAgent": "kamu-cli/0.261.0"
           },
           "description": "HTTP-specific configuration"
         },
@@ -1464,7 +1464,7 @@
         "http": {
           "connectTimeout": "30s",
           "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.260.2"
+          "userAgent": "kamu-cli/0.261.0"
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"
