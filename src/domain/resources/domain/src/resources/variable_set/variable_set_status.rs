@@ -9,17 +9,28 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceCondition, ResourcePhase};
+use crate::ResourceStatus;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableSetStatus {
-    pub phase: ResourcePhase,
-    pub observed_generation: u64,
-    pub conditions: Vec<ResourceCondition>,
+    #[serde(flatten)]
+    pub resource_status: ResourceStatus,
+
     pub stats: VariableSetStats,
 }
+
+impl VariableSetStatus {
+    pub fn new_pending(stats: VariableSetStats) -> Self {
+        Self {
+            resource_status: ResourceStatus::new_pending(),
+            stats,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct VariableSetStats {

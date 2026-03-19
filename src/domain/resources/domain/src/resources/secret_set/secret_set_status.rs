@@ -9,17 +9,28 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceCondition, ResourcePhase};
+use crate::ResourceStatus;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretSetStatus {
-    pub phase: ResourcePhase,
-    pub observed_generation: u64,
-    pub conditions: Vec<ResourceCondition>,
+    #[serde(flatten)]
+    pub resource_status: ResourceStatus,
+
     pub stats: SecretSetStats,
 }
+
+impl SecretSetStatus {
+    pub fn new_pending(stats: SecretSetStats) -> Self {
+        Self {
+            resource_status: ResourceStatus::new_pending(),
+            stats,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SecretSetStats {

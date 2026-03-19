@@ -10,9 +10,7 @@
 use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 
 use crate::{
-    ResourceCondition,
     ResourceMetadata,
-    ResourcePhase,
     ResourceState,
     SecretSetEvent,
     SecretSetID,
@@ -48,16 +46,11 @@ impl Projection for SecretSetState {
                         deleted_at: None,
                     },
                     spec: e.spec,
-                    status: SecretSetStatus {
-                        phase: ResourcePhase::Pending,
-                        observed_generation: 0,
-                        conditions: vec![],
-                        stats: SecretSetStats {
-                            total_secrets: total,
-                            valid_secrets: 0,
-                            invalid_secrets: 0,
-                        },
-                    },
+                    status: SecretSetStatus::new_pending(SecretSetStats {
+                        total_secrets: total,
+                        valid_secrets: 0,
+                        invalid_secrets: 0,
+                    }),
                 })
             }
 
@@ -70,8 +63,7 @@ impl Projection for SecretSetState {
                 s.metadata.generation = e.new_generation;
                 s.metadata.updated_at = e.event_time;
 
-                s.status.phase = ResourcePhase::Pending;
-                s.status.conditions.clear();
+                s.status.resource_status.reset_for_new_spec();
                 s.status.stats = SecretSetStats {
                     total_secrets: total,
                     valid_secrets: 0,
@@ -84,11 +76,7 @@ impl Projection for SecretSetState {
             (Some(mut s), E::ReconciliationStarted(e)) => {
                 assert_eq!(s.metadata.uid, e.secret_set_id);
 
-                s.status.phase = ResourcePhase::Reconciling;
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_true(e.event_time),
-                );
+                s.status.resource_status.mark_reconciling(e.event_time);
 
                 Ok(s)
             }
@@ -96,22 +84,10 @@ impl Projection for SecretSetState {
             (Some(mut s), E::ReconciliationSucceeded(e)) => {
                 assert_eq!(s.metadata.uid, e.secret_set_id);
 
-                s.status.phase = ResourcePhase::Ready;
-                s.status.observed_generation = e.generation;
+                s.status
+                    .resource_status
+                    .mark_ready(e.event_time, e.generation);
                 s.status.stats = e.stats;
-
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::accepted_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::ready_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_false(e.event_time),
-                );
 
                 Ok(s)
             }
@@ -119,22 +95,13 @@ impl Projection for SecretSetState {
             (Some(mut s), E::ReconciliationFailed(e)) => {
                 assert_eq!(s.metadata.uid, e.secret_set_id);
 
-                s.status.phase = ResourcePhase::Failed;
-                s.status.observed_generation = e.generation;
+                s.status.resource_status.mark_failed(
+                    e.event_time,
+                    e.generation,
+                    e.reason,
+                    e.message,
+                );
                 s.status.stats = e.stats;
-
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::accepted_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::ready_false(e.event_time, e.reason, e.message),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_false(e.event_time),
-                );
 
                 Ok(s)
             }
