@@ -19,9 +19,6 @@ pub enum VariableSetLifecycleError {
     #[error(transparent)]
     Validation(#[from] VariableSetValidationError),
 
-    #[error("variable set with identical spec already exists")]
-    NoChanges,
-
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<VariableSetState>>),
 }

@@ -14,18 +14,18 @@ use crate::{ResourceCondition, ResourcePhase};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct VariableSetStatus {
+pub struct SecretSetStatus {
     pub phase: ResourcePhase,
     pub observed_generation: u64,
     pub conditions: Vec<ResourceCondition>,
-    pub stats: VariableSetStats,
+    pub stats: SecretSetStats,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct VariableSetStats {
-    pub total_variables: usize,
-    pub valid_variables: usize,
-    pub invalid_variables: usize,
+pub struct SecretSetStats {
+    pub total_secrets: usize,
+    pub valid_secrets: usize,
+    pub invalid_secrets: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
