@@ -7,25 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
+use event_sourcing::ProjectionError;
 
-use crate::{ResourceCondition, ResourcePhase};
+use crate::{SecretSetState, SecretSetValidationError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct VariableSetStatus {
-    pub phase: ResourcePhase,
-    pub observed_generation: u64,
-    pub conditions: Vec<ResourceCondition>,
-    pub stats: VariableSetStats,
-}
+#[derive(Debug, thiserror::Error)]
+pub enum SecretSetLifecycleError {
+    #[error(transparent)]
+    Validation(#[from] SecretSetValidationError),
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct VariableSetStats {
-    pub total_variables: usize,
-    pub valid_variables: usize,
-    pub invalid_variables: usize,
+    #[error("resource invariant violation: {0}")]
+    InvariantViolation(Box<ProjectionError<SecretSetState>>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

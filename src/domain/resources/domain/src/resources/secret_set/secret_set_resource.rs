@@ -15,44 +15,44 @@ use crate::{
     ResourceID,
     ResourceMetadata,
     ResourceValidateSpec,
-    VariableSetEvent,
-    VariableSetEventCreated,
-    VariableSetEventSpecUpdated,
-    VariableSetEventStore,
-    VariableSetLifecycleError,
-    VariableSetSpec,
-    VariableSetState,
-    VariableSetStatus,
+    SecretSetEvent,
+    SecretSetEventCreated,
+    SecretSetEventSpecUpdated,
+    SecretSetEventStore,
+    SecretSetLifecycleError,
+    SecretSetSpec,
+    SecretSetState,
+    SecretSetStatus,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct VariableSetResource(Aggregate<VariableSetState, VariableSetEventStoreStatic>);
+pub struct SecretSetResource(Aggregate<SecretSetState, SecretSetEventStoreStatic>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetID = ResourceID;
+pub type SecretSetID = ResourceID;
 
-type VariableSetEventStoreStatic = dyn VariableSetEventStore + 'static;
+type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl VariableSetResource {
+impl SecretSetResource {
     pub fn try_create(
         now: DateTime<Utc>,
-        variable_set_id: VariableSetID,
+        secret_set_id: SecretSetID,
         name: String,
-        spec: VariableSetSpec,
-    ) -> Result<Self, VariableSetLifecycleError> {
+        spec: SecretSetSpec,
+    ) -> Result<Self, SecretSetLifecycleError> {
         spec.validate()?;
 
         Ok(Self(
             Aggregate::new(
-                variable_set_id,
-                VariableSetEventCreated {
+                secret_set_id,
+                SecretSetEventCreated {
                     event_time: now,
-                    variable_set_id,
+                    secret_set_id,
                     name,
                     spec,
                 },
@@ -64,22 +64,22 @@ impl VariableSetResource {
     pub fn try_update_spec(
         &mut self,
         now: DateTime<Utc>,
-        new_spec: VariableSetSpec,
-    ) -> Result<(), VariableSetLifecycleError> {
+        new_spec: SecretSetSpec,
+    ) -> Result<(), SecretSetLifecycleError> {
         new_spec.validate()?;
 
         if self.spec == new_spec {
             return Ok(()); // No changes, skip update
         }
 
-        let event = VariableSetEvent::SpecUpdated(VariableSetEventSpecUpdated {
+        let event = SecretSetEvent::SpecUpdated(SecretSetEventSpecUpdated {
             event_time: now,
-            variable_set_id: self.metadata.uid,
+            secret_set_id: self.metadata.uid,
             new_spec,
             new_generation: self.metadata.generation + 1,
         });
         self.apply(event)
-            .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))?;
+            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?;
 
         Ok(())
     }
@@ -87,9 +87,9 @@ impl VariableSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl DeclarativeResource for VariableSetResource {
-    type Spec = VariableSetSpec;
-    type Status = VariableSetStatus;
+impl DeclarativeResource for SecretSetResource {
+    type Spec = SecretSetSpec;
+    type Status = SecretSetStatus;
 
     fn metadata(&self) -> &ResourceMetadata {
         &self.metadata
