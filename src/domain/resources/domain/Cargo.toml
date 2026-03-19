@@ -1,0 +1,42 @@
+[package]
+name = "kamu-resources"
+description = "Domain model of the managed resources control pane"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+database-common = { workspace = true }
+enum-variants = { workspace = true }
+event-sourcing = { workspace = true }
+internal-error = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+tokio-stream = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false }
+
+
+[dev-dependencies]
