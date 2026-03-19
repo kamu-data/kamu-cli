@@ -42,13 +42,13 @@ impl SqliteFlowProcessStateQuery {
                 )
             }
             FlowProcessOrderField::NextPlannedAt => {
-                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
+                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}")
             }
             FlowProcessOrderField::LastFailureAt => {
-                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}",)
+                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}")
             }
             FlowProcessOrderField::ConsecutiveFailures => {
-                format!("consecutive_failures {direction}, {default_tiebreaker}",)
+                format!("consecutive_failures {direction}, {default_tiebreaker}")
             }
             FlowProcessOrderField::EffectiveState => {
                 let main_ordering = r#"
@@ -62,10 +62,10 @@ impl SqliteFlowProcessStateQuery {
                         END
                     "#
                 .to_string();
-                format!("{main_ordering} {direction}, {default_tiebreaker}",)
+                format!("{main_ordering} {direction}, {default_tiebreaker}")
             }
             FlowProcessOrderField::FlowType => {
-                format!("flow_type {direction}, {default_tiebreaker}",)
+                format!("flow_type {direction}, {default_tiebreaker}")
             }
         }
     }

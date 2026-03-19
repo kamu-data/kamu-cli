@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use {kamu_flow_system as fs, kamu_webhooks as wh};
+use kamu_flow_system as fs;
+use kamu_webhooks as wh;
 
 use crate::prelude::*;
 use crate::queries::{Dataset, DatasetRequestStateWithOwner};

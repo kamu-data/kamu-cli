@@ -131,15 +131,10 @@ impl SetInfoBuilder {
     }
 
     pub fn keyword(mut self, keyword: &str) -> Self {
-        if self.v.keywords.is_none() {
-            self.v.keywords = Some(vec![String::from(keyword)]);
-        } else {
-            self.v
-                .keywords
-                .as_mut()
-                .unwrap()
-                .push(String::from(keyword));
-        }
+        self.v
+            .keywords
+            .get_or_insert_with(Vec::new)
+            .push(keyword.to_string());
         self
     }
 

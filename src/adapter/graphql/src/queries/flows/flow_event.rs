@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
+use event_sourcing as evs;
+use kamu_flow_system as fs;
+use kamu_task_system as ts;
 
 use super::{FlowActivationCause, FlowStartCondition};
 use crate::prelude::*;

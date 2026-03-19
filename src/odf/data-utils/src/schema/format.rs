@@ -179,7 +179,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                     )?;
                 }
 
-                write!(self.output, r#", "fields": ["#,)?;
+                write!(self.output, r#", "fields": ["#)?;
 
                 for (i, field) in fields.iter().enumerate() {
                     self.write(field)?;

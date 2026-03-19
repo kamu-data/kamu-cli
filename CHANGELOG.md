@@ -17,8 +17,18 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - ReBAC relation and dataset property updates now suppress redundant outbox messages and downstream dataset search reindexing when the effective authorization state remains unchanged.
 - Extended test coverage for ReBac use cases and services
-### Fixed
-- ReBAC single-relation unset now emits the correct dataset-relations snapshot message instead of the wrong dataset-properties deletion message.
+- Several major dependency upgrades:
+   - alloy 1.5 -> 1.7
+   - async-openai 0.32 -> 0.33
+   - geojson 0.24 -> 1.0
+   - jsonschema 0.40 -> 0.45
+   - tokio-tungstenite 0.28 -> 0.29
+   - toml 0.8 -> 1.0
+   - strum 0.27 -> 0.28
+   - ssi-caips 0.2 -> 0.3
+   - vergen 8.3 -> 9.1
+   - zip 3 -> 8.2
+- Latest Rust nightly toolchain (March 19th, 2026)   
 
 ## [0.260.2] - 2026-03-04
 ### Changed

@@ -42,9 +42,8 @@ pub async fn append_snapshot_metadata_to_dataset(
 ) -> Result<AppendResult, AppendError> {
     let chain = dataset.as_metadata_chain();
     let mut head = current_head.clone();
-    let mut sequence_number = 1;
 
-    for event in metadata {
+    for (sequence_number, event) in (1..).zip(metadata) {
         head = chain
             .append(
                 MetadataBlock {
@@ -59,8 +58,6 @@ pub async fn append_snapshot_metadata_to_dataset(
                 },
             )
             .await?;
-
-        sequence_number += 1;
     }
 
     Ok(AppendResult {

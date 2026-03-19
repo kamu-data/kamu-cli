@@ -303,6 +303,6 @@ mod test {
         }))
         .unwrap();
 
-        std::assert_matches::assert_matches!(attrs.get::<ArrowEncoding>(), Err(_));
+        std::assert_matches!(attrs.get::<ArrowEncoding>(), Err(_));
     }
 }

@@ -302,7 +302,7 @@ impl E2EApi<'_> {
 
         let status = response.status();
         if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected health response status: {status}",))?;
+            InternalError::bail(format!("Unexpected health response status: {status}"))?;
         }
 
         Ok(())
@@ -320,7 +320,7 @@ impl E2EApi<'_> {
 
         let status = response.status();
         if status != StatusCode::OK {
-            InternalError::bail(format!("Unexpected shutdown response status: {status}",))?;
+            InternalError::bail(format!("Unexpected shutdown response status: {status}"))?;
         }
 
         Ok(())

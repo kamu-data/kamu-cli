@@ -153,9 +153,7 @@ macro_rules! test_client_server_s3_harness_permutations {
     };
 }
 
-pub(crate) use {
-    test_client_server_local_fs_harness_permutations,
-    test_client_server_s3_harness_permutations,
-};
+pub(crate) use test_client_server_local_fs_harness_permutations;
+pub(crate) use test_client_server_s3_harness_permutations;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

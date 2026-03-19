@@ -427,7 +427,7 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
                 .collect::<Vec<_>>()
         };
 
-        account_refs.sort_by(|a, b| a.registered_at.cmp(&b.registered_at));
+        account_refs.sort_by_key(|a| a.registered_at);
 
         let accounts_page_it = account_refs
             .into_iter()

@@ -28,7 +28,7 @@ pub(crate) use test_api_server::*;
 macro_rules! await_client_server_flow {
     ($api_server_handle: expr, $client_handle: expr) => {
         tokio::select! {
-            _ = tokio::time::sleep(std::time::Duration::from_secs(60)) => panic!("test timeout!"),
+            _ = tokio::time::sleep(std::time::Duration::from_mins(1)) => panic!("test timeout!"),
             _ = $api_server_handle => panic!("server-side aborted"),
             _ = $client_handle => {} // Pass, do nothing
         }

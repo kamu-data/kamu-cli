@@ -52,7 +52,7 @@ impl WebhookSignerImpl {
                 let name_lc = name.to_ascii_lowercase();
                 headers.get(&name_lc).map(|v| {
                     let val = v.to_str().unwrap_or("").trim();
-                    (format!("\"{name_lc}\"",), format!(": {val}",))
+                    (format!("\"{name_lc}\""), format!(": {val}"))
                 })
             }
             SigningField::Derived(s) if *s == SIGNING_FIELD_METHOD => {

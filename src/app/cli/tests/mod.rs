@@ -7,7 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(exit_status_error)]
-#![feature(assert_matches)]
-
 mod tests;

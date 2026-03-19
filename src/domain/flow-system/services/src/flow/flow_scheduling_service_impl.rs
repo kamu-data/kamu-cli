@@ -164,10 +164,10 @@ impl FlowSchedulingServiceImpl {
                             // Evaluate throttling condition: is new time earlier than planned?
                             // In case of reactive condition and manual trigger,
                             // there is no planned time, but otherwise compare
-                            if flow.timing.scheduled_for_activation_at.is_none()
-                                || flow.timing.scheduled_for_activation_at.is_some_and(
-                                    |planned_time| throttling_boundary_time < planned_time,
-                                )
+                            if flow
+                                .timing
+                                .scheduled_for_activation_at
+                                .is_none_or(|planned_time| throttling_boundary_time < planned_time)
                             {
                                 // Indicate throttling, if applied
                                 if throttling_boundary_time > activation_time {

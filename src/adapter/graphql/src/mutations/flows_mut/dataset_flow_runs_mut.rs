@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+use kamu_adapter_flow_dataset as afs;
+use kamu_flow_system as fs;
 
 use super::{
     FlowInDatasetError,

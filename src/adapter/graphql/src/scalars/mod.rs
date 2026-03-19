@@ -228,7 +228,8 @@ macro_rules! __simple_string_scalar_scalar_type {
     };
 }
 
+use __simple_string_scalar_general;
+use __simple_string_scalar_scalar_type;
 pub(crate) use simple_string_scalar;
-use {__simple_string_scalar_general, __simple_string_scalar_scalar_type};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -171,7 +171,7 @@ impl Harness {
     }
 
     fn upload_main_url(&self) -> String {
-        format!("http://{}/platform/file/upload", self.api_server_addr(),)
+        format!("http://{}/platform/file/upload", self.api_server_addr())
     }
 
     fn target_path_from_upload_url(cache_dir: &Path, upload_url: &str) -> PathBuf {

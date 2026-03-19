@@ -10,7 +10,8 @@
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AccountService;
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+use kamu_adapter_flow_dataset as afs;
+use kamu_flow_system as fs;
 
 use crate::mutations::{FlowInDatasetError, FlowNotFound, check_if_flow_belongs_to_dataset};
 use crate::prelude::*;

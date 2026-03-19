@@ -455,7 +455,7 @@ impl ContainerRuntime {
             return Ok(false);
         };
 
-        stream.set_read_timeout(Some(Duration::from_millis(1000)))?;
+        stream.set_read_timeout(Some(Duration::from_secs(1)))?;
 
         let mut buf = [0; 1];
         match stream.read(&mut buf) {

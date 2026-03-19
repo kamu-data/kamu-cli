@@ -195,7 +195,7 @@ impl ElasticsearchClient {
     ) -> Result<Vec<String>, ElasticsearchClientError> {
         use elasticsearch::indices::IndicesGetParts;
 
-        let pattern = format!("{prefix}*",);
+        let pattern = format!("{prefix}*");
         let response = self
             .client
             .indices()

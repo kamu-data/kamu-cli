@@ -60,7 +60,7 @@ impl MockFlowSensorDispatcher {
         input_flow_binding: FlowBinding,
         activation_cause: FlowActivationCauseResourceUpdate,
     ) -> Self {
-        use std::assert_matches::assert_matches;
+        use std::assert_matches;
 
         let mut mock = MockFlowSensorDispatcher::new();
         mock.expect_dispatch_input_flow_success()

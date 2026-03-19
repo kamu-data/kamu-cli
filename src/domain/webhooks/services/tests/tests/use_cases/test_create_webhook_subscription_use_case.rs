@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
@@ -47,7 +47,7 @@ async fn test_create_in_dataset_success() {
             WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
-    assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,7 +134,7 @@ async fn test_event_types_deduplicated() {
             WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
-    assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
 
     // Find the subscription and ensure it has only one event type
 
@@ -146,7 +146,7 @@ async fn test_event_types_deduplicated() {
         .await
         .unwrap();
 
-    assert_eq!(subscription.event_types().len(), 1,);
+    assert_eq!(subscription.event_types().len(), 1);
     assert_eq!(
         subscription.event_types()[0],
         WebhookEventTypeCatalog::test()
@@ -186,7 +186,7 @@ async fn test_label_unique_in_dataset() {
             WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
-    assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
 
     // Second subscription with the same label in the same dataset => error
     let res = harness
@@ -214,7 +214,7 @@ async fn test_label_unique_in_dataset() {
             WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
-    assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

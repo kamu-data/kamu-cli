@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
-
 mod access_token_repository_test_utils;
 mod account_quota_event_store_test_suite;
 mod accounts_repository_test_utils;

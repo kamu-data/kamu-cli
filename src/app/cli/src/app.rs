@@ -1111,7 +1111,7 @@ fn prepare_run_dir(run_dir: &Path) {
             )
         });
         std::fs::create_dir(run_dir).unwrap_or_else(|e| {
-            panic!("Unable to create run directory {}: {e}", run_dir.display(),)
+            panic!("Unable to create run directory {}: {e}", run_dir.display())
         });
     }
 }

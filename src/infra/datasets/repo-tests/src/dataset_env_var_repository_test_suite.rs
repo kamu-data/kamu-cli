@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 
 use chrono::{SubsecRound, Utc};
 use database_common::PaginationOpts;
@@ -184,7 +184,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    db_dataset_env_vars.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    db_dataset_env_vars.sort_by_key(|a| a.created_at);
 
     assert_eq!(
         db_dataset_env_vars,

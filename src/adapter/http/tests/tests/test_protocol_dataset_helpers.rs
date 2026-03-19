@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use axum_extra::TypedHeader;
@@ -160,7 +160,7 @@ async fn test_object_url_local_fs() {
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}")
                 }
             ]
     );
@@ -213,7 +213,7 @@ async fn test_object_url_local_fs() {
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}")
                 }
             ]
     );
@@ -242,7 +242,7 @@ async fn test_object_url_local_fs() {
                 },
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
-                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}", )
+                    value: format!("Bearer {DUMMY_ACCESS_TOKEN}")
                 }
             ]
     );

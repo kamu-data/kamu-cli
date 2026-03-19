@@ -12,8 +12,9 @@ use std::collections::HashSet;
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
+use kamu_adapter_flow_dataset as afs;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+use kamu_flow_system as fs;
 
 use super::Account;
 use crate::prelude::*;

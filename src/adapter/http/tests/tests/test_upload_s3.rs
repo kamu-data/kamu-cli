@@ -142,7 +142,7 @@ impl Harness {
     }
 
     fn upload_retrieve_url(&self) -> String {
-        format!("http://{}/platform/file/upload", self.api_server_addr(),)
+        format!("http://{}/platform/file/upload", self.api_server_addr())
     }
 
     async fn read_bucket_file_as_string(bucket_contest: &S3Context, file_key: String) -> String {

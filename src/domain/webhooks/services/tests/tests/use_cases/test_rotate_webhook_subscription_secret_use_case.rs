@@ -31,7 +31,7 @@ async fn test_rotate_secret() {
     let old_secret = subscription.secret().clone();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to rotate subscription secret: {res:?}",);
+    assert!(res.is_ok(), "Failed to rotate subscription secret: {res:?}");
     assert_ne!(subscription.secret(), &old_secret);
 }
 

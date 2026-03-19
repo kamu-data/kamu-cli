@@ -34,8 +34,9 @@ use kamu_adapter_task_dataset::{
 };
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
+use kamu_flow_system as fs;
 use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
-use {kamu_flow_system as fs, kamu_task_system as ts};
+use kamu_task_system as ts;
 
 use crate::prelude::*;
 
@@ -686,7 +687,7 @@ impl FlowDescriptionBuilder {
                         dataset_id
                     );
                     FlowDescriptionDataset::Unknown(FlowDescriptionUnknown {
-                        message: format!("No SetTransformEvent for dataset {dataset_id}",),
+                        message: format!("No SetTransformEvent for dataset {dataset_id}"),
                     })
                 }
             }

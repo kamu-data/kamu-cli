@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::fs::File;
-use std::io;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
+use std::{assert_matches, io};
 
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::Searcher;

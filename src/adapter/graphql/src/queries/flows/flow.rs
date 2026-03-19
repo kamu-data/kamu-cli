@@ -9,7 +9,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+use kamu_adapter_flow_dataset as afs;
+use kamu_flow_system as fs;
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
 use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};

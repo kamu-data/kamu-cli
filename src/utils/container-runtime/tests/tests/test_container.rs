@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::time::Duration;
 
 use container_runtime::*;
@@ -46,9 +46,7 @@ async fn test_container_terminate_not_called() {
         .unwrap();
 
     assert_matches!(
-        container
-            .wait_for_container(Duration::from_millis(5000))
-            .await,
+        container.wait_for_container(Duration::from_secs(5)).await,
         Ok(_)
     );
 
@@ -86,9 +84,7 @@ async fn test_container_terminate_awaited() {
         .unwrap();
 
     assert_matches!(
-        container
-            .wait_for_container(Duration::from_millis(5000))
-            .await,
+        container.wait_for_container(Duration::from_secs(5)).await,
         Ok(_)
     );
 

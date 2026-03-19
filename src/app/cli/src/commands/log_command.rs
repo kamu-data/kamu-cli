@@ -496,7 +496,7 @@ impl AsciiRenderer {
         value: &str,
     ) -> Result<(), std::io::Error> {
         self.indent(output, indent)?;
-        writeln!(output, "{}{}", style(name).dim(), style(":").dim(),)?;
+        writeln!(output, "{}{}", style(name).dim(), style(":").dim())?;
         for line in value.trim_end().split('\n') {
             self.indent(output, indent + 1)?;
             writeln!(output, "{line}")?;

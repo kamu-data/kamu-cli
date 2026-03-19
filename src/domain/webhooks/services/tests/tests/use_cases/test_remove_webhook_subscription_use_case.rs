@@ -38,12 +38,12 @@ async fn test_remove_subscription_success() {
     let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to remove subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to remove subscription: {res:?}");
 
     let res = harness
         .find_subscription(subscription.id(), WebhookSubscriptionQueryMode::Active)
         .await;
-    assert!(res.is_none(), "Subscription was not removed: {res:?}",);
+    assert!(res.is_none(), "Subscription was not removed: {res:?}");
 
     let res = harness
         .find_subscription(
@@ -75,10 +75,10 @@ async fn test_remove_idempotence() {
     let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to remove subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to remove subscription: {res:?}");
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Second removal not ignored: {res:?}",);
+    assert!(res.is_ok(), "Second removal not ignored: {res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
