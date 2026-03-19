@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceCondition {
     pub type_: ResourceConditionType,
     pub status: ResourceConditionStatus,
@@ -114,7 +115,7 @@ impl ResourceCondition {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceConditionStatus {
     True,
     False,
@@ -123,7 +124,7 @@ pub enum ResourceConditionStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceConditionType {
     Accepted,
     Ready,

@@ -10,9 +10,7 @@
 use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 
 use crate::{
-    ResourceCondition,
     ResourceMetadata,
-    ResourcePhase,
     ResourceState,
     VariableSetEvent,
     VariableSetID,
@@ -48,16 +46,11 @@ impl Projection for VariableSetState {
                         deleted_at: None,
                     },
                     spec: e.spec,
-                    status: VariableSetStatus {
-                        phase: ResourcePhase::Pending,
-                        observed_generation: 0,
-                        conditions: vec![],
-                        stats: VariableSetStats {
-                            total_variables: total,
-                            valid_variables: 0,
-                            invalid_variables: 0,
-                        },
-                    },
+                    status: VariableSetStatus::new_pending(VariableSetStats {
+                        total_variables: total,
+                        valid_variables: 0,
+                        invalid_variables: 0,
+                    }),
                 })
             }
 
@@ -70,11 +63,12 @@ impl Projection for VariableSetState {
                 s.metadata.generation = e.new_generation;
                 s.metadata.updated_at = e.event_time;
 
-                s.status.phase = ResourcePhase::Pending;
-                s.status.conditions = vec![];
-                s.status.stats.total_variables = total;
-                s.status.stats.valid_variables = 0;
-                s.status.stats.invalid_variables = 0;
+                s.status.resource_status.reset_for_new_spec();
+                s.status.stats = VariableSetStats {
+                    total_variables: total,
+                    valid_variables: 0,
+                    invalid_variables: 0,
+                };
 
                 Ok(s)
             }
@@ -82,11 +76,7 @@ impl Projection for VariableSetState {
             (Some(mut s), E::ReconciliationStarted(e)) => {
                 assert_eq!(s.metadata.uid, e.variable_set_id);
 
-                s.status.phase = ResourcePhase::Reconciling;
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_true(e.event_time),
-                );
+                s.status.resource_status.mark_reconciling(e.event_time);
 
                 Ok(s)
             }
@@ -94,22 +84,10 @@ impl Projection for VariableSetState {
             (Some(mut s), E::ReconciliationSucceeded(e)) => {
                 assert_eq!(s.metadata.uid, e.variable_set_id);
 
-                s.status.phase = ResourcePhase::Ready;
-                s.status.observed_generation = e.generation;
+                s.status
+                    .resource_status
+                    .mark_ready(e.event_time, e.generation);
                 s.status.stats = e.stats;
-
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::accepted_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::ready_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_false(e.event_time),
-                );
 
                 Ok(s)
             }
@@ -117,22 +95,13 @@ impl Projection for VariableSetState {
             (Some(mut s), E::ReconciliationFailed(e)) => {
                 assert_eq!(s.metadata.uid, e.variable_set_id);
 
-                s.status.phase = ResourcePhase::Failed;
-                s.status.observed_generation = e.generation;
+                s.status.resource_status.mark_failed(
+                    e.event_time,
+                    e.generation,
+                    e.reason,
+                    e.message,
+                );
                 s.status.stats = e.stats;
-
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::accepted_true(e.event_time),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::ready_false(e.event_time, e.reason, e.message),
-                );
-                ResourceCondition::set_condition(
-                    &mut s.status.conditions,
-                    ResourceCondition::reconciling_false(e.event_time),
-                );
 
                 Ok(s)
             }
