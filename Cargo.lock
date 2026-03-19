@@ -6971,7 +6971,6 @@ dependencies = [
  "reusable",
  "rstest",
  "schemars 1.2.1",
- "secrecy",
  "serde",
  "serde_json",
  "serde_with",

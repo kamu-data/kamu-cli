@@ -58,7 +58,6 @@ nutype = { version = "0.6", default-features = false, features = [
 rand = "0.9"
 reusable = "0.1"
 schemars = { version = "1", default-features = false, features = ["derive"] }
-secrecy = "0.10"
 serde = "1"
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
