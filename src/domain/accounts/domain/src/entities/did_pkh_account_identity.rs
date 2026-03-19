@@ -40,8 +40,9 @@ impl DidPkhAccountIdentity {
 
         let account_name =
             odf::AccountName::from_str(&unique_wallet_address_based_ident).int_err()?;
-        // NOTE: we use uuid because the username is limited to 64 characters per RFC,
-        //       which doesn't always suit us. Besides, this email is a placeholder.
+        // NOTE: We use UUID because the username is limited to 64 characters
+        //       per RFC5321, which doesn't always suit us.
+        //       Besides, this email is a placeholder.
         let email = {
             use uuid::Uuid;
 
