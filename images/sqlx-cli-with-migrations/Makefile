@@ -6,7 +6,11 @@ ifndef KAMU_VERSION
 $(error KAMU_VERSION is not set)
 endif
 
+# IMPORTANT! Before updating, verify how the patch version is currently used in the latest image
+#            to avoid overwriting the existing image:
+#            https://github.com/kamu-data/kamu-cli/pkgs/container/sqlx-cli-with-migrations
 IMAGE_TAG = $(KAMU_VERSION).1
+#                           ^ patch
 IMAGE_SQLX_TAG = latest
 
 ################################################################################
