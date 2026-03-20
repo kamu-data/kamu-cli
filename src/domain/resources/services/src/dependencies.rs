@@ -7,21 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ReconcilableResource;
+use dill::CatalogBuilder;
+
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait Reconciler<R: ReconcilableResource>: Send + Sync {
-    async fn reconcile(&self, resource: &R) -> Result<R::ReconcileSuccess, R::ReconcileError>;
-}
+pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add::<VariableSetReconcileResourceUseCaseImpl>();
+    catalog_builder.add::<VariableSetReconcilerImpl>();
+    catalog_builder.add::<VariableSetResourceRepositoryAdapter>();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceReconcileError: std::error::Error + Send + Sync {
-    fn reason_code(&self) -> &'static str;
-    fn user_message(&self) -> String;
-    fn is_transient(&self) -> bool;
+    catalog_builder.add::<SecretSetReconcileResourceUseCaseImpl>();
+    catalog_builder.add::<SecretSetReconcilerImpl>();
+    catalog_builder.add::<SecretSetResourceRepositoryAdapter>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

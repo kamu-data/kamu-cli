@@ -10,12 +10,14 @@
 #![feature(error_generic_member_access)]
 
 mod entities;
+mod repo;
 mod resources;
 mod services;
 mod use_cases;
 mod values;
 
 pub use entities::*;
+pub use repo::*;
 pub use resources::*;
 pub use services::*;
 pub use use_cases::*;

@@ -23,7 +23,7 @@ use crate::{
 
 impl ReconcilableResource for SecretSetResource {
     type ReconcileSuccess = SecretSetReconcileSuccess;
-    type ReconcicleError = SecretSetReconcileError;
+    type ReconcileError = SecretSetReconcileError;
     type LifecycleError = SecretSetLifecycleError;
     type ResourceState = SecretSetState;
 
@@ -59,7 +59,7 @@ impl ReconcilableResource for SecretSetResource {
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
-        error: &Self::ReconcicleError,
+        error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError> {
         SecretSetResource::try_mark_reconciliation_failed(
             self,
@@ -74,6 +74,7 @@ impl ReconcilableResource for SecretSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct SecretSetReconcileSuccess {
     pub stats: SecretSetStats,
 }

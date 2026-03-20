@@ -14,7 +14,7 @@ use crate::ReconcilableResource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ReconcileResourceUseCase<R: ReconcilableResource> {
+pub trait ReconcileResourceUseCase<R: ReconcilableResource>: Send + Sync {
     async fn execute(&self, id: &R::Identity) -> Result<(), ReconcileResourceUseCaseError<R>>;
 }
 

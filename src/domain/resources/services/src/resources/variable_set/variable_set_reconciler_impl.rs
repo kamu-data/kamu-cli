@@ -7,34 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResource, SecretSetReconcileSuccess};
+use kamu_resources::{ReconcilableResource, VariableSetReconcileSuccess};
 
-use crate::domain::{DeclarativeResource, Reconciler, SecretSetResource, SecretSetStats};
+use crate::domain::{DeclarativeResource, Reconciler, VariableSetResource, VariableSetStats};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SecretSetReconciler {}
+#[dill::component]
+#[dill::interface(dyn Reconciler<VariableSetResource>)]
+pub struct VariableSetReconcilerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reconciler<SecretSetResource> for SecretSetReconciler {
+impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
     async fn reconcile(
         &self,
-        resource: &SecretSetResource,
+        resource: &VariableSetResource,
     ) -> Result<
-        <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
-        <SecretSetResource as ReconcilableResource>::ReconcicleError,
+        <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
+        <VariableSetResource as ReconcilableResource>::ReconcileError,
     > {
-        let total = resource.spec().secrets.len();
+        let total = resource.spec().variables.len();
 
-        // TODO: actually synchronize secrets
+        // TODO: actually synchronize variables
 
-        Ok(SecretSetReconcileSuccess {
-            stats: SecretSetStats {
-                total_secrets: total,
-                valid_secrets: total,
-                invalid_secrets: 0,
+        Ok(VariableSetReconcileSuccess {
+            stats: VariableSetStats {
+                total_variables: total,
+                valid_variables: total,
+                invalid_variables: 0,
             },
         })
     }

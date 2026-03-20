@@ -7,12 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources as domain;
+mod reconcilable_resource_repo;
 
-mod dependencies;
-mod generic;
-mod resources;
-
-pub use dependencies::*;
-pub use generic::*;
-pub use resources::*;
+pub use reconcilable_resource_repo::*;
