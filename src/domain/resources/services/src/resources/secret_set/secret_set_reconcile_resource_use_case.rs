@@ -9,54 +9,51 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
 use kamu_resources::{
     DeclarativeResource,
-    ReconcileError,
+    ReconcilableResource,
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
+    ResourceReconcileError,
     SecretSetEventStore,
     SecretSetID,
     SecretSetResource,
-    SecretSetState,
     SecretSetStats,
-    needs_reconciliation,
 };
 use time_source::SystemTimeSource;
-
-use crate::{SecretSetReconcileError, SecretSetReconcileSuccess};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SecretSetReconcileResourceUseCaseImpl {
     event_store: Arc<dyn SecretSetEventStore>,
-    reconciler: Arc<
-        dyn Reconciler<
-                SecretSetResource,
-                Success = SecretSetReconcileSuccess,
-                Error = SecretSetReconcileError,
-            >,
-    >,
+    reconciler: Arc<dyn Reconciler<SecretSetResource>>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ReconcileResourceUseCase<SecretSetState> for SecretSetReconcileResourceUseCaseImpl {
-    async fn execute(&self, id: &SecretSetID) -> Result<(), ReconcileResourceUseCaseError> {
+impl ReconcileResourceUseCase<SecretSetResource> for SecretSetReconcileResourceUseCaseImpl {
+    async fn execute(
+        &self,
+        id: &SecretSetID,
+    ) -> Result<(), ReconcileResourceUseCaseError<SecretSetResource>> {
         let mut resource = SecretSetResource::load(id, self.event_store.as_ref())
             .await
-            .int_err()?;
-        if needs_reconciliation(resource.as_ref()) {
+            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
+        if !resource.needs_reconciliation() {
             return Ok(());
         }
 
         resource
             .try_mark_reconciliation_started(self.time_source.now())
-            .int_err()?;
-        resource.save(self.event_store.as_ref()).await.int_err()?;
+            .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
+
+        resource
+            .save(self.event_store.as_ref())
+            .await
+            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
 
         match self.reconciler.reconcile(&resource).await {
             Ok(success) => {
@@ -66,7 +63,7 @@ impl ReconcileResourceUseCase<SecretSetState> for SecretSetReconcileResourceUseC
                         resource.metadata().generation,
                         success.stats,
                     )
-                    .int_err()?;
+                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
             }
             Err(err) => {
                 resource
@@ -77,11 +74,14 @@ impl ReconcileResourceUseCase<SecretSetState> for SecretSetReconcileResourceUseC
                         err.to_string(),
                         SecretSetStats::default(),
                     )
-                    .int_err()?;
+                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
             }
         }
 
-        resource.save(self.event_store.as_ref()).await.int_err()?;
+        resource
+            .save(self.event_store.as_ref())
+            .await
+            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
 
         Ok(())
     }

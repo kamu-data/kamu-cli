@@ -9,6 +9,7 @@
 
 mod secret_set_event;
 mod secret_set_lifecycle_error;
+mod secret_set_reconcilation;
 mod secret_set_resource;
 mod secret_set_spec;
 mod secret_set_state;
@@ -16,6 +17,7 @@ mod secret_set_status;
 
 pub use secret_set_event::*;
 pub use secret_set_lifecycle_error::*;
+pub use secret_set_reconcilation::*;
 pub use secret_set_resource::*;
 pub use secret_set_spec::*;
 pub use secret_set_state::*;

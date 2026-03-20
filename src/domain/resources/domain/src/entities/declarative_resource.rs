@@ -7,48 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourceMetadata, ResourceState};
+use crate::ResourceMetadata;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait DeclarativeResource: Send + Sync {
-    type Identity;
-    type Spec;
-    type Status;
+    type Identity: std::fmt::Debug + Send + Sync;
+    type Spec: std::fmt::Debug + Send + Sync;
+    type Status: std::fmt::Debug + Send + Sync;
 
     fn id(&self) -> &Self::Identity;
     fn metadata(&self) -> &ResourceMetadata;
     fn spec(&self) -> &Self::Spec;
     fn status(&self) -> &Self::Status;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<
-    TIdentity: std::fmt::Debug + Clone + Send + Sync,
-    TSpec: std::fmt::Debug + Clone + Send + Sync,
-    TStatus: std::fmt::Debug + Clone + Send + Sync,
-> DeclarativeResource for ResourceState<TIdentity, TSpec, TStatus>
-{
-    type Identity = TIdentity;
-    type Spec = TSpec;
-    type Status = TStatus;
-
-    fn id(&self) -> &Self::Identity {
-        &self.id
-    }
-
-    fn metadata(&self) -> &ResourceMetadata {
-        &self.metadata
-    }
-
-    fn spec(&self) -> &Self::Spec {
-        &self.spec
-    }
-
-    fn status(&self) -> &Self::Status {
-        &self.status
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

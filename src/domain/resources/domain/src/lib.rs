@@ -13,8 +13,10 @@ mod entities;
 mod resources;
 mod services;
 mod use_cases;
+mod values;
 
 pub use entities::*;
 pub use resources::*;
 pub use services::*;
 pub use use_cases::*;
+pub use values::*;

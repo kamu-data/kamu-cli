@@ -7,27 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use event_sourcing::{LoadError, SaveError};
 
-use crate::DeclarativeResource;
+use crate::ReconcilableResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ReconcileResourceUseCase<R: DeclarativeResource> {
-    async fn execute(&self, id: &R::Identity) -> Result<(), ReconcileResourceUseCaseError>;
+pub trait ReconcileResourceUseCase<R: ReconcilableResource> {
+    async fn execute(&self, id: &R::Identity) -> Result<(), ReconcileResourceUseCaseError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ReconcileResourceUseCaseError {
+pub enum ReconcileResourceUseCaseError<R: ReconcilableResource> {
+    #[error("Resource with the specified identity failed to load. Reason: {0}")]
+    LoadFailed(LoadError<R::ResourceState>),
+
+    #[error("Resource with the specified identity failed to save. Reason: {0}")]
+    SaveFailed(SaveError),
+
     #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    Lifecycle(R::LifecycleError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

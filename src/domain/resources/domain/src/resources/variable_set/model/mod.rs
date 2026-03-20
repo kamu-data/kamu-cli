@@ -9,6 +9,7 @@
 
 mod variable_set_event;
 mod variable_set_lifecycle_error;
+mod variable_set_reconcilation;
 mod variable_set_resource;
 mod variable_set_spec;
 mod variable_set_state;
@@ -16,6 +17,7 @@ mod variable_set_status;
 
 pub use variable_set_event::*;
 pub use variable_set_lifecycle_error::*;
+pub use variable_set_reconcilation::*;
 pub use variable_set_resource::*;
 pub use variable_set_spec::*;
 pub use variable_set_state::*;

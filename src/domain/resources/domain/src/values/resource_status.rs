@@ -32,6 +32,10 @@ impl ResourceStatus {
         }
     }
 
+    pub fn needs_reconciliation(&self, generation: u64) -> bool {
+        self.observed_generation < generation
+    }
+
     pub fn mark_reconciling(&mut self, now: DateTime<Utc>) {
         self.phase = ResourcePhase::Reconciling;
         ResourceCondition::set_condition(

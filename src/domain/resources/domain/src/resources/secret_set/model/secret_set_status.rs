@@ -45,4 +45,15 @@ pub struct SecretSetStats {
     pub invalid_secrets: usize,
 }
 
+impl SecretSetStats {
+    pub fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
+        let total = spec.secrets.len();
+        Self {
+            total_secrets: total,
+            valid_secrets: 0,
+            invalid_secrets: 0,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

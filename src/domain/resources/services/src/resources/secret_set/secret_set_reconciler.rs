@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ReconcileError;
+use kamu_resources::{ReconcilableResource, SecretSetReconcileSuccess};
 
 use crate::domain::{DeclarativeResource, Reconciler, SecretSetResource, SecretSetStats};
 
@@ -19,10 +19,13 @@ pub struct SecretSetReconciler {}
 
 #[async_trait::async_trait]
 impl Reconciler<SecretSetResource> for SecretSetReconciler {
-    type Success = SecretSetReconcileSuccess;
-    type Error = SecretSetReconcileError;
-
-    async fn reconcile(&self, resource: &SecretSetResource) -> Result<Self::Success, Self::Error> {
+    async fn reconcile(
+        &self,
+        resource: &SecretSetResource,
+    ) -> Result<
+        <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
+        <SecretSetResource as ReconcilableResource>::ReconcicleError,
+    > {
         let total = resource.spec().secrets.len();
 
         // TODO: actually synchronize secrets
@@ -34,32 +37,6 @@ impl Reconciler<SecretSetResource> for SecretSetReconciler {
                 invalid_secrets: 0,
             },
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct SecretSetReconcileSuccess {
-    pub stats: SecretSetStats,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum SecretSetReconcileError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        internal_error::InternalError,
-    ),
-}
-
-impl ReconcileError for SecretSetReconcileError {
-    fn reason_code(&self) -> &'static str {
-        match self {
-            SecretSetReconcileError::Internal(_) => "internal_error",
-        }
     }
 }
 
