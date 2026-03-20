@@ -7,22 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::ProjectionError;
-
-use crate::{ResourceMetadataValidationError, SecretSetSpecValidationError, SecretSetState};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error)]
-pub enum SecretSetLifecycleError {
-    #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
+pub trait ResourceValidateMetadata {
+    type ValidationError;
 
-    #[error(transparent)]
-    SpecValidation(#[from] SecretSetSpecValidationError),
-
-    #[error("resource invariant violation: {0}")]
-    InvariantViolation(Box<ProjectionError<SecretSetState>>),
+    fn validate(&self) -> Result<(), Self::ValidationError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

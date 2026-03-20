@@ -10,14 +10,17 @@
 use event_sourcing::ProjectionError;
 use thiserror::Error;
 
-use crate::{VariableSetState, VariableSetValidationError};
+use crate::{ResourceMetadataValidationError, VariableSetSpecValidationError, VariableSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum VariableSetLifecycleError {
     #[error(transparent)]
-    Validation(#[from] VariableSetValidationError),
+    MetadataValidation(#[from] ResourceMetadataValidationError),
+
+    #[error(transparent)]
+    SpecValidation(#[from] VariableSetSpecValidationError),
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<VariableSetState>>),

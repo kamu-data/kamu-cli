@@ -10,15 +10,19 @@
 mod declarative_resource;
 mod resource_condition;
 mod resource_metadata;
+mod resource_metadata_input;
 mod resource_phase;
 mod resource_state;
 mod resource_status;
+mod resource_validate_metadata_spec;
 mod resource_validate_spec;
 
 pub use declarative_resource::*;
 pub use resource_condition::*;
 pub use resource_metadata::*;
+pub use resource_metadata_input::*;
 pub use resource_phase::*;
 pub use resource_state::*;
 pub use resource_status::*;
+pub use resource_validate_metadata_spec::*;
 pub use resource_validate_spec::*;

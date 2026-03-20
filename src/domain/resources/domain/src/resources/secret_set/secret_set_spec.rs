@@ -46,15 +46,15 @@ impl SecretSetSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceValidateSpec for SecretSetSpec {
-    type ValidationError = SecretSetValidationError;
+    type ValidationError = SecretSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
         if self.secrets.is_empty() {
-            return Err(SecretSetValidationError::EmptySecrets);
+            return Err(SecretSetSpecValidationError::EmptySecrets);
         }
 
         if self.secrets.len() > Self::MAX_SECRETS {
-            return Err(SecretSetValidationError::TooManySecrets {
+            return Err(SecretSetSpecValidationError::TooManySecrets {
                 actual: self.secrets.len(),
                 max: Self::MAX_SECRETS,
             });
@@ -62,15 +62,15 @@ impl ResourceValidateSpec for SecretSetSpec {
 
         for (name, secret) in &self.secrets {
             if !Self::is_valid_secret_name(name) {
-                return Err(SecretSetValidationError::InvalidSecretName { name: name.clone() });
+                return Err(SecretSetSpecValidationError::InvalidSecretName { name: name.clone() });
             }
 
             if secret.value.is_empty() {
-                return Err(SecretSetValidationError::EmptySecretValue { name: name.clone() });
+                return Err(SecretSetSpecValidationError::EmptySecretValue { name: name.clone() });
             }
 
             if secret.value.len() > Self::MAX_SECRET_VALUE_LEN {
-                return Err(SecretSetValidationError::SecretValueTooLong {
+                return Err(SecretSetSpecValidationError::SecretValueTooLong {
                     name: name.clone(),
                     actual: secret.value.len(),
                     max: Self::MAX_SECRET_VALUE_LEN,
@@ -85,7 +85,7 @@ impl ResourceValidateSpec for SecretSetSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum SecretSetValidationError {
+pub enum SecretSetSpecValidationError {
     #[error("secret set must contain at least one secret")]
     EmptySecrets,
 

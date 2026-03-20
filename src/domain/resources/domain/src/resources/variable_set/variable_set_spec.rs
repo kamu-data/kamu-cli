@@ -47,15 +47,15 @@ impl VariableSetSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceValidateSpec for VariableSetSpec {
-    type ValidationError = VariableSetValidationError;
+    type ValidationError = VariableSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
         if self.variables.is_empty() {
-            return Err(VariableSetValidationError::EmptyVariables);
+            return Err(VariableSetSpecValidationError::EmptyVariables);
         }
 
         if self.variables.len() > Self::MAX_VARIABLES {
-            return Err(VariableSetValidationError::TooManyVariables {
+            return Err(VariableSetSpecValidationError::TooManyVariables {
                 actual: self.variables.len(),
                 max: Self::MAX_VARIABLES,
             });
@@ -63,15 +63,19 @@ impl ResourceValidateSpec for VariableSetSpec {
 
         for (name, variable) in &self.variables {
             if !Self::is_valid_variable_name(name) {
-                return Err(VariableSetValidationError::InvalidVariableName { name: name.clone() });
+                return Err(VariableSetSpecValidationError::InvalidVariableName {
+                    name: name.clone(),
+                });
             }
 
             if variable.value.is_empty() {
-                return Err(VariableSetValidationError::EmptyVariableValue { name: name.clone() });
+                return Err(VariableSetSpecValidationError::EmptyVariableValue {
+                    name: name.clone(),
+                });
             }
 
             if variable.value.len() > Self::MAX_VARIABLE_VALUE_LEN {
-                return Err(VariableSetValidationError::VariableValueTooLong {
+                return Err(VariableSetSpecValidationError::VariableValueTooLong {
                     name: name.clone(),
                     actual: variable.value.len(),
                     max: Self::MAX_VARIABLE_VALUE_LEN,
@@ -86,7 +90,7 @@ impl ResourceValidateSpec for VariableSetSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum VariableSetValidationError {
+pub enum VariableSetSpecValidationError {
     #[error("variable set must contain at least one variable")]
     EmptyVariables,
 

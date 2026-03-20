@@ -10,7 +10,8 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+
+use crate::ResourceMetadataInput;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,19 +60,8 @@ impl ResourceMetadata {
         self.labels = input.labels;
         self.annotations = input.annotations;
 
-        self.generation += 1;
         self.updated_at = Utc::now();
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceMetadataInput {
-    pub name: ResourceName,
-    pub description: Option<String>,
-    pub labels: BTreeMap<String, String>,
-    pub annotations: BTreeMap<String, String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
