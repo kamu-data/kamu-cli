@@ -14,6 +14,7 @@ use crate::{
     DeclarativeResource,
     ResourceMetadata,
     ResourceMetadataInput,
+    ResourceValidateMetadata,
     ResourceValidateSpec,
     SecretSetEvent,
     SecretSetEventCreated,
@@ -45,6 +46,7 @@ impl SecretSetResource {
         metadata: ResourceMetadataInput,
         spec: SecretSetSpec,
     ) -> Result<Self, SecretSetLifecycleError> {
+        metadata.validate()?;
         spec.validate()?;
 
         Ok(Self(
@@ -70,6 +72,8 @@ impl SecretSetResource {
             return Ok(()); // No changes, skip update
         }
 
+        new_metadata.validate()?;
+
         let event = SecretSetEvent::MetadataUpdated(SecretSetEventMetadataUpdated {
             event_time: now,
             secret_set_id: self.id,
@@ -87,11 +91,11 @@ impl SecretSetResource {
         now: DateTime<Utc>,
         new_spec: SecretSetSpec,
     ) -> Result<(), SecretSetLifecycleError> {
-        new_spec.validate()?;
-
         if self.spec == new_spec {
             return Ok(()); // No changes, skip update
         }
+
+        new_spec.validate()?;
 
         let event = SecretSetEvent::SpecUpdated(SecretSetEventSpecUpdated {
             event_time: now,

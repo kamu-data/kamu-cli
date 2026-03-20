@@ -14,6 +14,7 @@ use crate::{
     DeclarativeResource,
     ResourceMetadata,
     ResourceMetadataInput,
+    ResourceValidateMetadata,
     ResourceValidateSpec,
     VariableSetEvent,
     VariableSetEventCreated,
@@ -45,6 +46,7 @@ impl VariableSetResource {
         metadata: ResourceMetadataInput,
         spec: VariableSetSpec,
     ) -> Result<Self, VariableSetLifecycleError> {
+        metadata.validate()?;
         spec.validate()?;
 
         Ok(Self(
@@ -70,6 +72,8 @@ impl VariableSetResource {
             return Ok(()); // No changes, skip update
         }
 
+        new_metadata.validate()?;
+
         let event = VariableSetEvent::MetadataUpdated(VariableSetEventMetadataUpdated {
             event_time: now,
             variable_set_id: self.id,
@@ -87,11 +91,11 @@ impl VariableSetResource {
         now: DateTime<Utc>,
         new_spec: VariableSetSpec,
     ) -> Result<(), VariableSetLifecycleError> {
-        new_spec.validate()?;
-
         if self.spec == new_spec {
             return Ok(()); // No changes, skip update
         }
+
+        new_spec.validate()?;
 
         let event = VariableSetEvent::SpecUpdated(VariableSetEventSpecUpdated {
             event_time: now,
