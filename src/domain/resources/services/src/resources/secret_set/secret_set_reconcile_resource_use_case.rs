@@ -72,6 +72,7 @@ impl ReconcileResourceUseCase<SecretSetState> for SecretSetReconcileResourceUseC
                 resource
                     .try_mark_reconciliation_failed(
                         self.time_source.now(),
+                        resource.metadata().generation,
                         err.reason_code().to_string(),
                         err.to_string(),
                         SecretSetStats::default(),
