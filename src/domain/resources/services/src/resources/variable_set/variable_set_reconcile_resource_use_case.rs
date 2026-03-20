@@ -9,54 +9,51 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
 use kamu_resources::{
     DeclarativeResource,
-    ReconcileError,
+    ReconcilableResource,
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
+    ResourceReconcileError,
     VariableSetEventStore,
     VariableSetID,
     VariableSetResource,
-    VariableSetState,
     VariableSetStats,
-    needs_reconciliation,
 };
 use time_source::SystemTimeSource;
-
-use crate::{VariableSetReconcileError, VariableSetReconcileSuccess};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VariableSetReconcileResourceUseCaseImpl {
     event_store: Arc<dyn VariableSetEventStore>,
-    reconciler: Arc<
-        dyn Reconciler<
-                VariableSetResource,
-                Success = VariableSetReconcileSuccess,
-                Error = VariableSetReconcileError,
-            >,
-    >,
+    reconciler: Arc<dyn Reconciler<VariableSetResource>>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ReconcileResourceUseCase<VariableSetState> for VariableSetReconcileResourceUseCaseImpl {
-    async fn execute(&self, id: &VariableSetID) -> Result<(), ReconcileResourceUseCaseError> {
+impl ReconcileResourceUseCase<VariableSetResource> for VariableSetReconcileResourceUseCaseImpl {
+    async fn execute(
+        &self,
+        id: &VariableSetID,
+    ) -> Result<(), ReconcileResourceUseCaseError<VariableSetResource>> {
         let mut resource = VariableSetResource::load(id, self.event_store.as_ref())
             .await
-            .int_err()?;
-        if needs_reconciliation(resource.as_ref()) {
+            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
+        if !resource.needs_reconciliation() {
             return Ok(());
         }
 
         resource
             .try_mark_reconciliation_started(self.time_source.now())
-            .int_err()?;
-        resource.save(self.event_store.as_ref()).await.int_err()?;
+            .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
+
+        resource
+            .save(self.event_store.as_ref())
+            .await
+            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
 
         match self.reconciler.reconcile(&resource).await {
             Ok(success) => {
@@ -66,7 +63,7 @@ impl ReconcileResourceUseCase<VariableSetState> for VariableSetReconcileResource
                         resource.metadata().generation,
                         success.stats,
                     )
-                    .int_err()?;
+                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
             }
             Err(err) => {
                 resource
@@ -77,11 +74,14 @@ impl ReconcileResourceUseCase<VariableSetState> for VariableSetReconcileResource
                         err.to_string(),
                         VariableSetStats::default(),
                     )
-                    .int_err()?;
+                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
             }
         }
 
-        resource.save(self.event_store.as_ref()).await.int_err()?;
+        resource
+            .save(self.event_store.as_ref())
+            .await
+            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
 
         Ok(())
     }

@@ -12,6 +12,7 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceMetadata,
     ResourceMetadataInput,
     ResourcePhase,
     ResourceValidateMetadata,
@@ -29,6 +30,7 @@ use crate::{
     SecretSetSpec,
     SecretSetState,
     SecretSetStats,
+    SecretSetStatus,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,6 +191,30 @@ impl SecretSetResource {
             },
         ))
         .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DeclarativeResource for SecretSetResource {
+    type Identity = SecretSetID;
+    type Spec = SecretSetSpec;
+    type Status = SecretSetStatus;
+
+    fn id(&self) -> &Self::Identity {
+        &self.as_ref().id
+    }
+
+    fn metadata(&self) -> &ResourceMetadata {
+        &self.as_ref().metadata
+    }
+
+    fn spec(&self) -> &Self::Spec {
+        &self.as_ref().spec
+    }
+
+    fn status(&self) -> &Self::Status {
+        &self.as_ref().status
     }
 }
 

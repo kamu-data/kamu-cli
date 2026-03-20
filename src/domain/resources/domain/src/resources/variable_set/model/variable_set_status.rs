@@ -45,4 +45,15 @@ pub struct VariableSetStats {
     pub invalid_variables: usize,
 }
 
+impl VariableSetStats {
+    pub fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
+        let total = spec.variables.len();
+        Self {
+            total_variables: total,
+            valid_variables: 0,
+            invalid_variables: 0,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

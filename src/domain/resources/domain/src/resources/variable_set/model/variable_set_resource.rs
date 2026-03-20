@@ -12,6 +12,7 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceMetadata,
     ResourceMetadataInput,
     ResourcePhase,
     ResourceValidateMetadata,
@@ -29,6 +30,7 @@ use crate::{
     VariableSetSpec,
     VariableSetState,
     VariableSetStats,
+    VariableSetStatus,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,6 +191,30 @@ impl VariableSetResource {
             },
         ))
         .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DeclarativeResource for VariableSetResource {
+    type Identity = VariableSetID;
+    type Spec = VariableSetSpec;
+    type Status = VariableSetStatus;
+
+    fn id(&self) -> &Self::Identity {
+        &self.as_ref().id
+    }
+
+    fn metadata(&self) -> &ResourceMetadata {
+        &self.as_ref().metadata
+    }
+
+    fn spec(&self) -> &Self::Spec {
+        &self.as_ref().spec
+    }
+
+    fn status(&self) -> &Self::Status {
+        &self.as_ref().status
     }
 }
 

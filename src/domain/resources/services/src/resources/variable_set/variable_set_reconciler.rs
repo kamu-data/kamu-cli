@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ReconcileError;
+use kamu_resources::{ReconcilableResource, VariableSetReconcileSuccess};
 
 use crate::domain::{DeclarativeResource, Reconciler, VariableSetResource, VariableSetStats};
 
@@ -19,13 +19,13 @@ pub struct VariableSetReconciler {}
 
 #[async_trait::async_trait]
 impl Reconciler<VariableSetResource> for VariableSetReconciler {
-    type Success = VariableSetReconcileSuccess;
-    type Error = VariableSetReconcileError;
-
     async fn reconcile(
         &self,
         resource: &VariableSetResource,
-    ) -> Result<Self::Success, Self::Error> {
+    ) -> Result<
+        <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
+        <VariableSetResource as ReconcilableResource>::ReconcicleError,
+    > {
         let total = resource.spec().variables.len();
 
         // TODO: actually synchronize variables
@@ -37,32 +37,6 @@ impl Reconciler<VariableSetResource> for VariableSetReconciler {
                 invalid_variables: 0,
             },
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct VariableSetReconcileSuccess {
-    pub stats: VariableSetStats,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum VariableSetReconcileError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        internal_error::InternalError,
-    ),
-}
-
-impl ReconcileError for VariableSetReconcileError {
-    fn reason_code(&self) -> &'static str {
-        match self {
-            VariableSetReconcileError::Internal(_) => "internal_error",
-        }
     }
 }
 
