@@ -12,13 +12,15 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ResourceID,
     ResourceMetadata,
+    ResourceMetadataInput,
     ResourceValidateSpec,
     VariableSetEvent,
     VariableSetEventCreated,
+    VariableSetEventMetadataUpdated,
     VariableSetEventSpecUpdated,
     VariableSetEventStore,
+    VariableSetID,
     VariableSetLifecycleError,
     VariableSetSpec,
     VariableSetState,
@@ -32,8 +34,6 @@ pub struct VariableSetResource(Aggregate<VariableSetState, VariableSetEventStore
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetID = ResourceID;
-
 type VariableSetEventStoreStatic = dyn VariableSetEventStore + 'static;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ impl VariableSetResource {
     pub fn try_create(
         now: DateTime<Utc>,
         variable_set_id: VariableSetID,
-        name: String,
+        metadata: ResourceMetadataInput,
         spec: VariableSetSpec,
     ) -> Result<Self, VariableSetLifecycleError> {
         spec.validate()?;
@@ -53,12 +53,33 @@ impl VariableSetResource {
                 VariableSetEventCreated {
                     event_time: now,
                     variable_set_id,
-                    name,
+                    metadata,
                     spec,
                 },
             )
             .unwrap(),
         ))
+    }
+
+    pub fn try_update_metadata(
+        &mut self,
+        now: DateTime<Utc>,
+        new_metadata: ResourceMetadataInput,
+    ) -> Result<(), VariableSetLifecycleError> {
+        if self.metadata.is_equivalent_to(&new_metadata) {
+            return Ok(()); // No changes, skip update
+        }
+
+        let event = VariableSetEvent::MetadataUpdated(VariableSetEventMetadataUpdated {
+            event_time: now,
+            variable_set_id: self.id,
+            new_metadata,
+        });
+
+        self.apply(event)
+            .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))?;
+
+        Ok(())
     }
 
     pub fn try_update_spec(
@@ -74,10 +95,11 @@ impl VariableSetResource {
 
         let event = VariableSetEvent::SpecUpdated(VariableSetEventSpecUpdated {
             event_time: now,
-            variable_set_id: self.metadata.uid,
+            variable_set_id: self.id,
             new_spec,
             new_generation: self.metadata.generation + 1,
         });
+
         self.apply(event)
             .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))?;
 

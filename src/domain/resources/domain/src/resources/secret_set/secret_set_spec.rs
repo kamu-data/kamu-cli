@@ -17,7 +17,6 @@ use crate::ResourceValidateSpec;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecretSetSpec {
-    pub description: Option<String>,
     pub secrets: BTreeMap<String, SecretSpec>,
 }
 
@@ -30,7 +29,6 @@ pub struct SecretSpec {
 
 impl SecretSetSpec {
     pub const MAX_SECRETS: usize = 256;
-    pub const MAX_DESCRIPTION_LEN: usize = 4096;
     pub const MAX_SECRET_VALUE_LEN: usize = 16 * 1024;
 
     fn is_valid_secret_name(name: &str) -> bool {
@@ -59,15 +57,6 @@ impl ResourceValidateSpec for SecretSetSpec {
             return Err(SecretSetValidationError::TooManySecrets {
                 actual: self.secrets.len(),
                 max: Self::MAX_SECRETS,
-            });
-        }
-
-        if let Some(description) = &self.description
-            && description.len() > Self::MAX_DESCRIPTION_LEN
-        {
-            return Err(SecretSetValidationError::DescriptionTooLong {
-                actual: description.len(),
-                max: Self::MAX_DESCRIPTION_LEN,
             });
         }
 

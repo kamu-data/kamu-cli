@@ -18,7 +18,6 @@ use crate::ResourceValidateSpec;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VariableSetSpec {
-    pub description: Option<String>,
     pub variables: BTreeMap<String, VariableSpec>,
 }
 
@@ -31,7 +30,6 @@ pub struct VariableSpec {
 
 impl VariableSetSpec {
     pub const MAX_VARIABLES: usize = 256;
-    pub const MAX_DESCRIPTION_LEN: usize = 4096;
     pub const MAX_VARIABLE_VALUE_LEN: usize = 16 * 1024;
 
     fn is_valid_variable_name(name: &str) -> bool {
@@ -60,15 +58,6 @@ impl ResourceValidateSpec for VariableSetSpec {
             return Err(VariableSetValidationError::TooManyVariables {
                 actual: self.variables.len(),
                 max: Self::MAX_VARIABLES,
-            });
-        }
-
-        if let Some(description) = &self.description
-            && description.len() > Self::MAX_DESCRIPTION_LEN
-        {
-            return Err(VariableSetValidationError::DescriptionTooLong {
-                actual: description.len(),
-                max: Self::MAX_DESCRIPTION_LEN,
             });
         }
 
