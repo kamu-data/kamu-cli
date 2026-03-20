@@ -16,7 +16,7 @@ use crate::{DeclarativeResource, ResourceReconcileError};
 
 pub trait ReconcilableResource: DeclarativeResource {
     type ReconcileSuccess;
-    type ReconcicleError: ResourceReconcileError;
+    type ReconcileError: ResourceReconcileError;
     type LifecycleError;
     type ResourceState: Projection;
 
@@ -38,7 +38,7 @@ pub trait ReconcilableResource: DeclarativeResource {
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
-        error: &Self::ReconcicleError,
+        error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError>;
 }
 

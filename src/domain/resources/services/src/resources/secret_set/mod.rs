@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod secret_set_reconcile_resource_use_case;
-mod secret_set_reconciler;
+mod secret_set_reconciler_impl;
+mod secret_set_repo_adapter;
 
 pub use secret_set_reconcile_resource_use_case::*;
-pub use secret_set_reconciler::*;
+pub use secret_set_reconciler_impl::*;
+pub use secret_set_repo_adapter::*;

@@ -9,42 +9,37 @@
 
 use std::sync::Arc;
 
-use kamu_resources::{
+use event_sourcing::{LoadError, SaveError};
+
+use crate::domain::{
     ReconcilableResourceRepository,
-    ReconcileResourceUseCase,
-    ReconcileResourceUseCaseError,
-    Reconciler,
+    VariableSetEventStore,
     VariableSetID,
     VariableSetResource,
+    VariableSetState,
 };
-use time_source::SystemTimeSource;
-
-use crate::ReconcileResourceUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ReconcileResourceUseCase<VariableSetResource>)]
-pub struct VariableSetReconcileResourceUseCaseImpl {
-    repo: Arc<dyn ReconcilableResourceRepository<VariableSetResource>>,
-    reconciler: Arc<dyn Reconciler<VariableSetResource>>,
-    time_source: Arc<dyn SystemTimeSource>,
+#[dill::interface(dyn ReconcilableResourceRepository<VariableSetResource>)]
+pub struct VariableSetResourceRepositoryAdapter {
+    event_store: Arc<dyn VariableSetEventStore>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ReconcileResourceUseCase<VariableSetResource> for VariableSetReconcileResourceUseCaseImpl {
-    async fn execute(
+impl ReconcilableResourceRepository<VariableSetResource> for VariableSetResourceRepositoryAdapter {
+    async fn load(
         &self,
         id: &VariableSetID,
-    ) -> Result<(), ReconcileResourceUseCaseError<VariableSetResource>> {
-        let helper = ReconcileResourceUseCaseHelper::new(
-            self.repo.as_ref(),
-            self.reconciler.as_ref(),
-            self.time_source.as_ref(),
-        );
-        helper.execute_reconciliation(id).await
+    ) -> Result<VariableSetResource, LoadError<VariableSetState>> {
+        VariableSetResource::load(id, self.event_store.as_ref()).await
+    }
+
+    async fn save(&self, resource: &mut VariableSetResource) -> Result<(), SaveError> {
+        resource.save(self.event_store.as_ref()).await
     }
 }
 

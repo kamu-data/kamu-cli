@@ -10,23 +10,23 @@
 use std::sync::Arc;
 
 use kamu_resources::{
-    DeclarativeResource,
-    ReconcilableResource,
+    ReconcilableResourceRepository,
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
-    ResourceReconcileError,
-    SecretSetEventStore,
     SecretSetID,
     SecretSetResource,
-    SecretSetStats,
 };
 use time_source::SystemTimeSource;
 
+use crate::ReconcileResourceUseCaseHelper;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn ReconcileResourceUseCase<SecretSetResource>)]
 pub struct SecretSetReconcileResourceUseCaseImpl {
-    event_store: Arc<dyn SecretSetEventStore>,
+    repo: Arc<dyn ReconcilableResourceRepository<SecretSetResource>>,
     reconciler: Arc<dyn Reconciler<SecretSetResource>>,
     time_source: Arc<dyn SystemTimeSource>,
 }
@@ -39,51 +39,12 @@ impl ReconcileResourceUseCase<SecretSetResource> for SecretSetReconcileResourceU
         &self,
         id: &SecretSetID,
     ) -> Result<(), ReconcileResourceUseCaseError<SecretSetResource>> {
-        let mut resource = SecretSetResource::load(id, self.event_store.as_ref())
-            .await
-            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
-        if !resource.needs_reconciliation() {
-            return Ok(());
-        }
-
-        resource
-            .try_mark_reconciliation_started(self.time_source.now())
-            .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
-
-        resource
-            .save(self.event_store.as_ref())
-            .await
-            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
-
-        match self.reconciler.reconcile(&resource).await {
-            Ok(success) => {
-                resource
-                    .try_mark_reconciliation_succeeded(
-                        self.time_source.now(),
-                        resource.metadata().generation,
-                        success.stats,
-                    )
-                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
-            }
-            Err(err) => {
-                resource
-                    .try_mark_reconciliation_failed(
-                        self.time_source.now(),
-                        resource.metadata().generation,
-                        err.reason_code().to_string(),
-                        err.to_string(),
-                        SecretSetStats::default(),
-                    )
-                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
-            }
-        }
-
-        resource
-            .save(self.event_store.as_ref())
-            .await
-            .map_err(ReconcileResourceUseCaseError::SaveFailed)?;
-
-        Ok(())
+        let helper = ReconcileResourceUseCaseHelper::new(
+            self.repo.as_ref(),
+            self.reconciler.as_ref(),
+            self.time_source.as_ref(),
+        );
+        helper.execute_reconciliation(id).await
     }
 }
 

@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod variable_set_reconcile_resource_use_case;
-mod variable_set_reconciler;
+mod variable_set_reconciler_impl;
+mod variable_set_repo_adapter;
 
 pub use variable_set_reconcile_resource_use_case::*;
-pub use variable_set_reconciler::*;
+pub use variable_set_reconciler_impl::*;
+pub use variable_set_repo_adapter::*;

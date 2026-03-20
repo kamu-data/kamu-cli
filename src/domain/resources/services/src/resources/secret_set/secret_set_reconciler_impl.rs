@@ -7,34 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResource, VariableSetReconcileSuccess};
+use kamu_resources::{ReconcilableResource, SecretSetReconcileSuccess};
 
-use crate::domain::{DeclarativeResource, Reconciler, VariableSetResource, VariableSetStats};
+use crate::domain::{DeclarativeResource, Reconciler, SecretSetResource, SecretSetStats};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct VariableSetReconciler {}
+#[dill::component]
+#[dill::interface(dyn Reconciler<SecretSetResource>)]
+pub struct SecretSetReconcilerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reconciler<VariableSetResource> for VariableSetReconciler {
+impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
     async fn reconcile(
         &self,
-        resource: &VariableSetResource,
+        resource: &SecretSetResource,
     ) -> Result<
-        <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
-        <VariableSetResource as ReconcilableResource>::ReconcicleError,
+        <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
+        <SecretSetResource as ReconcilableResource>::ReconcileError,
     > {
-        let total = resource.spec().variables.len();
+        let total = resource.spec().secrets.len();
 
-        // TODO: actually synchronize variables
+        // TODO: actually synchronize secrets
 
-        Ok(VariableSetReconcileSuccess {
-            stats: VariableSetStats {
-                total_variables: total,
-                valid_variables: total,
-                invalid_variables: 0,
+        Ok(SecretSetReconcileSuccess {
+            stats: SecretSetStats {
+                total_secrets: total,
+                valid_secrets: total,
+                invalid_secrets: 0,
             },
         })
     }

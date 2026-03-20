@@ -23,7 +23,7 @@ use crate::{
 
 impl ReconcilableResource for VariableSetResource {
     type ReconcileSuccess = VariableSetReconcileSuccess;
-    type ReconcicleError = VariableSetReconcileError;
+    type ReconcileError = VariableSetReconcileError;
     type LifecycleError = VariableSetLifecycleError;
     type ResourceState = VariableSetState;
 
@@ -59,7 +59,7 @@ impl ReconcilableResource for VariableSetResource {
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
-        error: &Self::ReconcicleError,
+        error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError> {
         VariableSetResource::try_mark_reconciliation_failed(
             self,
@@ -74,6 +74,7 @@ impl ReconcilableResource for VariableSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct VariableSetReconcileSuccess {
     pub stats: VariableSetStats,
 }
