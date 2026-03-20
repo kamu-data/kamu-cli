@@ -13,7 +13,6 @@ use crate::{
     ResourceMetadata,
     ResourceState,
     VariableSetEvent,
-    VariableSetID,
     VariableSetSpec,
     VariableSetStats,
     VariableSetStatus,
@@ -21,7 +20,9 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetState = ResourceState<VariableSetSpec, VariableSetStatus>;
+pub type VariableSetID = uuid::Uuid;
+
+pub type VariableSetState = ResourceState<VariableSetID, VariableSetSpec, VariableSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,14 +38,8 @@ impl Projection for VariableSetState {
                 let total = e.spec.variables.len();
 
                 Ok(Self {
-                    metadata: ResourceMetadata {
-                        uid: e.variable_set_id,
-                        name: e.name,
-                        generation: 1,
-                        created_at: e.event_time,
-                        updated_at: e.event_time,
-                        deleted_at: None,
-                    },
+                    id: e.variable_set_id,
+                    metadata: ResourceMetadata::from(e.metadata),
                     spec: e.spec,
                     status: VariableSetStatus::new_pending(VariableSetStats {
                         total_variables: total,
@@ -54,8 +49,16 @@ impl Projection for VariableSetState {
                 })
             }
 
+            (Some(mut s), E::MetadataUpdated(e)) => {
+                assert_eq!(s.id, e.variable_set_id);
+
+                s.metadata.update(e.new_metadata);
+
+                Ok(s)
+            }
+
             (Some(mut s), E::SpecUpdated(e)) => {
-                assert_eq!(s.metadata.uid, e.variable_set_id);
+                assert_eq!(s.id, e.variable_set_id);
 
                 let total = e.new_spec.variables.len();
 
@@ -74,7 +77,7 @@ impl Projection for VariableSetState {
             }
 
             (Some(mut s), E::ReconciliationStarted(e)) => {
-                assert_eq!(s.metadata.uid, e.variable_set_id);
+                assert_eq!(s.id, e.variable_set_id);
 
                 s.status.resource_status.mark_reconciling(e.event_time);
 
@@ -82,7 +85,7 @@ impl Projection for VariableSetState {
             }
 
             (Some(mut s), E::ReconciliationSucceeded(e)) => {
-                assert_eq!(s.metadata.uid, e.variable_set_id);
+                assert_eq!(s.id, e.variable_set_id);
 
                 s.status
                     .resource_status
@@ -93,7 +96,7 @@ impl Projection for VariableSetState {
             }
 
             (Some(mut s), E::ReconciliationFailed(e)) => {
-                assert_eq!(s.metadata.uid, e.variable_set_id);
+                assert_eq!(s.id, e.variable_set_id);
 
                 s.status.resource_status.mark_failed(
                     e.event_time,

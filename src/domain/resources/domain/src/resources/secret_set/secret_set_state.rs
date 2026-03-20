@@ -13,7 +13,6 @@ use crate::{
     ResourceMetadata,
     ResourceState,
     SecretSetEvent,
-    SecretSetID,
     SecretSetSpec,
     SecretSetStats,
     SecretSetStatus,
@@ -21,7 +20,9 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetState = ResourceState<SecretSetSpec, SecretSetStatus>;
+pub type SecretSetID = uuid::Uuid;
+
+pub type SecretSetState = ResourceState<SecretSetID, SecretSetSpec, SecretSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,14 +38,8 @@ impl Projection for SecretSetState {
                 let total = e.spec.secrets.len();
 
                 Ok(Self {
-                    metadata: ResourceMetadata {
-                        uid: e.secret_set_id,
-                        name: e.name,
-                        generation: 1,
-                        created_at: e.event_time,
-                        updated_at: e.event_time,
-                        deleted_at: None,
-                    },
+                    id: e.secret_set_id,
+                    metadata: ResourceMetadata::from(e.metadata),
                     spec: e.spec,
                     status: SecretSetStatus::new_pending(SecretSetStats {
                         total_secrets: total,
@@ -54,8 +49,16 @@ impl Projection for SecretSetState {
                 })
             }
 
+            (Some(mut s), E::MetadataUpdated(e)) => {
+                assert_eq!(s.id, e.secret_set_id);
+
+                s.metadata.update(e.new_metadata);
+
+                Ok(s)
+            }
+
             (Some(mut s), E::SpecUpdated(e)) => {
-                assert_eq!(s.metadata.uid, e.secret_set_id);
+                assert_eq!(s.id, e.secret_set_id);
 
                 let total = e.new_spec.secrets.len();
 
@@ -74,7 +77,7 @@ impl Projection for SecretSetState {
             }
 
             (Some(mut s), E::ReconciliationStarted(e)) => {
-                assert_eq!(s.metadata.uid, e.secret_set_id);
+                assert_eq!(s.id, e.secret_set_id);
 
                 s.status.resource_status.mark_reconciling(e.event_time);
 
@@ -82,7 +85,7 @@ impl Projection for SecretSetState {
             }
 
             (Some(mut s), E::ReconciliationSucceeded(e)) => {
-                assert_eq!(s.metadata.uid, e.secret_set_id);
+                assert_eq!(s.id, e.secret_set_id);
 
                 s.status
                     .resource_status
@@ -93,7 +96,7 @@ impl Projection for SecretSetState {
             }
 
             (Some(mut s), E::ReconciliationFailed(e)) => {
-                assert_eq!(s.metadata.uid, e.secret_set_id);
+                assert_eq!(s.id, e.secret_set_id);
 
                 s.status.resource_status.mark_failed(
                     e.event_time,

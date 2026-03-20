@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceName, VariableSetID, VariableSetSpec, VariableSetStats};
+use crate::{ResourceMetadataInput, VariableSetID, VariableSetSpec, VariableSetStats};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +19,7 @@ use crate::{ResourceName, VariableSetID, VariableSetSpec, VariableSetStats};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VariableSetEvent {
     Created(VariableSetEventCreated),
+    MetadataUpdated(VariableSetEventMetadataUpdated),
     SpecUpdated(VariableSetEventSpecUpdated),
     ReconciliationStarted(VariableSetEventReconciliationStarted),
     ReconciliationSucceeded(VariableSetEventReconciliationSucceeded),
@@ -31,8 +32,17 @@ pub enum VariableSetEvent {
 pub struct VariableSetEventCreated {
     pub event_time: DateTime<Utc>,
     pub variable_set_id: VariableSetID,
-    pub name: ResourceName,
+    pub metadata: ResourceMetadataInput,
     pub spec: VariableSetSpec,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VariableSetEventMetadataUpdated {
+    pub event_time: DateTime<Utc>,
+    pub variable_set_id: VariableSetID,
+    pub new_metadata: ResourceMetadataInput,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,6 +92,7 @@ impl VariableSetEvent {
     pub fn variable_set_id(&self) -> &VariableSetID {
         match self {
             VariableSetEvent::Created(e) => &e.variable_set_id,
+            VariableSetEvent::MetadataUpdated(e) => &e.variable_set_id,
             VariableSetEvent::SpecUpdated(e) => &e.variable_set_id,
             VariableSetEvent::ReconciliationStarted(e) => &e.variable_set_id,
             VariableSetEvent::ReconciliationSucceeded(e) => &e.variable_set_id,
@@ -94,6 +105,9 @@ impl VariableSetEvent {
 
 impl_enum_with_variants!(VariableSetEvent);
 impl_enum_variant!(VariableSetEvent::Created(VariableSetEventCreated));
+impl_enum_variant!(VariableSetEvent::MetadataUpdated(
+    VariableSetEventMetadataUpdated
+));
 impl_enum_variant!(VariableSetEvent::SpecUpdated(VariableSetEventSpecUpdated));
 impl_enum_variant!(VariableSetEvent::ReconciliationStarted(
     VariableSetEventReconciliationStarted

@@ -12,13 +12,15 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ResourceID,
     ResourceMetadata,
+    ResourceMetadataInput,
     ResourceValidateSpec,
     SecretSetEvent,
     SecretSetEventCreated,
+    SecretSetEventMetadataUpdated,
     SecretSetEventSpecUpdated,
     SecretSetEventStore,
+    SecretSetID,
     SecretSetLifecycleError,
     SecretSetSpec,
     SecretSetState,
@@ -32,8 +34,6 @@ pub struct SecretSetResource(Aggregate<SecretSetState, SecretSetEventStoreStatic
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetID = ResourceID;
-
 type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ impl SecretSetResource {
     pub fn try_create(
         now: DateTime<Utc>,
         secret_set_id: SecretSetID,
-        name: String,
+        metadata: ResourceMetadataInput,
         spec: SecretSetSpec,
     ) -> Result<Self, SecretSetLifecycleError> {
         spec.validate()?;
@@ -53,12 +53,33 @@ impl SecretSetResource {
                 SecretSetEventCreated {
                     event_time: now,
                     secret_set_id,
-                    name,
+                    metadata,
                     spec,
                 },
             )
             .unwrap(),
         ))
+    }
+
+    pub fn try_update_metadata(
+        &mut self,
+        now: DateTime<Utc>,
+        new_metadata: ResourceMetadataInput,
+    ) -> Result<(), SecretSetLifecycleError> {
+        if self.metadata.is_equivalent_to(&new_metadata) {
+            return Ok(()); // No changes, skip update
+        }
+
+        let event = SecretSetEvent::MetadataUpdated(SecretSetEventMetadataUpdated {
+            event_time: now,
+            secret_set_id: self.id,
+            new_metadata,
+        });
+
+        self.apply(event)
+            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?;
+
+        Ok(())
     }
 
     pub fn try_update_spec(
@@ -74,10 +95,11 @@ impl SecretSetResource {
 
         let event = SecretSetEvent::SpecUpdated(SecretSetEventSpecUpdated {
             event_time: now,
-            secret_set_id: self.metadata.uid,
+            secret_set_id: self.id,
             new_spec,
             new_generation: self.metadata.generation + 1,
         });
+
         self.apply(event)
             .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?;
 

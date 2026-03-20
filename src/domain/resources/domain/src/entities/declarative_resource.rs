@@ -22,8 +22,11 @@ pub trait DeclarativeResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec: std::fmt::Debug + Clone, TStatus: std::fmt::Debug + Clone> DeclarativeResource
-    for ResourceState<TSpec, TStatus>
+impl<
+    TIdentity: std::fmt::Debug + Clone,
+    TSpec: std::fmt::Debug + Clone,
+    TStatus: std::fmt::Debug + Clone,
+> DeclarativeResource for ResourceState<TIdentity, TSpec, TStatus>
 {
     type Spec = TSpec;
     type Status = TStatus;
