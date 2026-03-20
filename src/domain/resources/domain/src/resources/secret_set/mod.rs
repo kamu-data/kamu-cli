@@ -7,20 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod secret_set_event;
-mod secret_set_event_store;
-mod secret_set_lifecycle_error;
-mod secret_set_reconciler;
-mod secret_set_resource;
-mod secret_set_spec;
-mod secret_set_state;
-mod secret_set_status;
+mod model;
+mod repo;
 
-pub use secret_set_event::*;
-pub use secret_set_event_store::*;
-pub use secret_set_lifecycle_error::*;
-pub use secret_set_reconciler::*;
-pub use secret_set_resource::*;
-pub use secret_set_spec::*;
-pub use secret_set_state::*;
-pub use secret_set_status::*;
+pub use model::*;
+pub use repo::*;

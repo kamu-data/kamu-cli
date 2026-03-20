@@ -39,7 +39,7 @@ impl Projection for VariableSetState {
 
                 Ok(Self {
                     id: e.variable_set_id,
-                    metadata: ResourceMetadata::from(e.metadata),
+                    metadata: ResourceMetadata::from_input(e.event_time, e.metadata),
                     spec: e.spec,
                     status: VariableSetStatus::new_pending(VariableSetStats {
                         total_variables: total,
@@ -52,7 +52,7 @@ impl Projection for VariableSetState {
             (Some(mut s), E::MetadataUpdated(e)) => {
                 assert_eq!(s.id, e.variable_set_id);
 
-                s.metadata.update(e.new_metadata);
+                s.metadata.apply_update(e.event_time, e.new_metadata);
 
                 Ok(s)
             }
@@ -66,7 +66,7 @@ impl Projection for VariableSetState {
                 s.metadata.generation = e.new_generation;
                 s.metadata.updated_at = e.event_time;
 
-                s.status.resource_status.reset_for_new_spec();
+                s.status.resource_status.mark_pending_for_new_generation();
                 s.status.stats = VariableSetStats {
                     total_variables: total,
                     valid_variables: 0,

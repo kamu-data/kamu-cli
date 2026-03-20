@@ -13,9 +13,9 @@ use crate::ResourceMetadata;
 
 #[derive(Debug, Clone)]
 pub struct ResourceState<
-    TIdentity: std::fmt::Debug + Clone,
-    TSpec: std::fmt::Debug + Clone,
-    TStatus: std::fmt::Debug + Clone,
+    TIdentity: std::fmt::Debug + Clone + Send + Sync,
+    TSpec: std::fmt::Debug + Clone + Send + Sync,
+    TStatus: std::fmt::Debug + Clone + Send + Sync,
 > {
     pub id: TIdentity,
     pub metadata: ResourceMetadata,

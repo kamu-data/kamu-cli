@@ -7,14 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod secret_set_event;
+mod secret_set_lifecycle_error;
+mod secret_set_resource;
+mod secret_set_spec;
+mod secret_set_state;
+mod secret_set_status;
 
-mod entities;
-mod resources;
-mod services;
-mod use_cases;
-
-pub use entities::*;
-pub use resources::*;
-pub use services::*;
-pub use use_cases::*;
+pub use secret_set_event::*;
+pub use secret_set_lifecycle_error::*;
+pub use secret_set_resource::*;
+pub use secret_set_spec::*;
+pub use secret_set_state::*;
+pub use secret_set_status::*;

@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::ResourceStatus;
+use crate::{ResourceStatus, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,6 +27,12 @@ impl VariableSetStatus {
             resource_status: ResourceStatus::new_pending(),
             stats,
         }
+    }
+}
+
+impl ResourceStatusLike for VariableSetStatus {
+    fn resource_status(&self) -> &ResourceStatus {
+        &self.resource_status
     }
 }
 

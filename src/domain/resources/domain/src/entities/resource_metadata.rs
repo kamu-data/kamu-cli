@@ -31,22 +31,20 @@ pub struct ResourceMetadata {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-impl From<ResourceMetadataInput> for ResourceMetadata {
-    fn from(input: ResourceMetadataInput) -> Self {
+impl ResourceMetadata {
+    pub fn from_input(now: DateTime<Utc>, input: ResourceMetadataInput) -> Self {
         Self {
             name: input.name,
             description: input.description,
             labels: input.labels,
             annotations: input.annotations,
             generation: 1,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
             deleted_at: None,
         }
     }
-}
 
-impl ResourceMetadata {
     pub fn is_equivalent_to(&self, input: &ResourceMetadataInput) -> bool {
         self.name == input.name
             && self.description == input.description
@@ -54,13 +52,13 @@ impl ResourceMetadata {
             && self.annotations == input.annotations
     }
 
-    pub fn update(&mut self, input: ResourceMetadataInput) {
+    pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceMetadataInput) {
         self.name = input.name;
         self.description = input.description;
         self.labels = input.labels;
         self.annotations = input.annotations;
 
-        self.updated_at = Utc::now();
+        self.updated_at = now;
     }
 }
 

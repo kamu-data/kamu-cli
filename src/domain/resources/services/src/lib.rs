@@ -9,12 +9,8 @@
 
 #![feature(error_generic_member_access)]
 
-mod entities;
-mod resources;
-mod services;
-mod use_cases;
+use kamu_resources as domain;
 
-pub use entities::*;
+mod resources;
+
 pub use resources::*;
-pub use services::*;
-pub use use_cases::*;

@@ -7,20 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod variable_set_event;
-mod variable_set_event_store;
-mod variable_set_lifecycle_error;
-mod variable_set_reconciler;
-mod variable_set_resource;
-mod variable_set_spec;
-mod variable_set_state;
-mod variable_set_status;
+mod model;
+mod repo;
 
-pub use variable_set_event::*;
-pub use variable_set_event_store::*;
-pub use variable_set_lifecycle_error::*;
-pub use variable_set_reconciler::*;
-pub use variable_set_resource::*;
-pub use variable_set_spec::*;
-pub use variable_set_state::*;
-pub use variable_set_status::*;
+pub use model::*;
+pub use repo::*;

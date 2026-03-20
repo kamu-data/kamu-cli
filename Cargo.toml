@@ -57,6 +57,7 @@ members = [
     "src/domain/auth-web3/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
+    "src/domain/resources/services",
     "src/domain/search/services",
     "src/domain/task-system/services",
     "src/domain/webhooks/services",
@@ -207,6 +208,7 @@ kamu-datasets-services = { version = "0.261.0", path = "src/domain/datasets/serv
     "s3",
 ] }
 kamu-flow-system-services = { version = "0.261.0", path = "src/domain/flow-system/services", default-features = false }
+kamu-resources-services = { version = "0.261.0", path = "src/domain/resources/services", default-features = false }
 kamu-search-services = { version = "0.261.0", path = "src/domain/search/services", default-features = false }
 kamu-task-system-services = { version = "0.261.0", path = "src/domain/task-system/services", default-features = false }
 kamu-webhooks-services = { version = "0.261.0", path = "src/domain/webhooks/services", default-features = false }

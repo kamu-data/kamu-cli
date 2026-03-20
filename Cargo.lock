@@ -8608,6 +8608,25 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-services"
+version = "0.261.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "kamu-resources",
+ "serde",
+ "thiserror 2.0.18",
+ "time-source",
+ "tokio-stream",
  "uuid",
 ]
 

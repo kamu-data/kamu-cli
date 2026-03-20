@@ -11,10 +11,12 @@ use crate::{ResourceMetadata, ResourceState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait DeclarativeResource {
+pub trait DeclarativeResource: Send + Sync {
+    type Identity;
     type Spec;
     type Status;
 
+    fn id(&self) -> &Self::Identity;
     fn metadata(&self) -> &ResourceMetadata;
     fn spec(&self) -> &Self::Spec;
     fn status(&self) -> &Self::Status;
@@ -23,13 +25,18 @@ pub trait DeclarativeResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<
-    TIdentity: std::fmt::Debug + Clone,
-    TSpec: std::fmt::Debug + Clone,
-    TStatus: std::fmt::Debug + Clone,
+    TIdentity: std::fmt::Debug + Clone + Send + Sync,
+    TSpec: std::fmt::Debug + Clone + Send + Sync,
+    TStatus: std::fmt::Debug + Clone + Send + Sync,
 > DeclarativeResource for ResourceState<TIdentity, TSpec, TStatus>
 {
+    type Identity = TIdentity;
     type Spec = TSpec;
     type Status = TStatus;
+
+    fn id(&self) -> &Self::Identity {
+        &self.id
+    }
 
     fn metadata(&self) -> &ResourceMetadata {
         &self.metadata

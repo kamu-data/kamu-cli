@@ -7,18 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::DeclarativeResource;
+use crate::{DeclarativeResource, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait Reconciler<R>
-where
-    R: DeclarativeResource + Send + Sync,
-{
-    type Error;
+pub trait Reconciler<R>: Send + Sync {
+    type Success;
+    type Error: ReconcileError;
 
-    async fn reconcile(&self, resource: &mut R) -> Result<(), Self::Error>;
+    async fn reconcile(&self, resource: &R) -> Result<Self::Success, Self::Error>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn needs_reconciliation<R>(resource: &R) -> bool
+where
+    R: DeclarativeResource,
+    R::Status: ResourceStatusLike,
+{
+    resource.status().resource_status().observed_generation < resource.metadata().generation
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ReconcileError: std::error::Error {
+    fn reason_code(&self) -> &'static str;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
