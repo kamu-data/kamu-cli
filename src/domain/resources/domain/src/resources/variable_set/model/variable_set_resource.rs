@@ -62,7 +62,7 @@ impl VariableSetResource {
                     spec,
                 },
             )
-            .unwrap(),
+            .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))?,
         ))
     }
 
@@ -164,10 +164,20 @@ impl VariableSetResource {
     pub fn try_mark_reconciliation_failed(
         &mut self,
         now: DateTime<Utc>,
+        expected_generation: u64,
         reason: String,
         message: String,
         stats: VariableSetStats,
     ) -> Result<(), VariableSetLifecycleError> {
+        if self.metadata().generation != expected_generation {
+            tracing::warn!(
+                expected_generation,
+                current_generation = self.metadata().generation,
+                "Attempting to mark reconciliation failed for wrong resource generation.",
+            );
+            return Ok(()); // Skip update if generation doesn't match
+        }
+
         self.apply(VariableSetEvent::ReconciliationFailed(
             VariableSetEventReconciliationFailed {
                 event_time: now,

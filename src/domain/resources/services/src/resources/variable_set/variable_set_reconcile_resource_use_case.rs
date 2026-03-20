@@ -72,6 +72,7 @@ impl ReconcileResourceUseCase<VariableSetState> for VariableSetReconcileResource
                 resource
                     .try_mark_reconciliation_failed(
                         self.time_source.now(),
+                        resource.metadata().generation,
                         err.reason_code().to_string(),
                         err.to_string(),
                         VariableSetStats::default(),
