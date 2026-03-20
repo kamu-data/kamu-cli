@@ -7,36 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
+use internal_error::InternalError;
 
-use crate::ResourceStatus;
+use crate::DeclarativeResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecretSetStatus {
-    #[serde(flatten)]
-    pub resource_status: ResourceStatus,
-
-    pub stats: SecretSetStats,
-}
-
-impl SecretSetStatus {
-    pub fn new_pending(stats: SecretSetStats) -> Self {
-        Self {
-            resource_status: ResourceStatus::new_pending(),
-            stats,
-        }
-    }
+#[async_trait::async_trait]
+pub trait ReconcileResourceUseCase<R: DeclarativeResource> {
+    async fn execute(&self, id: &R::Identity) -> Result<(), ReconcileResourceUseCaseError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct SecretSetStats {
-    pub total_secrets: usize,
-    pub valid_secrets: usize,
-    pub invalid_secrets: usize,
+#[derive(thiserror::Error, Debug)]
+pub enum ReconcileResourceUseCaseError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

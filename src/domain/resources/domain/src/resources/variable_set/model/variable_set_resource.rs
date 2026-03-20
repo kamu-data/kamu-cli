@@ -12,20 +12,23 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ResourceMetadata,
     ResourceMetadataInput,
+    ResourcePhase,
     ResourceValidateMetadata,
     ResourceValidateSpec,
     VariableSetEvent,
     VariableSetEventCreated,
     VariableSetEventMetadataUpdated,
+    VariableSetEventReconciliationFailed,
+    VariableSetEventReconciliationStarted,
+    VariableSetEventReconciliationSucceeded,
     VariableSetEventSpecUpdated,
     VariableSetEventStore,
     VariableSetID,
     VariableSetLifecycleError,
     VariableSetSpec,
     VariableSetState,
-    VariableSetStatus,
+    VariableSetStats,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,24 +112,73 @@ impl VariableSetResource {
 
         Ok(())
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    pub fn try_mark_reconciliation_started(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), VariableSetLifecycleError> {
+        if self.status().resource_status.observed_generation == self.metadata().generation {
+            return Ok(());
+        }
 
-impl DeclarativeResource for VariableSetResource {
-    type Spec = VariableSetSpec;
-    type Status = VariableSetStatus;
+        if self.status().resource_status.phase == ResourcePhase::Reconciling {
+            return Ok(());
+        }
 
-    fn metadata(&self) -> &ResourceMetadata {
-        &self.metadata
+        self.apply(VariableSetEvent::ReconciliationStarted(
+            VariableSetEventReconciliationStarted {
+                event_time: now,
+                variable_set_id: self.id,
+                generation: self.metadata().generation,
+            },
+        ))
+        .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))
     }
 
-    fn spec(&self) -> &Self::Spec {
-        &self.spec
+    pub fn try_mark_reconciliation_succeeded(
+        &mut self,
+        now: DateTime<Utc>,
+        expected_generation: u64,
+        stats: VariableSetStats,
+    ) -> Result<(), VariableSetLifecycleError> {
+        if self.metadata().generation != expected_generation {
+            tracing::warn!(
+                expected_generation,
+                current_generation = self.metadata().generation,
+                "Attempting to mark reconciliation succeeded for wrong resource generation.",
+            );
+            return Ok(()); // Skip update if generation doesn't match
+        }
+
+        self.apply(VariableSetEvent::ReconciliationSucceeded(
+            VariableSetEventReconciliationSucceeded {
+                event_time: now,
+                variable_set_id: self.id,
+                generation: self.metadata().generation,
+                stats,
+            },
+        ))
+        .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))
     }
 
-    fn status(&self) -> &Self::Status {
-        &self.status
+    pub fn try_mark_reconciliation_failed(
+        &mut self,
+        now: DateTime<Utc>,
+        reason: String,
+        message: String,
+        stats: VariableSetStats,
+    ) -> Result<(), VariableSetLifecycleError> {
+        self.apply(VariableSetEvent::ReconciliationFailed(
+            VariableSetEventReconciliationFailed {
+                event_time: now,
+                variable_set_id: self.id,
+                generation: self.metadata().generation,
+                reason,
+                message,
+                stats,
+            },
+        ))
+        .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))
     }
 }
 
