@@ -21,7 +21,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableEventSourcedResourceModel {
+pub trait ReconcilableResourceModel {
     type Spec: std::fmt::Debug + Clone + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug + Clone;
     type Success;

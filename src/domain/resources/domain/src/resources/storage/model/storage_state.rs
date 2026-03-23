@@ -10,7 +10,7 @@
 use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 
 use crate::{
-    ReconcilableEventSourcedResourceModel,
+    ReconcilableResourceModel,
     ReconcilableStatusProjector,
     ResourceID,
     ResourceState,
@@ -30,7 +30,7 @@ pub type StorageState = ResourceState<StorageSpec, StorageStatus>;
 
 pub struct StorageResourceModel {}
 
-impl ReconcilableEventSourcedResourceModel for StorageResourceModel {
+impl ReconcilableResourceModel for StorageResourceModel {
     type Spec = StorageSpec;
     type Status = StorageStatus;
     type Success = StorageReconcileSuccess;

@@ -9,14 +9,15 @@
 
 #![feature(error_generic_member_access)]
 
-mod entities;
+mod core;
 mod repo;
 mod resources;
 mod services;
 mod use_cases;
 mod values;
 
-pub use entities::*;
+pub use core::*;
+
 pub use repo::*;
 pub use resources::*;
 pub use services::*;
