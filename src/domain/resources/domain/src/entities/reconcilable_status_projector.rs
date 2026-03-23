@@ -48,7 +48,7 @@ where
     match (state, event) {
         (None, E::Created(e)) => {
             let pending_status = TModel::StatusProjector::new_pending(&e.spec);
-            Ok(TModel::state_from_created(
+            Ok(TModel::from_created(
                 e.resource_id,
                 ResourceMetadata::from_input(e.event_time, e.metadata),
                 e.spec,

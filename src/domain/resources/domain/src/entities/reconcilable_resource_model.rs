@@ -31,7 +31,7 @@ pub trait ReconcilableResourceModel {
             Status = Self::Status,
         >;
 
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,

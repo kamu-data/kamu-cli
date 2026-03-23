@@ -17,7 +17,6 @@ use crate::{
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
-    ResourceStateFactory,
     ResourceValidateMetadata,
     ResourceValidateSpec,
     SecretSetEventStore,
@@ -104,24 +103,6 @@ impl DeclarativeResource for SecretSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceStateFactory for SecretSetResource {
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::ResourceState {
-        SecretSetState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct SecretSetResourceModel {}
 
 impl ReconcilableResourceModel for SecretSetResourceModel {
@@ -133,7 +114,7 @@ impl ReconcilableResourceModel for SecretSetResourceModel {
     type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
     type StatusProjector = SecretSetStatusProjector;
 
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,

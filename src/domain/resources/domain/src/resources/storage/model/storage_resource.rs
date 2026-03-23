@@ -17,7 +17,6 @@ use crate::{
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
-    ResourceStateFactory,
     ResourceValidateMetadata,
     ResourceValidateSpec,
     StorageEventStore,
@@ -104,24 +103,6 @@ impl DeclarativeResource for StorageResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceStateFactory for StorageResource {
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::ResourceState {
-        StorageState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct StorageResourceModel {}
 
 impl ReconcilableResourceModel for StorageResourceModel {
@@ -133,7 +114,7 @@ impl ReconcilableResourceModel for StorageResourceModel {
     type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
     type StatusProjector = StorageStatusProjector;
 
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,

@@ -17,7 +17,6 @@ use crate::{
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
-    ResourceStateFactory,
     ResourceValidateMetadata,
     ResourceValidateSpec,
     VariableSetEventStore,
@@ -104,24 +103,6 @@ impl DeclarativeResource for VariableSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceStateFactory for VariableSetResource {
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::ResourceState {
-        VariableSetState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct VariableSetResourceModel {}
 
 impl ReconcilableResourceModel for VariableSetResourceModel {
@@ -133,7 +114,7 @@ impl ReconcilableResourceModel for VariableSetResourceModel {
     type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
     type StatusProjector = VariableSetStatusProjector;
 
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,
