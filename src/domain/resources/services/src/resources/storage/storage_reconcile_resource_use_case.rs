@@ -14,7 +14,7 @@ use kamu_resources::{
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
-    StorageID,
+    ResourceID,
     StorageResource,
 };
 use time_source::SystemTimeSource;
@@ -37,7 +37,7 @@ pub struct StorageReconcileResourceUseCaseImpl {
 impl ReconcileResourceUseCase<StorageResource> for StorageReconcileResourceUseCaseImpl {
     async fn execute(
         &self,
-        id: &StorageID,
+        id: &ResourceID,
     ) -> Result<(), ReconcileResourceUseCaseError<StorageResource>> {
         let helper = ReconcileResourceUseCaseHelper::new(
             self.repo.as_ref(),

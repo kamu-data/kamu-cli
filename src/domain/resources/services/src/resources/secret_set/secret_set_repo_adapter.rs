@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use event_sourcing::{LoadError, SaveError};
+use kamu_resources::ResourceID;
 
 use crate::domain::{
     ReconcilableResourceRepository,
     SecretSetEventStore,
-    SecretSetID,
     SecretSetResource,
     SecretSetState,
 };
@@ -31,7 +31,7 @@ pub struct SecretSetResourceRepositoryAdapter {
 
 #[async_trait::async_trait]
 impl ReconcilableResourceRepository<SecretSetResource> for SecretSetResourceRepositoryAdapter {
-    async fn load(&self, id: &SecretSetID) -> Result<SecretSetResource, LoadError<SecretSetState>> {
+    async fn load(&self, id: &ResourceID) -> Result<SecretSetResource, LoadError<SecretSetState>> {
         SecretSetResource::load(id, self.event_store.as_ref()).await
     }
 

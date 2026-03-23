@@ -11,28 +11,22 @@ use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 use internal_error::InternalError;
 
-use crate::{ResourceName, SecretSetID, SecretSetState};
+use crate::{ResourceID, ResourceIDStream, ResourceName, SecretSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait SecretSetEventStore: EventStore<SecretSetState> {
-    async fn new_secret_set_id(&self) -> Result<SecretSetID, InternalError>;
+    async fn new_secret_set_id(&self) -> Result<ResourceID, InternalError>;
 
     async fn get_secret_set_id_by_name(
         &self,
         name: &ResourceName,
-    ) -> Result<Option<SecretSetID>, InternalError>;
+    ) -> Result<Option<ResourceID>, InternalError>;
 
-    fn list_secret_sets(&self, pagination: PaginationOpts) -> SecretSetIDStream<'_>;
+    fn list_secret_sets(&self, pagination: PaginationOpts) -> ResourceIDStream<'_>;
 
     async fn get_count_secret_sets(&self) -> Result<usize, InternalError>;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type SecretSetIDStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<SecretSetID, InternalError>> + Send + 'a>,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

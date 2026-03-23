@@ -11,28 +11,22 @@ use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 use internal_error::InternalError;
 
-use crate::{ResourceName, StorageID, StorageState};
+use crate::{ResourceID, ResourceIDStream, ResourceName, StorageState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait StorageEventStore: EventStore<StorageState> {
-    async fn new_storage_id(&self) -> Result<StorageID, InternalError>;
+    async fn new_storage_id(&self) -> Result<ResourceID, InternalError>;
 
     async fn get_storage_id_by_name(
         &self,
         name: &ResourceName,
-    ) -> Result<Option<StorageID>, InternalError>;
+    ) -> Result<Option<ResourceID>, InternalError>;
 
-    fn list_storages(&self, pagination: PaginationOpts) -> StorageIDStream<'_>;
+    fn list_storages(&self, pagination: PaginationOpts) -> ResourceIDStream<'_>;
 
     async fn get_count_storages(&self) -> Result<usize, InternalError>;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type StorageIDStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<StorageID, InternalError>> + Send + 'a>,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

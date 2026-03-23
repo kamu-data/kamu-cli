@@ -7,22 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::ProjectionError;
-
-use crate::{ResourceMetadataValidationError, StorageState, StorageValidationError};
+use crate::{DeclarativeResource, ResourceID, ResourceMetadata};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error)]
-pub enum StorageLifecycleError {
-    #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
-
-    #[error(transparent)]
-    SpecValidation(#[from] StorageValidationError),
-
-    #[error("resource invariant violation: {0}")]
-    InvariantViolation(Box<ProjectionError<StorageState>>),
+pub trait ResourceStateFactory: DeclarativeResource + Sized {
+    fn state_from_created(
+        resource_id: ResourceID,
+        metadata: ResourceMetadata,
+        spec: Self::Spec,
+        status: Self::Status,
+    ) -> Self::ResourceState;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

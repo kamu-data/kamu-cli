@@ -13,8 +13,8 @@ use event_sourcing::{LoadError, SaveError};
 
 use crate::domain::{
     ReconcilableResourceRepository,
+    ResourceID,
     VariableSetEventStore,
-    VariableSetID,
     VariableSetResource,
     VariableSetState,
 };
@@ -33,7 +33,7 @@ pub struct VariableSetResourceRepositoryAdapter {
 impl ReconcilableResourceRepository<VariableSetResource> for VariableSetResourceRepositoryAdapter {
     async fn load(
         &self,
-        id: &VariableSetID,
+        id: &ResourceID,
     ) -> Result<VariableSetResource, LoadError<VariableSetState>> {
         VariableSetResource::load(id, self.event_store.as_ref()).await
     }

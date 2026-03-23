@@ -13,8 +13,8 @@ use event_sourcing::{LoadError, SaveError};
 
 use crate::domain::{
     ReconcilableResourceRepository,
+    ResourceID,
     StorageEventStore,
-    StorageID,
     StorageResource,
     StorageState,
 };
@@ -31,7 +31,7 @@ pub struct StorageResourceRepositoryAdapter {
 
 #[async_trait::async_trait]
 impl ReconcilableResourceRepository<StorageResource> for StorageResourceRepositoryAdapter {
-    async fn load(&self, id: &StorageID) -> Result<StorageResource, LoadError<StorageState>> {
+    async fn load(&self, id: &ResourceID) -> Result<StorageResource, LoadError<StorageState>> {
         StorageResource::load(id, self.event_store.as_ref()).await
     }
 

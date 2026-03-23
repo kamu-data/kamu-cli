@@ -14,7 +14,7 @@ use kamu_resources::{
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
-    SecretSetID,
+    ResourceID,
     SecretSetResource,
 };
 use time_source::SystemTimeSource;
@@ -37,7 +37,7 @@ pub struct SecretSetReconcileResourceUseCaseImpl {
 impl ReconcileResourceUseCase<SecretSetResource> for SecretSetReconcileResourceUseCaseImpl {
     async fn execute(
         &self,
-        id: &SecretSetID,
+        id: &ResourceID,
     ) -> Result<(), ReconcileResourceUseCaseError<SecretSetResource>> {
         let helper = ReconcileResourceUseCaseHelper::new(
             self.repo.as_ref(),

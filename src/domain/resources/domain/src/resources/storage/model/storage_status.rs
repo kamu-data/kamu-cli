@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::ResourceStatus;
+use crate::{ResourceStatus, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +21,8 @@ pub struct StorageStatus {
     pub references: StorageReferenceStatus,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl StorageStatus {
     pub fn new_pending(provider_kind: StorageProviderKind) -> Self {
         Self {
@@ -28,6 +30,16 @@ impl StorageStatus {
             provider_kind,
             references: StorageReferenceStatus::default(),
         }
+    }
+}
+
+impl ResourceStatusLike for StorageStatus {
+    fn resource_status(&self) -> &ResourceStatus {
+        &self.resource_status
+    }
+
+    fn resource_status_mut(&mut self) -> &mut ResourceStatus {
+        &mut self.resource_status
     }
 }
 
