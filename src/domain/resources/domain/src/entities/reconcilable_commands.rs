@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     ReconcilableEventSourcedResource,
+    ReconcilableResourceEvent,
     ReconcileFailureMapper,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
@@ -18,6 +20,40 @@ use crate::{
     ResourceValidateMetadata,
     ResourceValidateSpec,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait InvariantViolationOf<TState: Projection> {
+    fn invariant_violation(error: ProjectionError<TState>) -> Self;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
+    now: DateTime<Utc>,
+    resource_id: crate::ResourceID,
+    metadata: ResourceMetadataInput,
+    spec: R::Spec,
+    create: TCreate,
+) -> Result<TCreated, R::LifecycleError>
+where
+    R: ReconcilableEventSourcedResource,
+    R::Spec: ResourceValidateSpec,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>
+        + From<ResourceMetadataValidationError>
+        + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+    TCreate: FnOnce(
+        crate::ResourceID,
+        ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::FailureDetails>,
+    ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
+{
+    metadata.validate()?;
+    spec.validate()?;
+
+    let event = R::make_created_event(now, resource_id, metadata, spec);
+
+    create(resource_id, event).map_err(R::LifecycleError::invariant_violation)
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

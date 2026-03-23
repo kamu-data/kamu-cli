@@ -9,7 +9,12 @@
 
 use event_sourcing::ProjectionError;
 
-use crate::{ResourceMetadataValidationError, StorageState, StorageValidationError};
+use crate::{
+    InvariantViolationOf,
+    ResourceMetadataValidationError,
+    StorageState,
+    StorageValidationError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +28,14 @@ pub enum StorageLifecycleError {
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<StorageState>>),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl InvariantViolationOf<StorageState> for StorageLifecycleError {
+    fn invariant_violation(error: ProjectionError<StorageState>) -> Self {
+        Self::InvariantViolation(Box::new(error))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

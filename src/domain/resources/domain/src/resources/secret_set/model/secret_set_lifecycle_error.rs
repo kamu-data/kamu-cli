@@ -9,7 +9,12 @@
 
 use event_sourcing::ProjectionError;
 
-use crate::{ResourceMetadataValidationError, SecretSetSpecValidationError, SecretSetState};
+use crate::{
+    InvariantViolationOf,
+    ResourceMetadataValidationError,
+    SecretSetSpecValidationError,
+    SecretSetState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +28,14 @@ pub enum SecretSetLifecycleError {
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<SecretSetState>>),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl InvariantViolationOf<SecretSetState> for SecretSetLifecycleError {
+    fn invariant_violation(error: ProjectionError<SecretSetState>) -> Self {
+        Self::InvariantViolation(Box::new(error))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

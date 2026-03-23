@@ -16,8 +16,6 @@ use crate::{
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
-    ResourceValidateMetadata,
-    ResourceValidateSpec,
     StorageEventStore,
     StorageFailureDetails,
     StorageLifecycleError,
@@ -26,6 +24,7 @@ use crate::{
     StorageState,
     StorageStatus,
     StorageStatusProjector,
+    try_create_reconcilable_resource,
     try_update_resource_metadata,
     try_update_resource_spec,
 };
@@ -48,15 +47,14 @@ impl StorageResource {
         metadata: ResourceMetadataInput,
         spec: StorageSpec,
     ) -> Result<Self, StorageLifecycleError> {
-        metadata.validate()?;
-        spec.validate()?;
-
-        use crate::ReconcilableEventSourcedResource;
-        let event = Self::make_created_event(now, resource_id, metadata, spec);
-
-        Aggregate::new(resource_id, event)
-            .map(Self)
-            .map_err(|e| StorageLifecycleError::InvariantViolation(Box::new(e)))
+        try_create_reconcilable_resource::<Self, _, _>(
+            now,
+            resource_id,
+            metadata,
+            spec,
+            Aggregate::new,
+        )
+        .map(Self)
     }
 
     pub fn try_update_metadata(
