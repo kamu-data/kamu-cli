@@ -10,9 +10,11 @@
 use kamu_resources as domain;
 
 mod dependencies;
-mod generic;
-mod resources;
+mod reconcile;
+mod reconcilers;
+mod repo_adapters;
 
 pub use dependencies::*;
-pub use generic::*;
-pub use resources::*;
+pub use reconcile::*;
+pub use reconcilers::*;
+pub use repo_adapters::*;
