@@ -31,15 +31,6 @@ impl StorageStatus {
             references: StorageReferenceStatus::default(),
         }
     }
-
-    pub fn pending_from_spec(spec: &crate::StorageSpec) -> Self {
-        Self::new_pending(spec.provider.kind())
-    }
-
-    pub fn reset_pending_from_spec(&mut self, spec: &crate::StorageSpec) {
-        self.provider_kind = spec.provider.kind();
-        self.references = StorageReferenceStatus::default();
-    }
 }
 
 impl ResourceStatusLike for StorageStatus {

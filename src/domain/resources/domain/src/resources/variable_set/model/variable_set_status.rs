@@ -28,14 +28,6 @@ impl VariableSetStatus {
             stats,
         }
     }
-
-    pub fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
-        Self::new_pending(VariableSetStats::pending_from_spec(spec))
-    }
-
-    pub fn reset_pending_from_spec(&mut self, spec: &crate::VariableSetSpec) {
-        self.stats = VariableSetStats::pending_from_spec(spec);
-    }
 }
 
 impl ResourceStatusLike for VariableSetStatus {

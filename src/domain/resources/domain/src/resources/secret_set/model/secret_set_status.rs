@@ -28,14 +28,6 @@ impl SecretSetStatus {
             stats,
         }
     }
-
-    pub fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
-        Self::new_pending(SecretSetStats::pending_from_spec(spec))
-    }
-
-    pub fn reset_pending_from_spec(&mut self, spec: &crate::SecretSetSpec) {
-        self.stats = SecretSetStats::pending_from_spec(spec);
-    }
 }
 
 impl ResourceStatusLike for SecretSetStatus {
