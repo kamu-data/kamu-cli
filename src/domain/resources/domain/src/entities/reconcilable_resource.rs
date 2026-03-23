@@ -13,7 +13,6 @@ use crate::{
     DeclarativeResource,
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
-    ReconcileFailureMapper,
     ResourceReconcileError,
 };
 
@@ -24,6 +23,8 @@ pub trait ReconcilableResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
     type FailureDetails;
     type LifecycleError;
+
+    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
 
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusLike;
@@ -64,7 +65,7 @@ pub trait ReconcilableResource: DeclarativeResource {
         error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError>
     where
-        Self: ReconcileFailureMapper + ReconcilableEventSourcedResource + Sized,
+        Self: ReconcilableEventSourcedResource + Sized,
         Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
     {
         crate::try_mark_resource_reconciliation_failed(self, now, expected_generation, error)

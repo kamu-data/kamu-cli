@@ -15,7 +15,6 @@ use crate::{
     InvariantViolationOf,
     ReconcilableResource,
     ReconcilableResourceEvent,
-    ReconcileFailureMapper,
     ResourceEventCreated,
     ResourceEventMetadataUpdated,
     ResourceEventReconciliationFailed,
@@ -123,10 +122,7 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>
-    where
-        Self: ReconcileFailureMapper,
-    {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
         ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
             event_time: now,
             resource_id: *self.resource_id(),

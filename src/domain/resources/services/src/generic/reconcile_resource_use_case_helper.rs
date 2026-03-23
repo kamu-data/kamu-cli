@@ -11,7 +11,6 @@ use kamu_resources::{
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ReconcilableResourceRepository,
-    ReconcileFailureMapper,
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceID,
@@ -20,10 +19,7 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReconcileResourceUseCaseHelper<
-    'a,
-    R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
-> {
+pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcilableEventSourcedResource> {
     repo: &'a dyn ReconcilableResourceRepository<R>,
     reconciler: &'a dyn Reconciler<R>,
     time_source: &'a dyn SystemTimeSource,
@@ -33,7 +29,7 @@ pub struct ReconcileResourceUseCaseHelper<
 
 impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
+    R: ReconcilableEventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     pub fn new(

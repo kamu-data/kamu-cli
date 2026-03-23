@@ -10,7 +10,6 @@
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResource,
-    ReconcileFailureMapper,
     ResourceReconcileError,
     SecretSetFailureDetails,
     SecretSetLifecycleError,
@@ -25,21 +24,17 @@ impl ReconcilableResource for SecretSetResource {
     type ReconcileError = SecretSetReconcileError;
     type FailureDetails = SecretSetFailureDetails;
     type LifecycleError = SecretSetLifecycleError;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for SecretSetResource {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcileFailureMapper for SecretSetResource {
     fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
         SecretSetFailureDetails {
             stats: SecretSetStats::default(),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ReconcilableEventSourcedResource for SecretSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

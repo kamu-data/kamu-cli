@@ -12,7 +12,6 @@ use internal_error::InternalError;
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResource,
-    ReconcileFailureMapper,
     ResourceReconcileError,
     StorageFailureDetails,
     StorageLifecycleError,
@@ -78,20 +77,16 @@ impl ReconcilableResource for StorageResource {
     type ReconcileError = StorageReconcileError;
     type FailureDetails = StorageFailureDetails;
     type LifecycleError = StorageLifecycleError;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for StorageResource {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcileFailureMapper for StorageResource {
     fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
         StorageFailureDetails {
             references: StorageReferenceStatus::default(),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ReconcilableEventSourcedResource for StorageResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

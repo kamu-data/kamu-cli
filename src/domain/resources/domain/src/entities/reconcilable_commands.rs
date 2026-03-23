@@ -13,7 +13,6 @@ use event_sourcing::{Projection, ProjectionError};
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResourceEvent,
-    ReconcileFailureMapper,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
     ResourcePhase,
@@ -157,7 +156,7 @@ pub fn try_mark_resource_reconciliation_failed<R>(
     error: &R::ReconcileError,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
+    R: ReconcilableEventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.metadata().generation != expected_generation {

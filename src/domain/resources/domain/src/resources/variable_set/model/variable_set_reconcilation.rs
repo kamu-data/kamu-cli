@@ -10,7 +10,6 @@
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResource,
-    ReconcileFailureMapper,
     ResourceReconcileError,
     VariableSetFailureDetails,
     VariableSetLifecycleError,
@@ -25,21 +24,17 @@ impl ReconcilableResource for VariableSetResource {
     type ReconcileError = VariableSetReconcileError;
     type FailureDetails = VariableSetFailureDetails;
     type LifecycleError = VariableSetLifecycleError;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for VariableSetResource {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcileFailureMapper for VariableSetResource {
     fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
         VariableSetFailureDetails {
             stats: VariableSetStats::default(),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ReconcilableEventSourcedResource for VariableSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

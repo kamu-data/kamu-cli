@@ -14,7 +14,6 @@ mod reconcilable_event_sourced_resource_model;
 mod reconcilable_resource;
 mod reconcilable_resource_event;
 mod reconcilable_status_projector;
-mod reconcile_failure_mapper;
 
 pub use declarative_resource::*;
 pub use reconcilable_commands::*;
@@ -23,4 +22,3 @@ pub use reconcilable_event_sourced_resource_model::*;
 pub use reconcilable_resource::*;
 pub use reconcilable_resource_event::*;
 pub use reconcilable_status_projector::*;
-pub use reconcile_failure_mapper::*;
