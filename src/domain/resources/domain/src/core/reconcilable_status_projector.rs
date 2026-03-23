@@ -14,6 +14,7 @@ use crate::{
     ReconcilableResourceEvent,
     ReconcilableResourceModel,
     ResourceMetadata,
+    ResourceState,
     ResourceStatusLike,
 };
 
@@ -57,12 +58,13 @@ where
     match (state, event) {
         (None, E::Created(e)) => {
             let pending_status = TModel::StatusProjector::new_pending(&e.spec);
-            Ok(TModel::from_created(
+            Ok(ResourceState::new(
                 e.resource_id,
                 ResourceMetadata::from_input(e.event_time, e.metadata),
                 e.spec,
                 pending_status,
-            ))
+            )
+            .into())
         }
 
         (Some(mut s), E::MetadataUpdated(e)) => {

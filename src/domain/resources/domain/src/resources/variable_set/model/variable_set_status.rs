@@ -9,7 +9,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{PendingStatusFromSpec, ResourceStatus, ResourceStatusLike};
+use crate::{
+    PendingStatusFromSpec,
+    ReconcilableStatusProjector,
+    ResourceStatus,
+    ResourceStatusLike,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +54,34 @@ impl PendingStatusFromSpec<crate::VariableSetSpec> for VariableSetStatus {
 
     fn reset_pending_from_spec(&mut self, spec: &crate::VariableSetSpec) {
         self.stats = VariableSetStats::pending_from_spec(spec);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct VariableSetStatusProjector;
+
+impl
+    ReconcilableStatusProjector<
+        crate::VariableSetSpec,
+        crate::VariableSetReconcileSuccess,
+        crate::VariableSetFailureDetails,
+    > for VariableSetStatusProjector
+{
+    type Status = VariableSetStatus;
+
+    fn on_reconciliation_succeeded(
+        status: &mut Self::Status,
+        success: crate::VariableSetReconcileSuccess,
+    ) {
+        status.stats = success.stats;
+    }
+
+    fn on_reconciliation_failed(
+        status: &mut Self::Status,
+        details: crate::VariableSetFailureDetails,
+    ) {
+        status.stats = details.stats;
     }
 }
 

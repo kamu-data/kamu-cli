@@ -13,8 +13,6 @@ use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
     ReconcilableStatusProjector,
-    ResourceID,
-    ResourceMetadata,
     ResourceState,
     ResourceStatusLike,
 };
@@ -37,15 +35,6 @@ pub trait ReconcilableResourceModel {
             Self::FailureDetails,
             Status = Self::Status,
         >;
-
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::State {
-        ResourceState::new(resource_id, metadata, spec, status).into()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

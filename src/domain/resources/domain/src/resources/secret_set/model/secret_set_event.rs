@@ -7,9 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ReconcilableResourceEvent, SecretSetReconcileSuccess, SecretSetSpec, SecretSetStats};
+use crate::{
+    ReconcilableResourceEvent,
+    ResourceID,
+    SecretSetReconcileSuccess,
+    SecretSetSpec,
+    SecretSetStats,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +28,14 @@ pub type SecretSetEvent =
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecretSetFailureDetails {
     pub stats: SecretSetStats,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ProjectionEvent<ResourceID> for SecretSetEvent {
+    fn matches_query(&self, query: &ResourceID) -> bool {
+        self.resource_id() == query
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

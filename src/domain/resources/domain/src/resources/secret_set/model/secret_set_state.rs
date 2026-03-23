@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
+use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     ReconcilableResourceModel,
-    ReconcilableStatusProjector,
     ResourceID,
     ResourceState,
     SecretSetEvent,
@@ -19,6 +18,7 @@ use crate::{
     SecretSetReconcileSuccess,
     SecretSetSpec,
     SecretSetStatus,
+    SecretSetStatusProjector,
     project_reconcilable_resource_state,
 };
 
@@ -41,38 +41,12 @@ impl ReconcilableResourceModel for SecretSetResourceModel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SecretSetStatusProjector;
-
-impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>
-    for SecretSetStatusProjector
-{
-    type Status = SecretSetStatus;
-
-    fn on_reconciliation_succeeded(status: &mut Self::Status, success: SecretSetReconcileSuccess) {
-        status.stats = success.stats;
-    }
-
-    fn on_reconciliation_failed(status: &mut Self::Status, details: SecretSetFailureDetails) {
-        status.stats = details.stats;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl Projection for SecretSetState {
     type Query = ResourceID;
     type Event = SecretSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<SecretSetResourceModel>(state, event)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ProjectionEvent<ResourceID> for SecretSetEvent {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
     }
 }
 

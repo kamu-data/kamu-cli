@@ -9,7 +9,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{PendingStatusFromSpec, ResourceStatus, ResourceStatusLike};
+use crate::{
+    PendingStatusFromSpec,
+    ReconcilableStatusProjector,
+    ResourceStatus,
+    ResourceStatusLike,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +58,32 @@ impl PendingStatusFromSpec<crate::StorageSpec> for StorageStatus {
     fn reset_pending_from_spec(&mut self, spec: &crate::StorageSpec) {
         self.provider_kind = spec.provider.kind();
         self.references = StorageReferenceStatus::default();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct StorageStatusProjector;
+
+impl
+    ReconcilableStatusProjector<
+        crate::StorageSpec,
+        crate::StorageReconcileSuccess,
+        crate::StorageFailureDetails,
+    > for StorageStatusProjector
+{
+    type Status = StorageStatus;
+
+    fn on_reconciliation_succeeded(
+        status: &mut Self::Status,
+        success: crate::StorageReconcileSuccess,
+    ) {
+        status.provider_kind = success.provider_kind;
+        status.references = success.references;
+    }
+
+    fn on_reconciliation_failed(status: &mut Self::Status, details: crate::StorageFailureDetails) {
+        status.references = details.references;
     }
 }
 

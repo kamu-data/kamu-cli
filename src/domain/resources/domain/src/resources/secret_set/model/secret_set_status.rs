@@ -9,7 +9,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{PendingStatusFromSpec, ResourceStatus, ResourceStatusLike};
+use crate::{
+    PendingStatusFromSpec,
+    ReconcilableStatusProjector,
+    ResourceStatus,
+    ResourceStatusLike,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +54,34 @@ impl PendingStatusFromSpec<crate::SecretSetSpec> for SecretSetStatus {
 
     fn reset_pending_from_spec(&mut self, spec: &crate::SecretSetSpec) {
         self.stats = SecretSetStats::pending_from_spec(spec);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SecretSetStatusProjector;
+
+impl
+    ReconcilableStatusProjector<
+        crate::SecretSetSpec,
+        crate::SecretSetReconcileSuccess,
+        crate::SecretSetFailureDetails,
+    > for SecretSetStatusProjector
+{
+    type Status = SecretSetStatus;
+
+    fn on_reconciliation_succeeded(
+        status: &mut Self::Status,
+        success: crate::SecretSetReconcileSuccess,
+    ) {
+        status.stats = success.stats;
+    }
+
+    fn on_reconciliation_failed(
+        status: &mut Self::Status,
+        details: crate::SecretSetFailureDetails,
+    ) {
+        status.stats = details.stats;
     }
 }
 

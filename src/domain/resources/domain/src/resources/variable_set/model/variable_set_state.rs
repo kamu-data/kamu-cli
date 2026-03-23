@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
+use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     ReconcilableResourceModel,
-    ReconcilableStatusProjector,
     ResourceID,
     ResourceState,
     VariableSetEvent,
@@ -19,6 +18,7 @@ use crate::{
     VariableSetReconcileSuccess,
     VariableSetSpec,
     VariableSetStatus,
+    VariableSetStatusProjector,
     project_reconcilable_resource_state,
 };
 
@@ -41,45 +41,12 @@ impl ReconcilableResourceModel for VariableSetResourceModel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct VariableSetStatusProjector;
-
-impl
-    ReconcilableStatusProjector<
-        VariableSetSpec,
-        VariableSetReconcileSuccess,
-        VariableSetFailureDetails,
-    > for VariableSetStatusProjector
-{
-    type Status = VariableSetStatus;
-
-    fn on_reconciliation_succeeded(
-        status: &mut Self::Status,
-        success: VariableSetReconcileSuccess,
-    ) {
-        status.stats = success.stats;
-    }
-
-    fn on_reconciliation_failed(status: &mut Self::Status, details: VariableSetFailureDetails) {
-        status.stats = details.stats;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl Projection for VariableSetState {
     type Query = ResourceID;
     type Event = VariableSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<VariableSetResourceModel>(state, event)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ProjectionEvent<ResourceID> for VariableSetEvent {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
     }
 }
 

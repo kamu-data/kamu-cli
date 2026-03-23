@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
+use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     ReconcilableResourceModel,
-    ReconcilableStatusProjector,
     ResourceID,
     ResourceState,
     StorageEvent,
@@ -19,6 +18,7 @@ use crate::{
     StorageReconcileSuccess,
     StorageSpec,
     StorageStatus,
+    StorageStatusProjector,
     project_reconcilable_resource_state,
 };
 
@@ -41,39 +41,12 @@ impl ReconcilableResourceModel for StorageResourceModel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct StorageStatusProjector;
-
-impl ReconcilableStatusProjector<StorageSpec, StorageReconcileSuccess, StorageFailureDetails>
-    for StorageStatusProjector
-{
-    type Status = StorageStatus;
-
-    fn on_reconciliation_succeeded(status: &mut Self::Status, success: StorageReconcileSuccess) {
-        status.provider_kind = success.provider_kind;
-        status.references = success.references;
-    }
-
-    fn on_reconciliation_failed(status: &mut Self::Status, details: StorageFailureDetails) {
-        status.references = details.references;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl Projection for StorageState {
     type Query = ResourceID;
     type Event = StorageEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<StorageResourceModel>(state, event)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ProjectionEvent<ResourceID> for StorageEvent {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
     }
 }
 
