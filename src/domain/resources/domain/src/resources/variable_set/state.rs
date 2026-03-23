@@ -10,7 +10,7 @@
 use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
-    ReconcilableResourceModel,
+    ReconcilableStateModel,
     ResourceID,
     ResourceState,
     VariableSetEvent,
@@ -28,9 +28,9 @@ pub type VariableSetState = ResourceState<VariableSetSpec, VariableSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct VariableSetResourceModel {}
+pub struct VariableSetStateModel {}
 
-impl ReconcilableResourceModel for VariableSetResourceModel {
+impl ReconcilableStateModel for VariableSetStateModel {
     type Spec = VariableSetSpec;
     type Status = VariableSetStatus;
     type Success = VariableSetReconcileSuccess;
@@ -46,7 +46,7 @@ impl Projection for VariableSetState {
     type Event = VariableSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<VariableSetResourceModel>(state, event)
+        project_reconcilable_resource_state::<VariableSetStateModel>(state, event)
     }
 }
 

@@ -10,7 +10,7 @@
 use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
-    ReconcilableResourceModel,
+    ReconcilableStateModel,
     ResourceID,
     ResourceState,
     SecretSetEvent,
@@ -28,9 +28,9 @@ pub type SecretSetState = ResourceState<SecretSetSpec, SecretSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SecretSetResourceModel {}
+pub struct SecretSetStateModel {}
 
-impl ReconcilableResourceModel for SecretSetResourceModel {
+impl ReconcilableStateModel for SecretSetStateModel {
     type Spec = SecretSetSpec;
     type Status = SecretSetStatus;
     type Success = SecretSetReconcileSuccess;
@@ -46,7 +46,7 @@ impl Projection for SecretSetState {
     type Event = SecretSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<SecretSetResourceModel>(state, event)
+        project_reconcilable_resource_state::<SecretSetStateModel>(state, event)
     }
 }
 

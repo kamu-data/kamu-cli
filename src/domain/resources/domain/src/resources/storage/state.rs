@@ -10,7 +10,7 @@
 use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
-    ReconcilableResourceModel,
+    ReconcilableStateModel,
     ResourceID,
     ResourceState,
     StorageEvent,
@@ -28,9 +28,9 @@ pub type StorageState = ResourceState<StorageSpec, StorageStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct StorageResourceModel {}
+pub struct StorageStateModel {}
 
-impl ReconcilableResourceModel for StorageResourceModel {
+impl ReconcilableStateModel for StorageStateModel {
     type Spec = StorageSpec;
     type Status = StorageStatus;
     type Success = StorageReconcileSuccess;
@@ -46,7 +46,7 @@ impl Projection for StorageState {
     type Event = StorageEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<StorageResourceModel>(state, event)
+        project_reconcilable_resource_state::<StorageStateModel>(state, event)
     }
 }
 

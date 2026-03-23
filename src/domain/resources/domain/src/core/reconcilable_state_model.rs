@@ -19,7 +19,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableResourceModel {
+pub trait ReconcilableStateModel {
     type Spec: std::fmt::Debug + Clone + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug + Clone;
     type Success;
