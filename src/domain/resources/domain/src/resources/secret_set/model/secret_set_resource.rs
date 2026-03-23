@@ -109,15 +109,6 @@ impl ReconcilableEventSourcedResourceModel for SecretSetResourceModel {
     type FailureDetails = SecretSetFailureDetails;
     type State = SecretSetState;
     type StatusProjector = SecretSetStatusProjector;
-
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::State {
-        SecretSetState::new(resource_id, metadata, spec, status)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

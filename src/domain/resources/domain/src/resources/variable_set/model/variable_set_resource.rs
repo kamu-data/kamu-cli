@@ -109,15 +109,6 @@ impl ReconcilableEventSourcedResourceModel for VariableSetResourceModel {
     type FailureDetails = VariableSetFailureDetails;
     type State = VariableSetState;
     type StatusProjector = VariableSetStatusProjector;
-
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::State {
-        VariableSetState::new(resource_id, metadata, spec, status)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

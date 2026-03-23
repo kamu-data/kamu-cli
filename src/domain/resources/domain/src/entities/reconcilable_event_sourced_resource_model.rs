@@ -15,6 +15,7 @@ use crate::{
     ReconcilableStatusProjector,
     ResourceID,
     ResourceMetadata,
+    ResourceState,
     ResourceStatusLike,
 };
 
@@ -26,6 +27,7 @@ pub trait ReconcilableEventSourcedResourceModel {
     type Success;
     type FailureDetails;
     type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+        + From<ResourceState<Self::Spec, Self::Status>>
         + Projection<
             Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>,
         >;
@@ -41,7 +43,9 @@ pub trait ReconcilableEventSourcedResourceModel {
         metadata: ResourceMetadata,
         spec: Self::Spec,
         status: Self::Status,
-    ) -> Self::State;
+    ) -> Self::State {
+        ResourceState::new(resource_id, metadata, spec, status).into()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

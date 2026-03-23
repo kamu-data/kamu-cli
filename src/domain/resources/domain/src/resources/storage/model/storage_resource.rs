@@ -109,15 +109,6 @@ impl ReconcilableEventSourcedResourceModel for StorageResourceModel {
     type FailureDetails = StorageFailureDetails;
     type State = StorageState;
     type StatusProjector = StorageStatusProjector;
-
-    fn from_created(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: Self::Spec,
-        status: Self::Status,
-    ) -> Self::State {
-        StorageState::new(resource_id, metadata, spec, status)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
