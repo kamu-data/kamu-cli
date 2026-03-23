@@ -9,7 +9,12 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{DeclarativeResource, ResourceReconcileError};
+use crate::{
+    DeclarativeResource,
+    ReconcilableEventSourcedResource,
+    ReconcileFailureMapper,
+    ResourceReconcileError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,26 +23,47 @@ pub trait ReconcilableResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
     type LifecycleError;
 
-    fn needs_reconciliation(&self) -> bool;
+    fn needs_reconciliation(&self) -> bool {
+        use crate::ResourceStatusLike;
+
+        self.status()
+            .resource_status()
+            .needs_reconciliation(self.metadata().generation)
+    }
 
     fn try_mark_reconciliation_started(
         &mut self,
         now: DateTime<Utc>,
-    ) -> Result<(), Self::LifecycleError>;
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: ReconcilableEventSourcedResource + Sized,
+    {
+        crate::try_mark_resource_reconciliation_started(self, now)
+    }
 
     fn try_mark_reconciliation_succeeded(
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
         success: Self::ReconcileSuccess,
-    ) -> Result<(), Self::LifecycleError>;
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: ReconcilableEventSourcedResource + Sized,
+    {
+        crate::try_mark_resource_reconciliation_succeeded(self, now, expected_generation, success)
+    }
 
     fn try_mark_reconciliation_failed(
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
-    ) -> Result<(), Self::LifecycleError>;
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: ReconcileFailureMapper + Sized,
+    {
+        crate::try_mark_resource_reconciliation_failed(self, now, expected_generation, error)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

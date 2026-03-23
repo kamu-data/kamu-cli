@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     ReconcilableEventSourcedResource,
+    ReconcileFailureMapper,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
     ResourcePhase,
@@ -116,7 +117,7 @@ pub fn try_mark_resource_reconciliation_failed<R>(
     error: &R::ReconcileError,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: ReconcileFailureMapper,
 {
     if resource.metadata().generation != expected_generation {
         tracing::warn!(

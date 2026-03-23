@@ -9,49 +9,119 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{ReconcilableResource, ResourceID, ResourceMetadataInput};
+use crate::{
+    ReconcilableResource,
+    ReconcilableResourceEvent,
+    ResourceEventCreated,
+    ResourceEventMetadataUpdated,
+    ResourceEventReconciliationFailed,
+    ResourceEventReconciliationStarted,
+    ResourceEventReconciliationSucceeded,
+    ResourceEventSpecUpdated,
+    ResourceID,
+    ResourceMetadataInput,
+    ResourceReconcileError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ReconcilableEventSourcedResource: ReconcilableResource {
-    type Event;
-    fn apply_event(&mut self, event: Self::Event) -> Result<(), Self::LifecycleError>;
+    type FailureDetails;
+
+    fn apply_event(
+        &mut self,
+        event: ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>,
+    ) -> Result<(), Self::LifecycleError>;
 
     fn make_created_event(
         now: DateTime<Utc>,
         resource_id: ResourceID,
         metadata: ResourceMetadataInput,
         spec: Self::Spec,
-    ) -> Self::Event;
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::Created(ResourceEventCreated {
+            event_time: now,
+            resource_id,
+            metadata,
+            spec,
+        })
+    }
 
     fn make_metadata_updated_event(
         &self,
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
-    ) -> Self::Event;
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::MetadataUpdated(ResourceEventMetadataUpdated {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            new_metadata,
+        })
+    }
 
     fn make_spec_updated_event(
         &self,
         now: DateTime<Utc>,
         new_spec: Self::Spec,
         new_generation: u64,
-    ) -> Self::Event;
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            new_spec,
+            new_generation,
+        })
+    }
 
-    fn make_reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event;
+    fn make_reconciliation_started_event(
+        &self,
+        now: DateTime<Utc>,
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            generation: self.metadata().generation,
+        })
+    }
 
     fn make_reconciliation_succeeded_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
         success: Self::ReconcileSuccess,
-    ) -> Self::Event;
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            generation: expected_generation,
+            success,
+        })
+    }
 
     fn make_reconciliation_failed_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
-    ) -> Self::Event;
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>
+    where
+        Self: ReconcileFailureMapper,
+    {
+        ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            generation: expected_generation,
+            reason: error.reason_code().to_string(),
+            message: error.user_message(),
+            details: Self::failure_details(error),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ReconcileFailureMapper: ReconcilableEventSourcedResource {
+    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_resources::{
-    ReconcilableResource,
+    ReconcileFailureMapper,
     ReconcilableResourceRepository,
     ReconcileResourceUseCaseError,
     Reconciler,
@@ -26,7 +26,7 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcilableResource> {
+pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcileFailureMapper> {
     repo: &'a dyn ReconcilableResourceRepository<R>,
     reconciler: &'a dyn Reconciler<R>,
     time_source: &'a dyn SystemTimeSource,
@@ -34,7 +34,7 @@ pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcilableResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'a, R: ReconcilableResource> ReconcileResourceUseCaseHelper<'a, R> {
+impl<'a, R: ReconcileFailureMapper> ReconcileResourceUseCaseHelper<'a, R> {
     pub fn new(
         repo: &'a dyn ReconcilableResourceRepository<R>,
         reconciler: &'a dyn Reconciler<R>,

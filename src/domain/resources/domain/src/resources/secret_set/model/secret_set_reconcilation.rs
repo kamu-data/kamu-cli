@@ -7,30 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-
 use crate::{
-    DeclarativeResource,
     ReconcilableEventSourcedResource,
     ReconcilableResource,
-    ReconcilableResourceEvent,
-    ResourceEventCreated,
-    ResourceEventMetadataUpdated,
-    ResourceEventReconciliationFailed,
-    ResourceEventReconciliationStarted,
-    ResourceEventReconciliationSucceeded,
-    ResourceEventSpecUpdated,
-    ResourceID,
-    ResourceMetadataInput,
+    ReconcileFailureMapper,
     ResourceReconcileError,
-    SecretSetEvent,
     SecretSetFailureDetails,
     SecretSetLifecycleError,
     SecretSetResource,
     SecretSetStats,
-    try_mark_resource_reconciliation_failed,
-    try_mark_resource_reconciliation_started,
-    try_mark_resource_reconciliation_succeeded,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,127 +24,33 @@ impl ReconcilableResource for SecretSetResource {
     type ReconcileSuccess = SecretSetReconcileSuccess;
     type ReconcileError = SecretSetReconcileError;
     type LifecycleError = SecretSetLifecycleError;
-
-    fn needs_reconciliation(&self) -> bool {
-        self.status()
-            .resource_status
-            .needs_reconciliation(self.metadata().generation)
-    }
-
-    fn try_mark_reconciliation_started(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), Self::LifecycleError> {
-        try_mark_resource_reconciliation_started(self, now)
-    }
-
-    fn try_mark_reconciliation_succeeded(
-        &mut self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        success: Self::ReconcileSuccess,
-    ) -> Result<(), Self::LifecycleError> {
-        try_mark_resource_reconciliation_succeeded(self, now, expected_generation, success)
-    }
-
-    fn try_mark_reconciliation_failed(
-        &mut self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        error: &Self::ReconcileError,
-    ) -> Result<(), Self::LifecycleError> {
-        try_mark_resource_reconciliation_failed(self, now, expected_generation, error)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReconcilableEventSourcedResource for SecretSetResource {
-    type Event = SecretSetEvent;
+    type FailureDetails = SecretSetFailureDetails;
 
-    fn apply_event(&mut self, event: Self::Event) -> Result<(), Self::LifecycleError> {
+    fn apply_event(
+        &mut self,
+        event: crate::ReconcilableResourceEvent<
+            Self::Spec,
+            Self::ReconcileSuccess,
+            Self::FailureDetails,
+        >,
+    ) -> Result<(), Self::LifecycleError> {
         self.apply(event)
             .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
     }
+}
 
-    fn make_created_event(
-        now: DateTime<Utc>,
-        resource_id: ResourceID,
-        metadata: ResourceMetadataInput,
-        spec: Self::Spec,
-    ) -> Self::Event {
-        ReconcilableResourceEvent::Created(ResourceEventCreated {
-            event_time: now,
-            resource_id,
-            metadata,
-            spec,
-        })
-    }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fn make_metadata_updated_event(
-        &self,
-        now: DateTime<Utc>,
-        new_metadata: ResourceMetadataInput,
-    ) -> Self::Event {
-        ReconcilableResourceEvent::MetadataUpdated(ResourceEventMetadataUpdated {
-            event_time: now,
-            resource_id: *self.resource_id(),
-            new_metadata,
-        })
-    }
-
-    fn make_spec_updated_event(
-        &self,
-        now: DateTime<Utc>,
-        new_spec: Self::Spec,
-        new_generation: u64,
-    ) -> Self::Event {
-        ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
-            event_time: now,
-            resource_id: *self.resource_id(),
-            new_spec,
-            new_generation,
-        })
-    }
-
-    fn make_reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event {
-        ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
-            event_time: now,
-            resource_id: *self.resource_id(),
-            generation: self.metadata().generation,
-        })
-    }
-
-    fn make_reconciliation_succeeded_event(
-        &self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        success: Self::ReconcileSuccess,
-    ) -> Self::Event {
-        ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
-            event_time: now,
-            resource_id: *self.resource_id(),
-            generation: expected_generation,
-            success,
-        })
-    }
-
-    fn make_reconciliation_failed_event(
-        &self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        error: &Self::ReconcileError,
-    ) -> Self::Event {
-        ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
-            event_time: now,
-            resource_id: *self.resource_id(),
-            generation: expected_generation,
-            reason: error.reason_code().to_string(),
-            message: error.user_message(),
-            details: SecretSetFailureDetails {
-                stats: SecretSetStats::default(),
-            },
-        })
+impl ReconcileFailureMapper for SecretSetResource {
+    fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
+        SecretSetFailureDetails {
+            stats: SecretSetStats::default(),
+        }
     }
 }
 
