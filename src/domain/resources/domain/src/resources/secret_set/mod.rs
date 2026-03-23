@@ -7,8 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod model;
+mod event;
+mod lifecycle_error;
+mod reconciliation;
 mod repo;
+mod resource;
+mod spec;
+mod state;
+mod status;
 
-pub use model::*;
+pub use event::*;
+pub use lifecycle_error::*;
+pub use reconciliation::*;
 pub use repo::*;
+pub use resource::*;
+pub use spec::*;
+pub use state::*;
+pub use status::*;
