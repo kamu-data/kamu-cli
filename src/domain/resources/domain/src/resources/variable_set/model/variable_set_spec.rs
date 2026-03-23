@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use crate::ResourceValidateSpec;
 
@@ -89,7 +88,7 @@ impl ResourceValidateSpec for VariableSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum VariableSetSpecValidationError {
     #[error("variable set must contain at least one variable")]
     EmptyVariables,
