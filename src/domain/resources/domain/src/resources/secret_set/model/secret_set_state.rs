@@ -16,7 +16,7 @@ use crate::{
     SecretSetEvent,
     SecretSetFailureDetails,
     SecretSetReconcileSuccess,
-    SecretSetResource,
+    SecretSetResourceModel,
     SecretSetSpec,
     SecretSetStats,
     SecretSetStatus,
@@ -67,14 +67,7 @@ impl Projection for SecretSetState {
     type Event = SecretSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<
-            SecretSetResource,
-            SecretSetSpec,
-            SecretSetStatus,
-            SecretSetReconcileSuccess,
-            SecretSetFailureDetails,
-            SecretSetStatusProjector,
-        >(state, event)
+        project_reconcilable_resource_state::<SecretSetResourceModel>(state, event)
     }
 }
 

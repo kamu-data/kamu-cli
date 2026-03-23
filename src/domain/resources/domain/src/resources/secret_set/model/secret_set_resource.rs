@@ -12,6 +12,8 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ReconcilableResourceEvent,
+    ReconcilableResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
@@ -19,10 +21,13 @@ use crate::{
     ResourceValidateMetadata,
     ResourceValidateSpec,
     SecretSetEventStore,
+    SecretSetFailureDetails,
     SecretSetLifecycleError,
+    SecretSetReconcileSuccess,
     SecretSetSpec,
     SecretSetState,
     SecretSetStatus,
+    SecretSetStatusProjector,
     try_update_resource_metadata,
     try_update_resource_spec,
 };
@@ -100,12 +105,40 @@ impl DeclarativeResource for SecretSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceStateFactory for SecretSetResource {
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,
         status: Self::Status,
     ) -> Self::ResourceState {
+        SecretSetState {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SecretSetResourceModel {}
+
+impl ReconcilableResourceModel for SecretSetResourceModel {
+    type Spec = SecretSetSpec;
+    type Status = SecretSetStatus;
+    type Success = SecretSetReconcileSuccess;
+    type FailureDetails = SecretSetFailureDetails;
+    type State = SecretSetState;
+    type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
+    type StatusProjector = SecretSetStatusProjector;
+
+    fn state_from_created(
+        resource_id: ResourceID,
+        metadata: ResourceMetadata,
+        spec: Self::Spec,
+        status: Self::Status,
+    ) -> Self::State {
         SecretSetState {
             resource_id,
             metadata,

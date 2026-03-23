@@ -17,7 +17,7 @@ use crate::{
     StorageFailureDetails,
     StorageReconcileSuccess,
     StorageReferenceStatus,
-    StorageResource,
+    StorageResourceModel,
     StorageSpec,
     StorageStatus,
     project_reconcilable_resource_state,
@@ -62,14 +62,7 @@ impl Projection for StorageState {
     type Event = StorageEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<
-            StorageResource,
-            StorageSpec,
-            StorageStatus,
-            StorageReconcileSuccess,
-            StorageFailureDetails,
-            StorageStatusProjector,
-        >(state, event)
+        project_reconcilable_resource_state::<StorageResourceModel>(state, event)
     }
 }
 

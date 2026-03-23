@@ -12,8 +12,8 @@ use event_sourcing::{Projection, ProjectionError};
 use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
+    ReconcilableResourceModel,
     ResourceMetadata,
-    ResourceStateFactory,
     ResourceStatusLike,
 };
 
@@ -33,31 +33,22 @@ pub trait ReconcilableStatusProjector<TSpec, TSuccess, TFailureDetails> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn project_reconcilable_resource_state<
-    TResource,
-    TSpec,
-    TStatus,
-    TSuccess,
-    TFailureDetails,
-    TProjector,
->(
-    state: Option<TResource::ResourceState>,
-    event: ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>,
-) -> Result<TResource::ResourceState, ProjectionError<TResource::ResourceState>>
+pub fn project_reconcilable_resource_state<TModel>(
+    state: Option<TModel::State>,
+    event: ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>,
+) -> Result<TModel::State, ProjectionError<TModel::State>>
 where
-    TResource: ResourceStateFactory<Spec = TSpec, Status = TStatus>,
-    TResource::ResourceState:
-        Projection<Event = ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>>,
-    TSpec: std::fmt::Debug + Clone + Send + Sync,
-    TProjector: ReconcilableStatusProjector<TSpec, TSuccess, TFailureDetails, Status = TStatus>,
-    TStatus: ResourceStatusLike + std::fmt::Debug + Clone + Send + Sync,
+    TModel: ReconcilableResourceModel,
+    TModel::State: Projection<
+        Event = ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>,
+    >,
 {
     use ReconcilableResourceEvent as E;
 
     match (state, event) {
         (None, E::Created(e)) => {
-            let pending_status = TProjector::new_pending(&e.spec);
-            Ok(TResource::state_from_created(
+            let pending_status = TModel::StatusProjector::new_pending(&e.spec);
+            Ok(TModel::state_from_created(
                 e.resource_id,
                 ResourceMetadata::from_input(e.event_time, e.metadata),
                 e.spec,
@@ -85,7 +76,7 @@ where
                 .mark_pending_for_new_generation();
 
             let spec = s.spec().clone();
-            TProjector::on_spec_updated(s.status_mut(), &spec);
+            TModel::StatusProjector::on_spec_updated(s.status_mut(), &spec);
 
             Ok(s)
         }
@@ -106,7 +97,7 @@ where
             s.status_mut()
                 .resource_status_mut()
                 .mark_ready(e.event_time, e.generation);
-            TProjector::on_reconciliation_succeeded(s.status_mut(), e.success);
+            TModel::StatusProjector::on_reconciliation_succeeded(s.status_mut(), e.success);
 
             Ok(s)
         }
@@ -120,7 +111,7 @@ where
                 e.reason,
                 e.message,
             );
-            TProjector::on_reconciliation_failed(s.status_mut(), e.details);
+            TModel::StatusProjector::on_reconciliation_failed(s.status_mut(), e.details);
 
             Ok(s)
         }

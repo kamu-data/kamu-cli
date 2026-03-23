@@ -12,6 +12,7 @@ mod reconcilable_commands;
 mod reconcilable_resource;
 mod reconcilable_resource_event;
 mod reconcilable_resource_factory;
+mod reconcilable_resource_model;
 mod reconcilable_status_projector;
 mod resource_state_factory;
 
@@ -20,5 +21,6 @@ pub use reconcilable_commands::*;
 pub use reconcilable_resource::*;
 pub use reconcilable_resource_event::*;
 pub use reconcilable_resource_factory::*;
+pub use reconcilable_resource_model::*;
 pub use reconcilable_status_projector::*;
 pub use resource_state_factory::*;

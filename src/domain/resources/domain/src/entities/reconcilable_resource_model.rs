@@ -7,17 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{DeclarativeResource, ResourceID, ResourceMetadata};
+use crate::{
+    DeclarativeResourceState,
+    ReconcilableStatusProjector,
+    ResourceID,
+    ResourceMetadata,
+    ResourceStatusLike,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceStateFactory: DeclarativeResource + Sized {
-    fn from_created(
+pub trait ReconcilableResourceModel {
+    type Spec: std::fmt::Debug + Clone + Send + Sync;
+    type Status: ResourceStatusLike + std::fmt::Debug + Clone;
+    type Success;
+    type FailureDetails;
+    type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
+    type Event;
+    type StatusProjector: ReconcilableStatusProjector<
+            Self::Spec,
+            Self::Success,
+            Self::FailureDetails,
+            Status = Self::Status,
+        >;
+
+    fn state_from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,
         status: Self::Status,
-    ) -> Self::ResourceState;
+    ) -> Self::State;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

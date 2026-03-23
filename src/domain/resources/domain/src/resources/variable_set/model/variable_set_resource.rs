@@ -12,6 +12,8 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ReconcilableResourceEvent,
+    ReconcilableResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
@@ -19,10 +21,13 @@ use crate::{
     ResourceValidateMetadata,
     ResourceValidateSpec,
     VariableSetEventStore,
+    VariableSetFailureDetails,
     VariableSetLifecycleError,
+    VariableSetReconcileSuccess,
     VariableSetSpec,
     VariableSetState,
     VariableSetStatus,
+    VariableSetStatusProjector,
     try_update_resource_metadata,
     try_update_resource_spec,
 };
@@ -100,12 +105,40 @@ impl DeclarativeResource for VariableSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceStateFactory for VariableSetResource {
-    fn state_from_created(
+    fn from_created(
         resource_id: ResourceID,
         metadata: ResourceMetadata,
         spec: Self::Spec,
         status: Self::Status,
     ) -> Self::ResourceState {
+        VariableSetState {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct VariableSetResourceModel {}
+
+impl ReconcilableResourceModel for VariableSetResourceModel {
+    type Spec = VariableSetSpec;
+    type Status = VariableSetStatus;
+    type Success = VariableSetReconcileSuccess;
+    type FailureDetails = VariableSetFailureDetails;
+    type State = VariableSetState;
+    type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
+    type StatusProjector = VariableSetStatusProjector;
+
+    fn state_from_created(
+        resource_id: ResourceID,
+        metadata: ResourceMetadata,
+        spec: Self::Spec,
+        status: Self::Status,
+    ) -> Self::State {
         VariableSetState {
             resource_id,
             metadata,

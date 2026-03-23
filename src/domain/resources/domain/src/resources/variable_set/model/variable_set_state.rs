@@ -16,7 +16,7 @@ use crate::{
     VariableSetEvent,
     VariableSetFailureDetails,
     VariableSetReconcileSuccess,
-    VariableSetResource,
+    VariableSetResourceModel,
     VariableSetSpec,
     VariableSetStats,
     VariableSetStatus,
@@ -75,14 +75,7 @@ impl Projection for VariableSetState {
     type Event = VariableSetEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<
-            VariableSetResource,
-            VariableSetSpec,
-            VariableSetStatus,
-            VariableSetReconcileSuccess,
-            VariableSetFailureDetails,
-            VariableSetStatusProjector,
-        >(state, event)
+        project_reconcilable_resource_state::<VariableSetResourceModel>(state, event)
     }
 }
 
