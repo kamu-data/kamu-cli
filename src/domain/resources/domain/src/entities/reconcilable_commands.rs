@@ -28,6 +28,19 @@ pub trait InvariantViolationOf<TState: Projection> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[macro_export]
+macro_rules! impl_invariant_violation_lifecycle_error {
+    ($lifecycle_error:ty, $state:ty) => {
+        impl $crate::InvariantViolationOf<$state> for $lifecycle_error {
+            fn invariant_violation(error: ::event_sourcing::ProjectionError<$state>) -> Self {
+                Self::InvariantViolation(::std::boxed::Box::new(error))
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
     now: DateTime<Utc>,
     resource_id: crate::ResourceID,

@@ -10,12 +10,7 @@
 use event_sourcing::ProjectionError;
 use thiserror::Error;
 
-use crate::{
-    InvariantViolationOf,
-    ResourceMetadataValidationError,
-    VariableSetSpecValidationError,
-    VariableSetState,
-};
+use crate::{ResourceMetadataValidationError, VariableSetSpecValidationError, VariableSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,10 +28,6 @@ pub enum VariableSetLifecycleError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl InvariantViolationOf<VariableSetState> for VariableSetLifecycleError {
-    fn invariant_violation(error: ProjectionError<VariableSetState>) -> Self {
-        Self::InvariantViolation(Box::new(error))
-    }
-}
+crate::impl_invariant_violation_lifecycle_error!(VariableSetLifecycleError, VariableSetState);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
