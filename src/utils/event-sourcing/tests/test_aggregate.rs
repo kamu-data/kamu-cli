@@ -80,7 +80,7 @@ impl EventStore<CalcState> for CalcEventStore {
         Ok(EventID::new(i64::try_from(s.len() - 1).unwrap()))
     }
 
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         Ok(self.0.lock().unwrap().len())
     }
 }

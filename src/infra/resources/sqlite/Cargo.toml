@@ -1,6 +1,6 @@
 [package]
-name = "kamu-resources"
-description = "Domain model of the managed resources control pane"
+name = "kamu-resources-sqlite"
+description = "SQLite-specific implementation of the managed resources event store"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,27 +21,29 @@ workspace = true
 doctest = false
 
 
-[features]
-default = []
-sqlx = ["dep:sqlx"]
-
-
 [dependencies]
 database-common = { workspace = true }
-enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
+kamu-resources = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, features = ["sqlx-sqlite"] }
 
+async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1", default-features = false }
-thiserror = { version = "2", default-features = false, features = ["std"] }
-tokio-stream = { version = "0.1", default-features = false }
-tracing = { version = "0.1", default-features = false }
-uuid = { version = "1", default-features = false }
-sqlx = { version = "0.8", optional = true, default-features = false }
+dill = { version = "0.15", default-features = false }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "json",
+    "macros",
+    "sqlite",
+    "chrono",
+    "uuid",
+] }
+uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]

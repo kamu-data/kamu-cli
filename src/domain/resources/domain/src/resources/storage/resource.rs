@@ -12,9 +12,11 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
+    ResourceType,
     StorageEventStore,
     StorageLifecycleError,
     StorageSpec,
@@ -37,6 +39,9 @@ type StorageEventStoreStatic = dyn StorageEventStore + 'static;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl StorageResource {
+    pub const RESOURCE_TYPE: &'static str = "storage";
+    pub const API_VERSION: &'static str = "v1alpha1";
+
     pub fn try_create(
         now: DateTime<Utc>,
         resource_id: ResourceID,
@@ -68,6 +73,18 @@ impl StorageResource {
     ) -> Result<(), StorageLifecycleError> {
         try_update_resource_spec(self, now, new_spec)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceType for StorageResource {
+    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceApiVersion for StorageResource {
+    const API_VERSION: &'static str = Self::API_VERSION;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

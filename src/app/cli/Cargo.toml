@@ -103,6 +103,11 @@ kamu-datasets-inmem = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 
+kamu-resources = { workspace = true }
+kamu-resources-inmem = { workspace = true }
+kamu-resources-postgres = { workspace = true }
+kamu-resources-sqlite = { workspace = true }
+
 messaging-outbox = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }

@@ -17,6 +17,7 @@ use crate::{ResourceName, ResourceValidateMetadata};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceMetadataInput {
+    pub account: odf::AccountID,
     pub name: ResourceName,
     pub description: Option<String>,
     pub labels: BTreeMap<String, String>,

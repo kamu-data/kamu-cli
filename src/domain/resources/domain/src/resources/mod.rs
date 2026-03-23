@@ -14,3 +14,23 @@ mod variable_set;
 pub use secret_set::*;
 pub use storage::*;
 pub use variable_set::*;
+
+use crate::{ResourceDescriptor, ResourceDescriptorProvider};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const RESOURCE_DESCRIPTORS: &[ResourceDescriptor] = &[
+    StorageResource::DESCRIPTOR,
+    SecretSetResource::DESCRIPTOR,
+    VariableSetResource::DESCRIPTOR,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn find_resource_descriptor(resource_type: &str) -> Option<&'static ResourceDescriptor> {
+    RESOURCE_DESCRIPTORS
+        .iter()
+        .find(|descriptor| descriptor.resource_type == resource_type)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

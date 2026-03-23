@@ -14,9 +14,11 @@ use crate::{EventID, Projection};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Common set of operations for an event store
-#[allow(clippy::len_without_is_empty)]
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
+    /// Returns the number of events stored
+    async fn total_events_stored(&self) -> Result<usize, InternalError>;
+
     /// Returns the event history of all aggregates in chronological order
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, Proj::Event>;
 
@@ -54,9 +56,6 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError>;
-
-    /// Returns the number of events stored
-    async fn len(&self) -> Result<usize, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

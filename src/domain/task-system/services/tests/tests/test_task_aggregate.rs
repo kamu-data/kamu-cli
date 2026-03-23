@@ -30,13 +30,13 @@ async fn test_task_agg_create_new() {
         Some(metadata.clone()),
     );
 
-    assert_eq!(event_store.len().await.unwrap(), 0);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 0);
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 1);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 1);
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 1);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 1);
 
     let task = Task::load(task.task_id, &event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Queued);
@@ -61,12 +61,12 @@ async fn test_task_save_load_update() {
 
     task.save(&event_store).await.unwrap();
     let cancel_event = task.last_stored_event_id().unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 3);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 3);
 
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 4);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 4);
 
     // Full load
     let task = Task::load(task_id, &event_store).await.unwrap();

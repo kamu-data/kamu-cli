@@ -7770,6 +7770,10 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-resources",
+ "kamu-resources-inmem",
+ "kamu-resources-postgres",
+ "kamu-resources-sqlite",
  "kamu-search",
  "kamu-search-cache-inmem",
  "kamu-search-cache-postgres",
@@ -8546,10 +8550,48 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "internal-error",
+ "opendatafabric",
  "serde",
+ "serde_json",
+ "sqlx",
  "thiserror 2.0.18",
  "tokio-stream",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-inmem"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-resources",
+ "opendatafabric",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-postgres"
+version = "0.261.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-resources",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 
@@ -8569,6 +8611,26 @@ dependencies = [
  "thiserror 2.0.18",
  "time-source",
  "tokio-stream",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-sqlite"
+version = "0.261.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-resources",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 

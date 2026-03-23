@@ -7,14 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod reconcilable_resource_repo;
-mod resource_event_store;
-mod resource_repository;
-mod resource_stream_key;
-mod stored_resource_event;
+// Re-exports
+pub use kamu_resources as domain;
 
-pub use reconcilable_resource_repo::*;
-pub use resource_event_store::*;
-pub use resource_repository::*;
-pub use resource_stream_key::*;
-pub use stored_resource_event::*;
+mod inmem_resource_event_store;
+
+pub use inmem_resource_event_store::*;

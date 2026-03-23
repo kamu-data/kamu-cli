@@ -83,7 +83,7 @@ impl<Proj: Projection, State: EventStoreState<Proj>> InMemoryEventStore<Proj, St
 impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
     for InMemoryEventStore<Proj, State>
 {
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events_count())
     }
 

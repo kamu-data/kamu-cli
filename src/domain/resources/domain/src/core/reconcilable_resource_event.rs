@@ -88,6 +88,17 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
             ReconcilableResourceEvent::ReconciliationFailed(e) => &e.resource_id,
         }
     }
+
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            ReconcilableResourceEvent::Created(e) => e.event_time,
+            ReconcilableResourceEvent::MetadataUpdated(e) => e.event_time,
+            ReconcilableResourceEvent::SpecUpdated(e) => e.event_time,
+            ReconcilableResourceEvent::ReconciliationStarted(e) => e.event_time,
+            ReconcilableResourceEvent::ReconciliationSucceeded(e) => e.event_time,
+            ReconcilableResourceEvent::ReconciliationFailed(e) => e.event_time,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

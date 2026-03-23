@@ -12,9 +12,11 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
+    ResourceType,
     VariableSetEventStore,
     VariableSetLifecycleError,
     VariableSetSpec,
@@ -37,6 +39,9 @@ type VariableSetEventStoreStatic = dyn VariableSetEventStore + 'static;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VariableSetResource {
+    pub const RESOURCE_TYPE: &'static str = "variable_set";
+    pub const API_VERSION: &'static str = "v1alpha1";
+
     pub fn try_create(
         now: DateTime<Utc>,
         resource_id: ResourceID,
@@ -68,6 +73,18 @@ impl VariableSetResource {
     ) -> Result<(), VariableSetLifecycleError> {
         try_update_resource_spec(self, now, new_spec)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceType for VariableSetResource {
+    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceApiVersion for VariableSetResource {
+    const API_VERSION: &'static str = Self::API_VERSION;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

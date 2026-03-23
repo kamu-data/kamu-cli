@@ -12,9 +12,11 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
+    ResourceType,
     SecretSetEventStore,
     SecretSetLifecycleError,
     SecretSetSpec,
@@ -37,6 +39,9 @@ type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SecretSetResource {
+    pub const RESOURCE_TYPE: &'static str = "secret_set";
+    pub const API_VERSION: &'static str = "v1alpha1";
+
     pub fn try_create(
         now: DateTime<Utc>,
         resource_id: ResourceID,
@@ -68,6 +73,18 @@ impl SecretSetResource {
     ) -> Result<(), SecretSetLifecycleError> {
         try_update_resource_spec(self, now, new_spec)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceType for SecretSetResource {
+    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceApiVersion for SecretSetResource {
+    const API_VERSION: &'static str = Self::API_VERSION;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

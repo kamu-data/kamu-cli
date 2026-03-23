@@ -21,6 +21,7 @@ pub type ResourceName = String;
 
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
+    pub account: odf::AccountID,
     pub name: ResourceName,
     pub description: Option<String>,
     pub labels: BTreeMap<String, String>,
@@ -34,6 +35,7 @@ pub struct ResourceMetadata {
 impl ResourceMetadata {
     pub fn from_input(now: DateTime<Utc>, input: ResourceMetadataInput) -> Self {
         Self {
+            account: input.account,
             name: input.name,
             description: input.description,
             labels: input.labels,
@@ -46,13 +48,15 @@ impl ResourceMetadata {
     }
 
     pub fn is_equivalent_to(&self, input: &ResourceMetadataInput) -> bool {
-        self.name == input.name
+        self.account == input.account
+            && self.name == input.name
             && self.description == input.description
             && self.labels == input.labels
             && self.annotations == input.annotations
     }
 
     pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceMetadataInput) {
+        self.account = input.account;
         self.name = input.name;
         self.description = input.description;
         self.labels = input.labels;

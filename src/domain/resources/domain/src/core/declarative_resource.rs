@@ -11,6 +11,44 @@ use crate::{ResourceID, ResourceMetadata, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub trait ResourceType {
+    const RESOURCE_TYPE: &'static str;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ResourceApiVersion {
+    const API_VERSION: &'static str;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceDescriptor {
+    pub resource_type: &'static str,
+    pub api_version: &'static str,
+}
+
+impl ResourceDescriptor {
+    pub const fn new(resource_type: &'static str, api_version: &'static str) -> Self {
+        Self {
+            resource_type,
+            api_version,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ResourceDescriptorProvider: ResourceType + ResourceApiVersion {
+    const DESCRIPTOR: ResourceDescriptor =
+        ResourceDescriptor::new(Self::RESOURCE_TYPE, Self::API_VERSION);
+}
+
+impl<T> ResourceDescriptorProvider for T where T: ResourceType + ResourceApiVersion {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait DeclarativeResource: Send + Sync {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
