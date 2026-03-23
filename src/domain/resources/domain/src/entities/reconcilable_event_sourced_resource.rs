@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::Projection;
+use event_sourcing::{AggregateAccess, Projection};
 
 use crate::{
     DeclarativeResource,
+    InvariantViolationOf,
     ReconcilableResource,
     ReconcilableResourceEvent,
     ReconcileFailureMapper,
@@ -29,12 +30,28 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ReconcilableEventSourcedResource:
-    ReconcilableResource + DeclarativeResource<ResourceState: Projection>
+    ReconcilableResource
+    + DeclarativeResource<
+        ResourceState: Projection<
+            Event = ReconcilableResourceEvent<
+                Self::Spec,
+                Self::ReconcileSuccess,
+                Self::FailureDetails,
+            >,
+        >,
+    > + AggregateAccess<Projection = Self::ResourceState>
 {
     fn apply_event(
         &mut self,
         event: ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>,
-    ) -> Result<(), Self::LifecycleError>;
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
+    {
+        self.aggregate_mut()
+            .apply(event)
+            .map_err(Self::LifecycleError::invariant_violation)
+    }
 
     fn make_created_event(
         now: DateTime<Utc>,

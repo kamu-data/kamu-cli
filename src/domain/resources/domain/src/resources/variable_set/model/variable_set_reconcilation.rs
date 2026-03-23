@@ -29,19 +29,7 @@ impl ReconcilableResource for VariableSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableEventSourcedResource for VariableSetResource {
-    fn apply_event(
-        &mut self,
-        event: crate::ReconcilableResourceEvent<
-            Self::Spec,
-            Self::ReconcileSuccess,
-            Self::FailureDetails,
-        >,
-    ) -> Result<(), Self::LifecycleError> {
-        self.apply(event)
-            .map_err(|e| VariableSetLifecycleError::InvariantViolation(Box::new(e)))
-    }
-}
+impl ReconcilableEventSourcedResource for VariableSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

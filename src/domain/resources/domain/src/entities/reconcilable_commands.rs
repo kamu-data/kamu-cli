@@ -64,7 +64,8 @@ pub fn try_update_resource_metadata<R>(
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
-    R::LifecycleError: From<ResourceMetadataValidationError>,
+    R::LifecycleError:
+        From<ResourceMetadataValidationError> + InvariantViolationOf<R::ResourceState>,
 {
     new_metadata.validate()?;
 
@@ -86,7 +87,8 @@ pub fn try_update_resource_spec<R>(
 where
     R: ReconcilableEventSourcedResource,
     R::Spec: ResourceValidateSpec + PartialEq + Clone,
-    R::LifecycleError: From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+    R::LifecycleError: From<<R::Spec as ResourceValidateSpec>::ValidationError>
+        + InvariantViolationOf<R::ResourceState>,
 {
     new_spec.validate()?;
 
@@ -106,6 +108,7 @@ pub fn try_mark_resource_reconciliation_started<R>(
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if !resource.needs_reconciliation() {
         return Ok(());
@@ -130,6 +133,7 @@ pub fn try_mark_resource_reconciliation_succeeded<R>(
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.metadata().generation != expected_generation {
         tracing::warn!(
@@ -154,6 +158,7 @@ pub fn try_mark_resource_reconciliation_failed<R>(
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.metadata().generation != expected_generation {
         tracing::warn!(

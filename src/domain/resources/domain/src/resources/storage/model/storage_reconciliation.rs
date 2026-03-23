@@ -82,19 +82,7 @@ impl ReconcilableResource for StorageResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableEventSourcedResource for StorageResource {
-    fn apply_event(
-        &mut self,
-        event: crate::ReconcilableResourceEvent<
-            Self::Spec,
-            Self::ReconcileSuccess,
-            Self::FailureDetails,
-        >,
-    ) -> Result<(), Self::LifecycleError> {
-        self.apply(event)
-            .map_err(|e| StorageLifecycleError::InvariantViolation(Box::new(e)))
-    }
-}
+impl ReconcilableEventSourcedResource for StorageResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

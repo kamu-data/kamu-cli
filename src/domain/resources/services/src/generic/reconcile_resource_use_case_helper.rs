@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_resources::{
+    InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ReconcilableResourceRepository,
     ReconcileFailureMapper,
@@ -30,8 +31,10 @@ pub struct ReconcileResourceUseCaseHelper<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'a, R: ReconcileFailureMapper + ReconcilableEventSourcedResource>
-    ReconcileResourceUseCaseHelper<'a, R>
+impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
+where
+    R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     pub fn new(
         repo: &'a dyn ReconcilableResourceRepository<R>,

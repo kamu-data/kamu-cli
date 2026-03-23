@@ -29,19 +29,7 @@ impl ReconcilableResource for SecretSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableEventSourcedResource for SecretSetResource {
-    fn apply_event(
-        &mut self,
-        event: crate::ReconcilableResourceEvent<
-            Self::Spec,
-            Self::ReconcileSuccess,
-            Self::FailureDetails,
-        >,
-    ) -> Result<(), Self::LifecycleError> {
-        self.apply(event)
-            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
-    }
-}
+impl ReconcilableEventSourcedResource for SecretSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

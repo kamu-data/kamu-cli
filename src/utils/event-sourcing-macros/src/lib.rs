@@ -199,6 +199,21 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
         }
 
+        impl ::event_sourcing::AggregateAccess for #type_name {
+            type Projection = #proj_type;
+            type Store = #store_type;
+
+            fn aggregate(&self) -> &::event_sourcing::Aggregate<Self::Projection, Self::Store> {
+                &self.0
+            }
+
+            fn aggregate_mut(
+                &mut self,
+            ) -> &mut ::event_sourcing::Aggregate<Self::Projection, Self::Store> {
+                &mut self.0
+            }
+        }
+
         impl Into<#proj_type> for #type_name {
             fn into(self) -> #proj_type {
                 self.0.into_state()

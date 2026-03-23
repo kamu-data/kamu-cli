@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     DeclarativeResource,
+    InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ReconcileFailureMapper,
     ResourceReconcileError,
@@ -38,6 +39,7 @@ pub trait ReconcilableResource: DeclarativeResource {
     ) -> Result<(), Self::LifecycleError>
     where
         Self: ReconcilableEventSourcedResource + Sized,
+        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
     {
         crate::try_mark_resource_reconciliation_started(self, now)
     }
@@ -50,6 +52,7 @@ pub trait ReconcilableResource: DeclarativeResource {
     ) -> Result<(), Self::LifecycleError>
     where
         Self: ReconcilableEventSourcedResource + Sized,
+        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
     {
         crate::try_mark_resource_reconciliation_succeeded(self, now, expected_generation, success)
     }
@@ -62,6 +65,7 @@ pub trait ReconcilableResource: DeclarativeResource {
     ) -> Result<(), Self::LifecycleError>
     where
         Self: ReconcileFailureMapper + ReconcilableEventSourcedResource + Sized,
+        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
     {
         crate::try_mark_resource_reconciliation_failed(self, now, expected_generation, error)
     }

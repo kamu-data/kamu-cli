@@ -38,6 +38,15 @@ where
     _store: PhantomData<Store>,
 }
 
+pub trait AggregateAccess {
+    type Projection: Projection;
+    type Store: EventStore<Self::Projection> + ?Sized;
+
+    fn aggregate(&self) -> &Aggregate<Self::Projection, Self::Store>;
+
+    fn aggregate_mut(&mut self) -> &mut Aggregate<Self::Projection, Self::Store>;
+}
+
 impl<Proj, Store> Aggregate<Proj, Store>
 where
     Proj: Projection,
