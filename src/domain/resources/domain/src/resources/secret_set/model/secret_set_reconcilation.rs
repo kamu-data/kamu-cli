@@ -23,14 +23,13 @@ use crate::{
 impl ReconcilableResource for SecretSetResource {
     type ReconcileSuccess = SecretSetReconcileSuccess;
     type ReconcileError = SecretSetReconcileError;
+    type FailureDetails = SecretSetFailureDetails;
     type LifecycleError = SecretSetLifecycleError;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReconcilableEventSourcedResource for SecretSetResource {
-    type FailureDetails = SecretSetFailureDetails;
-
     fn apply_event(
         &mut self,
         event: crate::ReconcilableResourceEvent<

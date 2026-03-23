@@ -76,14 +76,13 @@ impl ResourceReconcileError for StorageReconcileError {
 impl ReconcilableResource for StorageResource {
     type ReconcileSuccess = StorageReconcileSuccess;
     type ReconcileError = StorageReconcileError;
+    type FailureDetails = StorageFailureDetails;
     type LifecycleError = StorageLifecycleError;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReconcilableEventSourcedResource for StorageResource {
-    type FailureDetails = StorageFailureDetails;
-
     fn apply_event(
         &mut self,
         event: crate::ReconcilableResourceEvent<

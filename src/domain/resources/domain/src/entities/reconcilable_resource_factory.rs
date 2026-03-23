@@ -26,8 +26,6 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ReconcilableEventSourcedResource: ReconcilableResource {
-    type FailureDetails;
-
     fn apply_event(
         &mut self,
         event: ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>,
@@ -120,7 +118,7 @@ pub trait ReconcilableEventSourcedResource: ReconcilableResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcileFailureMapper: ReconcilableEventSourcedResource {
+pub trait ReconcileFailureMapper: ReconcilableResource {
     fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
 }
 

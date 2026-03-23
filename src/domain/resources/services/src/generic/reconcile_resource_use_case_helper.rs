@@ -6,16 +6,9 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
 
 use kamu_resources::{
+    ReconcilableEventSourcedResource,
     ReconcilableResourceRepository,
     ReconcileFailureMapper,
     ReconcileResourceUseCaseError,
@@ -26,7 +19,10 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcileFailureMapper> {
+pub struct ReconcileResourceUseCaseHelper<
+    'a,
+    R: ReconcileFailureMapper + ReconcilableEventSourcedResource,
+> {
     repo: &'a dyn ReconcilableResourceRepository<R>,
     reconciler: &'a dyn Reconciler<R>,
     time_source: &'a dyn SystemTimeSource,
@@ -34,7 +30,9 @@ pub struct ReconcileResourceUseCaseHelper<'a, R: ReconcileFailureMapper> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'a, R: ReconcileFailureMapper> ReconcileResourceUseCaseHelper<'a, R> {
+impl<'a, R: ReconcileFailureMapper + ReconcilableEventSourcedResource>
+    ReconcileResourceUseCaseHelper<'a, R>
+{
     pub fn new(
         repo: &'a dyn ReconcilableResourceRepository<R>,
         reconciler: &'a dyn Reconciler<R>,

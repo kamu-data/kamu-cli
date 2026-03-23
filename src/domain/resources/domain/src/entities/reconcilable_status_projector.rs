@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{Projection, ProjectionError};
+use event_sourcing::ProjectionError;
 
 use crate::{
     DeclarativeResourceState,
@@ -51,9 +51,13 @@ pub fn project_reconcilable_resource_state<TModel>(
 ) -> Result<TModel::State, ProjectionError<TModel::State>>
 where
     TModel: ReconcilableResourceModel,
-    TModel::State: Projection<
-        Event = ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>,
-    >,
+    TModel::State: event_sourcing::Projection<
+            Event = ReconcilableResourceEvent<
+                TModel::Spec,
+                TModel::Success,
+                TModel::FailureDetails,
+            >,
+        >,
 {
     use ReconcilableResourceEvent as E;
 

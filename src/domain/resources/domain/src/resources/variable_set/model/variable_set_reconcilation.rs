@@ -23,14 +23,13 @@ use crate::{
 impl ReconcilableResource for VariableSetResource {
     type ReconcileSuccess = VariableSetReconcileSuccess;
     type ReconcileError = VariableSetReconcileError;
+    type FailureDetails = VariableSetFailureDetails;
     type LifecycleError = VariableSetLifecycleError;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReconcilableEventSourcedResource for VariableSetResource {
-    type FailureDetails = VariableSetFailureDetails;
-
     fn apply_event(
         &mut self,
         event: crate::ReconcilableResourceEvent<
