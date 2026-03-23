@@ -10,8 +10,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::{
-    AppliesTypedEvent,
-    ReconcilableResourceEventFactory,
+    ReconcilableEventSourcedResource,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
     ResourcePhase,
@@ -25,10 +24,10 @@ pub fn try_update_resource_metadata<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     new_metadata: ResourceMetadataInput,
-) -> Result<(), <R as AppliesTypedEvent<R::Event>>::LifecycleError>
+) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableResourceEventFactory + AppliesTypedEvent<R::Event>,
-    <R as AppliesTypedEvent<R::Event>>::LifecycleError: From<ResourceMetadataValidationError>,
+    R: ReconcilableEventSourcedResource,
+    R::LifecycleError: From<ResourceMetadataValidationError>,
 {
     new_metadata.validate()?;
 
@@ -36,8 +35,8 @@ where
         return Ok(());
     }
 
-    let event = resource.metadata_updated_event(now, new_metadata);
-    resource.apply_typed_event(event)
+    let event = resource.make_metadata_updated_event(now, new_metadata);
+    resource.apply_event(event)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,12 +45,11 @@ pub fn try_update_resource_spec<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     new_spec: R::Spec,
-) -> Result<(), <R as AppliesTypedEvent<R::Event>>::LifecycleError>
+) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableResourceEventFactory + AppliesTypedEvent<R::Event>,
+    R: ReconcilableEventSourcedResource,
     R::Spec: ResourceValidateSpec + PartialEq + Clone,
-    <R as AppliesTypedEvent<R::Event>>::LifecycleError:
-        From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+    R::LifecycleError: From<<R::Spec as ResourceValidateSpec>::ValidationError>,
 {
     new_spec.validate()?;
 
@@ -59,8 +57,8 @@ where
         return Ok(());
     }
 
-    let event = resource.spec_updated_event(now, new_spec, resource.metadata().generation + 1);
-    resource.apply_typed_event(event)
+    let event = resource.make_spec_updated_event(now, new_spec, resource.metadata().generation + 1);
+    resource.apply_event(event)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,9 +66,9 @@ where
 pub fn try_mark_resource_reconciliation_started<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-) -> Result<(), <R as AppliesTypedEvent<R::Event>>::LifecycleError>
+) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableResourceEventFactory + AppliesTypedEvent<R::Event>,
+    R: ReconcilableEventSourcedResource,
 {
     if !resource.needs_reconciliation() {
         return Ok(());
@@ -81,8 +79,8 @@ where
         return Ok(());
     }
 
-    let event = resource.reconciliation_started_event(now);
-    resource.apply_typed_event(event)
+    let event = resource.make_reconciliation_started_event(now);
+    resource.apply_event(event)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,9 +90,9 @@ pub fn try_mark_resource_reconciliation_succeeded<R>(
     now: DateTime<Utc>,
     expected_generation: u64,
     success: R::ReconcileSuccess,
-) -> Result<(), <R as AppliesTypedEvent<R::Event>>::LifecycleError>
+) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableResourceEventFactory + AppliesTypedEvent<R::Event>,
+    R: ReconcilableEventSourcedResource,
 {
     if resource.metadata().generation != expected_generation {
         tracing::warn!(
@@ -105,8 +103,8 @@ where
         return Ok(());
     }
 
-    let event = resource.reconciliation_succeeded_event(now, expected_generation, success);
-    resource.apply_typed_event(event)
+    let event = resource.make_reconciliation_succeeded_event(now, expected_generation, success);
+    resource.apply_event(event)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,9 +114,9 @@ pub fn try_mark_resource_reconciliation_failed<R>(
     now: DateTime<Utc>,
     expected_generation: u64,
     error: &R::ReconcileError,
-) -> Result<(), <R as AppliesTypedEvent<R::Event>>::LifecycleError>
+) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableResourceEventFactory + AppliesTypedEvent<R::Event>,
+    R: ReconcilableEventSourcedResource,
 {
     if resource.metadata().generation != expected_generation {
         tracing::warn!(
@@ -129,8 +127,8 @@ where
         return Ok(());
     }
 
-    let event = resource.reconciliation_failed_event(now, expected_generation, error);
-    resource.apply_typed_event(event)
+    let event = resource.make_reconciliation_failed_event(now, expected_generation, error);
+    resource.apply_event(event)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

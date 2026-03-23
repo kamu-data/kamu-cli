@@ -10,11 +10,10 @@
 use chrono::{DateTime, Utc};
 
 use crate::{
-    AppliesTypedEvent,
     DeclarativeResource,
+    ReconcilableEventSourcedResource,
     ReconcilableResource,
     ReconcilableResourceEvent,
-    ReconcilableResourceEventFactory,
     ResourceEventCreated,
     ResourceEventMetadataUpdated,
     ResourceEventReconciliationFailed,
@@ -75,10 +74,15 @@ impl ReconcilableResource for SecretSetResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableResourceEventFactory for SecretSetResource {
+impl ReconcilableEventSourcedResource for SecretSetResource {
     type Event = SecretSetEvent;
 
-    fn created_event(
+    fn apply_event(&mut self, event: Self::Event) -> Result<(), Self::LifecycleError> {
+        self.apply(event)
+            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
+    }
+
+    fn make_created_event(
         now: DateTime<Utc>,
         resource_id: ResourceID,
         metadata: ResourceMetadataInput,
@@ -92,7 +96,7 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
         })
     }
 
-    fn metadata_updated_event(
+    fn make_metadata_updated_event(
         &self,
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
@@ -104,7 +108,7 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
         })
     }
 
-    fn spec_updated_event(
+    fn make_spec_updated_event(
         &self,
         now: DateTime<Utc>,
         new_spec: Self::Spec,
@@ -118,7 +122,7 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
         })
     }
 
-    fn reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event {
+    fn make_reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event {
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -126,7 +130,7 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
         })
     }
 
-    fn reconciliation_succeeded_event(
+    fn make_reconciliation_succeeded_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
@@ -140,7 +144,7 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
         })
     }
 
-    fn reconciliation_failed_event(
+    fn make_reconciliation_failed_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
@@ -156,17 +160,6 @@ impl ReconcilableResourceEventFactory for SecretSetResource {
                 stats: SecretSetStats::default(),
             },
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl AppliesTypedEvent<SecretSetEvent> for SecretSetResource {
-    type LifecycleError = SecretSetLifecycleError;
-
-    fn apply_typed_event(&mut self, event: SecretSetEvent) -> Result<(), Self::LifecycleError> {
-        self.apply(event)
-            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
     }
 }
 

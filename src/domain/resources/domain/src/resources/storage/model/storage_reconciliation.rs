@@ -11,11 +11,10 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
 use crate::{
-    AppliesTypedEvent,
     DeclarativeResource,
+    ReconcilableEventSourcedResource,
     ReconcilableResource,
     ReconcilableResourceEvent,
-    ReconcilableResourceEventFactory,
     ResourceEventCreated,
     ResourceEventMetadataUpdated,
     ResourceEventReconciliationFailed,
@@ -127,10 +126,15 @@ impl ReconcilableResource for StorageResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableResourceEventFactory for StorageResource {
+impl ReconcilableEventSourcedResource for StorageResource {
     type Event = StorageEvent;
 
-    fn created_event(
+    fn apply_event(&mut self, event: Self::Event) -> Result<(), Self::LifecycleError> {
+        self.apply(event)
+            .map_err(|e| StorageLifecycleError::InvariantViolation(Box::new(e)))
+    }
+
+    fn make_created_event(
         now: DateTime<Utc>,
         resource_id: ResourceID,
         metadata: ResourceMetadataInput,
@@ -144,7 +148,7 @@ impl ReconcilableResourceEventFactory for StorageResource {
         })
     }
 
-    fn metadata_updated_event(
+    fn make_metadata_updated_event(
         &self,
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
@@ -156,7 +160,7 @@ impl ReconcilableResourceEventFactory for StorageResource {
         })
     }
 
-    fn spec_updated_event(
+    fn make_spec_updated_event(
         &self,
         now: DateTime<Utc>,
         new_spec: Self::Spec,
@@ -170,7 +174,7 @@ impl ReconcilableResourceEventFactory for StorageResource {
         })
     }
 
-    fn reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event {
+    fn make_reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event {
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -178,7 +182,7 @@ impl ReconcilableResourceEventFactory for StorageResource {
         })
     }
 
-    fn reconciliation_succeeded_event(
+    fn make_reconciliation_succeeded_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
@@ -192,7 +196,7 @@ impl ReconcilableResourceEventFactory for StorageResource {
         })
     }
 
-    fn reconciliation_failed_event(
+    fn make_reconciliation_failed_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
@@ -208,17 +212,6 @@ impl ReconcilableResourceEventFactory for StorageResource {
                 references: StorageReferenceStatus::default(),
             },
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl AppliesTypedEvent<StorageEvent> for StorageResource {
-    type LifecycleError = StorageLifecycleError;
-
-    fn apply_typed_event(&mut self, event: StorageEvent) -> Result<(), Self::LifecycleError> {
-        self.apply(event)
-            .map_err(|e| StorageLifecycleError::InvariantViolation(Box::new(e)))
     }
 }
 

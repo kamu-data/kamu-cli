@@ -52,8 +52,8 @@ impl SecretSetResource {
         metadata.validate()?;
         spec.validate()?;
 
-        use crate::ReconcilableResourceEventFactory;
-        let event = Self::created_event(now, resource_id, metadata, spec);
+        use crate::ReconcilableEventSourcedResource;
+        let event = Self::make_created_event(now, resource_id, metadata, spec);
 
         Aggregate::new(resource_id, event)
             .map(Self)

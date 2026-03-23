@@ -13,52 +13,45 @@ use crate::{ReconcilableResource, ResourceID, ResourceMetadataInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableResourceEventFactory: ReconcilableResource {
+pub trait ReconcilableEventSourcedResource: ReconcilableResource {
     type Event;
+    fn apply_event(&mut self, event: Self::Event) -> Result<(), Self::LifecycleError>;
 
-    fn created_event(
+    fn make_created_event(
         now: DateTime<Utc>,
         resource_id: ResourceID,
         metadata: ResourceMetadataInput,
         spec: Self::Spec,
     ) -> Self::Event;
 
-    fn metadata_updated_event(
+    fn make_metadata_updated_event(
         &self,
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
     ) -> Self::Event;
 
-    fn spec_updated_event(
+    fn make_spec_updated_event(
         &self,
         now: DateTime<Utc>,
         new_spec: Self::Spec,
         new_generation: u64,
     ) -> Self::Event;
 
-    fn reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event;
+    fn make_reconciliation_started_event(&self, now: DateTime<Utc>) -> Self::Event;
 
-    fn reconciliation_succeeded_event(
+    fn make_reconciliation_succeeded_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
         success: Self::ReconcileSuccess,
     ) -> Self::Event;
 
-    fn reconciliation_failed_event(
+    fn make_reconciliation_failed_event(
         &self,
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
     ) -> Self::Event;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait AppliesTypedEvent<E> {
-    type LifecycleError;
-
-    fn apply_typed_event(&mut self, event: E) -> Result<(), Self::LifecycleError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
