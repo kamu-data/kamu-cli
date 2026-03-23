@@ -23,7 +23,6 @@ pub trait ReconcilableResourceModel {
     type Success;
     type FailureDetails;
     type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
-    type Event;
     type StatusProjector: ReconcilableStatusProjector<
             Self::Spec,
             Self::Success,

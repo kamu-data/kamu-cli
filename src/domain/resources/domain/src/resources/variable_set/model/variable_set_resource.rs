@@ -12,7 +12,6 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableResourceEvent,
     ReconcilableResourceModel,
     ResourceID,
     ResourceMetadata,
@@ -111,7 +110,6 @@ impl ReconcilableResourceModel for VariableSetResourceModel {
     type Success = VariableSetReconcileSuccess;
     type FailureDetails = VariableSetFailureDetails;
     type State = VariableSetState;
-    type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
     type StatusProjector = VariableSetStatusProjector;
 
     fn from_created(

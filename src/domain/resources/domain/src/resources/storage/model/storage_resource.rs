@@ -12,7 +12,6 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableResourceEvent,
     ReconcilableResourceModel,
     ResourceID,
     ResourceMetadata,
@@ -111,7 +110,6 @@ impl ReconcilableResourceModel for StorageResourceModel {
     type Success = StorageReconcileSuccess;
     type FailureDetails = StorageFailureDetails;
     type State = StorageState;
-    type Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>;
     type StatusProjector = StorageStatusProjector;
 
     fn from_created(
