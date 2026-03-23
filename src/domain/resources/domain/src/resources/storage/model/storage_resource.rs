@@ -12,18 +12,14 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
     StorageEventStore,
-    StorageFailureDetails,
     StorageLifecycleError,
-    StorageReconcileSuccess,
     StorageSpec,
     StorageState,
     StorageStatus,
-    StorageStatusProjector,
     try_create_reconcilable_resource,
     try_update_resource_metadata,
     try_update_resource_spec,
@@ -96,19 +92,6 @@ impl DeclarativeResource for StorageResource {
     fn status(&self) -> &Self::Status {
         &self.as_ref().status
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct StorageResourceModel {}
-
-impl ReconcilableEventSourcedResourceModel for StorageResourceModel {
-    type Spec = StorageSpec;
-    type Status = StorageStatus;
-    type Success = StorageReconcileSuccess;
-    type FailureDetails = StorageFailureDetails;
-    type State = StorageState;
-    type StatusProjector = StorageStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

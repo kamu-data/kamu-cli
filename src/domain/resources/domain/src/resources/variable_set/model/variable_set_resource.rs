@@ -12,18 +12,14 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
     VariableSetEventStore,
-    VariableSetFailureDetails,
     VariableSetLifecycleError,
-    VariableSetReconcileSuccess,
     VariableSetSpec,
     VariableSetState,
     VariableSetStatus,
-    VariableSetStatusProjector,
     try_create_reconcilable_resource,
     try_update_resource_metadata,
     try_update_resource_spec,
@@ -96,19 +92,6 @@ impl DeclarativeResource for VariableSetResource {
     fn status(&self) -> &Self::Status {
         &self.as_ref().status
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct VariableSetResourceModel {}
-
-impl ReconcilableEventSourcedResourceModel for VariableSetResourceModel {
-    type Spec = VariableSetSpec;
-    type Status = VariableSetStatus;
-    type Success = VariableSetReconcileSuccess;
-    type FailureDetails = VariableSetFailureDetails;
-    type State = VariableSetState;
-    type StatusProjector = VariableSetStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,13 +10,13 @@
 use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 
 use crate::{
+    ReconcilableEventSourcedResourceModel,
     ReconcilableStatusProjector,
     ResourceID,
     ResourceState,
     SecretSetEvent,
     SecretSetFailureDetails,
     SecretSetReconcileSuccess,
-    SecretSetResourceModel,
     SecretSetSpec,
     SecretSetStatus,
     project_reconcilable_resource_state,
@@ -27,6 +27,20 @@ use crate::{
 pub type SecretSetState = ResourceState<SecretSetSpec, SecretSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SecretSetResourceModel {}
+
+impl ReconcilableEventSourcedResourceModel for SecretSetResourceModel {
+    type Spec = SecretSetSpec;
+    type Status = SecretSetStatus;
+    type Success = SecretSetReconcileSuccess;
+    type FailureDetails = SecretSetFailureDetails;
+    type State = SecretSetState;
+    type StatusProjector = SecretSetStatusProjector;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SecretSetStatusProjector;
 
 impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>

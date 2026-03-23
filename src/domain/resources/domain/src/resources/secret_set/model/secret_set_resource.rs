@@ -12,18 +12,14 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
     SecretSetEventStore,
-    SecretSetFailureDetails,
     SecretSetLifecycleError,
-    SecretSetReconcileSuccess,
     SecretSetSpec,
     SecretSetState,
     SecretSetStatus,
-    SecretSetStatusProjector,
     try_create_reconcilable_resource,
     try_update_resource_metadata,
     try_update_resource_spec,
@@ -96,19 +92,6 @@ impl DeclarativeResource for SecretSetResource {
     fn status(&self) -> &Self::Status {
         &self.as_ref().status
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct SecretSetResourceModel {}
-
-impl ReconcilableEventSourcedResourceModel for SecretSetResourceModel {
-    type Spec = SecretSetSpec;
-    type Status = SecretSetStatus;
-    type Success = SecretSetReconcileSuccess;
-    type FailureDetails = SecretSetFailureDetails;
-    type State = SecretSetState;
-    type StatusProjector = SecretSetStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
