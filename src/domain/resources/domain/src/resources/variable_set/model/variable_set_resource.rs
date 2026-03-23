@@ -116,12 +116,7 @@ impl ReconcilableEventSourcedResourceModel for VariableSetResourceModel {
         spec: Self::Spec,
         status: Self::Status,
     ) -> Self::State {
-        VariableSetState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
+        VariableSetState::new(resource_id, metadata, spec, status)
     }
 }
 

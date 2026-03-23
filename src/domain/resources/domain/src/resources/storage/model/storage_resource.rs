@@ -116,12 +116,7 @@ impl ReconcilableEventSourcedResourceModel for StorageResourceModel {
         spec: Self::Spec,
         status: Self::Status,
     ) -> Self::State {
-        StorageState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
+        StorageState::new(resource_id, metadata, spec, status)
     }
 }
 

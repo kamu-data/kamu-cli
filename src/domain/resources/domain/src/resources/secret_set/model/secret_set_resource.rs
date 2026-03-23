@@ -116,12 +116,7 @@ impl ReconcilableEventSourcedResourceModel for SecretSetResourceModel {
         spec: Self::Spec,
         status: Self::Status,
     ) -> Self::State {
-        SecretSetState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
+        SecretSetState::new(resource_id, metadata, spec, status)
     }
 }
 

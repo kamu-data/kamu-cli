@@ -24,6 +24,28 @@ pub struct ResourceState<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl<TSpec, TStatus> ResourceState<TSpec, TStatus>
+where
+    TSpec: std::fmt::Debug + Clone + Send + Sync,
+    TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
+{
+    pub fn new(
+        resource_id: ResourceID,
+        metadata: ResourceMetadata,
+        spec: TSpec,
+        status: TStatus,
+    ) -> Self {
+        Self {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<TSpec, TStatus> DeclarativeResourceState for ResourceState<TSpec, TStatus>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
