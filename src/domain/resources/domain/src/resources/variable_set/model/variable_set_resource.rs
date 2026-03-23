@@ -12,7 +12,7 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableResourceModel,
+    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
@@ -104,7 +104,7 @@ impl DeclarativeResource for VariableSetResource {
 
 pub struct VariableSetResourceModel {}
 
-impl ReconcilableResourceModel for VariableSetResourceModel {
+impl ReconcilableEventSourcedResourceModel for VariableSetResourceModel {
     type Spec = VariableSetSpec;
     type Status = VariableSetStatus;
     type Success = VariableSetReconcileSuccess;

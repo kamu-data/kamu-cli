@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::Projection;
-
 use crate::{ResourceID, ResourceMetadata, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,8 +14,7 @@ use crate::{ResourceID, ResourceMetadata, ResourceStatusLike};
 pub trait DeclarativeResource: Send + Sync {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
-    type ResourceState: Projection
-        + DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
+    type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
 
     fn resource_id(&self) -> &ResourceID;
     fn metadata(&self) -> &ResourceMetadata;

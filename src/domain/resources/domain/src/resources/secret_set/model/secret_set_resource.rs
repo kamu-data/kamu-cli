@@ -12,7 +12,7 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableResourceModel,
+    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
@@ -104,7 +104,7 @@ impl DeclarativeResource for SecretSetResource {
 
 pub struct SecretSetResourceModel {}
 
-impl ReconcilableResourceModel for SecretSetResourceModel {
+impl ReconcilableEventSourcedResourceModel for SecretSetResourceModel {
     type Spec = SecretSetSpec;
     type Status = SecretSetStatus;
     type Success = SecretSetReconcileSuccess;

@@ -12,7 +12,7 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
-    ReconcilableResourceModel,
+    ReconcilableEventSourcedResourceModel,
     ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
@@ -104,7 +104,7 @@ impl DeclarativeResource for StorageResource {
 
 pub struct StorageResourceModel {}
 
-impl ReconcilableResourceModel for StorageResourceModel {
+impl ReconcilableEventSourcedResourceModel for StorageResourceModel {
     type Spec = StorageSpec;
     type Status = StorageStatus;
     type Success = StorageReconcileSuccess;

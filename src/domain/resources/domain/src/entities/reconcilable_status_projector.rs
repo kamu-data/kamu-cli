@@ -11,8 +11,8 @@ use event_sourcing::ProjectionError;
 
 use crate::{
     DeclarativeResourceState,
+    ReconcilableEventSourcedResourceModel,
     ReconcilableResourceEvent,
-    ReconcilableResourceModel,
     ResourceMetadata,
     ResourceStatusLike,
 };
@@ -50,14 +50,7 @@ pub fn project_reconcilable_resource_state<TModel>(
     event: ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>,
 ) -> Result<TModel::State, ProjectionError<TModel::State>>
 where
-    TModel: ReconcilableResourceModel,
-    TModel::State: event_sourcing::Projection<
-            Event = ReconcilableResourceEvent<
-                TModel::Spec,
-                TModel::Success,
-                TModel::FailureDetails,
-            >,
-        >,
+    TModel: ReconcilableEventSourcedResourceModel,
 {
     use ReconcilableResourceEvent as E;
 

@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use event_sourcing::Projection;
+
 use crate::{
     DeclarativeResourceState,
+    ReconcilableResourceEvent,
     ReconcilableStatusProjector,
     ResourceID,
     ResourceMetadata,
@@ -17,12 +20,15 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableResourceModel {
+pub trait ReconcilableEventSourcedResourceModel {
     type Spec: std::fmt::Debug + Clone + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug + Clone;
     type Success;
     type FailureDetails;
-    type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
+    type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+        + Projection<
+            Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>,
+        >;
     type StatusProjector: ReconcilableStatusProjector<
             Self::Spec,
             Self::Success,

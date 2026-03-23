@@ -8,10 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::Projection;
 
 use crate::{
+    DeclarativeResource,
     ReconcilableResource,
     ReconcilableResourceEvent,
+    ReconcileFailureMapper,
     ResourceEventCreated,
     ResourceEventMetadataUpdated,
     ResourceEventReconciliationFailed,
@@ -25,7 +28,9 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableEventSourcedResource: ReconcilableResource {
+pub trait ReconcilableEventSourcedResource:
+    ReconcilableResource + DeclarativeResource<ResourceState: Projection>
+{
     fn apply_event(
         &mut self,
         event: ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>,
@@ -114,12 +119,6 @@ pub trait ReconcilableEventSourcedResource: ReconcilableResource {
             details: Self::failure_details(error),
         })
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ReconcileFailureMapper: ReconcilableResource {
-    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

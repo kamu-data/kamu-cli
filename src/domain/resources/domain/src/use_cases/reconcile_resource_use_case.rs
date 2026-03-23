@@ -9,19 +9,19 @@
 
 use event_sourcing::{LoadError, SaveError};
 
-use crate::{ReconcilableResource, ResourceID};
+use crate::{ReconcilableEventSourcedResource, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ReconcileResourceUseCase<R: ReconcilableResource>: Send + Sync {
+pub trait ReconcileResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
     async fn execute(&self, id: &ResourceID) -> Result<(), ReconcileResourceUseCaseError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ReconcileResourceUseCaseError<R: ReconcilableResource> {
+pub enum ReconcileResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     #[error("Resource with the specified identity failed to load. Reason: {0}")]
     LoadFailed(LoadError<R::ResourceState>),
 

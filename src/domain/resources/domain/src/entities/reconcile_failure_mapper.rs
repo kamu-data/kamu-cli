@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{LoadError, SaveError};
-
-use crate::{ReconcilableEventSourcedResource, ResourceID};
+use crate::ReconcilableResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait ReconcilableResourceRepository<R: ReconcilableEventSourcedResource>: Send + Sync {
-    async fn load(&self, id: &ResourceID) -> Result<R, LoadError<R::ResourceState>>;
-    async fn save(&self, resource: &mut R) -> Result<(), SaveError>;
+pub trait ReconcileFailureMapper: ReconcilableResource {
+    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
