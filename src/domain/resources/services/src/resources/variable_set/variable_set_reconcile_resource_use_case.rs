@@ -14,7 +14,7 @@ use kamu_resources::{
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     Reconciler,
-    VariableSetID,
+    ResourceID,
     VariableSetResource,
 };
 use time_source::SystemTimeSource;
@@ -37,7 +37,7 @@ pub struct VariableSetReconcileResourceUseCaseImpl {
 impl ReconcileResourceUseCase<VariableSetResource> for VariableSetReconcileResourceUseCaseImpl {
     async fn execute(
         &self,
-        id: &VariableSetID,
+        id: &ResourceID,
     ) -> Result<(), ReconcileResourceUseCaseError<VariableSetResource>> {
         let helper = ReconcileResourceUseCaseHelper::new(
             self.repo.as_ref(),

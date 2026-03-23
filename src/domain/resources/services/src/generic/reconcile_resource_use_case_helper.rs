@@ -20,6 +20,7 @@ use kamu_resources::{
     ReconcilableResourceRepository,
     ReconcileResourceUseCaseError,
     Reconciler,
+    ResourceID,
 };
 use time_source::SystemTimeSource;
 
@@ -48,7 +49,7 @@ impl<'a, R: ReconcilableResource> ReconcileResourceUseCaseHelper<'a, R> {
 
     pub async fn execute_reconciliation(
         &self,
-        id: &R::Identity,
+        id: &ResourceID,
     ) -> Result<(), ReconcileResourceUseCaseError<R>> {
         let mut resource = self
             .repo

@@ -12,25 +12,19 @@ use event_sourcing::*;
 
 use crate::{
     DeclarativeResource,
+    ResourceID,
     ResourceMetadata,
     ResourceMetadataInput,
-    ResourcePhase,
+    ResourceStateFactory,
     ResourceValidateMetadata,
     ResourceValidateSpec,
-    SecretSetEvent,
-    SecretSetEventCreated,
-    SecretSetEventMetadataUpdated,
-    SecretSetEventReconciliationFailed,
-    SecretSetEventReconciliationStarted,
-    SecretSetEventReconciliationSucceeded,
-    SecretSetEventSpecUpdated,
     SecretSetEventStore,
-    SecretSetID,
     SecretSetLifecycleError,
     SecretSetSpec,
     SecretSetState,
-    SecretSetStats,
     SecretSetStatus,
+    try_update_resource_metadata,
+    try_update_resource_spec,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,25 +41,19 @@ type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
 impl SecretSetResource {
     pub fn try_create(
         now: DateTime<Utc>,
-        secret_set_id: SecretSetID,
+        resource_id: ResourceID,
         metadata: ResourceMetadataInput,
         spec: SecretSetSpec,
     ) -> Result<Self, SecretSetLifecycleError> {
         metadata.validate()?;
         spec.validate()?;
 
-        Ok(Self(
-            Aggregate::new(
-                secret_set_id,
-                SecretSetEventCreated {
-                    event_time: now,
-                    secret_set_id,
-                    metadata,
-                    spec,
-                },
-            )
-            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?,
-        ))
+        use crate::ReconcilableResourceEventFactory;
+        let event = Self::created_event(now, resource_id, metadata, spec);
+
+        Aggregate::new(resource_id, event)
+            .map(Self)
+            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
     }
 
     pub fn try_update_metadata(
@@ -73,22 +61,7 @@ impl SecretSetResource {
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
     ) -> Result<(), SecretSetLifecycleError> {
-        if self.metadata.is_equivalent_to(&new_metadata) {
-            return Ok(()); // No changes, skip update
-        }
-
-        new_metadata.validate()?;
-
-        let event = SecretSetEvent::MetadataUpdated(SecretSetEventMetadataUpdated {
-            event_time: now,
-            secret_set_id: self.id,
-            new_metadata,
-        });
-
-        self.apply(event)
-            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?;
-
-        Ok(())
+        try_update_resource_metadata(self, now, new_metadata)
     }
 
     pub fn try_update_spec(
@@ -96,113 +69,19 @@ impl SecretSetResource {
         now: DateTime<Utc>,
         new_spec: SecretSetSpec,
     ) -> Result<(), SecretSetLifecycleError> {
-        if self.spec == new_spec {
-            return Ok(()); // No changes, skip update
-        }
-
-        new_spec.validate()?;
-
-        let event = SecretSetEvent::SpecUpdated(SecretSetEventSpecUpdated {
-            event_time: now,
-            secret_set_id: self.id,
-            new_spec,
-            new_generation: self.metadata.generation + 1,
-        });
-
-        self.apply(event)
-            .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))?;
-
-        Ok(())
-    }
-
-    pub fn try_mark_reconciliation_started(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), SecretSetLifecycleError> {
-        if self.status().resource_status.observed_generation == self.metadata().generation {
-            return Ok(());
-        }
-
-        if self.status().resource_status.phase == ResourcePhase::Reconciling {
-            return Ok(());
-        }
-
-        self.apply(SecretSetEvent::ReconciliationStarted(
-            SecretSetEventReconciliationStarted {
-                event_time: now,
-                secret_set_id: self.id,
-                generation: self.metadata().generation,
-            },
-        ))
-        .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
-    }
-
-    pub fn try_mark_reconciliation_succeeded(
-        &mut self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        stats: SecretSetStats,
-    ) -> Result<(), SecretSetLifecycleError> {
-        if self.metadata().generation != expected_generation {
-            tracing::warn!(
-                expected_generation,
-                current_generation = self.metadata().generation,
-                "Attempting to mark reconciliation succeeded for wrong resource generation.",
-            );
-            return Ok(()); // Skip update if generation doesn't match
-        }
-
-        self.apply(SecretSetEvent::ReconciliationSucceeded(
-            SecretSetEventReconciliationSucceeded {
-                event_time: now,
-                secret_set_id: self.id,
-                generation: self.metadata().generation,
-                stats,
-            },
-        ))
-        .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
-    }
-
-    pub fn try_mark_reconciliation_failed(
-        &mut self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        reason: String,
-        message: String,
-        stats: SecretSetStats,
-    ) -> Result<(), SecretSetLifecycleError> {
-        if self.metadata().generation != expected_generation {
-            tracing::warn!(
-                expected_generation,
-                current_generation = self.metadata().generation,
-                "Attempting to mark reconciliation failed for wrong resource generation.",
-            );
-            return Ok(()); // Skip update if generation doesn't match
-        }
-
-        self.apply(SecretSetEvent::ReconciliationFailed(
-            SecretSetEventReconciliationFailed {
-                event_time: now,
-                secret_set_id: self.id,
-                generation: self.metadata().generation,
-                reason,
-                message,
-                stats,
-            },
-        ))
-        .map_err(|e| SecretSetLifecycleError::InvariantViolation(Box::new(e)))
+        try_update_resource_spec(self, now, new_spec)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DeclarativeResource for SecretSetResource {
-    type Identity = SecretSetID;
     type Spec = SecretSetSpec;
     type Status = SecretSetStatus;
+    type ResourceState = SecretSetState;
 
-    fn id(&self) -> &Self::Identity {
-        &self.as_ref().id
+    fn resource_id(&self) -> &ResourceID {
+        &self.as_ref().resource_id
     }
 
     fn metadata(&self) -> &ResourceMetadata {
@@ -215,6 +94,24 @@ impl DeclarativeResource for SecretSetResource {
 
     fn status(&self) -> &Self::Status {
         &self.as_ref().status
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceStateFactory for SecretSetResource {
+    fn state_from_created(
+        resource_id: ResourceID,
+        metadata: ResourceMetadata,
+        spec: Self::Spec,
+        status: Self::Status,
+    ) -> Self::ResourceState {
+        SecretSetState {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        }
     }
 }
 

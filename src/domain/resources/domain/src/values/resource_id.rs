@@ -7,22 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::ProjectionError;
-
-use crate::{ResourceMetadataValidationError, StorageState, StorageValidationError};
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error)]
-pub enum StorageLifecycleError {
-    #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
+pub type ResourceID = uuid::Uuid;
 
-    #[error(transparent)]
-    SpecValidation(#[from] StorageValidationError),
-
-    #[error("resource invariant violation: {0}")]
-    InvariantViolation(Box<ProjectionError<StorageState>>),
-}
+pub type ResourceIDStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<ResourceID, InternalError>> + Send + 'a>,
+>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

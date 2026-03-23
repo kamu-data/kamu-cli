@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::Projection;
 
 use crate::{DeclarativeResource, ResourceReconcileError};
 
@@ -18,7 +17,6 @@ pub trait ReconcilableResource: DeclarativeResource {
     type ReconcileSuccess;
     type ReconcileError: ResourceReconcileError;
     type LifecycleError;
-    type ResourceState: Projection;
 
     fn needs_reconciliation(&self) -> bool;
 

@@ -10,115 +10,79 @@
 use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 
 use crate::{
-    ResourceMetadata,
+    ReconcilableStatusProjector,
+    ResourceID,
     ResourceState,
     SecretSetEvent,
+    SecretSetFailureDetails,
+    SecretSetReconcileSuccess,
+    SecretSetResource,
     SecretSetSpec,
     SecretSetStats,
     SecretSetStatus,
+    project_reconcilable_resource_state,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetID = uuid::Uuid;
-
-pub type SecretSetState = ResourceState<SecretSetID, SecretSetSpec, SecretSetStatus>;
+pub type SecretSetState = ResourceState<SecretSetSpec, SecretSetStatus>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct SecretSetStatusProjector;
 
-impl Projection for SecretSetState {
-    type Query = SecretSetID;
-    type Event = SecretSetEvent;
+impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>
+    for SecretSetStatusProjector
+{
+    type Status = SecretSetStatus;
 
-    fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use SecretSetEvent as E;
+    fn new_pending(spec: &SecretSetSpec) -> Self::Status {
+        SecretSetStatus::new_pending(SecretSetStats {
+            total_secrets: spec.secrets.len(),
+            valid_secrets: 0,
+            invalid_secrets: 0,
+        })
+    }
 
-        match (state, event) {
-            (None, E::Created(e)) => {
-                let total = e.spec.secrets.len();
+    fn on_spec_updated(status: &mut Self::Status, spec: &SecretSetSpec) {
+        status.stats = SecretSetStats {
+            total_secrets: spec.secrets.len(),
+            valid_secrets: 0,
+            invalid_secrets: 0,
+        };
+    }
 
-                Ok(Self {
-                    id: e.secret_set_id,
-                    metadata: ResourceMetadata::from_input(e.event_time, e.metadata),
-                    spec: e.spec,
-                    status: SecretSetStatus::new_pending(SecretSetStats {
-                        total_secrets: total,
-                        valid_secrets: 0,
-                        invalid_secrets: 0,
-                    }),
-                })
-            }
+    fn on_reconciliation_succeeded(status: &mut Self::Status, success: SecretSetReconcileSuccess) {
+        status.stats = success.stats;
+    }
 
-            (Some(mut s), E::MetadataUpdated(e)) => {
-                assert_eq!(s.id, e.secret_set_id);
-
-                s.metadata.apply_update(e.event_time, e.new_metadata);
-
-                Ok(s)
-            }
-
-            (Some(mut s), E::SpecUpdated(e)) => {
-                assert_eq!(s.id, e.secret_set_id);
-
-                let total = e.new_spec.secrets.len();
-
-                s.spec = e.new_spec;
-                s.metadata.generation = e.new_generation;
-                s.metadata.updated_at = e.event_time;
-
-                s.status.resource_status.mark_pending_for_new_generation();
-                s.status.stats = SecretSetStats {
-                    total_secrets: total,
-                    valid_secrets: 0,
-                    invalid_secrets: 0,
-                };
-
-                Ok(s)
-            }
-
-            (Some(mut s), E::ReconciliationStarted(e)) => {
-                assert_eq!(s.id, e.secret_set_id);
-
-                s.status.resource_status.mark_reconciling(e.event_time);
-
-                Ok(s)
-            }
-
-            (Some(mut s), E::ReconciliationSucceeded(e)) => {
-                assert_eq!(s.id, e.secret_set_id);
-
-                s.status
-                    .resource_status
-                    .mark_ready(e.event_time, e.generation);
-                s.status.stats = e.stats;
-
-                Ok(s)
-            }
-
-            (Some(mut s), E::ReconciliationFailed(e)) => {
-                assert_eq!(s.id, e.secret_set_id);
-
-                s.status.resource_status.mark_failed(
-                    e.event_time,
-                    e.generation,
-                    e.reason,
-                    e.message,
-                );
-                s.status.stats = e.stats;
-
-                Ok(s)
-            }
-
-            (state, event) => Err(ProjectionError::new(state, event)),
-        }
+    fn on_reconciliation_failed(status: &mut Self::Status, details: SecretSetFailureDetails) {
+        status.stats = details.stats;
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ProjectionEvent<SecretSetID> for SecretSetEvent {
-    fn matches_query(&self, query: &SecretSetID) -> bool {
-        self.secret_set_id() == query
+impl Projection for SecretSetState {
+    type Query = ResourceID;
+    type Event = SecretSetEvent;
+
+    fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
+        project_reconcilable_resource_state::<
+            SecretSetResource,
+            SecretSetSpec,
+            SecretSetStatus,
+            SecretSetReconcileSuccess,
+            SecretSetFailureDetails,
+            SecretSetStatusProjector,
+        >(state, event)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ProjectionEvent<ResourceID> for SecretSetEvent {
+    fn matches_query(&self, query: &ResourceID) -> bool {
+        self.resource_id() == query
     }
 }
 

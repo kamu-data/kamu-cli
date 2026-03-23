@@ -34,6 +34,10 @@ impl ResourceStatusLike for VariableSetStatus {
     fn resource_status(&self) -> &ResourceStatus {
         &self.resource_status
     }
+
+    fn resource_status_mut(&mut self) -> &mut ResourceStatus {
+        &mut self.resource_status
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

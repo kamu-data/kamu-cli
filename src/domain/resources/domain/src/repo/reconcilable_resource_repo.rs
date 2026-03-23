@@ -9,13 +9,13 @@
 
 use event_sourcing::{LoadError, SaveError};
 
-use crate::ReconcilableResource;
+use crate::{ReconcilableResource, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ReconcilableResourceRepository<R: ReconcilableResource>: Send + Sync {
-    async fn load(&self, id: &R::Identity) -> Result<R, LoadError<R::ResourceState>>;
+    async fn load(&self, id: &ResourceID) -> Result<R, LoadError<R::ResourceState>>;
     async fn save(&self, resource: &mut R) -> Result<(), SaveError>;
 }
 
