@@ -84,7 +84,7 @@ impl ResourceValidateSpec for SecretSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum SecretSetSpecValidationError {
     #[error("secret set must contain at least one secret")]
     EmptySecrets,

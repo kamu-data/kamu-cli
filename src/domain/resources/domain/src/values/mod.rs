@@ -15,6 +15,7 @@ mod resource_state;
 mod resource_status;
 mod resource_validate_metadata_spec;
 mod resource_validate_spec;
+mod value_ref;
 
 pub use resource_condition::*;
 pub use resource_metadata::*;
@@ -24,3 +25,4 @@ pub use resource_state::*;
 pub use resource_status::*;
 pub use resource_validate_metadata_spec::*;
 pub use resource_validate_spec::*;
+pub use value_ref::*;
