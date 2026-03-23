@@ -19,12 +19,24 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub trait PendingStatusFromSpec<TSpec>: Sized {
+    fn pending_from_spec(spec: &TSpec) -> Self;
+
+    fn reset_pending_from_spec(&mut self, spec: &TSpec);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait ReconcilableStatusProjector<TSpec, TSuccess, TFailureDetails> {
-    type Status;
+    type Status: PendingStatusFromSpec<TSpec>;
 
-    fn new_pending(spec: &TSpec) -> Self::Status;
+    fn new_pending(spec: &TSpec) -> Self::Status {
+        Self::Status::pending_from_spec(spec)
+    }
 
-    fn on_spec_updated(status: &mut Self::Status, spec: &TSpec);
+    fn on_spec_updated(status: &mut Self::Status, spec: &TSpec) {
+        status.reset_pending_from_spec(spec);
+    }
 
     fn on_reconciliation_succeeded(status: &mut Self::Status, success: TSuccess);
 

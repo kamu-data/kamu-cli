@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceStatus, ResourceStatusLike};
+use crate::{PendingStatusFromSpec, ResourceStatus, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +28,14 @@ impl SecretSetStatus {
             stats,
         }
     }
+
+    pub fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
+        Self::new_pending(SecretSetStats::pending_from_spec(spec))
+    }
+
+    pub fn reset_pending_from_spec(&mut self, spec: &crate::SecretSetSpec) {
+        self.stats = SecretSetStats::pending_from_spec(spec);
+    }
 }
 
 impl ResourceStatusLike for SecretSetStatus {
@@ -37,6 +45,18 @@ impl ResourceStatusLike for SecretSetStatus {
 
     fn resource_status_mut(&mut self) -> &mut ResourceStatus {
         &mut self.resource_status
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl PendingStatusFromSpec<crate::SecretSetSpec> for SecretSetStatus {
+    fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
+        Self::new_pending(SecretSetStats::pending_from_spec(spec))
+    }
+
+    fn reset_pending_from_spec(&mut self, spec: &crate::SecretSetSpec) {
+        self.stats = SecretSetStats::pending_from_spec(spec);
     }
 }
 

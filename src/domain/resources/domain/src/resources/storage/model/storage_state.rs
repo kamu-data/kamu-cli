@@ -16,7 +16,6 @@ use crate::{
     StorageEvent,
     StorageFailureDetails,
     StorageReconcileSuccess,
-    StorageReferenceStatus,
     StorageResourceModel,
     StorageSpec,
     StorageStatus,
@@ -35,15 +34,6 @@ impl ReconcilableStatusProjector<StorageSpec, StorageReconcileSuccess, StorageFa
     for StorageStatusProjector
 {
     type Status = StorageStatus;
-
-    fn new_pending(spec: &StorageSpec) -> Self::Status {
-        StorageStatus::new_pending(spec.provider.kind())
-    }
-
-    fn on_spec_updated(status: &mut Self::Status, spec: &StorageSpec) {
-        status.provider_kind = spec.provider.kind();
-        status.references = StorageReferenceStatus::default();
-    }
 
     fn on_reconciliation_succeeded(status: &mut Self::Status, success: StorageReconcileSuccess) {
         status.provider_kind = success.provider_kind;

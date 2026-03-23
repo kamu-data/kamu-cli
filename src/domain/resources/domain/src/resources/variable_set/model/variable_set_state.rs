@@ -18,7 +18,6 @@ use crate::{
     VariableSetReconcileSuccess,
     VariableSetResourceModel,
     VariableSetSpec,
-    VariableSetStats,
     VariableSetStatus,
     project_reconcilable_resource_state,
 };
@@ -39,22 +38,6 @@ impl
     > for VariableSetStatusProjector
 {
     type Status = VariableSetStatus;
-
-    fn new_pending(spec: &VariableSetSpec) -> Self::Status {
-        VariableSetStatus::new_pending(VariableSetStats {
-            total_variables: spec.variables.len(),
-            valid_variables: 0,
-            invalid_variables: 0,
-        })
-    }
-
-    fn on_spec_updated(status: &mut Self::Status, spec: &VariableSetSpec) {
-        status.stats = VariableSetStats {
-            total_variables: spec.variables.len(),
-            valid_variables: 0,
-            invalid_variables: 0,
-        };
-    }
 
     fn on_reconciliation_succeeded(
         status: &mut Self::Status,

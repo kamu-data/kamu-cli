@@ -16,8 +16,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_resources::{
-    ReconcileFailureMapper,
     ReconcilableResourceRepository,
+    ReconcileFailureMapper,
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceID,

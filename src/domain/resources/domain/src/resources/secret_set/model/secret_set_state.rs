@@ -18,7 +18,6 @@ use crate::{
     SecretSetReconcileSuccess,
     SecretSetResourceModel,
     SecretSetSpec,
-    SecretSetStats,
     SecretSetStatus,
     project_reconcilable_resource_state,
 };
@@ -34,22 +33,6 @@ impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, Secre
     for SecretSetStatusProjector
 {
     type Status = SecretSetStatus;
-
-    fn new_pending(spec: &SecretSetSpec) -> Self::Status {
-        SecretSetStatus::new_pending(SecretSetStats {
-            total_secrets: spec.secrets.len(),
-            valid_secrets: 0,
-            invalid_secrets: 0,
-        })
-    }
-
-    fn on_spec_updated(status: &mut Self::Status, spec: &SecretSetSpec) {
-        status.stats = SecretSetStats {
-            total_secrets: spec.secrets.len(),
-            valid_secrets: 0,
-            invalid_secrets: 0,
-        };
-    }
 
     fn on_reconciliation_succeeded(status: &mut Self::Status, success: SecretSetReconcileSuccess) {
         status.stats = success.stats;

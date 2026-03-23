@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceStatus, ResourceStatusLike};
+use crate::{PendingStatusFromSpec, ResourceStatus, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +28,14 @@ impl VariableSetStatus {
             stats,
         }
     }
+
+    pub fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
+        Self::new_pending(VariableSetStats::pending_from_spec(spec))
+    }
+
+    pub fn reset_pending_from_spec(&mut self, spec: &crate::VariableSetSpec) {
+        self.stats = VariableSetStats::pending_from_spec(spec);
+    }
 }
 
 impl ResourceStatusLike for VariableSetStatus {
@@ -37,6 +45,18 @@ impl ResourceStatusLike for VariableSetStatus {
 
     fn resource_status_mut(&mut self) -> &mut ResourceStatus {
         &mut self.resource_status
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl PendingStatusFromSpec<crate::VariableSetSpec> for VariableSetStatus {
+    fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
+        Self::new_pending(VariableSetStats::pending_from_spec(spec))
+    }
+
+    fn reset_pending_from_spec(&mut self, spec: &crate::VariableSetSpec) {
+        self.stats = VariableSetStats::pending_from_spec(spec);
     }
 }
 
