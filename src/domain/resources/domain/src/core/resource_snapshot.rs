@@ -7,42 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::de::DeserializeOwned;
 
-use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata, ResourceName};
+use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[derive(Debug, Clone)]
 pub struct ResourceSnapshot {
     pub resource_id: ResourceID,
-    pub account_id: odf::AccountID,
     pub kind: String,
     pub api_version: String,
-    pub name: ResourceName,
-    pub description: Option<String>,
-    pub labels: serde_json::Value,
-    pub annotations: serde_json::Value,
+    pub metadata: ResourceMetadata,
 
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
 
-    pub generation: i64,
-    pub observed_generation: Option<i64>,
-    pub phase: Option<String>,
-
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
     pub last_reconciled_at: Option<DateTime<Utc>>,
     pub last_event_id: Option<EventID>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type ResourceSnapshotStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<ResourceSnapshot, InternalError>> + Send + 'a>,
+>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,26 +45,13 @@ where
     TSpec: DeserializeOwned,
     TStatus: DeserializeOwned + PendingStatusFromSpec<TSpec>,
 {
-    let metadata = ResourceMetadata {
-        account: snapshot.account_id,
-        name: snapshot.name,
-        description: snapshot.description,
-        labels: serde_json::from_value::<BTreeMap<String, String>>(snapshot.labels).int_err()?,
-        annotations: serde_json::from_value::<BTreeMap<String, String>>(snapshot.annotations)
-            .int_err()?,
-        generation: u64::try_from(snapshot.generation).int_err()?,
-        created_at: snapshot.created_at,
-        updated_at: snapshot.updated_at,
-        deleted_at: snapshot.deleted_at,
-    };
-
     let spec = serde_json::from_value(snapshot.spec).int_err()?;
     let status = match snapshot.status {
         Some(status) => serde_json::from_value(status).int_err()?,
         None => TStatus::pending_from_spec(&spec),
     };
 
-    Ok((snapshot.resource_id, metadata, spec, status))
+    Ok((snapshot.resource_id, snapshot.metadata, spec, status))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

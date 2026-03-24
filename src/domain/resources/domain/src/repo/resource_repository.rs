@@ -12,7 +12,14 @@ use event_sourcing::{ConcurrentModificationError, EventID};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceRawEventQuery, ResourceSnapshot};
+use crate::{
+    ResourceID,
+    ResourceIDStream,
+    ResourceName,
+    ResourceRawEventQuery,
+    ResourceSnapshot,
+    ResourceSnapshotStream,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +56,19 @@ pub trait ResourceRepository: Send + Sync {
         kind: &str,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_>;
+
+    fn list_resource_snapshots_by_kind(
+        &self,
+        account_id: odf::AccountID,
+        kind: &str,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_>;
+
+    fn list_all_resource_snapshots(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_>;
 
     async fn get_count_resources(
         &self,

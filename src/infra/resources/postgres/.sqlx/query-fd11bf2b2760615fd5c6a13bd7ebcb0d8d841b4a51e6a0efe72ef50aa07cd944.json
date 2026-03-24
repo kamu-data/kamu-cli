@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                resource_id as \"resource_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_kind,\n                api_version,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                observed_generation,\n                phase,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND resource_kind = $2\n            ",
+  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_reconciled_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
   "describe": {
     "columns": [
       {
@@ -60,44 +60,36 @@
       },
       {
         "ordinal": 11,
-        "name": "observed_generation",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 12,
-        "name": "phase",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 13,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 12,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 15,
+        "ordinal": 13,
         "name": "deleted_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 16,
+        "ordinal": 14,
         "name": "last_reconciled_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 17,
+        "ordinal": 15,
         "name": "last_event_id",
         "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text"
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -112,8 +104,6 @@
       false,
       true,
       false,
-      true,
-      true,
       false,
       false,
       true,
@@ -121,5 +111,5 @@
       true
     ]
   },
-  "hash": "b62e9a3e013f63e28e3529866b9db5b9e50ddcfbd28ded3b97fb207780ca5b44"
+  "hash": "fd11bf2b2760615fd5c6a13bd7ebcb0d8d841b4a51e6a0efe72ef50aa07cd944"
 }

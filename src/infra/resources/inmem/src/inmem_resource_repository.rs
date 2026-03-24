@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotStream,
     UpdateResourceError,
 };
 
@@ -75,18 +76,18 @@ impl ResourceRepository for InMemoryResourceRepository {
             id: resource_snapshot.resource_id,
         };
         let lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.account_id.clone(),
+            account_id: resource_snapshot.metadata.account.clone(),
             kind: resource_snapshot.kind.clone(),
-            name: resource_snapshot.name.clone(),
+            name: resource_snapshot.metadata.name.clone(),
         };
 
         if guard.snapshots_by_query.contains_key(&query)
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_snapshot.account_id.clone(),
+                account_id: resource_snapshot.metadata.account.clone(),
                 kind: resource_snapshot.kind.clone(),
-                name: resource_snapshot.name.clone(),
+                name: resource_snapshot.metadata.name.clone(),
             }));
         }
 
@@ -123,23 +124,23 @@ impl ResourceRepository for InMemoryResourceRepository {
         }
 
         let previous_lookup_key = ResourceLookupKey {
-            account_id: previous_snapshot.account_id,
+            account_id: previous_snapshot.metadata.account,
             kind: previous_snapshot.kind,
-            name: previous_snapshot.name,
+            name: previous_snapshot.metadata.name,
         };
         let next_lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.account_id.clone(),
+            account_id: resource_snapshot.metadata.account.clone(),
             kind: resource_snapshot.kind.clone(),
-            name: resource_snapshot.name.clone(),
+            name: resource_snapshot.metadata.name.clone(),
         };
 
         if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
             && *existing_resource_id != resource_snapshot.resource_id
         {
             return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_snapshot.account_id.clone(),
+                account_id: resource_snapshot.metadata.account.clone(),
                 kind: resource_snapshot.kind.clone(),
-                name: resource_snapshot.name.clone(),
+                name: resource_snapshot.metadata.name.clone(),
             }));
         }
 
@@ -191,14 +192,15 @@ impl ResourceRepository for InMemoryResourceRepository {
             guard
                 .snapshots_by_query
                 .values()
-                .filter(|snapshot| snapshot.account_id == account_id && snapshot.kind == kind)
+                .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
                 .cloned()
                 .collect()
         };
 
         resource_ids_page.sort_by(|lhs, rhs| {
-            rhs.updated_at
-                .cmp(&lhs.updated_at)
+            rhs.metadata
+                .updated_at
+                .cmp(&lhs.metadata.updated_at)
                 .then_with(|| rhs.resource_id.cmp(&lhs.resource_id))
         });
 
@@ -212,6 +214,71 @@ impl ResourceRepository for InMemoryResourceRepository {
         Box::pin(futures::stream::iter(resource_ids_page))
     }
 
+    fn list_resource_snapshots_by_kind(
+        &self,
+        account_id: odf::AccountID,
+        kind: &str,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_> {
+        let mut snapshots_page: Vec<_> = {
+            let guard = self.state.lock().unwrap();
+            guard
+                .snapshots_by_query
+                .values()
+                .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
+                .cloned()
+                .collect()
+        };
+
+        snapshots_page.sort_by(|lhs, rhs| {
+            rhs.metadata
+                .updated_at
+                .cmp(&lhs.metadata.updated_at)
+                .then_with(|| rhs.resource_id.cmp(&lhs.resource_id))
+        });
+
+        let snapshots_page: Vec<_> = snapshots_page
+            .into_iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .map(Ok)
+            .collect();
+
+        Box::pin(futures::stream::iter(snapshots_page))
+    }
+
+    fn list_all_resource_snapshots(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_> {
+        let mut snapshots_page: Vec<_> = {
+            let guard = self.state.lock().unwrap();
+            guard
+                .snapshots_by_query
+                .values()
+                .filter(|snapshot| snapshot.metadata.account == account_id)
+                .cloned()
+                .collect()
+        };
+
+        snapshots_page.sort_by(|lhs, rhs| {
+            rhs.metadata
+                .updated_at
+                .cmp(&lhs.metadata.updated_at)
+                .then_with(|| rhs.resource_id.cmp(&lhs.resource_id))
+        });
+
+        let snapshots_page: Vec<_> = snapshots_page
+            .into_iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .map(Ok)
+            .collect();
+
+        Box::pin(futures::stream::iter(snapshots_page))
+    }
+
     async fn get_count_resources(
         &self,
         account_id: odf::AccountID,
@@ -222,7 +289,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(guard
             .snapshots_by_query
             .values()
-            .filter(|snapshot| snapshot.account_id == account_id && snapshot.kind == kind)
+            .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
             .count())
     }
 }

@@ -85,6 +85,8 @@ interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "GetResourceByIdUseCase" <<i>>
 interface "InitOnStartup" <<i>>
 interface "JwtTokenIssuer" <<i>>
+interface "ListAllResourcesUseCase" <<i>>
+interface "ListResourcesByKindUseCase" <<i>>
 interface "MessageConsumer" <<i>>
 interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
@@ -255,6 +257,7 @@ class "JupyterConfig" <<singleton>>
 class "JwtAuthenticationConfig" <<singleton>>
 class "KamuAuthOso"
 class "KamuFlightSqlService"
+class "ListAllResourcesUseCaseImpl"
 class "LoginPasswordAuthProvider"
 class "LoginService"
 class "MessageDispatcherT" <<singleton>>
@@ -322,6 +325,7 @@ class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
 class "SecretSetEventStoreBridge"
 class "SecretSetGetResourceByIdUseCaseImpl"
+class "SecretSetListResourcesByKindUseCaseImpl"
 class "SecretSetReconcileResourceUseCaseImpl"
 class "SecretSetReconcilerImpl"
 class "SessionAuthAnonymous"
@@ -370,6 +374,7 @@ class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
 class "StorageEventStoreBridge"
 class "StorageGetResourceByIdUseCaseImpl"
+class "StorageListResourcesByKindUseCaseImpl"
 class "StorageReconcileResourceUseCaseImpl"
 class "StorageReconcilerImpl"
 class "SyncRequestBuilder"
@@ -388,6 +393,7 @@ class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
 class "VariableSetEventStoreBridge"
 class "VariableSetGetResourceByIdUseCaseImpl"
+class "VariableSetListResourcesByKindUseCaseImpl"
 class "VariableSetReconcileResourceUseCaseImpl"
 class "VariableSetReconcilerImpl"
 class "VerificationServiceImpl"
@@ -908,6 +914,14 @@ class "WsSmartTransferProtocolClient"
 "StorageGetResourceByIdUseCaseImpl"  --> "ResourceRepository"
 "GetResourceByIdUseCase" <|-- "VariableSetGetResourceByIdUseCaseImpl"
 "VariableSetGetResourceByIdUseCaseImpl"  --> "ResourceRepository"
+"ListAllResourcesUseCase" <|-- "ListAllResourcesUseCaseImpl"
+"ListAllResourcesUseCaseImpl"  --> "ResourceRepository"
+"ListResourcesByKindUseCase" <|-- "SecretSetListResourcesByKindUseCaseImpl"
+"SecretSetListResourcesByKindUseCaseImpl"  --> "ResourceRepository"
+"ListResourcesByKindUseCase" <|-- "StorageListResourcesByKindUseCaseImpl"
+"StorageListResourcesByKindUseCaseImpl"  --> "ResourceRepository"
+"ListResourcesByKindUseCase" <|-- "VariableSetListResourcesByKindUseCaseImpl"
+"VariableSetListResourcesByKindUseCaseImpl"  --> "ResourceRepository"
 "ReconcileResourceUseCase" <|-- "SecretSetReconcileResourceUseCaseImpl"
 "SecretSetReconcileResourceUseCaseImpl"  --> "SecretSetEventStore"
 "SecretSetReconcileResourceUseCaseImpl"  --> "Reconciler"

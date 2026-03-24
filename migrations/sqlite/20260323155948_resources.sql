@@ -14,8 +14,6 @@ CREATE TABLE resources (
     status                 JSONB NULL,
 
     generation             BIGINT NOT NULL,
-    observed_generation    BIGINT NULL,
-    phase                  VARCHAR(50) NULL,
 
     created_at             TIMESTAMPTZ NOT NULL,
     updated_at             TIMESTAMPTZ NOT NULL,
@@ -31,12 +29,6 @@ CREATE INDEX idx_resources_account_kind_name
 
 CREATE INDEX idx_resources_account_kind_updated_at
     ON resources (account_id, resource_kind, updated_at DESC);
-
-CREATE INDEX idx_resources_account_kind_phase
-    ON resources (account_id, resource_kind, phase);
-
-CREATE INDEX idx_resources_kind_phase
-    ON resources (resource_kind, phase);
 
 /* ------------------------------ */
 

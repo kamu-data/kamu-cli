@@ -12,11 +12,13 @@ use kamu_resources as domain;
 mod dependencies;
 pub mod event_stores;
 pub mod get_by_id;
+pub mod list;
 mod reconcile;
 mod reconcilers;
 
 pub use dependencies::*;
 pub use event_stores::*;
 pub use get_by_id::*;
+pub use list::*;
 pub use reconcile::*;
 pub use reconcilers::*;

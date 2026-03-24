@@ -23,7 +23,6 @@ doctest = false
 
 [features]
 default = []
-sqlx = ["dep:sqlx"]
 
 
 [dependencies]
@@ -41,7 +40,6 @@ thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
-sqlx = { version = "0.8", optional = true, default-features = false }
 
 
 [dev-dependencies]

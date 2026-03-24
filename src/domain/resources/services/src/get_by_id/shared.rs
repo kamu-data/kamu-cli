@@ -48,7 +48,7 @@ where
             .ok_or(GetResourceByIdError::NotFound)?;
 
         // TODO: ReBAC integration
-        if resource_snapshot.account_id != account_id {
+        if resource_snapshot.metadata.account != account_id {
             return Err(GetResourceByIdError::NotFound);
         }
 

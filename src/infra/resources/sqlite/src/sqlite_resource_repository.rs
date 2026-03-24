@@ -21,6 +21,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotStream,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -48,8 +49,11 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.account_id.as_stack_string();
+        let account_id_stack = resource_snapshot.metadata.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let labels = serde_json::to_value(&resource_snapshot.metadata.labels).unwrap();
+        let annotations = serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap();
+        let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
 
         sqlx::query!(
@@ -66,32 +70,28 @@ impl ResourceRepository for SqliteResourceRepository {
                 spec,
                 status,
                 generation,
-                observed_generation,
-                phase,
                 created_at,
                 updated_at,
                 deleted_at,
                 last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
             resource_snapshot.resource_id,
             account_id_str,
             resource_snapshot.kind,
             resource_snapshot.api_version,
-            resource_snapshot.name,
-            resource_snapshot.description,
-            resource_snapshot.labels,
-            resource_snapshot.annotations,
+            resource_snapshot.metadata.name,
+            resource_snapshot.metadata.description,
+            labels,
+            annotations,
             resource_snapshot.spec,
             resource_snapshot.status,
-            resource_snapshot.generation,
-            resource_snapshot.observed_generation,
-            resource_snapshot.phase,
-            resource_snapshot.created_at,
-            resource_snapshot.updated_at,
-            resource_snapshot.deleted_at,
+            generation,
+            resource_snapshot.metadata.created_at,
+            resource_snapshot.metadata.updated_at,
+            resource_snapshot.metadata.deleted_at,
             resource_snapshot.last_reconciled_at,
             last_event_id,
         )
@@ -100,9 +100,9 @@ impl ResourceRepository for SqliteResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
-                    account_id: resource_snapshot.account_id.clone(),
+                    account_id: resource_snapshot.metadata.account.clone(),
                     kind: resource_snapshot.kind.clone(),
-                    name: resource_snapshot.name.clone(),
+                    name: resource_snapshot.metadata.name.clone(),
                 })
             }
             _ => CreateResourceError::Internal(e.int_err()),
@@ -119,8 +119,11 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.account_id.as_stack_string();
+        let account_id_stack = resource_snapshot.metadata.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let labels = serde_json::to_value(&resource_snapshot.metadata.labels).unwrap();
+        let annotations = serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap();
+        let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
 
@@ -137,32 +140,28 @@ impl ResourceRepository for SqliteResourceRepository {
                 spec = $8,
                 status = $9,
                 generation = $10,
-                observed_generation = $11,
-                phase = $12,
-                updated_at = $13,
-                deleted_at = $14,
-                last_reconciled_at = $15,
-                last_event_id = $16
+                updated_at = $11,
+                deleted_at = $12,
+                last_reconciled_at = $13,
+                last_event_id = $14
             WHERE resource_id = $1
               AND (
-                    last_event_id IS NULL AND CAST($17 as INT8) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($17 as INT8) IS NOT NULL AND last_event_id = $17
+                    last_event_id IS NULL AND CAST($15 as INT8) IS NULL OR
+                    last_event_id IS NOT NULL AND CAST($15 as INT8) IS NOT NULL AND last_event_id = $15
               )
             "#,
             resource_snapshot.resource_id,
             account_id_str,
             resource_snapshot.api_version,
-            resource_snapshot.name,
-            resource_snapshot.description,
-            resource_snapshot.labels,
-            resource_snapshot.annotations,
+            resource_snapshot.metadata.name,
+            resource_snapshot.metadata.description,
+            labels,
+            annotations,
             resource_snapshot.spec,
             resource_snapshot.status,
-            resource_snapshot.generation,
-            resource_snapshot.observed_generation,
-            resource_snapshot.phase,
-            resource_snapshot.updated_at,
-            resource_snapshot.deleted_at,
+            generation,
+            resource_snapshot.metadata.updated_at,
+            resource_snapshot.metadata.deleted_at,
             resource_snapshot.last_reconciled_at,
             last_event_id,
             expected_last_event_id,
@@ -172,9 +171,9 @@ impl ResourceRepository for SqliteResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 UpdateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
-                    account_id: resource_snapshot.account_id.clone(),
+                    account_id: resource_snapshot.metadata.account.clone(),
                     kind: resource_snapshot.kind.clone(),
-                    name: resource_snapshot.name.clone(),
+                    name: resource_snapshot.metadata.name.clone(),
                 })
             }
             _ => UpdateResourceError::Internal(e.int_err()),
@@ -239,8 +238,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 spec as "spec: serde_json::Value",
                 status as "status: serde_json::Value",
                 generation,
-                observed_generation,
-                phase,
                 created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>",
                 deleted_at as "deleted_at: DateTime<Utc>",
@@ -259,21 +256,21 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             resource_id: row.resource_id,
-            account_id: row.account_id,
             kind: row.resource_kind,
             api_version: row.api_version,
-            name: row.resource_name,
-            description: row.description,
-            labels: row.labels,
-            annotations: row.annotations,
+            metadata: kamu_resources::ResourceMetadata {
+                account: row.account_id,
+                name: row.resource_name,
+                description: row.description,
+                labels: serde_json::from_value(row.labels).unwrap(),
+                annotations: serde_json::from_value(row.annotations).unwrap(),
+                generation: u64::try_from(row.generation).unwrap(),
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                deleted_at: row.deleted_at,
+            },
             spec: row.spec,
             status: row.status,
-            generation: row.generation,
-            observed_generation: row.observed_generation,
-            phase: row.phase,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            deleted_at: row.deleted_at,
             last_reconciled_at: row.last_reconciled_at,
             last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
         }))
@@ -315,6 +312,151 @@ impl ResourceRepository for SqliteResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(row.resource_id);
+            }
+        })
+    }
+
+    fn list_resource_snapshots_by_kind(
+        &self,
+        account_id: odf::AccountID,
+        kind: &str,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_> {
+        let resource_kind = kind.to_owned();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let account_id_stack = account_id.as_stack_string();
+            let account_id_str = account_id_stack.as_str();
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT
+                    resource_id as "resource_id: uuid::Uuid",
+                    account_id as "account_id: odf::AccountID",
+                    resource_kind,
+                    api_version,
+                    resource_name,
+                    description,
+                    labels as "labels: serde_json::Value",
+                    annotations as "annotations: serde_json::Value",
+                    spec as "spec: serde_json::Value",
+                    status as "status: serde_json::Value",
+                    generation,
+                    created_at as "created_at: DateTime<Utc>",
+                    updated_at as "updated_at: DateTime<Utc>",
+                    deleted_at as "deleted_at: DateTime<Utc>",
+                    last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
+                    last_event_id
+                FROM resources
+                WHERE account_id = $1
+                  AND resource_kind = $2
+                ORDER BY updated_at DESC, resource_id DESC
+                LIMIT $3 OFFSET $4
+                "#,
+                account_id_str,
+                resource_kind,
+                limit,
+                offset,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            while let Some(row) = query_stream.try_next().await? {
+                yield Ok(ResourceSnapshot {
+                    resource_id: row.resource_id,
+                    kind: row.resource_kind,
+                    api_version: row.api_version,
+                    metadata: kamu_resources::ResourceMetadata {
+                        account: row.account_id,
+                        name: row.resource_name,
+                        description: row.description,
+                        labels: serde_json::from_value(row.labels).unwrap(),
+                        annotations: serde_json::from_value(row.annotations).unwrap(),
+                        generation: u64::try_from(row.generation).unwrap(),
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                        deleted_at: row.deleted_at,
+                    },
+                    spec: row.spec,
+                    status: row.status,
+                    last_reconciled_at: row.last_reconciled_at,
+                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                });
+            }
+        })
+    }
+
+    fn list_all_resource_snapshots(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> ResourceSnapshotStream<'_> {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let account_id_stack = account_id.as_stack_string();
+            let account_id_str = account_id_stack.as_str();
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT
+                    resource_id as "resource_id: uuid::Uuid",
+                    account_id as "account_id: odf::AccountID",
+                    resource_kind,
+                    api_version,
+                    resource_name,
+                    description,
+                    labels as "labels: serde_json::Value",
+                    annotations as "annotations: serde_json::Value",
+                    spec as "spec: serde_json::Value",
+                    status as "status: serde_json::Value",
+                    generation,
+                    created_at as "created_at: DateTime<Utc>",
+                    updated_at as "updated_at: DateTime<Utc>",
+                    deleted_at as "deleted_at: DateTime<Utc>",
+                    last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
+                    last_event_id
+                FROM resources
+                WHERE account_id = $1
+                ORDER BY updated_at DESC, resource_id DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                account_id_str,
+                limit,
+                offset,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            while let Some(row) = query_stream.try_next().await? {
+                yield Ok(ResourceSnapshot {
+                    resource_id: row.resource_id,
+                    kind: row.resource_kind,
+                    api_version: row.api_version,
+                    metadata: kamu_resources::ResourceMetadata {
+                        account: row.account_id,
+                        name: row.resource_name,
+                        description: row.description,
+                        labels: serde_json::from_value(row.labels).unwrap(),
+                        annotations: serde_json::from_value(row.annotations).unwrap(),
+                        generation: u64::try_from(row.generation).unwrap(),
+                        created_at: row.created_at,
+                        updated_at: row.updated_at,
+                        deleted_at: row.deleted_at,
+                    },
+                    spec: row.spec,
+                    status: row.status,
+                    last_reconciled_at: row.last_reconciled_at,
+                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                });
             }
         })
     }

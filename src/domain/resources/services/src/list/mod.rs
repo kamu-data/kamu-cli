@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod get_resource_by_id_use_case;
-mod list_all_resources_use_case;
-mod list_resources_by_kind_use_case;
-mod reconcile_resource_use_case;
+mod list_all;
+mod secret_set;
+mod shared;
+mod storage;
+mod variable_set;
 
-pub use get_resource_by_id_use_case::*;
-pub use list_all_resources_use_case::*;
-pub use list_resources_by_kind_use_case::*;
-pub use reconcile_resource_use_case::*;
+pub use list_all::*;
+pub use secret_set::*;
+pub use shared::*;
+pub use storage::*;
+pub use variable_set::*;

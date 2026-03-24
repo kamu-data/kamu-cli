@@ -7,27 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use event_sourcing::EventID;
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::ResourceRawEventQuery;
+use crate::ResourceSnapshot;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ResourceRawEvent {
-    pub event_id: EventID,
-    pub query: ResourceRawEventQuery,
-    pub event_time: DateTime<Utc>,
-    pub event_type: String,
-    pub payload: serde_json::Value,
+#[async_trait::async_trait]
+pub trait ListAllResourcesUseCase: Send + Sync {
+    async fn execute(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type ResourceRawEventStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<ResourceRawEvent, InternalError>> + Send + 'a>,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
