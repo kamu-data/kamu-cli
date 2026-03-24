@@ -120,7 +120,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlockRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetDataBlockRepository>();
 
-            b.add::<kamu_resources_postgres::PostgresResourceEventStore>();
+            b.add::<kamu_resources_postgres::PostgresRawResourceEventStore>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
@@ -162,7 +162,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
 
-            b.add::<kamu_resources_inmem::InMemoryResourceEventStore>();
+            b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
@@ -200,7 +200,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlockRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetDataBlockRepository>();
 
-            b.add::<kamu_resources_sqlite::SqliteResourceEventStore>();
+            b.add::<kamu_resources_sqlite::SqliteResourceRawEventStore>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
@@ -257,7 +257,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
 
-    b.add::<kamu_resources_inmem::InMemoryResourceEventStore>();
+    b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 

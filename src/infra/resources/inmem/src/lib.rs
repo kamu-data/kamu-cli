@@ -10,6 +10,6 @@
 // Re-exports
 pub use kamu_resources as domain;
 
-mod inmem_resource_event_store;
+mod inmem_raw_resource_event_store;
 
-pub use inmem_resource_event_store::*;
+pub use inmem_raw_resource_event_store::*;

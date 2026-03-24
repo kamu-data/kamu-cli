@@ -9,7 +9,14 @@
 
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
-use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
+use event_sourcing::{
+    EventID,
+    EventStore,
+    EventStream,
+    GetEventsError,
+    GetEventsOpts,
+    SaveEventsError,
+};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
@@ -17,9 +24,9 @@ use kamu_resources::{
     ResourceIDStream,
     ResourceName,
     ResourceRawEvent,
+    ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
-    ResourceRawEventStream,
     ResourceRepository,
     ResourceRow,
 };
@@ -29,15 +36,13 @@ use kamu_resources::{
 #[component]
 #[interface(dyn ResourceRawEventStore)]
 #[interface(dyn ResourceRepository)]
-pub struct SqliteResourceEventStore {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresRawResourceEventStore {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl SqliteResourceEventStore {
+impl PostgresRawResourceEventStore {
     async fn save_event_rows(
-        connection_mut: &mut sqlx::SqliteConnection,
+        connection_mut: &mut sqlx::PgConnection,
         query: &ResourceRawEventQuery,
         events: &[ResourceRawEvent],
     ) -> Result<EventID, SaveEventsError> {
@@ -54,7 +59,6 @@ impl SqliteResourceEventStore {
                     event_payload
                 )
                 VALUES ($1, $2, $3, $4, $5)
-
                 RETURNING event_id
                 "#,
                 query.id,
@@ -75,7 +79,7 @@ impl SqliteResourceEventStore {
     }
 
     async fn get_last_event_id(
-        connection_mut: &mut sqlx::SqliteConnection,
+        connection_mut: &mut sqlx::PgConnection,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
         let last_event_id = sqlx::query_scalar!(
@@ -102,7 +106,7 @@ impl SqliteResourceEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceRepository for SqliteResourceEventStore {
+impl ResourceRepository for PostgresRawResourceEventStore {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
         Ok(ResourceID::new_v4())
     }
@@ -114,7 +118,7 @@ impl ResourceRepository for SqliteResourceEventStore {
         _name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         Err(InternalError::new(
-            "Resource lookup by name is not implemented for the event-only SQLite store",
+            "Resource lookup by name is not implemented for the event-only Postgres store",
         ))
     }
 
@@ -123,7 +127,7 @@ impl ResourceRepository for SqliteResourceEventStore {
         _query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceRow>, InternalError> {
         Err(InternalError::new(
-            "Resource snapshot rows are not implemented for the event-only SQLite store",
+            "Resource snapshot rows are not implemented for the event-only Postgres store",
         ))
     }
 
@@ -135,7 +139,7 @@ impl ResourceRepository for SqliteResourceEventStore {
     ) -> ResourceIDStream<'_> {
         Box::pin(async_stream::stream! {
             yield Err(InternalError::new(
-                "Resource listing is not implemented for the event-only SQLite store",
+                "Resource listing is not implemented for the event-only Postgres store",
             ));
         })
     }
@@ -146,7 +150,7 @@ impl ResourceRepository for SqliteResourceEventStore {
         _kind: &str,
     ) -> Result<usize, InternalError> {
         Err(InternalError::new(
-            "Resource counting is not implemented for the event-only SQLite store",
+            "Resource counting is not implemented for the event-only Postgres store",
         ))
     }
 }
@@ -154,14 +158,14 @@ impl ResourceRepository for SqliteResourceEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceRawEventStore for SqliteResourceEventStore {
+impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let events_count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(*) as "count!: i64"
+            SELECT COUNT(*) as "count!"
             FROM resource_events
             "#
         )
@@ -172,47 +176,35 @@ impl ResourceRawEventStore for SqliteResourceEventStore {
         Ok(usize::try_from(events_count).unwrap())
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> ResourceRawEventStream<'_> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, ResourceRawEvent> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
-            let maybe_from_id = opts.from.map(EventID::into_inner);
-            let maybe_to_id = opts.to.map(EventID::into_inner);
 
-            #[derive(Debug, sqlx::FromRow)]
-            struct EventRow {
-                event_id: i64,
-                resource_id: uuid::Uuid,
-                kind: String,
-                event_time: chrono::DateTime<chrono::Utc>,
-                event_type: String,
-                payload: serde_json::Value,
-            }
-
-            let mut rows = sqlx::query_as!(
-                EventRow,
+            let mut rows = sqlx::query!(
                 r#"
                 SELECT
                     event_id,
-                    resource_id as "resource_id: _",
+                    resource_id,
                     resource_kind as "kind!",
-                    event_time as "event_time: chrono::DateTime<chrono::Utc>",
+                    event_time,
                     event_type,
-                    event_payload as "payload: serde_json::Value"
+                    event_payload as "payload!"
                 FROM resource_events
-                WHERE ($1 IS NULL OR event_id > $1)
-                  AND ($2 IS NULL OR event_id <= $2)
+                WHERE ($1::bigint IS NULL OR event_id > $1)
+                  AND ($2::bigint IS NULL OR event_id <= $2)
                 ORDER BY event_id
                 "#,
-                maybe_from_id,
-                maybe_to_id,
+                opts.from.map(EventID::into_inner),
+                opts.to.map(EventID::into_inner),
             )
             .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some(row) = rows.try_next().await? {
-                yield Ok(ResourceRawEvent {
-                    event_id: EventID::new(row.event_id),
+                let event_id = EventID::new(row.event_id);
+                yield Ok((event_id, ResourceRawEvent {
+                    event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
                         id: row.resource_id,
@@ -220,7 +212,7 @@ impl ResourceRawEventStore for SqliteResourceEventStore {
                     event_time: row.event_time,
                     event_type: row.event_type,
                     payload: row.payload,
-                });
+                }));
             }
         })
     }
@@ -229,53 +221,41 @@ impl ResourceRawEventStore for SqliteResourceEventStore {
         &self,
         query: &ResourceRawEventQuery,
         opts: GetEventsOpts,
-    ) -> ResourceRawEventStream<'_> {
-        let query = query.clone();
+    ) -> EventStream<'_, ResourceRawEvent> {
+        let key = query.clone();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
-            let maybe_from_id = opts.from.map(EventID::into_inner);
-            let maybe_to_id = opts.to.map(EventID::into_inner);
 
-            #[derive(Debug, sqlx::FromRow)]
-            struct EventRow {
-                event_id: i64,
-                resource_id: uuid::Uuid,
-                kind: String,
-                event_time: chrono::DateTime<chrono::Utc>,
-                event_type: String,
-                payload: serde_json::Value,
-            }
-
-            let mut rows = sqlx::query_as!(
-                EventRow,
+            let mut rows = sqlx::query!(
                 r#"
                 SELECT
                     event_id,
-                    resource_id as "resource_id: _",
+                    resource_id,
                     resource_kind as "kind!",
-                    event_time as "event_time: chrono::DateTime<chrono::Utc>",
+                    event_time,
                     event_type,
-                    event_payload as "payload: serde_json::Value"
+                    event_payload as "payload!"
                 FROM resource_events
                 WHERE resource_id = $1
                   AND resource_kind = $2
-                  AND ($3 IS NULL OR event_id > $3)
-                  AND ($4 IS NULL OR event_id <= $4)
+                  AND ($3::bigint IS NULL OR event_id > $3)
+                  AND ($4::bigint IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
-                query.id,
-                query.kind,
-                maybe_from_id,
-                maybe_to_id,
+                key.id,
+                key.kind,
+                opts.from.map(EventID::into_inner),
+                opts.to.map(EventID::into_inner),
             )
             .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
 
             while let Some(row) = rows.try_next().await? {
-                yield Ok(ResourceRawEvent {
-                    event_id: EventID::new(row.event_id),
+                let event_id = EventID::new(row.event_id);
+                yield Ok((event_id, ResourceRawEvent {
+                    event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
                         id: row.resource_id,
@@ -283,7 +263,7 @@ impl ResourceRawEventStore for SqliteResourceEventStore {
                     event_time: row.event_time,
                     event_type: row.event_type,
                     payload: row.payload,
-                });
+                }));
             }
         })
     }
@@ -315,5 +295,9 @@ impl ResourceRawEventStore for SqliteResourceEventStore {
         Self::save_event_rows(connection_mut, query, &events).await
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceRawEventStore for PostgresRawResourceEventStore {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

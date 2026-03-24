@@ -7,39 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
-use internal_error::InternalError;
+use event_sourcing::{EventStore, Projection, ProjectionError, ProjectionEvent};
 
-use crate::{ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStream};
+use crate::{ResourceRawEvent, ResourceRawEventQuery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceRawEventStore: Send + Sync {
-    /// Returns the number of events stored
-    async fn total_events_stored(&self) -> Result<usize, InternalError>;
+pub trait ResourceRawEventStore: EventStore<ResourceRawEventProjection> {}
 
-    /// Returns the event history of all aggregates in chronological order
-    fn get_all_events(&self, opts: GetEventsOpts) -> ResourceRawEventStream<'_>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// Returns the event history of an aggregate in chronological order
-    fn get_events(
-        &self,
-        query: &ResourceRawEventQuery,
-        opts: GetEventsOpts,
-    ) -> ResourceRawEventStream<'_>;
+#[derive(Debug, Clone)]
+pub struct ResourceRawEventProjection {
+    raw_events: Vec<ResourceRawEvent>,
+}
 
-    /// Persists a series of events
-    ///
-    /// The `query` argument must be the same as query passed when retrieving
-    /// the events. It will be used prior to saving events to ensure that there
-    /// were no concurrent updates that could've influenced this transaction.
-    async fn save_events(
-        &self,
-        query: &ResourceRawEventQuery,
-        maybe_prev_stored_event_id: Option<EventID>,
-        events: Vec<ResourceRawEvent>,
-    ) -> Result<EventID, SaveEventsError>;
+impl Projection for ResourceRawEventProjection {
+    type Event = ResourceRawEvent;
+    type Query = ResourceRawEventQuery;
+
+    fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
+        let mut raw_events = state.map(|s| s.raw_events).unwrap_or_default();
+        raw_events.push(event);
+        Ok(Self { raw_events })
+    }
+}
+
+impl ProjectionEvent<ResourceRawEventQuery> for ResourceRawEvent {
+    fn matches_query(&self, query: &ResourceRawEventQuery) -> bool {
+        self.query == *query
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

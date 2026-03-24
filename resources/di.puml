@@ -120,8 +120,8 @@ interface "RenameDatasetUseCase" <<i>>
 interface "ResetDatasetUseCase" <<i>>
 interface "ResetExecutor" <<i>>
 interface "ResetPlanner" <<i>>
-interface "ResourceEventStore" <<i>>
 interface "ResourceLoader" <<i>>
+interface "ResourceRawEventStore" <<i>>
 interface "ResourceRepository" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
@@ -351,7 +351,7 @@ class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
 class "SqliteRebacRepository"
-class "SqliteResourceEventStore"
+class "SqliteResourceRawEventStore"
 class "SqliteTaskEventStore"
 class "SqliteTransactionManager"
 class "SqliteWeb3AuthEip4361NonceRepository"
@@ -877,9 +877,9 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
-"ResourceEventStore" <|-- "SqliteResourceEventStore"
-"ResourceRepository" <|-- "SqliteResourceEventStore"
-"SqliteResourceEventStore"  --> "TransactionRefT"
+"ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
+"ResourceRepository" <|-- "SqliteResourceRawEventStore"
+"SqliteResourceRawEventStore"  --> "TransactionRefT"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
