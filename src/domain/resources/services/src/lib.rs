@@ -10,7 +10,7 @@
 use kamu_resources as domain;
 
 mod dependencies;
-mod event_stores;
+pub mod event_stores;
 mod reconcile;
 mod reconcilers;
 mod repo_adapters;
