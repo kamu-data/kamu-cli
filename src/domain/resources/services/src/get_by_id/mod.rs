@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources as domain;
+mod secret_set;
+mod shared;
+mod storage;
+mod variable_set;
 
-mod dependencies;
-pub mod event_stores;
-pub mod get_by_id;
-mod reconcile;
-mod reconcilers;
-
-pub use dependencies::*;
-pub use event_stores::*;
-pub use get_by_id::*;
-pub use reconcile::*;
-pub use reconcilers::*;
+pub use secret_set::*;
+pub use shared::*;
+pub use storage::*;
+pub use variable_set::*;

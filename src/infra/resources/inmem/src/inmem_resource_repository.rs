@@ -22,7 +22,7 @@ use kamu_resources::{
     ResourceName,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceRow,
+    ResourceSnapshot,
     UpdateResourceError,
 };
 
@@ -37,7 +37,7 @@ struct ResourceLookupKey {
 
 #[derive(Default)]
 struct State {
-    rows_by_query: HashMap<ResourceRawEventQuery, ResourceRow>,
+    snapshots_by_query: HashMap<ResourceRawEventQuery, ResourceSnapshot>,
     ids_by_lookup_key: HashMap<ResourceLookupKey, ResourceID>,
 }
 
@@ -64,85 +64,92 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(ResourceID::new_v4())
     }
 
-    async fn create_resource(&self, resource_row: &ResourceRow) -> Result<(), CreateResourceError> {
+    async fn create_resource(
+        &self,
+        resource_snapshot: &ResourceSnapshot,
+    ) -> Result<(), CreateResourceError> {
         let mut guard = self.state.lock().unwrap();
 
         let query = ResourceRawEventQuery {
-            kind: resource_row.kind.clone(),
-            id: resource_row.resource_id,
+            kind: resource_snapshot.kind.clone(),
+            id: resource_snapshot.resource_id,
         };
         let lookup_key = ResourceLookupKey {
-            account_id: resource_row.account_id.clone(),
-            kind: resource_row.kind.clone(),
-            name: resource_row.name.clone(),
+            account_id: resource_snapshot.account_id.clone(),
+            kind: resource_snapshot.kind.clone(),
+            name: resource_snapshot.name.clone(),
         };
 
-        if guard.rows_by_query.contains_key(&query)
+        if guard.snapshots_by_query.contains_key(&query)
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_row.account_id.clone(),
-                kind: resource_row.kind.clone(),
-                name: resource_row.name.clone(),
+                account_id: resource_snapshot.account_id.clone(),
+                kind: resource_snapshot.kind.clone(),
+                name: resource_snapshot.name.clone(),
             }));
         }
 
         guard
             .ids_by_lookup_key
-            .insert(lookup_key, resource_row.resource_id);
-        guard.rows_by_query.insert(query, resource_row.clone());
+            .insert(lookup_key, resource_snapshot.resource_id);
+        guard
+            .snapshots_by_query
+            .insert(query, resource_snapshot.clone());
 
         Ok(())
     }
 
     async fn update_resource(
         &self,
-        resource_row: &ResourceRow,
+        resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError> {
         let mut guard = self.state.lock().unwrap();
 
         let query = ResourceRawEventQuery {
-            kind: resource_row.kind.clone(),
-            id: resource_row.resource_id,
+            kind: resource_snapshot.kind.clone(),
+            id: resource_snapshot.resource_id,
         };
 
-        let previous_row = guard
-            .rows_by_query
+        let previous_snapshot = guard
+            .snapshots_by_query
             .get(&query)
             .cloned()
             .ok_or_else(UpdateResourceError::concurrent_modification)?;
 
-        if previous_row.last_event_id != expected_last_event_id {
+        if previous_snapshot.last_event_id != expected_last_event_id {
             return Err(UpdateResourceError::concurrent_modification());
         }
 
         let previous_lookup_key = ResourceLookupKey {
-            account_id: previous_row.account_id,
-            kind: previous_row.kind,
-            name: previous_row.name,
+            account_id: previous_snapshot.account_id,
+            kind: previous_snapshot.kind,
+            name: previous_snapshot.name,
         };
         let next_lookup_key = ResourceLookupKey {
-            account_id: resource_row.account_id.clone(),
-            kind: resource_row.kind.clone(),
-            name: resource_row.name.clone(),
+            account_id: resource_snapshot.account_id.clone(),
+            kind: resource_snapshot.kind.clone(),
+            name: resource_snapshot.name.clone(),
         };
 
         if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
-            && *existing_resource_id != resource_row.resource_id
+            && *existing_resource_id != resource_snapshot.resource_id
         {
             return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_row.account_id.clone(),
-                kind: resource_row.kind.clone(),
-                name: resource_row.name.clone(),
+                account_id: resource_snapshot.account_id.clone(),
+                kind: resource_snapshot.kind.clone(),
+                name: resource_snapshot.name.clone(),
             }));
         }
 
         guard.ids_by_lookup_key.remove(&previous_lookup_key);
         guard
             .ids_by_lookup_key
-            .insert(next_lookup_key, resource_row.resource_id);
-        guard.rows_by_query.insert(query, resource_row.clone());
+            .insert(next_lookup_key, resource_snapshot.resource_id);
+        guard
+            .snapshots_by_query
+            .insert(query, resource_snapshot.clone());
 
         Ok(())
     }
@@ -165,12 +172,12 @@ impl ResourceRepository for InMemoryResourceRepository {
             .copied())
     }
 
-    async fn get_resource_row(
+    async fn get_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
-    ) -> Result<Option<ResourceRow>, InternalError> {
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
-        Ok(guard.rows_by_query.get(query).cloned())
+        Ok(guard.snapshots_by_query.get(query).cloned())
     }
 
     fn list_resource_ids(
@@ -182,9 +189,9 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut resource_ids_page: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard
-                .rows_by_query
+                .snapshots_by_query
                 .values()
-                .filter(|row| row.account_id == account_id && row.kind == kind)
+                .filter(|snapshot| snapshot.account_id == account_id && snapshot.kind == kind)
                 .cloned()
                 .collect()
         };
@@ -199,7 +206,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .into_iter()
             .skip(pagination.offset)
             .take(pagination.limit)
-            .map(|row| Ok(row.resource_id))
+            .map(|snapshot| Ok(snapshot.resource_id))
             .collect();
 
         Box::pin(futures::stream::iter(resource_ids_page))
@@ -213,9 +220,9 @@ impl ResourceRepository for InMemoryResourceRepository {
         let guard = self.state.lock().unwrap();
 
         Ok(guard
-            .rows_by_query
+            .snapshots_by_query
             .values()
-            .filter(|row| row.account_id == account_id && row.kind == kind)
+            .filter(|snapshot| snapshot.account_id == account_id && snapshot.kind == kind)
             .count())
     }
 }

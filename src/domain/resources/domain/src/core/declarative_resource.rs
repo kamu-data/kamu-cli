@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourceID, ResourceMetadata, ResourceStatusLike};
+use internal_error::InternalError;
+
+use crate::{ResourceID, ResourceMetadata, ResourceSnapshot, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +55,8 @@ pub trait DeclarativeResource: Send + Sync {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
     type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
+
+    fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError>;
 
     fn resource_id(&self) -> &ResourceID;
     fn metadata(&self) -> &ResourceMetadata;

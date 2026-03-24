@@ -572,6 +572,8 @@ pub fn configure_base_catalog(
         },
     );
 
+    kamu_resources_services::register_dependencies(&mut b);
+
     kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
     b.add::<DatabaseTransactionRunner>();

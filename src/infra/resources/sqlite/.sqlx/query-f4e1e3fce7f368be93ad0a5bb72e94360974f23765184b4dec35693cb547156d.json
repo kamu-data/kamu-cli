@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                resource_id as \"resource_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_kind,\n                api_version,\n                resource_name,\n                description,\n                labels as \"labels: serde_json::Value\",\n                annotations as \"annotations: serde_json::Value\",\n                spec as \"spec: serde_json::Value\",\n                status as \"status: serde_json::Value\",\n                generation,\n                observed_generation,\n                phase,\n                created_at as \"created_at: DateTime<Utc>\",\n                updated_at as \"updated_at: DateTime<Utc>\",\n                deleted_at as \"deleted_at: DateTime<Utc>\",\n                last_reconciled_at as \"last_reconciled_at: DateTime<Utc>\",\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND resource_kind = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id: odf::AccountID",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "resource_kind",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "api_version",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "resource_name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "labels: serde_json::Value",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "annotations: serde_json::Value",
+        "ordinal": 7,
+        "type_info": "Null"
+      },
+      {
+        "name": "spec: serde_json::Value",
+        "ordinal": 8,
+        "type_info": "Null"
+      },
+      {
+        "name": "status: serde_json::Value",
+        "ordinal": 9,
+        "type_info": "Null"
+      },
+      {
+        "name": "generation",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "observed_generation",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "phase",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 13,
+        "type_info": "Null"
+      },
+      {
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 14,
+        "type_info": "Null"
+      },
+      {
+        "name": "deleted_at: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_reconciled_at: DateTime<Utc>",
+        "ordinal": 16,
+        "type_info": "Null"
+      },
+      {
+        "name": "last_event_id",
+        "ordinal": 17,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f4e1e3fce7f368be93ad0a5bb72e94360974f23765184b4dec35693cb547156d"
+}

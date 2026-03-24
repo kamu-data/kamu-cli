@@ -15,14 +15,17 @@ use crate::*;
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<VariableSetEventStoreBridge>();
+    catalog_builder.add::<VariableSetGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<VariableSetReconcileResourceUseCaseImpl>();
     catalog_builder.add::<VariableSetReconcilerImpl>();
 
     catalog_builder.add::<SecretSetEventStoreBridge>();
+    catalog_builder.add::<SecretSetGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<SecretSetReconcileResourceUseCaseImpl>();
     catalog_builder.add::<SecretSetReconcilerImpl>();
 
     catalog_builder.add::<StorageEventStoreBridge>();
+    catalog_builder.add::<StorageGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<StorageReconcileResourceUseCaseImpl>();
     catalog_builder.add::<StorageReconcilerImpl>();
 }

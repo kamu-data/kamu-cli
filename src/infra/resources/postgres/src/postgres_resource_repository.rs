@@ -19,7 +19,7 @@ use kamu_resources::{
     ResourceName,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceRow,
+    ResourceSnapshot,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -40,13 +40,16 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(ResourceID::new_v4())
     }
 
-    async fn create_resource(&self, resource_row: &ResourceRow) -> Result<(), CreateResourceError> {
+    async fn create_resource(
+        &self,
+        resource_snapshot: &ResourceSnapshot,
+    ) -> Result<(), CreateResourceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_row.account_id.as_stack_string();
+        let account_id_stack = resource_snapshot.account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let last_event_id = resource_row.last_event_id.map(EventID::into_inner);
+        let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
 
         sqlx::query!(
             r#"
@@ -56,6 +59,9 @@ impl ResourceRepository for PostgresResourceRepository {
                 resource_kind,
                 api_version,
                 resource_name,
+                description,
+                labels,
+                annotations,
                 spec,
                 status,
                 generation,
@@ -63,24 +69,29 @@ impl ResourceRepository for PostgresResourceRepository {
                 phase,
                 created_at,
                 updated_at,
+                deleted_at,
                 last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             "#,
-            resource_row.resource_id,
+            resource_snapshot.resource_id,
             account_id_str,
-            resource_row.kind,
-            resource_row.api_version,
-            resource_row.name,
-            resource_row.spec,
-            resource_row.status,
-            resource_row.generation,
-            resource_row.observed_generation,
-            resource_row.phase,
-            resource_row.created_at,
-            resource_row.updated_at,
-            resource_row.last_reconciled_at,
+            resource_snapshot.kind,
+            resource_snapshot.api_version,
+            resource_snapshot.name,
+            resource_snapshot.description,
+            resource_snapshot.labels,
+            resource_snapshot.annotations,
+            resource_snapshot.spec,
+            resource_snapshot.status,
+            resource_snapshot.generation,
+            resource_snapshot.observed_generation,
+            resource_snapshot.phase,
+            resource_snapshot.created_at,
+            resource_snapshot.updated_at,
+            resource_snapshot.deleted_at,
+            resource_snapshot.last_reconciled_at,
             last_event_id,
         )
         .execute(connection_mut)
@@ -88,9 +99,9 @@ impl ResourceRepository for PostgresResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
-                    account_id: resource_row.account_id.clone(),
-                    kind: resource_row.kind.clone(),
-                    name: resource_row.name.clone(),
+                    account_id: resource_snapshot.account_id.clone(),
+                    kind: resource_snapshot.kind.clone(),
+                    name: resource_snapshot.name.clone(),
                 })
             }
             _ => CreateResourceError::Internal(e.int_err()),
@@ -101,15 +112,15 @@ impl ResourceRepository for PostgresResourceRepository {
 
     async fn update_resource(
         &self,
-        resource_row: &ResourceRow,
+        resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_row.account_id.as_stack_string();
+        let account_id_stack = resource_snapshot.account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let last_event_id = resource_row.last_event_id.map(EventID::into_inner);
+        let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
 
         let update_result = sqlx::query!(
@@ -119,31 +130,39 @@ impl ResourceRepository for PostgresResourceRepository {
                 account_id = $2,
                 api_version = $3,
                 resource_name = $4,
-                spec = $5,
-                status = $6,
-                generation = $7,
-                observed_generation = $8,
-                phase = $9,
-                updated_at = $10,
-                last_reconciled_at = $11,
-                last_event_id = $12
+                description = $5,
+                labels = $6,
+                annotations = $7,
+                spec = $8,
+                status = $9,
+                generation = $10,
+                observed_generation = $11,
+                phase = $12,
+                updated_at = $13,
+                deleted_at = $14,
+                last_reconciled_at = $15,
+                last_event_id = $16
             WHERE resource_id = $1
               AND (
-                    last_event_id IS NULL AND CAST($13 as BIGINT) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($13 as BIGINT) IS NOT NULL AND last_event_id = $13
+                    last_event_id IS NULL AND CAST($17 as BIGINT) IS NULL OR
+                    last_event_id IS NOT NULL AND CAST($17 as BIGINT) IS NOT NULL AND last_event_id = $17
               )
             "#,
-            resource_row.resource_id,
+            resource_snapshot.resource_id,
             account_id_str,
-            resource_row.api_version,
-            resource_row.name,
-            resource_row.spec,
-            resource_row.status,
-            resource_row.generation,
-            resource_row.observed_generation,
-            resource_row.phase,
-            resource_row.updated_at,
-            resource_row.last_reconciled_at,
+            resource_snapshot.api_version,
+            resource_snapshot.name,
+            resource_snapshot.description,
+            resource_snapshot.labels,
+            resource_snapshot.annotations,
+            resource_snapshot.spec,
+            resource_snapshot.status,
+            resource_snapshot.generation,
+            resource_snapshot.observed_generation,
+            resource_snapshot.phase,
+            resource_snapshot.updated_at,
+            resource_snapshot.deleted_at,
+            resource_snapshot.last_reconciled_at,
             last_event_id,
             expected_last_event_id,
         )
@@ -152,9 +171,9 @@ impl ResourceRepository for PostgresResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 UpdateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
-                    account_id: resource_row.account_id.clone(),
-                    kind: resource_row.kind.clone(),
-                    name: resource_row.name.clone(),
+                    account_id: resource_snapshot.account_id.clone(),
+                    kind: resource_snapshot.kind.clone(),
+                    name: resource_snapshot.name.clone(),
                 })
             }
             _ => UpdateResourceError::Internal(e.int_err()),
@@ -197,10 +216,10 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(maybe_resource_id)
     }
 
-    async fn get_resource_row(
+    async fn get_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
-    ) -> Result<Option<ResourceRow>, InternalError> {
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -212,6 +231,9 @@ impl ResourceRepository for PostgresResourceRepository {
                 resource_kind,
                 api_version,
                 resource_name,
+                description,
+                labels,
+                annotations,
                 spec,
                 status,
                 generation,
@@ -219,6 +241,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 phase,
                 created_at,
                 updated_at,
+                deleted_at,
                 last_reconciled_at,
                 last_event_id
             FROM resources
@@ -232,12 +255,15 @@ impl ResourceRepository for PostgresResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_row.map(|row| ResourceRow {
+        Ok(maybe_row.map(|row| ResourceSnapshot {
             resource_id: row.resource_id,
             account_id: row.account_id,
             kind: row.resource_kind,
             api_version: row.api_version,
             name: row.resource_name,
+            description: row.description,
+            labels: row.labels,
+            annotations: row.annotations,
             spec: row.spec,
             status: row.status,
             generation: row.generation,
@@ -245,6 +271,7 @@ impl ResourceRepository for PostgresResourceRepository {
             phase: row.phase,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            deleted_at: row.deleted_at,
             last_reconciled_at: row.last_reconciled_at,
             last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
         }))

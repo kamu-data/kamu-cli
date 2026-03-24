@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::{ConcurrentModificationError, EventID};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceRawEventQuery};
+use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceRawEventQuery, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,11 +20,14 @@ use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceRawEventQuery};
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
 
-    async fn create_resource(&self, resource_row: &ResourceRow) -> Result<(), CreateResourceError>;
+    async fn create_resource(
+        &self,
+        resource_snapshot: &ResourceSnapshot,
+    ) -> Result<(), CreateResourceError>;
 
     async fn update_resource(
         &self,
-        resource_row: &ResourceRow,
+        resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError>;
 
@@ -36,10 +38,10 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    async fn get_resource_row(
+    async fn get_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
-    ) -> Result<Option<ResourceRow>, InternalError>;
+    ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
     fn list_resource_ids(
         &self,
@@ -94,30 +96,6 @@ pub struct ResourceDuplicateError {
     pub account_id: odf::AccountID,
     pub kind: String,
     pub name: ResourceName,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
-#[derive(Debug, Clone)]
-pub struct ResourceRow {
-    pub resource_id: ResourceID,
-    pub account_id: odf::AccountID,
-    pub kind: String,
-    pub api_version: String,
-    pub name: ResourceName,
-
-    pub spec: serde_json::Value,
-    pub status: Option<serde_json::Value>,
-
-    pub generation: i64,
-    pub observed_generation: Option<i64>,
-    pub phase: Option<String>,
-
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub last_reconciled_at: Option<DateTime<Utc>>,
-    pub last_event_id: Option<EventID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -82,6 +82,7 @@ interface "FlowTriggerEventStore" <<i>>
 interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
 interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
+interface "GetResourceByIdUseCase" <<i>>
 interface "InitOnStartup" <<i>>
 interface "JwtTokenIssuer" <<i>>
 interface "MessageConsumer" <<i>>
@@ -112,6 +113,8 @@ interface "QueryService" <<i>>
 interface "RebacDatasetRegistryFacade" <<i>>
 interface "RebacRepository" <<i>>
 interface "RebacService" <<i>>
+interface "ReconcileResourceUseCase" <<i>>
+interface "Reconciler" <<i>>
 interface "RemoteAliasResolver" <<i>>
 interface "RemoteAliasesRegistry" <<i>>
 interface "RemoteRepositoryRegistry" <<i>>
@@ -127,6 +130,7 @@ interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
 interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
+interface "SecretSetEventStore" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
 interface "SetDatasetRebacPropertiesUseCase" <<i>>
@@ -134,6 +138,7 @@ interface "SetWatermarkExecutor" <<i>>
 interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
 interface "SmartTransferProtocolClient" <<i>>
+interface "StorageEventStore" <<i>>
 interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
@@ -144,6 +149,7 @@ interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionedFileUseCase" <<i>>
+interface "VariableSetEventStore" <<i>>
 interface "VerificationService" <<i>>
 interface "VerifyDatasetUseCase" <<i>>
 interface "ViewCollectionEntriesUseCase" <<i>>
@@ -314,6 +320,10 @@ class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
 class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
+class "SecretSetEventStoreBridge"
+class "SecretSetGetResourceByIdUseCaseImpl"
+class "SecretSetReconcileResourceUseCaseImpl"
+class "SecretSetReconcilerImpl"
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
 class "SessionCachingConfig" <<singleton>>
@@ -358,6 +368,10 @@ class "SqliteTransactionManager"
 class "SqliteWeb3AuthEip4361NonceRepository"
 class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
+class "StorageEventStoreBridge"
+class "StorageGetResourceByIdUseCaseImpl"
+class "StorageReconcileResourceUseCaseImpl"
+class "StorageReconcilerImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
 class "SystemTimeSourceDefault" <<agnostic>>
@@ -372,6 +386,10 @@ class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
+class "VariableSetEventStoreBridge"
+class "VariableSetGetResourceByIdUseCaseImpl"
+class "VariableSetReconcileResourceUseCaseImpl"
+class "VariableSetReconcilerImpl"
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
@@ -878,6 +896,33 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
+"SecretSetEventStore" <|-- "SecretSetEventStoreBridge"
+"SecretSetEventStoreBridge"  --> "ResourceRawEventStore"
+"StorageEventStore" <|-- "StorageEventStoreBridge"
+"StorageEventStoreBridge"  --> "ResourceRawEventStore"
+"VariableSetEventStore" <|-- "VariableSetEventStoreBridge"
+"VariableSetEventStoreBridge"  --> "ResourceRawEventStore"
+"GetResourceByIdUseCase" <|-- "SecretSetGetResourceByIdUseCaseImpl"
+"SecretSetGetResourceByIdUseCaseImpl"  --> "ResourceRepository"
+"GetResourceByIdUseCase" <|-- "StorageGetResourceByIdUseCaseImpl"
+"StorageGetResourceByIdUseCaseImpl"  --> "ResourceRepository"
+"GetResourceByIdUseCase" <|-- "VariableSetGetResourceByIdUseCaseImpl"
+"VariableSetGetResourceByIdUseCaseImpl"  --> "ResourceRepository"
+"ReconcileResourceUseCase" <|-- "SecretSetReconcileResourceUseCaseImpl"
+"SecretSetReconcileResourceUseCaseImpl"  --> "SecretSetEventStore"
+"SecretSetReconcileResourceUseCaseImpl"  --> "Reconciler"
+"SecretSetReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"ReconcileResourceUseCase" <|-- "StorageReconcileResourceUseCaseImpl"
+"StorageReconcileResourceUseCaseImpl"  --> "StorageEventStore"
+"StorageReconcileResourceUseCaseImpl"  --> "Reconciler"
+"StorageReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"ReconcileResourceUseCase" <|-- "VariableSetReconcileResourceUseCaseImpl"
+"VariableSetReconcileResourceUseCaseImpl"  --> "VariableSetEventStore"
+"VariableSetReconcileResourceUseCaseImpl"  --> "Reconciler"
+"VariableSetReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"Reconciler" <|-- "SecretSetReconcilerImpl"
+"Reconciler" <|-- "StorageReconcilerImpl"
+"Reconciler" <|-- "VariableSetReconcilerImpl"
 "ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
 "SqliteResourceRawEventStore"  --> "TransactionRefT"
 "ResourceRepository" <|-- "SqliteResourceRepository"

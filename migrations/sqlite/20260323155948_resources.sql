@@ -6,6 +6,9 @@ CREATE TABLE resources (
     resource_kind          VARCHAR(100) NOT NULL,
     api_version            VARCHAR(100) NOT NULL,
     resource_name          VARCHAR(200) NOT NULL,
+    description            TEXT NULL,
+    labels                 JSONB NOT NULL,
+    annotations            JSONB NOT NULL,
 
     spec                   JSONB NOT NULL,
     status                 JSONB NULL,
@@ -16,6 +19,7 @@ CREATE TABLE resources (
 
     created_at             TIMESTAMPTZ NOT NULL,
     updated_at             TIMESTAMPTZ NOT NULL,
+    deleted_at             TIMESTAMPTZ NULL,
     last_reconciled_at     TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL,
 

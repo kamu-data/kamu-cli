@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
+use internal_error::InternalError;
 
 use crate::{
     DeclarativeResource,
@@ -22,6 +23,7 @@ use crate::{
     VariableSetSpec,
     VariableSetState,
     VariableSetStatus,
+    decode_typed_resource_snapshot,
     try_create_reconcilable_resource,
     try_update_resource_metadata,
     try_update_resource_spec,
@@ -93,6 +95,20 @@ impl DeclarativeResource for VariableSetResource {
     type Spec = VariableSetSpec;
     type Status = VariableSetStatus;
     type ResourceState = VariableSetState;
+
+    fn decode_snapshot(
+        snapshot: crate::ResourceSnapshot,
+    ) -> Result<Self::ResourceState, InternalError> {
+        let (resource_id, metadata, spec, status) =
+            decode_typed_resource_snapshot::<VariableSetSpec, VariableSetStatus>(snapshot)?;
+
+        Ok(VariableSetState {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        })
+    }
 
     fn resource_id(&self) -> &ResourceID {
         &self.as_ref().resource_id
