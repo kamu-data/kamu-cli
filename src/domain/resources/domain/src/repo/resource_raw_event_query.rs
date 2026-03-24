@@ -12,7 +12,7 @@ use crate::ResourceID;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ResourceStreamKey {
+pub struct ResourceRawEventQuery {
     pub kind: String,
     pub id: ResourceID,
 }

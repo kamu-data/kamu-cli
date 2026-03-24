@@ -13,22 +13,21 @@ use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
-    NewStoredResourceEvent,
-    ResourceEventStore,
     ResourceID,
     ResourceIDStream,
     ResourceName,
+    ResourceRawEvent,
+    ResourceRawEventQuery,
+    ResourceRawEventStore,
+    ResourceRawEventStream,
     ResourceRepository,
     ResourceRow,
-    ResourceStreamKey,
-    StoredResourceEvent,
-    StoredResourceEventStream,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn ResourceEventStore)]
+#[interface(dyn ResourceRawEventStore)]
 #[interface(dyn ResourceRepository)]
 pub struct PostgresResourceEventStore {
     transaction: TransactionRefT<sqlx::Postgres>,
@@ -37,13 +36,9 @@ pub struct PostgresResourceEventStore {
 impl PostgresResourceEventStore {
     async fn save_event_rows(
         connection_mut: &mut sqlx::PgConnection,
-        key: &ResourceStreamKey,
-        account_id: &odf::AccountID,
-        events: &[NewStoredResourceEvent],
+        query: &ResourceRawEventQuery,
+        events: &[ResourceRawEvent],
     ) -> Result<EventID, SaveEventsError> {
-        use odf::metadata::AsStackString;
-
-        let account_id = account_id.as_stack_string();
         let mut last_event_id = None;
 
         for event in events {
@@ -51,18 +46,16 @@ impl PostgresResourceEventStore {
                 r#"
                 INSERT INTO resource_events (
                     resource_id,
-                    account_id,
                     resource_kind,
                     event_time,
                     event_type,
                     event_payload
                 )
-                VALUES ($1, $2, $3, $4, $5, $6)
+                VALUES ($1, $2, $3, $4, $5)
                 RETURNING event_id
                 "#,
-                key.id,
-                account_id.as_str(),
-                key.kind,
+                query.id,
+                query.kind,
                 event.event_time,
                 event.event_type,
                 event.payload,
@@ -80,7 +73,7 @@ impl PostgresResourceEventStore {
 
     async fn get_last_event_id(
         connection_mut: &mut sqlx::PgConnection,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
         let last_event_id = sqlx::query_scalar!(
             r#"
@@ -91,8 +84,8 @@ impl PostgresResourceEventStore {
             ORDER BY event_id DESC
             LIMIT 1
             "#,
-            key.id,
-            key.kind,
+            query.id,
+            query.kind,
         )
         .fetch_optional(connection_mut)
         .await
@@ -124,7 +117,7 @@ impl ResourceRepository for PostgresResourceEventStore {
 
     async fn get_resource_row(
         &self,
-        _key: &ResourceStreamKey,
+        _query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceRow>, InternalError> {
         Err(InternalError::new(
             "Resource snapshot rows are not implemented for the event-only Postgres store",
@@ -158,7 +151,7 @@ impl ResourceRepository for PostgresResourceEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceEventStore for PostgresResourceEventStore {
+impl ResourceRawEventStore for PostgresResourceEventStore {
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -176,7 +169,7 @@ impl ResourceEventStore for PostgresResourceEventStore {
         Ok(usize::try_from(events_count).unwrap())
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> StoredResourceEventStream<'_> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> ResourceRawEventStream<'_> {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -202,9 +195,9 @@ impl ResourceEventStore for PostgresResourceEventStore {
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = rows.try_next().await? {
-                yield Ok(StoredResourceEvent {
+                yield Ok(ResourceRawEvent {
                     event_id: EventID::new(row.event_id),
-                    key: ResourceStreamKey {
+                    query: ResourceRawEventQuery {
                         kind: row.kind,
                         id: row.resource_id,
                     },
@@ -218,10 +211,10 @@ impl ResourceEventStore for PostgresResourceEventStore {
 
     fn get_events(
         &self,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         opts: GetEventsOpts,
-    ) -> StoredResourceEventStream<'_> {
-        let key = key.clone();
+    ) -> ResourceRawEventStream<'_> {
+        let key = query.clone();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -252,9 +245,9 @@ impl ResourceEventStore for PostgresResourceEventStore {
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = rows.try_next().await? {
-                yield Ok(StoredResourceEvent {
+                yield Ok(ResourceRawEvent {
                     event_id: EventID::new(row.event_id),
-                    key: ResourceStreamKey {
+                    query: ResourceRawEventQuery {
                         kind: row.kind,
                         id: row.resource_id,
                     },
@@ -268,10 +261,9 @@ impl ResourceEventStore for PostgresResourceEventStore {
 
     async fn save_events(
         &self,
-        account_id: odf::AccountID,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         maybe_prev_stored_event_id: Option<EventID>,
-        events: Vec<NewStoredResourceEvent>,
+        events: Vec<ResourceRawEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
@@ -283,7 +275,7 @@ impl ResourceEventStore for PostgresResourceEventStore {
             .await
             .map_err(ErrorIntoInternal::int_err)?;
 
-        let actual_last_event_id = Self::get_last_event_id(connection_mut, key)
+        let actual_last_event_id = Self::get_last_event_id(connection_mut, query)
             .await
             .map_err(SaveEventsError::Internal)?;
 
@@ -291,7 +283,7 @@ impl ResourceEventStore for PostgresResourceEventStore {
             return Err(SaveEventsError::concurrent_modification());
         }
 
-        Self::save_event_rows(connection_mut, key, &account_id, &events).await
+        Self::save_event_rows(connection_mut, query, &events).await
     }
 }
 

@@ -41,7 +41,6 @@ CREATE SEQUENCE resource_event_id_seq AS BIGINT;
 CREATE TABLE resource_events (
     event_id               BIGINT PRIMARY KEY DEFAULT nextval('resource_event_id_seq'),
     resource_id            UUID NOT NULL,
-    account_id             VARCHAR(100) NOT NULL,
     resource_kind          VARCHAR(100) NOT NULL,
 
     event_time             TIMESTAMPTZ NOT NULL,
@@ -57,8 +56,5 @@ CREATE INDEX idx_resource_events_resource_id_event_id
 
 CREATE INDEX idx_resource_events_kind_event_id
     ON resource_events (resource_kind, event_id);
-
-CREATE INDEX idx_resource_events_account_kind_event_id
-    ON resource_events (account_id, resource_kind, event_id);
 
 /* ------------------------------ */

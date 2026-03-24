@@ -10,24 +10,24 @@
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
 use internal_error::InternalError;
 
-use crate::{NewStoredResourceEvent, ResourceStreamKey, StoredResourceEventStream};
+use crate::{ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStream};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceEventStore: Send + Sync {
+pub trait ResourceRawEventStore: Send + Sync {
     /// Returns the number of events stored
     async fn total_events_stored(&self) -> Result<usize, InternalError>;
 
     /// Returns the event history of all aggregates in chronological order
-    fn get_all_events(&self, opts: GetEventsOpts) -> StoredResourceEventStream<'_>;
+    fn get_all_events(&self, opts: GetEventsOpts) -> ResourceRawEventStream<'_>;
 
     /// Returns the event history of an aggregate in chronological order
     fn get_events(
         &self,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         opts: GetEventsOpts,
-    ) -> StoredResourceEventStream<'_>;
+    ) -> ResourceRawEventStream<'_>;
 
     /// Persists a series of events
     ///
@@ -36,10 +36,9 @@ pub trait ResourceEventStore: Send + Sync {
     /// were no concurrent updates that could've influenced this transaction.
     async fn save_events(
         &self,
-        account_id: odf::AccountID,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         maybe_prev_stored_event_id: Option<EventID>,
-        events: Vec<NewStoredResourceEvent>,
+        events: Vec<ResourceRawEvent>,
     ) -> Result<EventID, SaveEventsError>;
 }
 

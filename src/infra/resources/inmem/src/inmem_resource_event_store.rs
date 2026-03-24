@@ -15,16 +15,15 @@ use dill::*;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
 use internal_error::InternalError;
 use kamu_resources::{
-    NewStoredResourceEvent,
-    ResourceEventStore,
     ResourceID,
     ResourceIDStream,
     ResourceName,
+    ResourceRawEvent,
+    ResourceRawEventQuery,
+    ResourceRawEventStore,
     ResourceRepository,
     ResourceRow,
-    ResourceStreamKey,
-    StoredResourceEvent,
-    StoredResourceEventStream,
+    ResourceRawEventStream,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +31,7 @@ use kamu_resources::{
 #[derive(Default)]
 struct State {
     last_event_id: Option<EventID>,
-    events_by_key: HashMap<ResourceStreamKey, Vec<StoredResourceEvent>>,
+    events_by_query: HashMap<ResourceRawEventQuery, Vec<ResourceRawEvent>>,
 }
 
 impl State {
@@ -47,9 +46,9 @@ impl State {
         next_id
     }
 
-    fn get_last_event_id(&self, key: &ResourceStreamKey) -> Option<EventID> {
-        self.events_by_key
-            .get(key)
+    fn get_last_event_id(&self, query: &ResourceRawEventQuery) -> Option<EventID> {
+        self.events_by_query
+            .get(query)
             .and_then(|events| events.last())
             .map(|event| event.event_id)
     }
@@ -62,7 +61,7 @@ pub struct InMemoryResourceEventStore {
 }
 
 #[component(pub)]
-#[interface(dyn ResourceEventStore)]
+#[interface(dyn ResourceRawEventStore)]
 #[interface(dyn ResourceRepository)]
 #[scope(Singleton)]
 impl InMemoryResourceEventStore {
@@ -94,7 +93,7 @@ impl ResourceRepository for InMemoryResourceEventStore {
 
     async fn get_resource_row(
         &self,
-        _key: &ResourceStreamKey,
+        _query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceRow>, InternalError> {
         Err(InternalError::new(
             "Resource snapshot rows are not implemented for the event-only in-memory store",
@@ -126,17 +125,17 @@ impl ResourceRepository for InMemoryResourceEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceEventStore for InMemoryResourceEventStore {
+impl ResourceRawEventStore for InMemoryResourceEventStore {
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let guard = self.state.lock().unwrap();
-        Ok(guard.events_by_key.values().map(Vec::len).sum())
+        Ok(guard.events_by_query.values().map(Vec::len).sum())
     }
 
-    fn get_all_events(&self, opts: GetEventsOpts) -> StoredResourceEventStream<'_> {
+    fn get_all_events(&self, opts: GetEventsOpts) -> ResourceRawEventStream<'_> {
         let events_page = {
             let guard = self.state.lock().unwrap();
             let mut all_events: Vec<_> = guard
-                .events_by_key
+                .events_by_query
                 .values()
                 .flatten()
                 .filter(|event| opts.from.is_none_or(|from| event.event_id > from))
@@ -154,15 +153,15 @@ impl ResourceEventStore for InMemoryResourceEventStore {
 
     fn get_events(
         &self,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         opts: GetEventsOpts,
-    ) -> StoredResourceEventStream<'_> {
+    ) -> ResourceRawEventStream<'_> {
         let events_page = {
             let guard = self.state.lock().unwrap();
 
             guard
-                .events_by_key
-                .get(key)
+                .events_by_query
+                .get(query)
                 .map(|events| {
                     events
                         .iter()
@@ -180,17 +179,16 @@ impl ResourceEventStore for InMemoryResourceEventStore {
 
     async fn save_events(
         &self,
-        _account_id: odf::AccountID,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
         maybe_prev_stored_event_id: Option<EventID>,
-        events: Vec<NewStoredResourceEvent>,
+        events: Vec<ResourceRawEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
         }
 
         let mut guard = self.state.lock().unwrap();
-        let actual_last_event_id = guard.get_last_event_id(key);
+        let actual_last_event_id = guard.get_last_event_id(query);
 
         if actual_last_event_id != maybe_prev_stored_event_id {
             return Err(SaveEventsError::concurrent_modification());
@@ -202,12 +200,12 @@ impl ResourceEventStore for InMemoryResourceEventStore {
             let event_id = guard.next_event_id();
 
             guard
-                .events_by_key
-                .entry(key.clone())
+                .events_by_query
+                .entry(query.clone())
                 .or_default()
-                .push(StoredResourceEvent {
+                .push(ResourceRawEvent {
                     event_id,
-                    key: key.clone(),
+                    query: query.clone(),
                     event_time: event.event_time,
                     event_type: event.event_type,
                     payload: event.payload,

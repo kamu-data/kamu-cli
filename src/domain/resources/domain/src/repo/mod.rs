@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod reconcilable_resource_repo;
-mod resource_event_store;
+mod resource_raw_event;
+mod resource_raw_event_query;
+mod resource_raw_event_store;
 mod resource_repository;
-mod resource_stream_key;
-mod stored_resource_event;
 
 pub use reconcilable_resource_repo::*;
-pub use resource_event_store::*;
+pub use resource_raw_event::*;
+pub use resource_raw_event_query::*;
+pub use resource_raw_event_store::*;
 pub use resource_repository::*;
-pub use resource_stream_key::*;
-pub use stored_resource_event::*;

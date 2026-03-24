@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use event_sourcing::EventID;
 use internal_error::InternalError;
 
-use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceStreamKey};
+use crate::{ResourceID, ResourceIDStream, ResourceName, ResourceRawEventQuery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +28,7 @@ pub trait ResourceRepository: Send + Sync {
 
     async fn get_resource_row(
         &self,
-        key: &ResourceStreamKey,
+        query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceRow>, InternalError>;
 
     fn list_resource_ids(

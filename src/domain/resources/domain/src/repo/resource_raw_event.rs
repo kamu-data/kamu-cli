@@ -11,15 +11,15 @@ use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
 use internal_error::InternalError;
 
-use crate::ResourceStreamKey;
+use crate::ResourceRawEventQuery;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[derive(Debug, Clone)]
-pub struct StoredResourceEvent {
+pub struct ResourceRawEvent {
     pub event_id: EventID,
-    pub key: ResourceStreamKey,
+    pub query: ResourceRawEventQuery,
     pub event_time: DateTime<Utc>,
     pub event_type: String,
     pub payload: serde_json::Value,
@@ -27,17 +27,8 @@ pub struct StoredResourceEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type StoredResourceEventStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<StoredResourceEvent, InternalError>> + Send + 'a>,
+pub type ResourceRawEventStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<ResourceRawEvent, InternalError>> + Send + 'a>,
 >;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct NewStoredResourceEvent {
-    pub event_time: DateTime<Utc>,
-    pub event_type: String,
-    pub payload: serde_json::Value,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
