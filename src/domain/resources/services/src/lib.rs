@@ -13,10 +13,8 @@ mod dependencies;
 pub mod event_stores;
 mod reconcile;
 mod reconcilers;
-mod repo_adapters;
 
 pub use dependencies::*;
 pub use event_stores::*;
 pub use reconcile::*;
 pub use reconcilers::*;
-pub use repo_adapters::*;

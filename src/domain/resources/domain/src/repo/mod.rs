@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod reconcilable_resource_repo;
 mod resource_raw_event;
 mod resource_raw_event_query;
 mod resource_raw_event_store;
 mod resource_repository;
 
-pub use reconcilable_resource_repo::*;
 pub use resource_raw_event::*;
 pub use resource_raw_event_query::*;
 pub use resource_raw_event_store::*;
