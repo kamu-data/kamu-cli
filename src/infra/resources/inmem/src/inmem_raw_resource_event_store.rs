@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use dill::*;
 use event_sourcing::{
     EventID,
@@ -21,15 +20,10 @@ use event_sourcing::{
 use futures::TryStreamExt;
 use internal_error::InternalError;
 use kamu_resources::{
-    ResourceID,
-    ResourceIDStream,
-    ResourceName,
     ResourceRawEvent,
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
-    ResourceRepository,
-    ResourceRow,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,63 +37,12 @@ pub struct InMemoryRawResourceEventStore {
 
 #[component(pub)]
 #[interface(dyn ResourceRawEventStore)]
-#[interface(dyn ResourceRepository)]
 #[scope(Singleton)]
 impl InMemoryRawResourceEventStore {
     pub fn new() -> Self {
         Self {
             inner: InMemoryEventStore::new(),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl ResourceRepository for InMemoryRawResourceEventStore {
-    async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
-        Ok(ResourceID::new_v4())
-    }
-
-    async fn get_resource_id_by_name(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-        _name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError> {
-        Err(InternalError::new(
-            "Resource lookup by name is not implemented for the event-only in-memory store",
-        ))
-    }
-
-    async fn get_resource_row(
-        &self,
-        _query: &ResourceRawEventQuery,
-    ) -> Result<Option<ResourceRow>, InternalError> {
-        Err(InternalError::new(
-            "Resource snapshot rows are not implemented for the event-only in-memory store",
-        ))
-    }
-
-    fn list_resource_ids(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-        _pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
-        Box::pin(futures::stream::iter([Err(InternalError::new(
-            "Resource listing is not implemented for the event-only in-memory store",
-        ))]))
-    }
-
-    async fn get_count_resources(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-    ) -> Result<usize, InternalError> {
-        Err(InternalError::new(
-            "Resource counting is not implemented for the event-only in-memory store",
-        ))
     }
 }
 

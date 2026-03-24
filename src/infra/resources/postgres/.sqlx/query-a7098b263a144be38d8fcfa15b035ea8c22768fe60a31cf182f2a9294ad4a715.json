@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                resource_id as \"resource_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_kind,\n                api_version,\n                resource_name,\n                spec,\n                status,\n                generation,\n                observed_generation,\n                phase,\n                created_at,\n                updated_at,\n                last_reconciled_at,\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND resource_kind = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resource_id: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id: odf::AccountID",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "resource_kind",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "api_version",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "resource_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "spec",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "observed_generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "phase",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "last_reconciled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "last_event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "a7098b263a144be38d8fcfa15b035ea8c22768fe60a31cf182f2a9294ad4a715"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    event_id,\n                    resource_id as \"resource_id: _\",\n                    resource_kind as \"kind!\",\n                    event_time as \"event_time: chrono::DateTime<chrono::Utc>\",\n                    event_type,\n                    event_payload as \"payload: serde_json::Value\"\n                FROM resource_events\n                WHERE ($1 IS NULL OR event_id > $1)\n                  AND ($2 IS NULL OR event_id <= $2)\n                ORDER BY event_id\n                ",
+  "query": "\n                SELECT\n                    event_id,\n                    resource_id as \"resource_id: _\",\n                    resource_kind as \"kind!\",\n                    event_time as \"event_time: DateTime<Utc>\",\n                    event_type,\n                    event_payload as \"payload: serde_json::Value\"\n                FROM resource_events\n                WHERE ($1 IS NULL OR event_id > $1)\n                  AND ($2 IS NULL OR event_id <= $2)\n                ORDER BY event_id\n                ",
   "describe": {
     "columns": [
       {
@@ -19,7 +19,7 @@
         "type_info": "Text"
       },
       {
-        "name": "event_time: chrono::DateTime<chrono::Utc>",
+        "name": "event_time: DateTime<Utc>",
         "ordinal": 3,
         "type_info": "Null"
       },
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "7d3fbe6e52bd359ea4eb245ddcd0e61054f76aefad65c4431138fb5c27602ab9"
+  "hash": "4a58d60c23a9ecf3f6f5abd145f86d14259015109a20b2f24621c6f07ee3adf9"
 }

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT resource_id as \"resource_id: uuid::Uuid\"\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resource_id: uuid::Uuid",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b0c66b1de0af9cb18d783ede7cd619528670ad9103cc18a1e50bb8a59c9f2c74"
+}

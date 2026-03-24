@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE resources\n            SET\n                account_id = $2,\n                api_version = $3,\n                resource_name = $4,\n                spec = $5,\n                status = $6,\n                generation = $7,\n                observed_generation = $8,\n                phase = $9,\n                updated_at = $10,\n                last_reconciled_at = $11,\n                last_event_id = $12\n            WHERE resource_id = $1\n              AND (\n                    last_event_id IS NULL AND CAST($13 as BIGINT) IS NULL OR\n                    last_event_id IS NOT NULL AND CAST($13 as BIGINT) IS NOT NULL AND last_event_id = $13\n              )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d6833f6434197065b62ac0fc37bcb2c538137bcbbb07bedb2c9d877e22d96190"
+}

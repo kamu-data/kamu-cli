@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::TransactionRefT;
 use dill::{component, interface};
 use event_sourcing::{
     EventID,
@@ -20,22 +20,16 @@ use event_sourcing::{
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
-    ResourceID,
-    ResourceIDStream,
-    ResourceName,
     ResourceRawEvent,
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
-    ResourceRepository,
-    ResourceRow,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
 #[interface(dyn ResourceRawEventStore)]
-#[interface(dyn ResourceRepository)]
 pub struct PostgresRawResourceEventStore {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
@@ -100,58 +94,6 @@ impl PostgresRawResourceEventStore {
         .map(|maybe_event_id| maybe_event_id.map(EventID::new))?;
 
         Ok(last_event_id)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl ResourceRepository for PostgresRawResourceEventStore {
-    async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
-        Ok(ResourceID::new_v4())
-    }
-
-    async fn get_resource_id_by_name(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-        _name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError> {
-        Err(InternalError::new(
-            "Resource lookup by name is not implemented for the event-only Postgres store",
-        ))
-    }
-
-    async fn get_resource_row(
-        &self,
-        _query: &ResourceRawEventQuery,
-    ) -> Result<Option<ResourceRow>, InternalError> {
-        Err(InternalError::new(
-            "Resource snapshot rows are not implemented for the event-only Postgres store",
-        ))
-    }
-
-    fn list_resource_ids(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-        _pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
-        Box::pin(async_stream::stream! {
-            yield Err(InternalError::new(
-                "Resource listing is not implemented for the event-only Postgres store",
-            ));
-        })
-    }
-
-    async fn get_count_resources(
-        &self,
-        _account_id: odf::AccountID,
-        _kind: &str,
-    ) -> Result<usize, InternalError> {
-        Err(InternalError::new(
-            "Resource counting is not implemented for the event-only Postgres store",
-        ))
     }
 }
 
