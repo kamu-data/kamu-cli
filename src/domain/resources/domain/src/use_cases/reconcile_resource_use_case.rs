@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{LoadError, SaveError};
+use event_sourcing::{ConcurrentModificationError, LoadError, SaveError};
+use internal_error::InternalError;
 
 use crate::{ReconcilableEventSourcedResource, ResourceID};
 
@@ -25,8 +26,14 @@ pub enum ReconcileResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     #[error("Resource with the specified identity failed to load. Reason: {0}")]
     LoadFailed(LoadError<R::ResourceState>),
 
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
+
     #[error("Resource with the specified identity failed to save. Reason: {0}")]
     SaveFailed(SaveError),
+
+    #[error(transparent)]
+    SnapshotSyncFailed(#[from] InternalError),
 
     #[error(transparent)]
     Lifecycle(R::LifecycleError),

@@ -114,6 +114,25 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn try_delete_resource<R>(
+    resource: &mut R,
+    now: DateTime<Utc>,
+    tombstone_name: String,
+) -> Result<(), R::LifecycleError>
+where
+    R: ReconcilableEventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+{
+    if resource.metadata().deleted_at.is_some() {
+        return Ok(());
+    }
+
+    let event = resource.make_deleted_event(now, tombstone_name);
+    resource.apply_event(event)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn try_mark_resource_reconciliation_started<R>(
     resource: &mut R,
     now: DateTime<Utc>,

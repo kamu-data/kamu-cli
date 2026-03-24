@@ -8602,6 +8602,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "enum-variants",
  "event-sourcing",
@@ -8613,6 +8614,7 @@ dependencies = [
  "thiserror 2.0.18",
  "time-source",
  "tokio-stream",
+ "tracing",
  "uuid",
 ]
 

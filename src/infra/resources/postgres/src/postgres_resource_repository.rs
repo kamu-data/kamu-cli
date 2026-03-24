@@ -203,6 +203,7 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE account_id = $1
               AND resource_kind = $2
               AND resource_name = $3
+              AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             kind,
@@ -244,6 +245,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE resource_id = $1
               AND resource_kind = $2
+              AND deleted_at IS NULL
             "#,
             query.id,
             query.kind,
@@ -296,6 +298,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 FROM resources
                 WHERE account_id = $1
                   AND resource_kind = $2
+                  AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
@@ -351,6 +354,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 FROM resources
                 WHERE account_id = $1
                   AND resource_kind = $2
+                  AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
@@ -421,6 +425,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
+                  AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -472,6 +477,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_kind = $2
+              AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             kind,

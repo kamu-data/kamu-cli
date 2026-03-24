@@ -67,6 +67,10 @@ where
             .into())
         }
 
+        (Some(s), event) if s.metadata().deleted_at.is_some() => {
+            Err(ProjectionError::new(Some(s), event))
+        }
+
         (Some(mut s), E::MetadataUpdated(e)) => {
             assert_eq!(s.resource_id(), &e.resource_id);
 
@@ -88,6 +92,16 @@ where
 
             let spec = s.spec().clone();
             TModel::StatusProjector::on_spec_updated(s.status_mut(), &spec);
+
+            Ok(s)
+        }
+
+        (Some(mut s), E::Deleted(e)) => {
+            assert_eq!(s.resource_id(), &e.resource_id);
+
+            s.metadata_mut().deleted_at = Some(e.event_time);
+            s.metadata_mut().updated_at = e.event_time;
+            s.metadata_mut().name = e.tombstone_name;
 
             Ok(s)
         }

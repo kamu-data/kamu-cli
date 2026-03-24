@@ -27,6 +27,7 @@ default = []
 
 [dependencies]
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 time-source = { workspace = true }
@@ -40,6 +41,7 @@ enum-variants = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 serde_json = { version = "1.0", default-features = false }
 

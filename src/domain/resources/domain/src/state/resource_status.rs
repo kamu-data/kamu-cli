@@ -36,6 +36,16 @@ impl ResourceStatus {
         self.observed_generation < generation
     }
 
+    pub fn last_reconciled_at(&self) -> Option<DateTime<Utc>> {
+        self.conditions.iter().find_map(|condition| {
+            if condition.type_ == crate::ResourceConditionType::Ready {
+                Some(condition.last_transition_time)
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn mark_reconciling(&mut self, now: DateTime<Utc>) {
         self.phase = ResourcePhase::Reconciling;
         ResourceCondition::set_condition(

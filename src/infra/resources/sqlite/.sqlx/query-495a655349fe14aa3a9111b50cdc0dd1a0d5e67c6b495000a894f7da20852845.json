@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels as \"labels: serde_json::Value\",\n                    annotations as \"annotations: serde_json::Value\",\n                    spec as \"spec: serde_json::Value\",\n                    status as \"status: serde_json::Value\",\n                    generation,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    updated_at as \"updated_at: DateTime<Utc>\",\n                    deleted_at as \"deleted_at: DateTime<Utc>\",\n                    last_reconciled_at as \"last_reconciled_at: DateTime<Utc>\",\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
+  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels as \"labels: serde_json::Value\",\n                    annotations as \"annotations: serde_json::Value\",\n                    spec as \"spec: serde_json::Value\",\n                    status as \"status: serde_json::Value\",\n                    generation,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    updated_at as \"updated_at: DateTime<Utc>\",\n                    deleted_at as \"deleted_at: DateTime<Utc>\",\n                    last_reconciled_at as \"last_reconciled_at: DateTime<Utc>\",\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
   "describe": {
     "columns": [
       {
@@ -106,5 +106,5 @@
       true
     ]
   },
-  "hash": "39927d396ec45d3922d16629372b3460997438b34c32fc1f268324175061e5d4"
+  "hash": "495a655349fe14aa3a9111b50cdc0dd1a0d5e67c6b495000a894f7da20852845"
 }

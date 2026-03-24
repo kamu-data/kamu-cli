@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT resource_id as \"resource_id: uuid::Uuid\"\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0ee62fb5c3fa7c16b94c48752eae6052b3e8df51fc0b14ced6f48c144de4a3d2"
+}

@@ -10,9 +10,10 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
 use internal_error::{InternalError, ResultIntoInternal};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata};
+use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,6 +53,37 @@ where
     };
 
     Ok((snapshot.resource_id, snapshot.metadata, spec, status))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn make_typed_resource_snapshot<TSpec, TStatus>(
+    resource_id: ResourceID,
+    kind: &'static str,
+    api_version: &'static str,
+    metadata: ResourceMetadata,
+    spec: &TSpec,
+    status: &TStatus,
+    last_event_id: Option<EventID>,
+) -> Result<ResourceSnapshot, InternalError>
+where
+    TSpec: Serialize,
+    TStatus: Serialize + ResourceStatusLike,
+{
+    let spec = serde_json::to_value(spec).int_err()?;
+    let status_json = serde_json::to_value(status).int_err()?;
+    let last_reconciled_at = status.resource_status().last_reconciled_at();
+
+    Ok(ResourceSnapshot {
+        resource_id,
+        kind: kind.to_string(),
+        api_version: api_version.to_string(),
+        metadata,
+        spec,
+        status: Some(status_json),
+        last_reconciled_at,
+        last_event_id,
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

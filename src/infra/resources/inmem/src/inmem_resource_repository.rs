@@ -170,7 +170,16 @@ impl ResourceRepository for InMemoryResourceRepository {
                 kind: kind.to_owned(),
                 name: name.clone(),
             })
-            .copied())
+            .and_then(|resource_id| {
+                guard
+                    .snapshots_by_query
+                    .values()
+                    .find(|snapshot| {
+                        snapshot.resource_id == *resource_id
+                            && snapshot.metadata.deleted_at.is_none()
+                    })
+                    .map(|snapshot| snapshot.resource_id)
+            }))
     }
 
     async fn get_resource_snapshot(
@@ -178,7 +187,11 @@ impl ResourceRepository for InMemoryResourceRepository {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
-        Ok(guard.snapshots_by_query.get(query).cloned())
+        Ok(guard
+            .snapshots_by_query
+            .get(query)
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .cloned())
     }
 
     fn list_resource_ids(
@@ -192,7 +205,11 @@ impl ResourceRepository for InMemoryResourceRepository {
             guard
                 .snapshots_by_query
                 .values()
-                .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
+                .filter(|snapshot| {
+                    snapshot.metadata.account == account_id
+                        && snapshot.kind == kind
+                        && snapshot.metadata.deleted_at.is_none()
+                })
                 .cloned()
                 .collect()
         };
@@ -225,7 +242,11 @@ impl ResourceRepository for InMemoryResourceRepository {
             guard
                 .snapshots_by_query
                 .values()
-                .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
+                .filter(|snapshot| {
+                    snapshot.metadata.account == account_id
+                        && snapshot.kind == kind
+                        && snapshot.metadata.deleted_at.is_none()
+                })
                 .cloned()
                 .collect()
         };
@@ -257,7 +278,10 @@ impl ResourceRepository for InMemoryResourceRepository {
             guard
                 .snapshots_by_query
                 .values()
-                .filter(|snapshot| snapshot.metadata.account == account_id)
+                .filter(|snapshot| {
+                    snapshot.metadata.account == account_id
+                        && snapshot.metadata.deleted_at.is_none()
+                })
                 .cloned()
                 .collect()
         };
@@ -289,7 +313,11 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(guard
             .snapshots_by_query
             .values()
-            .filter(|snapshot| snapshot.metadata.account == account_id && snapshot.kind == kind)
+            .filter(|snapshot| {
+                snapshot.metadata.account == account_id
+                    && snapshot.kind == kind
+                    && snapshot.metadata.deleted_at.is_none()
+            })
             .count())
     }
 }

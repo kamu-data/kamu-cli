@@ -34,6 +34,18 @@ pub trait ReconcilableResource: DeclarativeResource {
             .needs_reconciliation(self.metadata().generation)
     }
 
+    fn try_delete(
+        &mut self,
+        now: DateTime<Utc>,
+        tombstone_name: String,
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: ReconcilableEventSourcedResource + Sized,
+        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
+    {
+        crate::try_delete_resource(self, now, tombstone_name)
+    }
+
     fn try_mark_reconciliation_started(
         &mut self,
         now: DateTime<Utc>,

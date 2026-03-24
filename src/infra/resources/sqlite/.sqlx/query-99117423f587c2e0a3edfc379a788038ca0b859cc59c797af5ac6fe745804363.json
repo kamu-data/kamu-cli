@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels as \"labels: serde_json::Value\",\n                    annotations as \"annotations: serde_json::Value\",\n                    spec as \"spec: serde_json::Value\",\n                    status as \"status: serde_json::Value\",\n                    generation,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    updated_at as \"updated_at: DateTime<Utc>\",\n                    deleted_at as \"deleted_at: DateTime<Utc>\",\n                    last_reconciled_at as \"last_reconciled_at: DateTime<Utc>\",\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $2 OFFSET $3\n                ",
+  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels as \"labels: serde_json::Value\",\n                    annotations as \"annotations: serde_json::Value\",\n                    spec as \"spec: serde_json::Value\",\n                    status as \"status: serde_json::Value\",\n                    generation,\n                    created_at as \"created_at: DateTime<Utc>\",\n                    updated_at as \"updated_at: DateTime<Utc>\",\n                    deleted_at as \"deleted_at: DateTime<Utc>\",\n                    last_reconciled_at as \"last_reconciled_at: DateTime<Utc>\",\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -106,5 +106,5 @@
       true
     ]
   },
-  "hash": "baeae314f8dea13d6728ac4dc52f61c9784788aad25494afd056616ceb1838a6"
+  "hash": "99117423f587c2e0a3edfc379a788038ca0b859cc59c797af5ac6fe745804363"
 }

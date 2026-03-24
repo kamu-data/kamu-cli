@@ -14,6 +14,10 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add::<VariableSetDeleteResourcesUseCaseImpl>();
+    catalog_builder.add::<SecretSetDeleteResourcesUseCaseImpl>();
+    catalog_builder.add::<StorageDeleteResourcesUseCaseImpl>();
+
     catalog_builder.add::<VariableSetEventStoreBridge>();
     catalog_builder.add::<VariableSetGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<VariableSetListResourcesByKindUseCaseImpl>();

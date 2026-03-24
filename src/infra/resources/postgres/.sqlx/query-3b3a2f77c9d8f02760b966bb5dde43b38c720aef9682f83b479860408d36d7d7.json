@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                resource_id as \"resource_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_kind,\n                api_version,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND resource_kind = $2\n            ",
+  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_reconciled_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -86,8 +86,9 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text"
+        "Text",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -109,5 +110,5 @@
       true
     ]
   },
-  "hash": "2f137d0c37ad14cb85c1744c7b5ab7a9611f69f8df88c72cbdea212e994e239e"
+  "hash": "3b3a2f77c9d8f02760b966bb5dde43b38c720aef9682f83b479860408d36d7d7"
 }

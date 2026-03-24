@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_reconciled_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $2 OFFSET $3\n                ",
+  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_reconciled_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
   "describe": {
     "columns": [
       {
@@ -87,6 +87,7 @@
     "parameters": {
       "Left": [
         "Text",
+        "Text",
         "Int8",
         "Int8"
       ]
@@ -110,5 +111,5 @@
       true
     ]
   },
-  "hash": "4b9494ccd138fc8adc193cf78c501c62cfb1d75776f2af09d5692b40cd77a6a6"
+  "hash": "7a540a592f66659532c8c88bc9216873369047021c2e578bc722010758ee6e87"
 }

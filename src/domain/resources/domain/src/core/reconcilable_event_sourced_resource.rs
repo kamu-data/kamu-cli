@@ -9,13 +9,17 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::{AggregateAccess, Projection};
+use internal_error::InternalError;
+use serde::Serialize;
 
 use crate::{
     DeclarativeResource,
     InvariantViolationOf,
     ReconcilableResource,
     ReconcilableResourceEvent,
+    ResourceDescriptorProvider,
     ResourceEventCreated,
+    ResourceEventDeleted,
     ResourceEventMetadataUpdated,
     ResourceEventReconciliationFailed,
     ResourceEventReconciliationStarted,
@@ -24,6 +28,9 @@ use crate::{
     ResourceID,
     ResourceMetadataInput,
     ResourceReconcileError,
+    ResourceSnapshot,
+    ResourceStatusLike,
+    make_typed_resource_snapshot,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +97,35 @@ pub trait ReconcilableEventSourcedResource:
             new_spec,
             new_generation,
         })
+    }
+
+    fn make_deleted_event(
+        &self,
+        now: DateTime<Utc>,
+        tombstone_name: String,
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+        ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
+            event_time: now,
+            resource_id: *self.resource_id(),
+            tombstone_name,
+        })
+    }
+
+    fn make_resource_snapshot(&self) -> Result<ResourceSnapshot, InternalError>
+    where
+        Self: ResourceDescriptorProvider,
+        Self::Spec: Serialize,
+        Self::Status: Serialize + ResourceStatusLike,
+    {
+        make_typed_resource_snapshot(
+            *self.resource_id(),
+            Self::DESCRIPTOR.resource_type,
+            Self::DESCRIPTOR.api_version,
+            self.metadata().clone(),
+            self.spec(),
+            self.status(),
+            self.aggregate().last_stored_event_id(),
+        )
     }
 
     fn make_reconciliation_started_event(

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT resource_id as \"resource_id: uuid::Uuid\"\n            FROM resources\n            WHERE account_id = $1\n              AND resource_kind = $2\n              AND resource_name = $3\n              AND deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "857579074e6f912b8601df4d0a1c37f4aadc66bc9774864ff184a05ce1af2196"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    resource_id as \"resource_id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_kind,\n                    api_version,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_reconciled_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_kind = $2\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
+  "query": "\n            SELECT\n                resource_id as \"resource_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_kind,\n                api_version,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND resource_kind = $2\n              AND deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -86,10 +86,8 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
-        "Int8",
-        "Int8"
+        "Uuid",
+        "Text"
       ]
     },
     "nullable": [
@@ -111,5 +109,5 @@
       true
     ]
   },
-  "hash": "fd11bf2b2760615fd5c6a13bd7ebcb0d8d841b4a51e6a0efe72ef50aa07cd944"
+  "hash": "3449ddd0af1138fb959c624ff65e23d227302bbaf401c62928c58d79344001c4"
 }

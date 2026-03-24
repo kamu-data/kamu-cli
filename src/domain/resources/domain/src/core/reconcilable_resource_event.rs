@@ -20,6 +20,7 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
     Created(ResourceEventCreated<TSpec>),
     MetadataUpdated(ResourceEventMetadataUpdated),
     SpecUpdated(ResourceEventSpecUpdated<TSpec>),
+    Deleted(ResourceEventDeleted),
     ReconciliationStarted(ResourceEventReconciliationStarted),
     ReconciliationSucceeded(ResourceEventReconciliationSucceeded<TSuccess>),
     ReconciliationFailed(ResourceEventReconciliationFailed<TFailureDetails>),
@@ -48,6 +49,13 @@ pub struct ResourceEventSpecUpdated<TSpec> {
     pub resource_id: ResourceID,
     pub new_spec: TSpec,
     pub new_generation: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceEventDeleted {
+    pub event_time: DateTime<Utc>,
+    pub resource_id: ResourceID,
+    pub tombstone_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,6 +91,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
             ReconcilableResourceEvent::Created(_) => "Created",
             ReconcilableResourceEvent::MetadataUpdated(_) => "MetadataUpdated",
             ReconcilableResourceEvent::SpecUpdated(_) => "SpecUpdated",
+            ReconcilableResourceEvent::Deleted(_) => "Deleted",
             ReconcilableResourceEvent::ReconciliationStarted(_) => "ReconciliationStarted",
             ReconcilableResourceEvent::ReconciliationSucceeded(_) => "ReconciliationSucceeded",
             ReconcilableResourceEvent::ReconciliationFailed(_) => "ReconciliationFailed",
@@ -94,6 +103,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
             ReconcilableResourceEvent::Created(e) => &e.resource_id,
             ReconcilableResourceEvent::MetadataUpdated(e) => &e.resource_id,
             ReconcilableResourceEvent::SpecUpdated(e) => &e.resource_id,
+            ReconcilableResourceEvent::Deleted(e) => &e.resource_id,
             ReconcilableResourceEvent::ReconciliationStarted(e) => &e.resource_id,
             ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.resource_id,
             ReconcilableResourceEvent::ReconciliationFailed(e) => &e.resource_id,
@@ -105,6 +115,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
             ReconcilableResourceEvent::Created(e) => e.event_time,
             ReconcilableResourceEvent::MetadataUpdated(e) => e.event_time,
             ReconcilableResourceEvent::SpecUpdated(e) => e.event_time,
+            ReconcilableResourceEvent::Deleted(e) => e.event_time,
             ReconcilableResourceEvent::ReconciliationStarted(e) => e.event_time,
             ReconcilableResourceEvent::ReconciliationSucceeded(e) => e.event_time,
             ReconcilableResourceEvent::ReconciliationFailed(e) => e.event_time,
@@ -129,6 +140,11 @@ impl_enum_variant!(
     ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::SpecUpdated(
         ResourceEventSpecUpdated<TSpec>
     )
+);
+impl_enum_variant!(
+    ReconcilableResourceEvent < TSpec,
+    TSuccess,
+    TFailureDetails > ::Deleted(ResourceEventDeleted)
 );
 impl_enum_variant!(
     ReconcilableResourceEvent < TSpec,
