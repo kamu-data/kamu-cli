@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use datafusion::execution::object_store::ObjectStoreRegistry;
 use kamu::*;
+use object_store::ObjectStoreExt as _;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use url::Url;

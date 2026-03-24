@@ -53,9 +53,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "52", default-features = false, features = [
-    "nested_expressions",
-] }
+datafusion = { version = "53", default-features = false, features = ["nested_expressions"] }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
@@ -96,7 +94,7 @@ kamu-search-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 
-arrow = { version = "57", default-features = false }
+arrow = { version = "58", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.14"

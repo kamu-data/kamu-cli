@@ -48,6 +48,8 @@ impl ReaderJson {
         })
     }
 
+    // TODO: Since v53 datafusion supports array JSON documents, so we could skip
+    // the conversion in some cases
     #[tracing::instrument(level = "info", name = "ReaderJson::convert_to_ndjson", skip_all)]
     fn convert_to_ndjson_blocking(
         in_path: &Path,

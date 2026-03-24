@@ -160,7 +160,7 @@ read_input = "0.8"                                                # Basic user i
 webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "57", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "58", features = ["flight-sql-experimental"] }
 async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
 axum = { version = "0.8", features = ["ws"] }
@@ -221,14 +221,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "52", default-features = false, features = [
-    "crypto_expressions",
-    "encoding_expressions",
-    "parquet",
-    "regex_expressions",
-    "unicode_expressions",
-    "compression",
-] }
+datafusion = { version = "53", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
 dill = { version = "0.15", default-features = false }
 dirs = "6"
 fs_extra = "1.3"

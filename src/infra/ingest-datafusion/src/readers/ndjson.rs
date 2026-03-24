@@ -65,7 +65,7 @@ impl Reader for ReaderNdJson {
             Some(v) => Err(unsupported!("Unsupported NdJson.timestampFormat: {}", v)),
         }?;
 
-        let options = NdJsonReadOptions {
+        let options = JsonReadOptions {
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
             schema: self.schema.as_deref(),
@@ -76,6 +76,7 @@ impl Reader for ReaderNdJson {
             file_compression_type: FileCompressionType::UNCOMPRESSED,
             file_sort_order: Vec::new(),
             infinite: false,
+            newline_delimited: true,
         };
 
         let df = self

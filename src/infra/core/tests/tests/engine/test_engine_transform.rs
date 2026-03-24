@@ -126,7 +126,7 @@ impl DatasetHelper {
             record_batch.schema(),
             Some(
                 WriterProperties::builder()
-                    .set_max_row_group_size(1)
+                    .set_max_row_group_row_count(Some(1))
                     .set_column_dictionary_enabled(
                         ColumnPath::new(vec!["city".to_string(), "population_x10".to_string()]),
                         true,

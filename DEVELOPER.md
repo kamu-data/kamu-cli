@@ -3,6 +3,7 @@
   - [Configure Podman as Default Runtime (Recommended)](#configure-podman-as-default-runtime-recommended)
   - [Build with Databases](#build-with-databases)
   - [Database migrations](#database-migrations)
+  - [Working with Elasticsearch](#working-with-elasticsearch)
   - [Run Linters](#run-linters)
   - [Run Tests](#run-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
@@ -487,6 +488,7 @@ The usual upgrade procedure looks like this:
      -p arrow-schema \
      -p object_store \
      -p datafusion \
+     -p datafusion-common \
      -p datafusion-functions-json \
      -p datafusion-odata \
      -p datafusion-ethers \

@@ -205,7 +205,7 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::HugeInt
         | SqlDataType::UHugeInt
         | SqlDataType::UBigInt
-        | SqlDataType::TimestampNtz
+        | SqlDataType::TimestampNtz(_)
         | SqlDataType::TsVector
         | SqlDataType::TsQuery => {
             return Err(UnsupportedSchema::new(format!(

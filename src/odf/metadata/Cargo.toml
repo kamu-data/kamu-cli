@@ -80,9 +80,7 @@ tonic = { version = "0.14", default-features = false, features = [
 tonic-prost = { version = "0.14", default-features = false }
 
 # Optional
-arrow = { optional = true, version = "57", default-features = false, features = [
-    "ipc",
-] }
+arrow = { optional = true, version = "58", default-features = false, features = ["ipc"] }
 rand = { optional = true, version = "0.9", default-features = false }
 schemars = { optional = true, version = "1", default-features = false, features = [
     "derive",

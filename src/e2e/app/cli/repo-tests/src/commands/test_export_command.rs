@@ -12,7 +12,7 @@ use std::fs::read_dir;
 use datafusion::arrow::array::{Int64Array, RecordBatch, downcast_array};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
-use datafusion::execution::options::{CsvReadOptions, NdJsonReadOptions, ParquetReadOptions};
+use datafusion::execution::options::{CsvReadOptions, JsonReadOptions, ParquetReadOptions};
 use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -293,7 +293,7 @@ pub async fn test_export_to_json_file(kamu: KamuCliPuppet) {
     );
 
     let df = create_ctx()
-        .read_json(output_path.to_str().unwrap(), NdJsonReadOptions::default())
+        .read_json(output_path.to_str().unwrap(), JsonReadOptions::default())
         .await
         .unwrap();
     let batches = df.collect().await.unwrap();
@@ -400,7 +400,7 @@ pub async fn test_export_to_json_files(kamu: KamuCliPuppet) {
     let mut start_offset = 0;
     for file in files {
         let df = create_ctx()
-            .read_json(file.to_str().unwrap(), NdJsonReadOptions::default())
+            .read_json(file.to_str().unwrap(), JsonReadOptions::default())
             .await
             .unwrap();
 

@@ -25,7 +25,7 @@ doctest = false
 kamu-core = { workspace = true }
 odf = { workspace = true, default-features = false }
 
-datafusion = { version = "52", default-features = false }
+datafusion = { version = "53", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt"] }
 
 

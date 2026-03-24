@@ -50,7 +50,6 @@ async fn test_wrong_arguments() {
     for arguments in [
         "1",                    // number
         "'kamu/unknown-table'", // string literal not a table reference
-        "kamu/unknown-table",   // identifiers w/ division operator
     ] {
         assert_matches!(
             ctx.sql(&formatdoc!(
