@@ -119,4 +119,7 @@ ignore = [
     # Unsound (lru)
     # https://rustsec.org/advisories/RUSTSEC-2026-0002
     "RUSTSEC-2026-0002",
+    # Vulnerability: CRLs not considered authoritative by Distribution Point due to faulty matching logic
+    # https://rustsec.org/advisories/RUSTSEC-2026-0049
+    "RUSTSEC-2026-0049",
 ]
