@@ -17,7 +17,7 @@ use event_sourcing::{
     InMemoryEventStore,
     SaveEventsError,
 };
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt, future};
 use internal_error::InternalError;
 use kamu_resources::{
     ResourceRawEvent,
@@ -94,6 +94,45 @@ impl EventStore<ResourceRawEventProjection> for InMemoryRawResourceEventStore {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceRawEventStore for InMemoryRawResourceEventStore {}
+#[async_trait::async_trait]
+impl ResourceRawEventStore for InMemoryRawResourceEventStore {
+    async fn total_events_stored_by_kind(&self, kind: &str) -> Result<usize, InternalError> {
+        let mut events = self.get_all_events(GetEventsOpts::default());
+        let mut count = 0;
+
+        while let Some(event) = events.next().await {
+            let (_, event) = match event {
+                Ok(event) => event,
+                Err(err) => match err {
+                    event_sourcing::GetEventsError::Internal(err) => return Err(err),
+                },
+            };
+
+            if event.query.kind == kind {
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
+    fn get_all_events_by_kind(
+        &self,
+        kind: &str,
+        opts: GetEventsOpts,
+    ) -> EventStream<'_, ResourceRawEvent> {
+        let kind = kind.to_string();
+
+        Box::pin(self.get_all_events(opts).filter_map(move |event| {
+            let kind = kind.clone();
+
+            future::ready(match event {
+                Ok((event_id, event)) if event.query.kind == kind => Some(Ok((event_id, event))),
+                Ok(_) => None,
+                Err(err) => Some(Err(err)),
+            })
+        }))
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

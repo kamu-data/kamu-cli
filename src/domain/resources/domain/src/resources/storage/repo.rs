@@ -7,26 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use event_sourcing::EventStore;
-use internal_error::InternalError;
 
-use crate::{ResourceID, ResourceIDStream, ResourceName, StorageState};
+use crate::StorageState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait StorageEventStore: EventStore<StorageState> {
-    async fn new_storage_id(&self) -> Result<ResourceID, InternalError>;
-
-    async fn get_storage_id_by_name(
-        &self,
-        name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError>;
-
-    fn list_storages(&self, pagination: PaginationOpts) -> ResourceIDStream<'_>;
-
-    async fn get_count_storages(&self) -> Result<usize, InternalError>;
-}
+pub trait StorageEventStore: EventStore<StorageState> {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

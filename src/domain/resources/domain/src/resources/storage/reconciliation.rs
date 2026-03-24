@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     ReconcilableEventSourcedResource,
@@ -22,7 +23,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StorageReconcileSuccess {
     pub provider_kind: StorageProviderKind,
     pub references: StorageReferenceStatus,

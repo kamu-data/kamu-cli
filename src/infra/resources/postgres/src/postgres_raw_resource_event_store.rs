@@ -52,8 +52,8 @@ impl PostgresRawResourceEventStore {
                     event_type,
                     event_payload
                 )
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING event_id
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING event_id
                 "#,
                 query.id,
                 query.kind,
@@ -80,8 +80,8 @@ impl PostgresRawResourceEventStore {
             r#"
             SELECT event_id
             FROM resource_events
-            WHERE resource_id = $1
-              AND resource_kind = $2
+            WHERE
+                resource_id = $1 AND resource_kind = $2
             ORDER BY event_id DESC
             LIMIT 1
             "#,
@@ -107,8 +107,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
 
         let events_count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(*) as "count!"
-            FROM resource_events
+            SELECT COUNT(*) as "count!" FROM resource_events
             "#
         )
         .fetch_one(connection_mut)
@@ -240,6 +239,78 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceRawEventStore for PostgresRawResourceEventStore {}
+#[async_trait::async_trait]
+impl ResourceRawEventStore for PostgresRawResourceEventStore {
+    async fn total_events_stored_by_kind(&self, kind: &str) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let events_count = sqlx::query_scalar!(
+            r#"
+            SELECT
+                COUNT(*) as "count!"
+            FROM resource_events
+            WHERE resource_kind = $1
+            "#,
+            kind,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(events_count).unwrap())
+    }
+
+    fn get_all_events_by_kind(
+        &self,
+        kind: &str,
+        opts: GetEventsOpts,
+    ) -> EventStream<'_, ResourceRawEvent> {
+        let kind = kind.to_string();
+        let maybe_from_id = opts.from.map(EventID::into_inner);
+        let maybe_to_id = opts.to.map(EventID::into_inner);
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let mut rows = sqlx::query!(
+                r#"
+                SELECT
+                    event_id,
+                    resource_id,
+                    resource_kind as "kind!",
+                    event_time,
+                    event_type,
+                    event_payload as "payload!"
+                FROM resource_events
+                WHERE resource_kind = $1
+                  AND ($2::bigint IS NULL OR event_id > $2)
+                  AND ($3::bigint IS NULL OR event_id <= $3)
+                ORDER BY event_id
+                "#,
+                kind,
+                maybe_from_id,
+                maybe_to_id,
+            )
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some(row) = rows.try_next().await? {
+                let event_id = EventID::new(row.event_id);
+                yield Ok((event_id, ResourceRawEvent {
+                    event_id,
+                    query: ResourceRawEventQuery {
+                        kind: row.kind,
+                        id: row.resource_id,
+                    },
+                    event_time: row.event_time,
+                    event_type: row.event_type,
+                    payload: row.payload,
+                }));
+            }
+        })
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

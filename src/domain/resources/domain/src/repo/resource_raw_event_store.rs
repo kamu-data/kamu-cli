@@ -7,14 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{EventStore, Projection, ProjectionError, ProjectionEvent};
+use event_sourcing::{
+    EventStore,
+    EventStream,
+    GetEventsOpts,
+    Projection,
+    ProjectionError,
+    ProjectionEvent,
+};
+use internal_error::InternalError;
 
 use crate::{ResourceRawEvent, ResourceRawEventQuery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceRawEventStore: EventStore<ResourceRawEventProjection> {}
+pub trait ResourceRawEventStore: EventStore<ResourceRawEventProjection> {
+    async fn total_events_stored_by_kind(&self, kind: &str) -> Result<usize, InternalError>;
+
+    fn get_all_events_by_kind(
+        &self,
+        kind: &str,
+        opts: GetEventsOpts,
+    ) -> EventStream<'_, ResourceRawEvent>;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

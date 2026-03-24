@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResource,
@@ -38,7 +40,7 @@ impl ReconcilableEventSourcedResource for VariableSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VariableSetReconcileSuccess {
     pub stats: VariableSetStats,
 }

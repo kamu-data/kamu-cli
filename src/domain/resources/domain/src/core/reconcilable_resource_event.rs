@@ -78,6 +78,17 @@ pub struct ResourceEventReconciliationFailed<TFailureDetails> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
+    pub fn typename(&self) -> &'static str {
+        match self {
+            ReconcilableResourceEvent::Created(_) => "Created",
+            ReconcilableResourceEvent::MetadataUpdated(_) => "MetadataUpdated",
+            ReconcilableResourceEvent::SpecUpdated(_) => "SpecUpdated",
+            ReconcilableResourceEvent::ReconciliationStarted(_) => "ReconciliationStarted",
+            ReconcilableResourceEvent::ReconciliationSucceeded(_) => "ReconciliationSucceeded",
+            ReconcilableResourceEvent::ReconciliationFailed(_) => "ReconciliationFailed",
+        }
+    }
+
     pub fn resource_id(&self) -> &ResourceID {
         match self {
             ReconcilableResourceEvent::Created(e) => &e.resource_id,
