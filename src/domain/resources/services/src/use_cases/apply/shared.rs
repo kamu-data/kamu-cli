@@ -22,14 +22,13 @@ use crate::domain::{
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
     ResourceID,
+    ResourceLoadError,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
-    ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceQueryService,
     ResourceStatusLike,
     ResourceValidateSpec,
-    TypedResourceQueryError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +57,7 @@ where
     resource_query_service
         .find_existing_id_by_name(resource_id, metadata)
         .await
-        .map_err(ApplyResourceUseCaseError::SnapshotSyncFailed)
+        .map_err(ApplyResourceUseCaseError::Internal)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,31 +69,10 @@ pub(crate) async fn ensure_resource_id_matches_type<R>(
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
 {
-    match resource_query_service
+    resource_query_service
         .ensure_resource_id_matches_type(resource_id)
         .await
-    {
-        Ok(()) => Ok(()),
-        Err(TypedResourceQueryError::NotFound(resource_id)) => {
-            Err(ApplyResourceUseCaseError::ResourceIdNotFound(resource_id))
-        }
-        Err(TypedResourceQueryError::TypeMismatch {
-            resource_id,
-            expected_kind,
-            expected_api_version,
-            actual_kind,
-            actual_api_version,
-        }) => Err(ApplyResourceUseCaseError::ResourceTypeMismatch {
-            resource_id,
-            expected_kind,
-            expected_api_version,
-            actual_kind,
-            actual_api_version,
-        }),
-        Err(
-            TypedResourceQueryError::Internal(err) | TypedResourceQueryError::DecodeFailed(err),
-        ) => Err(ApplyResourceUseCaseError::SnapshotSyncFailed(err)),
-    }
+        .map_err(ApplyResourceUseCaseError::from)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,26 +94,15 @@ where
     let resource_id = resource_query_service
         .allocate_id()
         .await
-        .map_err(ApplyResourceUseCaseError::SnapshotSyncFailed)?;
+        .map_err(ApplyResourceUseCaseError::Internal)?;
     let mut resource =
         <R as ReconcilableResource>::try_create(now, resource_id, params.metadata, params.spec)
             .map_err(ApplyResourceUseCaseError::Lifecycle)?;
 
-    match resource_persistence_service.create(&mut resource).await {
-        Ok(()) => {}
-        Err(ResourcePersistenceError::Duplicate(err)) => {
-            return Err(ApplyResourceUseCaseError::Duplicate(err));
-        }
-        Err(ResourcePersistenceError::ConcurrentModification(err)) => {
-            return Err(ApplyResourceUseCaseError::ConcurrentModification(err));
-        }
-        Err(ResourcePersistenceError::SaveFailed(err)) => {
-            return Err(ApplyResourceUseCaseError::SaveFailed(err));
-        }
-        Err(ResourcePersistenceError::Internal(err)) => {
-            return Err(ApplyResourceUseCaseError::SnapshotSyncFailed(err));
-        }
-    }
+    resource_persistence_service
+        .create(&mut resource)
+        .await
+        .map_err(ApplyResourceUseCaseError::from)?;
 
     Ok(make_result(resource, ApplyResourceOutcome::Created))
 }
@@ -165,21 +132,10 @@ where
         return Ok(make_result(resource, ApplyResourceOutcome::Updated));
     }
 
-    match resource_persistence_service.save(&mut resource).await {
-        Ok(()) => {}
-        Err(ResourcePersistenceError::Duplicate(err)) => {
-            return Err(ApplyResourceUseCaseError::Duplicate(err));
-        }
-        Err(ResourcePersistenceError::ConcurrentModification(err)) => {
-            return Err(ApplyResourceUseCaseError::ConcurrentModification(err));
-        }
-        Err(ResourcePersistenceError::SaveFailed(err)) => {
-            return Err(ApplyResourceUseCaseError::SaveFailed(err));
-        }
-        Err(ResourcePersistenceError::Internal(err)) => {
-            return Err(ApplyResourceUseCaseError::SnapshotSyncFailed(err));
-        }
-    }
+    resource_persistence_service
+        .save(&mut resource)
+        .await
+        .map_err(ApplyResourceUseCaseError::from)?;
 
     Ok(make_result(resource, ApplyResourceOutcome::Updated))
 }
@@ -225,6 +181,7 @@ where
     let resource = resource_aggregate_loader
         .load(&resource_id)
         .await
+        .map_err(ResourceLoadError)
         .map_err(ApplyResourceUseCaseError::LoadFailed)?;
 
     apply_update_resource::<R>(resource_persistence_service, resource, params, now).await

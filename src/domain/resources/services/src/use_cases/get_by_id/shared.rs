@@ -34,12 +34,7 @@ macro_rules! declare_get_resource_by_id_use_case {
                 self.resource_query_service
                     .get_state_by_id(account_id, id)
                     .await
-                    .map_err(|err| match err {
-                        $crate::domain::TypedResourceQueryError::NotFound(_) => {
-                            $crate::domain::GetResourceByIdError::NotFound
-                        }
-                        err => $crate::domain::GetResourceByIdError::Internal(err.into_internal()),
-                    })
+                    .map_err($crate::domain::GetResourceByIdError::from)
             }
         }
     };

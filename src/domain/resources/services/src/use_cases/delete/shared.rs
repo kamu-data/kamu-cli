@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -46,18 +46,12 @@ where
         .await
     {
         Ok(()) => Ok(()),
-        Err(ResourcePersistenceError::Duplicate(err)) => {
-            Err(DeleteResourcesError::Internal(InternalError::new(format!(
-                "Unexpected duplicate resource state while deleting resource {resource_id}: {err}"
-            ))))
+        Err(ResourcePersistenceError::Duplicate(_)) => {
+            unreachable!("delete() must not expose duplicate persistence errors")
         }
         Err(ResourcePersistenceError::ConcurrentModification(err)) => {
             Err(DeleteResourcesError::ConcurrentModification(err))
         }
-        Err(ResourcePersistenceError::SaveFailed(err)) => Err(DeleteResourcesError::Internal(
-            err.int_err()
-                .with_context(format!("Failed to save deleted resource {resource_id}")),
-        )),
         Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
             err.with_context(format!("Failed to persist deleted resource {resource_id}")),
         )),
@@ -77,6 +71,7 @@ where
     resource_query_service
         .find_owned_snapshot(account_id, resource_id)
         .await
+        .map_err(DeleteResourcesError::from)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,9 +93,11 @@ where
         .load(resource_id)
         .await
         .map_err(|err| {
-            DeleteResourcesError::Internal(InternalError::new(format!(
-                "Failed to load resource {resource_id}: {err}"
-            )))
+            DeleteResourcesError::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context(format!("Failed to load resource {resource_id}")),
+            )
         })?;
 
     delete_and_sync_resource::<R>(resource_persistence_service, time_source, resource).await

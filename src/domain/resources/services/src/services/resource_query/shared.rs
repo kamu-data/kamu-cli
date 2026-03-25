@@ -8,18 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::StreamExt;
 
 use crate::domain::{
     DeclarativeResource,
-    DeleteResourcesError,
+    FindOwnedResourceError,
     ResourceDescriptorProvider,
     ResourceID,
     ResourceMetadataInput,
+    ResourceNotFoundError,
+    ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceTypeMismatchError,
     TypedResourceQueryError,
 };
 
@@ -35,18 +38,19 @@ where
     let snapshot = resource_repository
         .find_resource_snapshot_by_id(resource_id)
         .await?
-        .ok_or(TypedResourceQueryError::NotFound(*resource_id))?;
+        .ok_or(ResourceNotFoundError(*resource_id))?;
 
     if snapshot.kind != R::DESCRIPTOR.resource_type
         || snapshot.api_version != R::DESCRIPTOR.api_version
     {
-        return Err(TypedResourceQueryError::TypeMismatch {
-            resource_id: *resource_id,
-            expected_kind: R::DESCRIPTOR.resource_type.to_string(),
-            expected_api_version: R::DESCRIPTOR.api_version.to_string(),
-            actual_kind: snapshot.kind,
-            actual_api_version: snapshot.api_version,
-        });
+        return Err(ResourceTypeMismatchError::new(
+            *resource_id,
+            R::DESCRIPTOR.resource_type.to_string(),
+            R::DESCRIPTOR.api_version.to_string(),
+            snapshot.kind,
+            snapshot.api_version,
+        )
+        .into());
     }
 
     Ok(snapshot)
@@ -75,13 +79,14 @@ fn type_mismatch<R>(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryE
 where
     R: ResourceDescriptorProvider,
 {
-    TypedResourceQueryError::TypeMismatch {
-        resource_id: resource_snapshot.resource_id,
-        expected_kind: R::DESCRIPTOR.resource_type.to_string(),
-        expected_api_version: R::DESCRIPTOR.api_version.to_string(),
-        actual_kind: resource_snapshot.kind.clone(),
-        actual_api_version: resource_snapshot.api_version.clone(),
-    }
+    ResourceTypeMismatchError::new(
+        resource_snapshot.resource_id,
+        R::DESCRIPTOR.resource_type.to_string(),
+        R::DESCRIPTOR.api_version.to_string(),
+        resource_snapshot.kind.clone(),
+        resource_snapshot.api_version.clone(),
+    )
+    .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,7 +119,7 @@ pub(crate) async fn find_owned_snapshot<R>(
     resource_repository: &dyn ResourceRepository,
     account_id: &odf::AccountID,
     resource_id: ResourceID,
-) -> Result<Option<ResourceSnapshot>, DeleteResourcesError>
+) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>
 where
     R: ResourceDescriptorProvider,
 {
@@ -125,10 +130,14 @@ where
     };
 
     if resource_snapshot.metadata.account != *account_id {
-        return Err(DeleteResourcesError::not_enough_permissions(
-            resource_snapshot.resource_id,
-            R::DESCRIPTOR.resource_type,
-        ));
+        return Err(odf::AccessError::Unauthorized(
+            ResourceNotOwnedByAccountError {
+                resource_id: resource_snapshot.resource_id,
+                resource_type: R::DESCRIPTOR.resource_type,
+            }
+            .into(),
+        )
+        .into());
     }
 
     Ok(Some(resource_snapshot))
@@ -147,11 +156,11 @@ where
     let Some(resource_snapshot) =
         get_snapshot_by_query::<R>(resource_repository, resource_id).await?
     else {
-        return Err(TypedResourceQueryError::NotFound(*resource_id));
+        return Err(ResourceNotFoundError(*resource_id).into());
     };
 
     if resource_snapshot.metadata.account != account_id {
-        return Err(TypedResourceQueryError::NotFound(*resource_id));
+        return Err(ResourceNotFoundError(*resource_id).into());
     }
 
     if resource_snapshot.kind != R::DESCRIPTOR.resource_type
@@ -160,7 +169,7 @@ where
         return Err(type_mismatch::<R>(&resource_snapshot));
     }
 
-    R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::DecodeFailed)
+    R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::Internal)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,7 +178,7 @@ pub(crate) async fn list_states_by_kind<R>(
     resource_repository: &dyn ResourceRepository,
     account_id: odf::AccountID,
     pagination: PaginationOpts,
-) -> Result<Vec<R::ResourceState>, TypedResourceQueryError>
+) -> Result<Vec<R::ResourceState>, InternalError>
 where
     R: DeclarativeResource + ResourceDescriptorProvider,
 {
@@ -186,12 +195,10 @@ where
         if resource_snapshot.kind != R::DESCRIPTOR.resource_type
             || resource_snapshot.api_version != R::DESCRIPTOR.api_version
         {
-            return Err(type_mismatch::<R>(&resource_snapshot));
+            return Err(type_mismatch::<R>(&resource_snapshot).int_err());
         }
 
-        resource_states.push(
-            R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::DecodeFailed)?,
-        );
+        resource_states.push(R::decode_snapshot(resource_snapshot)?);
     }
 
     Ok(resource_states)
@@ -249,7 +256,7 @@ macro_rules! declare_resource_query_service {
                 resource_id: $crate::domain::ResourceID,
             ) -> Result<
                 Option<$crate::domain::ResourceSnapshot>,
-                $crate::domain::DeleteResourcesError,
+                $crate::domain::FindOwnedResourceError,
             > {
                 super::shared::find_owned_snapshot::<$resource>(
                     self.resource_repository.as_ref(),
@@ -281,7 +288,7 @@ macro_rules! declare_resource_query_service {
                 pagination: database_common::PaginationOpts,
             ) -> Result<
                 Vec<<$resource as $crate::domain::DeclarativeResource>::ResourceState>,
-                $crate::domain::TypedResourceQueryError,
+                internal_error::InternalError,
             > {
                 super::shared::list_states_by_kind::<$resource>(
                     self.resource_repository.as_ref(),

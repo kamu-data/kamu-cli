@@ -7,10 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{ConcurrentModificationError, LoadError, SaveError};
-use internal_error::InternalError;
+use event_sourcing::ConcurrentModificationError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{ReconcilableEventSourcedResource, ResourceID};
+use crate::{
+    ReconcilableEventSourcedResource,
+    ResourceID,
+    ResourceLoadError,
+    ResourcePersistenceError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,20 +28,36 @@ pub trait ReconcileResourceUseCase<R: ReconcilableEventSourcedResource>: Send + 
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReconcileResourceUseCaseError<R: ReconcilableEventSourcedResource> {
-    #[error("Resource with the specified identity failed to load. Reason: {0}")]
-    LoadFailed(LoadError<R::ResourceState>),
+    #[error(transparent)]
+    LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
 
-    #[error("Resource with the specified identity failed to save. Reason: {0}")]
-    SaveFailed(SaveError),
-
     #[error(transparent)]
-    SnapshotSyncFailed(#[from] InternalError),
+    Internal(#[from] InternalError),
 
     #[error(transparent)]
     Lifecycle(R::LifecycleError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<R> From<ResourcePersistenceError> for ReconcileResourceUseCaseError<R>
+where
+    R: ReconcilableEventSourcedResource,
+{
+    fn from(err: ResourcePersistenceError) -> Self {
+        match err {
+            ResourcePersistenceError::Duplicate(err) => Self::Internal(err.int_err().with_context(
+                "Unexpected duplicate resource state while reconciling existing resource",
+            )),
+            ResourcePersistenceError::ConcurrentModification(err) => {
+                Self::ConcurrentModification(err)
+            }
+            ResourcePersistenceError::Internal(err) => Self::Internal(err),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

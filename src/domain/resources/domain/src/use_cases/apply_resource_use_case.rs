@@ -7,10 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{ConcurrentModificationError, LoadError, SaveError};
+use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 
-use crate::{DeclarativeResource, ReconcilableEventSourcedResource, ResourceID, ResourceSnapshot};
+use crate::{
+    DeclarativeResource,
+    ReconcilableEventSourcedResource,
+    ResourceID,
+    ResourceLoadError,
+    ResourceNotFoundError,
+    ResourcePersistenceError,
+    ResourceSnapshot,
+    ResourceTypeMismatchError,
+    TypedResourceQueryError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,23 +60,14 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
 
 #[derive(thiserror::Error, Debug)]
 pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
-    #[error("Resource with the specified identity failed to load. Reason: {0}")]
-    LoadFailed(LoadError<R::ResourceState>),
+    #[error(transparent)]
+    LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
-    #[error("Resource with id {0} was not found")]
-    ResourceIdNotFound(ResourceID),
+    #[error(transparent)]
+    ResourceIdNotFound(#[from] ResourceNotFoundError),
 
-    #[error(
-        "Resource id {resource_id} refers to {actual_kind}/{actual_api_version}, expected \
-         {expected_kind}/{expected_api_version}"
-    )]
-    ResourceTypeMismatch {
-        resource_id: ResourceID,
-        expected_kind: String,
-        expected_api_version: String,
-        actual_kind: String,
-        actual_api_version: String,
-    },
+    #[error(transparent)]
+    ResourceTypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
     Duplicate(crate::ResourceDuplicateError),
@@ -74,11 +75,8 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
 
-    #[error("Resource with the specified identity failed to save. Reason: {0}")]
-    SaveFailed(SaveError),
-
-    #[error("Failed to synchronize resource snapshot")]
-    SnapshotSyncFailed(#[source] InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 
     #[error(transparent)]
     Lifecycle(R::LifecycleError),
@@ -95,24 +93,43 @@ where
         expected: &crate::ResourceDescriptor,
         actual: &ResourceSnapshot,
     ) -> Self {
-        Self::ResourceTypeMismatch {
+        Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
             resource_id,
-            expected_kind: expected.resource_type.to_string(),
-            expected_api_version: expected.api_version.to_string(),
-            actual_kind: actual.kind.clone(),
-            actual_api_version: actual.api_version.clone(),
+            expected,
+            actual,
+        ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<R> From<ResourcePersistenceError> for ApplyResourceUseCaseError<R>
+where
+    R: ReconcilableEventSourcedResource,
+{
+    fn from(err: ResourcePersistenceError) -> Self {
+        match err {
+            ResourcePersistenceError::Duplicate(err) => Self::Duplicate(err),
+            ResourcePersistenceError::ConcurrentModification(err) => {
+                Self::ConcurrentModification(err)
+            }
+            ResourcePersistenceError::Internal(err) => Self::Internal(err),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<R> From<InternalError> for ApplyResourceUseCaseError<R>
+impl<R> From<TypedResourceQueryError> for ApplyResourceUseCaseError<R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    fn from(err: InternalError) -> Self {
-        Self::SnapshotSyncFailed(err)
+    fn from(err: TypedResourceQueryError) -> Self {
+        match err {
+            TypedResourceQueryError::NotFound(err) => Self::ResourceIdNotFound(err),
+            TypedResourceQueryError::TypeMismatch(err) => Self::ResourceTypeMismatch(err),
+            TypedResourceQueryError::Internal(err) => Self::Internal(err),
+        }
     }
 }
 

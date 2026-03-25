@@ -10,7 +10,14 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::{DeclarativeResource, ResourceID, ResourceMetadataInput, ResourceSnapshot};
+use crate::{
+    DeclarativeResource,
+    ResourceID,
+    ResourceMetadataInput,
+    ResourceNotFoundError,
+    ResourceSnapshot,
+    ResourceTypeMismatchError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +40,7 @@ pub trait ResourceQueryService<R: DeclarativeResource>: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         resource_id: ResourceID,
-    ) -> Result<Option<ResourceSnapshot>, crate::DeleteResourcesError>;
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
     async fn get_state_by_id(
         &self,
@@ -45,44 +52,36 @@ pub trait ResourceQueryService<R: DeclarativeResource>: Send + Sync {
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,
-    ) -> Result<Vec<R::ResourceState>, TypedResourceQueryError>;
+    ) -> Result<Vec<R::ResourceState>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum FindOwnedResourceError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] internal_error::InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
 pub enum TypedResourceQueryError {
-    #[error("Resource with id {0} was not found")]
-    NotFound(ResourceID),
+    #[error(transparent)]
+    NotFound(#[from] ResourceNotFoundError),
 
-    #[error(
-        "Resource id {resource_id} refers to {actual_kind}/{actual_api_version}, expected \
-         {expected_kind}/{expected_api_version}"
-    )]
-    TypeMismatch {
-        resource_id: ResourceID,
-        expected_kind: String,
-        expected_api_version: String,
-        actual_kind: String,
-        actual_api_version: String,
-    },
-
-    #[error("Failed to decode resource snapshot")]
-    DecodeFailed(InternalError),
+    #[error(transparent)]
+    TypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl TypedResourceQueryError {
-    pub fn into_internal(self) -> InternalError {
-        match self {
-            Self::NotFound(_) | Self::TypeMismatch { .. } => InternalError::new(self),
-            Self::DecodeFailed(err) | Self::Internal(err) => err,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

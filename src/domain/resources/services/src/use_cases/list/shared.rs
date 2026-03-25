@@ -34,7 +34,6 @@ macro_rules! declare_list_resources_by_kind_use_case {
                 self.resource_query_service
                     .list_states_by_kind(account_id, pagination)
                     .await
-                    .map_err($crate::domain::TypedResourceQueryError::into_internal)
             }
         }
     };

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::{ConcurrentModificationError, SaveError};
+use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 
 use crate::{ReconcilableEventSourcedResource, ResourceDuplicateError};
@@ -37,9 +37,6 @@ pub enum ResourcePersistenceError {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
-
-    #[error(transparent)]
-    SaveFailed(SaveError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

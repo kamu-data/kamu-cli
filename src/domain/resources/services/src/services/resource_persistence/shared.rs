@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::{EventID, SaveError};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use serde::Serialize;
 
 use crate::domain::{
@@ -82,7 +82,7 @@ where
             return Err(ResourcePersistenceError::ConcurrentModification(err));
         }
         Err(err) => {
-            return Err(ResourcePersistenceError::SaveFailed(err));
+            return Err(ResourcePersistenceError::Internal(err.int_err()));
         }
     }
 
@@ -110,7 +110,7 @@ where
             return Err(ResourcePersistenceError::ConcurrentModification(err));
         }
         Err(err) => {
-            return Err(ResourcePersistenceError::SaveFailed(err));
+            return Err(ResourcePersistenceError::Internal(err.int_err()));
         }
     }
 
@@ -135,13 +135,22 @@ where
     let tombstone_name = format!("deleted-{}", resource.resource_id());
 
     resource.try_delete(now, tombstone_name).map_err(|err| {
-        ResourcePersistenceError::Internal(InternalError::new(format!(
-            "Failed to delete resource {}: {err}",
+        ResourcePersistenceError::Internal(format!("{err}").int_err().with_context(format!(
+            "Failed to delete resource {}",
             resource.resource_id()
         )))
     })?;
 
-    save_resource(resource_repository, event_store, resource).await
+    match save_resource(resource_repository, event_store, resource).await {
+        Ok(()) => Ok(()),
+        Err(ResourcePersistenceError::Duplicate(err)) => Err(ResourcePersistenceError::Internal(
+            format!("{err}").int_err().with_context(format!(
+                "Unexpected duplicate resource state while deleting resource {}",
+                resource.resource_id()
+            )),
+        )),
+        Err(err) => Err(err),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

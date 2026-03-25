@@ -49,6 +49,14 @@ cargo nextest run -E 'test(test_name_here)'
 ### Repositories
 - Keep repository layers simple when possible; prefer domain/service-level complex algorithms rather than repositories unless storage-specific behavior is the actual concern.
 
+### Error Handling
+- Prefer operation-specific error types and keep impossible variants out of operation-specific APIs when practical.
+- When translation is structural only, implement `From` near the error type definition and keep service/use-case code at a higher level.
+- Reuse shared domain error types for repeated concepts such as resource not found, type mismatch, and load failures.
+- Do not use catch-all match arms for error conversion; list variants explicitly.
+- Prefer plain `InternalError` for generic infrastructure/read failures; only introduce named wrappers when the distinction is meaningful at the boundary.
+- Prefer `.int_err()` plus `.with_context(...)` over ad hoc `InternalError::new(format!(...))` when converting errors.
+
 
 ## Scope
 

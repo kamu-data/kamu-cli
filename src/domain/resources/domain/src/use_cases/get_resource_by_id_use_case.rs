@@ -9,7 +9,13 @@
 
 use internal_error::InternalError;
 
-use crate::{DeclarativeResource, ResourceID};
+use crate::{
+    DeclarativeResource,
+    ResourceID,
+    ResourceNotFoundError,
+    ResourceTypeMismatchError,
+    TypedResourceQueryError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,11 +32,26 @@ pub trait GetResourceByIdUseCase<R: DeclarativeResource>: Send + Sync {
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetResourceByIdError {
-    #[error("Resource with the specified identity was not found")]
-    NotFound,
+    #[error(transparent)]
+    NotFound(#[from] ResourceNotFoundError),
+
+    #[error(transparent)]
+    TypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<TypedResourceQueryError> for GetResourceByIdError {
+    fn from(err: TypedResourceQueryError) -> Self {
+        match err {
+            TypedResourceQueryError::NotFound(err) => Self::NotFound(err),
+            TypedResourceQueryError::TypeMismatch(err) => Self::TypeMismatch(err),
+            TypedResourceQueryError::Internal(err) => Self::Internal(err),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

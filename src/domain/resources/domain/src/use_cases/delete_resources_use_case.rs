@@ -11,7 +11,7 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DeclarativeResource, ResourceID};
+use crate::{DeclarativeResource, FindOwnedResourceError, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,25 +44,13 @@ pub enum DeleteResourcesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl DeleteResourcesError {
-    pub fn not_enough_permissions(resource_id: ResourceID, resource_type: &'static str) -> Self {
-        Self::Access(odf::AccessError::Unauthorized(
-            DeleteResourcesNotEnoughPermissionsError {
-                resource_id,
-                resource_type,
-            }
-            .into(),
-        ))
+impl From<FindOwnedResourceError> for DeleteResourcesError {
+    fn from(err: FindOwnedResourceError) -> Self {
+        match err {
+            FindOwnedResourceError::Access(err) => Self::Access(err),
+            FindOwnedResourceError::Internal(err) => Self::Internal(err),
+        }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("User has no permission to delete resource '{resource_id}' of type '{resource_type}'")]
-pub struct DeleteResourcesNotEnoughPermissionsError {
-    pub resource_id: ResourceID,
-    pub resource_type: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

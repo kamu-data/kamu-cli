@@ -17,7 +17,6 @@ use crate::domain::{
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceDescriptorProvider,
-    ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceStatusLike,
 };
@@ -34,27 +33,10 @@ where
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    match resource_persistence_service.save(resource).await {
-        Ok(()) => {}
-        Err(ResourcePersistenceError::Duplicate(_)) => {
-            return Err(ReconcileResourceUseCaseError::SnapshotSyncFailed(
-                internal_error::InternalError::new(
-                    "Unexpected duplicate resource state while reconciling existing resource",
-                ),
-            ));
-        }
-        Err(ResourcePersistenceError::ConcurrentModification(err)) => {
-            return Err(ReconcileResourceUseCaseError::ConcurrentModification(err));
-        }
-        Err(ResourcePersistenceError::SaveFailed(err)) => {
-            return Err(ReconcileResourceUseCaseError::SaveFailed(err));
-        }
-        Err(ResourcePersistenceError::Internal(err)) => {
-            return Err(ReconcileResourceUseCaseError::SnapshotSyncFailed(err));
-        }
-    }
-
-    Ok(())
+    resource_persistence_service
+        .save(resource)
+        .await
+        .map_err(ReconcileResourceUseCaseError::from)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,6 +129,7 @@ macro_rules! declare_reconcile_resource_use_case {
                 let resource = resource_aggregate_loader
                     .load(&id)
                     .await
+                    .map_err($crate::domain::ResourceLoadError)
                     .map_err($crate::domain::ReconcileResourceUseCaseError::LoadFailed)?;
                 if !resource.needs_reconciliation() {
                     return Ok(None);
