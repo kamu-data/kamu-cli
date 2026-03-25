@@ -9,6 +9,7 @@
 
 use event_sourcing::SaveError;
 use internal_error::{ErrorIntoInternal, InternalError};
+use serde::Serialize;
 use time_source::SystemTimeSource;
 
 use crate::domain::{
@@ -37,8 +38,8 @@ where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
-    R::Spec: serde::Serialize,
-    R::Status: serde::Serialize + ResourceStatusLike,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     let resource_id = *resource.resource_id();
     let now = time_source.now();
@@ -93,7 +94,7 @@ where
         id: resource_id,
     };
 
-    let Some(resource_snapshot) = resource_repository.get_resource_snapshot(&query).await? else {
+    let Some(resource_snapshot) = resource_repository.find_resource_snapshot(&query).await? else {
         return Ok(None);
     };
 

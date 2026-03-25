@@ -34,6 +34,7 @@ cargo nextest run -E 'test(test_name_here)'
 - Prefer inline formatting like `format!("value={value}")`.
 - Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
 - Respect exact long separator comment style where surrounding files use it.
+- Name lookup methods consistently: `get_xxx` returns the thing or a not-found error, while `find_xxx` returns `Option<T>` and treats absence as non-error.
 
 
 ## Design Notes

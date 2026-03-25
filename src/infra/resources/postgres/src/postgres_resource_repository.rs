@@ -185,7 +185,7 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(())
     }
 
-    async fn get_resource_id_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
@@ -216,7 +216,7 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(maybe_resource_id)
     }
 
-    async fn get_resource_snapshot(
+    async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
@@ -249,6 +249,64 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             query.id,
             query.kind,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_row.map(|row| ResourceSnapshot {
+            resource_id: row.resource_id,
+            kind: row.resource_kind,
+            api_version: row.api_version,
+            metadata: kamu_resources::ResourceMetadata {
+                account: row.account_id,
+                name: row.resource_name,
+                description: row.description,
+                labels: serde_json::from_value(row.labels).unwrap(),
+                annotations: serde_json::from_value(row.annotations).unwrap(),
+                generation: u64::try_from(row.generation).unwrap(),
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                deleted_at: row.deleted_at,
+            },
+            spec: row.spec,
+            status: row.status,
+            last_reconciled_at: row.last_reconciled_at,
+            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+        }))
+    }
+
+    async fn find_resource_snapshot_by_id(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_row = sqlx::query!(
+            r#"
+            SELECT
+                resource_id as "resource_id: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE resource_id = $1
+              AND deleted_at IS NULL
+            "#,
+            resource_id,
         )
         .fetch_optional(connection_mut)
         .await
@@ -461,7 +519,7 @@ impl ResourceRepository for PostgresResourceRepository {
         })
     }
 
-    async fn get_count_resources(
+    async fn count_resources(
         &self,
         account_id: odf::AccountID,
         kind: &str,

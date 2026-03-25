@@ -11,8 +11,8 @@ use crate::domain::VariableSetResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-super::shared::declare_delete_resources_use_case!(
-    use_case = VariableSetDeleteResourcesUseCaseImpl,
+super::shared::declare_apply_resource_use_case!(
+    use_case = VariableSetApplyResourceUseCaseImpl,
     resource = VariableSetResource,
     store = VariableSetEventStore
 );

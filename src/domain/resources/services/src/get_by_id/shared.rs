@@ -43,7 +43,7 @@ where
         };
 
         let resource_snapshot = resource_repository
-            .get_resource_snapshot(&query)
+            .find_resource_snapshot(&query)
             .await?
             .ok_or(GetResourceByIdError::NotFound)?;
 

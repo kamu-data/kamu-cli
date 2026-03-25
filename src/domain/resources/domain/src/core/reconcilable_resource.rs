@@ -9,12 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{
-    DeclarativeResource,
-    InvariantViolationOf,
-    ReconcilableEventSourcedResource,
-    ResourceReconcileError,
-};
+use crate::{DeclarativeResource, ResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,8 +19,6 @@ pub trait ReconcilableResource: DeclarativeResource {
     type FailureDetails;
     type LifecycleError;
 
-    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
-
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusLike;
 
@@ -34,28 +27,43 @@ pub trait ReconcilableResource: DeclarativeResource {
             .needs_reconciliation(self.metadata().generation)
     }
 
+    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
+
+    fn try_create(
+        now: DateTime<Utc>,
+        resource_id: crate::ResourceID,
+        metadata: crate::ResourceMetadataInput,
+        spec: Self::Spec,
+    ) -> Result<Self, Self::LifecycleError>
+    where
+        Self: Sized;
+
+    fn try_update_metadata(
+        &mut self,
+        now: DateTime<Utc>,
+        new_metadata: crate::ResourceMetadataInput,
+    ) -> Result<(), Self::LifecycleError>;
+
+    fn try_update_spec(
+        &mut self,
+        now: DateTime<Utc>,
+        new_spec: Self::Spec,
+    ) -> Result<(), Self::LifecycleError>;
+
     fn try_delete(
         &mut self,
         now: DateTime<Utc>,
         tombstone_name: String,
     ) -> Result<(), Self::LifecycleError>
     where
-        Self: ReconcilableEventSourcedResource + Sized,
-        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
-    {
-        crate::try_delete_resource(self, now, tombstone_name)
-    }
+        Self: Sized;
 
     fn try_mark_reconciliation_started(
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), Self::LifecycleError>
     where
-        Self: ReconcilableEventSourcedResource + Sized,
-        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
-    {
-        crate::try_mark_resource_reconciliation_started(self, now)
-    }
+        Self: Sized;
 
     fn try_mark_reconciliation_succeeded(
         &mut self,
@@ -64,11 +72,7 @@ pub trait ReconcilableResource: DeclarativeResource {
         success: Self::ReconcileSuccess,
     ) -> Result<(), Self::LifecycleError>
     where
-        Self: ReconcilableEventSourcedResource + Sized,
-        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
-    {
-        crate::try_mark_resource_reconciliation_succeeded(self, now, expected_generation, success)
-    }
+        Self: Sized;
 
     fn try_mark_reconciliation_failed(
         &mut self,
@@ -77,11 +81,7 @@ pub trait ReconcilableResource: DeclarativeResource {
         error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError>
     where
-        Self: ReconcilableEventSourcedResource + Sized,
-        Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
-    {
-        crate::try_mark_resource_reconciliation_failed(self, now, expected_generation, error)
-    }
+        Self: Sized;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

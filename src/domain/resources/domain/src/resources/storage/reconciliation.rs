@@ -11,8 +11,6 @@ use internal_error::InternalError;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ReconcilableEventSourcedResource,
-    ReconcilableResource,
     ResourceReconcileError,
     StorageFailureDetails,
     StorageLifecycleError,
@@ -73,21 +71,17 @@ impl ResourceReconcileError for StorageReconcileError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableResource for StorageResource {
-    type ReconcileSuccess = StorageReconcileSuccess;
-    type ReconcileError = StorageReconcileError;
-    type FailureDetails = StorageFailureDetails;
-    type LifecycleError = StorageLifecycleError;
-
-    fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
+crate::impl_reconcilable_event_sourced_resource!(
+    resource = StorageResource,
+    reconcile_success = StorageReconcileSuccess,
+    reconcile_error = StorageReconcileError,
+    failure_details = StorageFailureDetails,
+    lifecycle_error = StorageLifecycleError,
+    failure_details_fn = |_error| {
         StorageFailureDetails {
             references: StorageReferenceStatus::default(),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for StorageResource {}
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

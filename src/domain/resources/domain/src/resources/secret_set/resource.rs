@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use internal_error::InternalError;
 
@@ -16,23 +15,18 @@ use crate::{
     ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
-    ResourceMetadataInput,
     ResourceType,
     SecretSetEventStore,
-    SecretSetLifecycleError,
     SecretSetSpec,
     SecretSetState,
     SecretSetStatus,
     decode_typed_resource_snapshot,
-    try_create_reconcilable_resource,
-    try_update_resource_metadata,
-    try_update_resource_spec,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct SecretSetResource(Aggregate<SecretSetState, SecretSetEventStoreStatic>);
+pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, SecretSetEventStoreStatic>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,38 +37,6 @@ type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
 impl SecretSetResource {
     pub const RESOURCE_TYPE: &'static str = "secret_set";
     pub const API_VERSION: &'static str = "v1alpha1";
-
-    pub fn try_create(
-        now: DateTime<Utc>,
-        resource_id: ResourceID,
-        metadata: ResourceMetadataInput,
-        spec: SecretSetSpec,
-    ) -> Result<Self, SecretSetLifecycleError> {
-        try_create_reconcilable_resource::<Self, _, _>(
-            now,
-            resource_id,
-            metadata,
-            spec,
-            Aggregate::new,
-        )
-        .map(Self)
-    }
-
-    pub fn try_update_metadata(
-        &mut self,
-        now: DateTime<Utc>,
-        new_metadata: ResourceMetadataInput,
-    ) -> Result<(), SecretSetLifecycleError> {
-        try_update_resource_metadata(self, now, new_metadata)
-    }
-
-    pub fn try_update_spec(
-        &mut self,
-        now: DateTime<Utc>,
-        new_spec: SecretSetSpec,
-    ) -> Result<(), SecretSetLifecycleError> {
-        try_update_resource_spec(self, now, new_spec)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,6 +70,10 @@ impl DeclarativeResource for SecretSetResource {
             spec,
             status,
         })
+    }
+
+    fn into_state(self) -> Self::ResourceState {
+        self.0.into_state()
     }
 
     fn resource_id(&self) -> &ResourceID {

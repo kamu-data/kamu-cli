@@ -10,8 +10,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ReconcilableEventSourcedResource,
-    ReconcilableResource,
     ResourceReconcileError,
     VariableSetFailureDetails,
     VariableSetLifecycleError,
@@ -21,22 +19,18 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableResource for VariableSetResource {
-    type ReconcileSuccess = VariableSetReconcileSuccess;
-    type ReconcileError = VariableSetReconcileError;
-    type FailureDetails = VariableSetFailureDetails;
-    type LifecycleError = VariableSetLifecycleError;
-
-    fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
+crate::impl_reconcilable_event_sourced_resource!(
+    resource = VariableSetResource,
+    reconcile_success = VariableSetReconcileSuccess,
+    reconcile_error = VariableSetReconcileError,
+    failure_details = VariableSetFailureDetails,
+    lifecycle_error = VariableSetLifecycleError,
+    failure_details_fn = |_error| {
         VariableSetFailureDetails {
             stats: VariableSetStats::default(),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for VariableSetResource {}
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

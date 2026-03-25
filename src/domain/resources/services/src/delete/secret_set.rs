@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::SecretSetResource;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 super::shared::declare_delete_resources_use_case!(
     use_case = SecretSetDeleteResourcesUseCaseImpl,
-    resource = crate::domain::SecretSetResource,
+    resource = SecretSetResource,
     store = SecretSetEventStore
 );
 

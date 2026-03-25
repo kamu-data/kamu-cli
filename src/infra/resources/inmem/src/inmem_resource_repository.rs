@@ -38,7 +38,7 @@ struct ResourceLookupKey {
 
 #[derive(Default)]
 struct State {
-    snapshots_by_query: HashMap<ResourceRawEventQuery, ResourceSnapshot>,
+    snapshots_by_id: HashMap<ResourceID, ResourceSnapshot>,
     ids_by_lookup_key: HashMap<ResourceLookupKey, ResourceID>,
 }
 
@@ -71,17 +71,15 @@ impl ResourceRepository for InMemoryResourceRepository {
     ) -> Result<(), CreateResourceError> {
         let mut guard = self.state.lock().unwrap();
 
-        let query = ResourceRawEventQuery {
-            kind: resource_snapshot.kind.clone(),
-            id: resource_snapshot.resource_id,
-        };
         let lookup_key = ResourceLookupKey {
             account_id: resource_snapshot.metadata.account.clone(),
             kind: resource_snapshot.kind.clone(),
             name: resource_snapshot.metadata.name.clone(),
         };
 
-        if guard.snapshots_by_query.contains_key(&query)
+        if guard
+            .snapshots_by_id
+            .contains_key(&resource_snapshot.resource_id)
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
@@ -95,8 +93,8 @@ impl ResourceRepository for InMemoryResourceRepository {
             .ids_by_lookup_key
             .insert(lookup_key, resource_snapshot.resource_id);
         guard
-            .snapshots_by_query
-            .insert(query, resource_snapshot.clone());
+            .snapshots_by_id
+            .insert(resource_snapshot.resource_id, resource_snapshot.clone());
 
         Ok(())
     }
@@ -108,14 +106,9 @@ impl ResourceRepository for InMemoryResourceRepository {
     ) -> Result<(), UpdateResourceError> {
         let mut guard = self.state.lock().unwrap();
 
-        let query = ResourceRawEventQuery {
-            kind: resource_snapshot.kind.clone(),
-            id: resource_snapshot.resource_id,
-        };
-
         let previous_snapshot = guard
-            .snapshots_by_query
-            .get(&query)
+            .snapshots_by_id
+            .get(&resource_snapshot.resource_id)
             .cloned()
             .ok_or_else(UpdateResourceError::concurrent_modification)?;
 
@@ -149,13 +142,13 @@ impl ResourceRepository for InMemoryResourceRepository {
             .ids_by_lookup_key
             .insert(next_lookup_key, resource_snapshot.resource_id);
         guard
-            .snapshots_by_query
-            .insert(query, resource_snapshot.clone());
+            .snapshots_by_id
+            .insert(resource_snapshot.resource_id, resource_snapshot.clone());
 
         Ok(())
     }
 
-    async fn get_resource_id_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
@@ -170,26 +163,33 @@ impl ResourceRepository for InMemoryResourceRepository {
                 kind: kind.to_owned(),
                 name: name.clone(),
             })
-            .and_then(|resource_id| {
-                guard
-                    .snapshots_by_query
-                    .values()
-                    .find(|snapshot| {
-                        snapshot.resource_id == *resource_id
-                            && snapshot.metadata.deleted_at.is_none()
-                    })
-                    .map(|snapshot| snapshot.resource_id)
-            }))
+            .and_then(|resource_id| guard.snapshots_by_id.get(resource_id))
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .map(|snapshot| snapshot.resource_id))
     }
 
-    async fn get_resource_snapshot(
+    async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .snapshots_by_query
-            .get(query)
+            .snapshots_by_id
+            .get(&query.id)
+            .filter(|snapshot| snapshot.kind == query.kind)
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .cloned())
+    }
+
+    async fn find_resource_snapshot_by_id(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(guard
+            .snapshots_by_id
+            .get(resource_id)
             .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
             .cloned())
     }
@@ -203,7 +203,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut resource_ids_page: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard
-                .snapshots_by_query
+                .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
                     snapshot.metadata.account == account_id
@@ -240,7 +240,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut snapshots_page: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard
-                .snapshots_by_query
+                .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
                     snapshot.metadata.account == account_id
@@ -276,7 +276,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut snapshots_page: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard
-                .snapshots_by_query
+                .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
                     snapshot.metadata.account == account_id
@@ -303,7 +303,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Box::pin(futures::stream::iter(snapshots_page))
     }
 
-    async fn get_count_resources(
+    async fn count_resources(
         &self,
         account_id: odf::AccountID,
         kind: &str,
@@ -311,7 +311,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let guard = self.state.lock().unwrap();
 
         Ok(guard
-            .snapshots_by_query
+            .snapshots_by_id
             .values()
             .filter(|snapshot| {
                 snapshot.metadata.account == account_id

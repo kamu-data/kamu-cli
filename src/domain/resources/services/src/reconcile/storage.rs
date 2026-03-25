@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::StorageResource;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 super::shared::declare_reconcile_resource_use_case!(
     use_case = StorageReconcileResourceUseCaseImpl,
-    resource = crate::domain::StorageResource,
+    resource = StorageResource,
     store = StorageEventStore
 );
 

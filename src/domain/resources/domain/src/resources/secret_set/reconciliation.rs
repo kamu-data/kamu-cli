@@ -10,8 +10,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ReconcilableEventSourcedResource,
-    ReconcilableResource,
     ResourceReconcileError,
     SecretSetFailureDetails,
     SecretSetLifecycleError,
@@ -21,22 +19,18 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReconcilableResource for SecretSetResource {
-    type ReconcileSuccess = SecretSetReconcileSuccess;
-    type ReconcileError = SecretSetReconcileError;
-    type FailureDetails = SecretSetFailureDetails;
-    type LifecycleError = SecretSetLifecycleError;
-
-    fn failure_details(_error: &Self::ReconcileError) -> Self::FailureDetails {
+crate::impl_reconcilable_event_sourced_resource!(
+    resource = SecretSetResource,
+    reconcile_success = SecretSetReconcileSuccess,
+    reconcile_error = SecretSetReconcileError,
+    failure_details = SecretSetFailureDetails,
+    lifecycle_error = SecretSetLifecycleError,
+    failure_details_fn = |_error| {
         SecretSetFailureDetails {
             stats: SecretSetStats::default(),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ReconcilableEventSourcedResource for SecretSetResource {}
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

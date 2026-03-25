@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
+use serde::Serialize;
 
 use crate::domain::{
     DeclarativeResource,
@@ -33,8 +34,8 @@ async fn persist_resource_state<R>(
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: serde::Serialize,
-    R::Status: serde::Serialize + ResourceStatusLike,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     // Events and the snapshot projection are updated together from the use case,
     // so both stores observe the same aggregate revision boundary.
@@ -72,8 +73,8 @@ pub(crate) async fn start_reconciliation_phase<R>(
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: serde::Serialize,
-    R::Status: serde::Serialize + ResourceStatusLike,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     // Phase 1 commits the "started" transition before the actual reconciliation
     // work, giving the second phase a stable persisted hand-off point.
@@ -105,8 +106,8 @@ pub(crate) async fn finish_reconciliation_phase<R>(
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: serde::Serialize,
-    R::Status: serde::Serialize + ResourceStatusLike,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     // Phase 2 runs in a separate transaction after the started state was
     // committed, so concurrent changes between the two phases are expected.

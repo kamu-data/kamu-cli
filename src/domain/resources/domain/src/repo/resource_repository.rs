@@ -38,16 +38,21 @@ pub trait ResourceRepository: Send + Sync {
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError>;
 
-    async fn get_resource_id_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    async fn get_resource_snapshot(
+    async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
+    ) -> Result<Option<ResourceSnapshot>, InternalError>;
+
+    async fn find_resource_snapshot_by_id(
+        &self,
+        resource_id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
     fn list_resource_ids(
@@ -70,7 +75,7 @@ pub trait ResourceRepository: Send + Sync {
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
-    async fn get_count_resources(
+    async fn count_resources(
         &self,
         account_id: odf::AccountID,
         kind: &str,

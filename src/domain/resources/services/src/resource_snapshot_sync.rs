@@ -9,6 +9,7 @@
 
 use event_sourcing::{ConcurrentModificationError, EventID};
 use internal_error::{ErrorIntoInternal, InternalError};
+use serde::Serialize;
 
 use crate::domain::{
     DeclarativeResource,
@@ -37,8 +38,8 @@ pub(crate) async fn sync_resource_snapshot<R>(
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: serde::Serialize,
-    R::Status: serde::Serialize + ResourceStatusLike,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     let snapshot = resource
         .make_resource_snapshot()

@@ -58,6 +58,10 @@ pub trait DeclarativeResource: Send + Sync {
 
     fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError>;
 
+    fn into_state(self) -> Self::ResourceState
+    where
+        Self: Sized;
+
     fn resource_id(&self) -> &ResourceID;
     fn metadata(&self) -> &ResourceMetadata;
     fn spec(&self) -> &Self::Spec;

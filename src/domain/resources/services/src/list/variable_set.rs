@@ -8,12 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use super::shared::declare_list_resources_by_kind_use_case;
+use crate::domain::VariableSetResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 declare_list_resources_by_kind_use_case!(
     use_case = VariableSetListResourcesByKindUseCaseImpl,
-    resource = crate::domain::VariableSetResource
+    resource = VariableSetResource
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

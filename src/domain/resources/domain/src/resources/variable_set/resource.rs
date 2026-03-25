@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use internal_error::InternalError;
 
@@ -16,23 +15,18 @@ use crate::{
     ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
-    ResourceMetadataInput,
     ResourceType,
     VariableSetEventStore,
-    VariableSetLifecycleError,
     VariableSetSpec,
     VariableSetState,
     VariableSetStatus,
     decode_typed_resource_snapshot,
-    try_create_reconcilable_resource,
-    try_update_resource_metadata,
-    try_update_resource_spec,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct VariableSetResource(Aggregate<VariableSetState, VariableSetEventStoreStatic>);
+pub struct VariableSetResource(pub(crate) Aggregate<VariableSetState, VariableSetEventStoreStatic>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,38 +37,6 @@ type VariableSetEventStoreStatic = dyn VariableSetEventStore + 'static;
 impl VariableSetResource {
     pub const RESOURCE_TYPE: &'static str = "variable_set";
     pub const API_VERSION: &'static str = "v1alpha1";
-
-    pub fn try_create(
-        now: DateTime<Utc>,
-        resource_id: ResourceID,
-        metadata: ResourceMetadataInput,
-        spec: VariableSetSpec,
-    ) -> Result<Self, VariableSetLifecycleError> {
-        try_create_reconcilable_resource::<Self, _, _>(
-            now,
-            resource_id,
-            metadata,
-            spec,
-            Aggregate::new,
-        )
-        .map(Self)
-    }
-
-    pub fn try_update_metadata(
-        &mut self,
-        now: DateTime<Utc>,
-        new_metadata: ResourceMetadataInput,
-    ) -> Result<(), VariableSetLifecycleError> {
-        try_update_resource_metadata(self, now, new_metadata)
-    }
-
-    pub fn try_update_spec(
-        &mut self,
-        now: DateTime<Utc>,
-        new_spec: VariableSetSpec,
-    ) -> Result<(), VariableSetLifecycleError> {
-        try_update_resource_spec(self, now, new_spec)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,6 +70,10 @@ impl DeclarativeResource for VariableSetResource {
             spec,
             status,
         })
+    }
+
+    fn into_state(self) -> Self::ResourceState {
+        self.0.into_state()
     }
 
     fn resource_id(&self) -> &ResourceID {
