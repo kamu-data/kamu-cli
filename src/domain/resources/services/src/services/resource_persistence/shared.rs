@@ -26,105 +26,72 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn sync_snapshot<R>(
-    resource_repository: &dyn ResourceRepository,
-    resource: &R,
-    expected_last_event_id: Option<EventID>,
-) -> Result<(), ResourcePersistenceError>
+pub struct ResourcePersistenceServiceHelper<'a, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+{
+    resource_repository: &'a dyn ResourceRepository,
+    event_store: &'a R::Store,
+}
+
+impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    let snapshot = resource.make_resource_snapshot()?;
-
-    match resource_repository
-        .update_resource(&snapshot, expected_last_event_id)
-        .await
-    {
-        Ok(()) => Ok(()),
-        Err(UpdateResourceError::ConcurrentModification(err)) => {
-            Err(ResourcePersistenceError::ConcurrentModification(err))
+    pub fn new(resource_repository: &'a dyn ResourceRepository, event_store: &'a R::Store) -> Self {
+        Self {
+            resource_repository,
+            event_store,
         }
-        Err(err) => Err(ResourcePersistenceError::Internal(err.int_err())),
+    }
+
+    pub async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
+        let snapshot = resource.make_resource_snapshot()?;
+
+        match self.resource_repository.create_resource(&snapshot).await {
+            Ok(()) => {}
+            Err(CreateResourceError::Duplicate(err)) => {
+                return Err(ResourcePersistenceError::Duplicate(err));
+            }
+            Err(CreateResourceError::Internal(err)) => {
+                return Err(ResourcePersistenceError::Internal(err));
+            }
+        }
+
+        match resource.aggregate_mut().save(self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
+            }
+        }
+
+        self.sync_snapshot(resource, None).await
+    }
+
+    pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
+        let expected_last_event_id = resource.aggregate().last_stored_event_id();
+
+        match resource.aggregate_mut().save(self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
+            }
+        }
+
+        self.sync_snapshot(resource, expected_last_event_id).await
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn create_resource<R>(
-    resource_repository: &dyn ResourceRepository,
-    event_store: &R::Store,
-    resource: &mut R,
-) -> Result<(), ResourcePersistenceError>
-where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
-    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
-{
-    let snapshot = resource.make_resource_snapshot()?;
-
-    match resource_repository.create_resource(&snapshot).await {
-        Ok(()) => {}
-        Err(CreateResourceError::Duplicate(err)) => {
-            return Err(ResourcePersistenceError::Duplicate(err));
-        }
-        Err(CreateResourceError::Internal(err)) => {
-            return Err(ResourcePersistenceError::Internal(err));
-        }
-    }
-
-    match resource.aggregate_mut().save(event_store).await {
-        Ok(()) => {}
-        Err(SaveError::ConcurrentModification(err)) => {
-            return Err(ResourcePersistenceError::ConcurrentModification(err));
-        }
-        Err(err) => {
-            return Err(ResourcePersistenceError::Internal(err.int_err()));
-        }
-    }
-
-    sync_snapshot(resource_repository, resource, None).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn save_resource<R>(
-    resource_repository: &dyn ResourceRepository,
-    event_store: &R::Store,
-    resource: &mut R,
-) -> Result<(), ResourcePersistenceError>
-where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
-    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
-{
-    let expected_last_event_id = resource.aggregate().last_stored_event_id();
-
-    match resource.aggregate_mut().save(event_store).await {
-        Ok(()) => {}
-        Err(SaveError::ConcurrentModification(err)) => {
-            return Err(ResourcePersistenceError::ConcurrentModification(err));
-        }
-        Err(err) => {
-            return Err(ResourcePersistenceError::Internal(err.int_err()));
-        }
-    }
-
-    sync_snapshot(resource_repository, resource, expected_last_event_id).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn delete_resource<R>(
-    resource_repository: &dyn ResourceRepository,
-    event_store: &R::Store,
-    resource: &mut R,
-    now: DateTime<Utc>,
-) -> Result<(), ResourcePersistenceError>
+impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
     R::LifecycleError:
@@ -132,29 +99,66 @@ where
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    let tombstone_name = format!("deleted-{}", resource.resource_id());
+    pub async fn delete(
+        &self,
+        resource: &mut R,
+        now: DateTime<Utc>,
+    ) -> Result<(), ResourcePersistenceError> {
+        let tombstone_name = format!("deleted-{}", resource.resource_id());
 
-    resource.try_delete(now, tombstone_name).map_err(|err| {
-        ResourcePersistenceError::Internal(format!("{err}").int_err().with_context(format!(
-            "Failed to delete resource {}",
-            resource.resource_id()
-        )))
-    })?;
-
-    match save_resource(resource_repository, event_store, resource).await {
-        Ok(()) => Ok(()),
-        Err(ResourcePersistenceError::Duplicate(err)) => Err(ResourcePersistenceError::Internal(
-            format!("{err}").int_err().with_context(format!(
-                "Unexpected duplicate resource state while deleting resource {}",
+        resource.try_delete(now, tombstone_name).map_err(|err| {
+            ResourcePersistenceError::Internal(format!("{err}").int_err().with_context(format!(
+                "Failed to delete resource {}",
                 resource.resource_id()
-            )),
-        )),
-        Err(err) => Err(err),
+            )))
+        })?;
+
+        match self.save(resource).await {
+            Ok(()) => Ok(()),
+            Err(ResourcePersistenceError::Duplicate(err)) => {
+                Err(ResourcePersistenceError::Internal(
+                    format!("{err}").int_err().with_context(format!(
+                        "Unexpected duplicate resource state while deleting resource {}",
+                        resource.resource_id()
+                    )),
+                ))
+            }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl<R> ResourcePersistenceServiceHelper<'_, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
+{
+    async fn sync_snapshot(
+        &self,
+        resource: &R,
+        expected_last_event_id: Option<EventID>,
+    ) -> Result<(), ResourcePersistenceError> {
+        let snapshot = resource.make_resource_snapshot()?;
+
+        match self
+            .resource_repository
+            .update_resource(&snapshot, expected_last_event_id)
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(UpdateResourceError::ConcurrentModification(err)) => {
+                Err(ResourcePersistenceError::ConcurrentModification(err))
+            }
+            Err(err) => Err(ResourcePersistenceError::Internal(err.int_err())),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[macro_export]
 macro_rules! declare_resource_persistence_service {
     (
         service = $service:ident,
@@ -174,24 +178,24 @@ macro_rules! declare_resource_persistence_service {
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), $crate::domain::ResourcePersistenceError> {
-                super::shared::create_resource(
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
-                    resource,
-                )
-                .await
+                );
+
+                helper.create(resource).await
             }
 
             async fn save(
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), $crate::domain::ResourcePersistenceError> {
-                super::shared::save_resource(
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
-                    resource,
-                )
-                .await
+                );
+
+                helper.save(resource).await
             }
 
             async fn delete(
@@ -199,18 +203,17 @@ macro_rules! declare_resource_persistence_service {
                 resource: &mut $resource,
                 now: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), $crate::domain::ResourcePersistenceError> {
-                super::shared::delete_resource(
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
-                    resource,
-                    now,
-                )
-                .await
+                );
+
+                helper.delete(resource, now).await
             }
         }
     };
 }
 
-pub(crate) use declare_resource_persistence_service;
+pub use declare_resource_persistence_service;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

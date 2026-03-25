@@ -28,184 +28,174 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn load_snapshot_by_id<R>(
-    resource_repository: &dyn ResourceRepository,
-    resource_id: &ResourceID,
-) -> Result<ResourceSnapshot, TypedResourceQueryError>
+pub struct ResourceQueryServiceHelper<'a, R>
 where
     R: ResourceDescriptorProvider,
 {
-    let snapshot = resource_repository
-        .find_resource_snapshot_by_id(resource_id)
-        .await?
-        .ok_or(ResourceNotFoundError(*resource_id))?;
-
-    if snapshot.kind != R::DESCRIPTOR.resource_type
-        || snapshot.api_version != R::DESCRIPTOR.api_version
-    {
-        return Err(ResourceTypeMismatchError::new(
-            *resource_id,
-            R::DESCRIPTOR.resource_type.to_string(),
-            R::DESCRIPTOR.api_version.to_string(),
-            snapshot.kind,
-            snapshot.api_version,
-        )
-        .into());
-    }
-
-    Ok(snapshot)
+    resource_repository: &'a dyn ResourceRepository,
+    _marker: std::marker::PhantomData<R>,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_snapshot_by_query<R>(
-    resource_repository: &dyn ResourceRepository,
-    resource_id: &ResourceID,
-) -> Result<Option<ResourceSnapshot>, InternalError>
+impl<'a, R> ResourceQueryServiceHelper<'a, R>
 where
     R: ResourceDescriptorProvider,
 {
-    let query = ResourceRawEventQuery {
-        kind: R::DESCRIPTOR.resource_type.to_string(),
-        id: *resource_id,
-    };
-
-    resource_repository.find_resource_snapshot(&query).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn type_mismatch<R>(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError
-where
-    R: ResourceDescriptorProvider,
-{
-    ResourceTypeMismatchError::new(
-        resource_snapshot.resource_id,
-        R::DESCRIPTOR.resource_type.to_string(),
-        R::DESCRIPTOR.api_version.to_string(),
-        resource_snapshot.kind.clone(),
-        resource_snapshot.api_version.clone(),
-    )
-    .into()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn find_existing_id_by_name<R>(
-    resource_repository: &dyn ResourceRepository,
-    resource_id: Option<ResourceID>,
-    metadata: &ResourceMetadataInput,
-) -> Result<Option<ResourceID>, InternalError>
-where
-    R: ResourceDescriptorProvider,
-{
-    match resource_id {
-        Some(resource_id) => Ok(Some(resource_id)),
-        None => {
-            resource_repository
-                .find_resource_id_by_name(
-                    metadata.account.clone(),
-                    R::DESCRIPTOR.resource_type,
-                    &metadata.name,
-                )
-                .await
+    pub fn new(resource_repository: &'a dyn ResourceRepository) -> Self {
+        Self {
+            resource_repository,
+            _marker: std::marker::PhantomData,
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    pub async fn load_snapshot_by_id(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<ResourceSnapshot, TypedResourceQueryError> {
+        let snapshot = self
+            .resource_repository
+            .find_resource_snapshot_by_id(resource_id)
+            .await?
+            .ok_or(ResourceNotFoundError(*resource_id))?;
 
-pub(crate) async fn find_owned_snapshot<R>(
-    resource_repository: &dyn ResourceRepository,
-    account_id: &odf::AccountID,
-    resource_id: ResourceID,
-) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>
-where
-    R: ResourceDescriptorProvider,
-{
-    let Some(resource_snapshot) =
-        get_snapshot_by_query::<R>(resource_repository, &resource_id).await?
-    else {
-        return Ok(None);
-    };
+        if snapshot.kind != R::DESCRIPTOR.resource_type
+            || snapshot.api_version != R::DESCRIPTOR.api_version
+        {
+            return Err(ResourceTypeMismatchError::new(
+                *resource_id,
+                R::DESCRIPTOR.resource_type.to_string(),
+                R::DESCRIPTOR.api_version.to_string(),
+                snapshot.kind,
+                snapshot.api_version,
+            )
+            .into());
+        }
 
-    if resource_snapshot.metadata.account != *account_id {
-        return Err(odf::AccessError::Unauthorized(
-            ResourceNotOwnedByAccountError {
-                resource_id: resource_snapshot.resource_id,
-                resource_type: R::DESCRIPTOR.resource_type,
+        Ok(snapshot)
+    }
+
+    pub async fn find_existing_id_by_name(
+        &self,
+        resource_id: Option<ResourceID>,
+        metadata: &ResourceMetadataInput,
+    ) -> Result<Option<ResourceID>, InternalError> {
+        match resource_id {
+            Some(resource_id) => Ok(Some(resource_id)),
+            None => {
+                self.resource_repository
+                    .find_resource_id_by_name(
+                        metadata.account.clone(),
+                        R::DESCRIPTOR.resource_type,
+                        &metadata.name,
+                    )
+                    .await
             }
-            .into(),
-        )
-        .into());
+        }
     }
 
-    Ok(Some(resource_snapshot))
+    pub async fn find_owned_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        resource_id: ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
+        let Some(resource_snapshot) = self.get_snapshot_by_query(&resource_id).await? else {
+            return Ok(None);
+        };
+
+        if resource_snapshot.metadata.account != *account_id {
+            return Err(odf::AccessError::Unauthorized(
+                ResourceNotOwnedByAccountError {
+                    resource_id: resource_snapshot.resource_id,
+                    resource_type: R::DESCRIPTOR.resource_type,
+                }
+                .into(),
+            )
+            .into());
+        }
+
+        Ok(Some(resource_snapshot))
+    }
+
+    async fn get_snapshot_by_query(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
+        let query = ResourceRawEventQuery {
+            kind: R::DESCRIPTOR.resource_type.to_string(),
+            id: *resource_id,
+        };
+
+        self.resource_repository
+            .find_resource_snapshot(&query)
+            .await
+    }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_state_by_id<R>(
-    resource_repository: &dyn ResourceRepository,
-    account_id: odf::AccountID,
-    resource_id: &ResourceID,
-) -> Result<R::ResourceState, TypedResourceQueryError>
+impl<R> ResourceQueryServiceHelper<'_, R>
 where
     R: DeclarativeResource + ResourceDescriptorProvider,
 {
-    let Some(resource_snapshot) =
-        get_snapshot_by_query::<R>(resource_repository, resource_id).await?
-    else {
-        return Err(ResourceNotFoundError(*resource_id).into());
-    };
+    pub async fn get_state_by_id(
+        &self,
+        account_id: odf::AccountID,
+        resource_id: &ResourceID,
+    ) -> Result<R::ResourceState, TypedResourceQueryError> {
+        let Some(resource_snapshot) = self.get_snapshot_by_query(resource_id).await? else {
+            return Err(ResourceNotFoundError(*resource_id).into());
+        };
 
-    if resource_snapshot.metadata.account != account_id {
-        return Err(ResourceNotFoundError(*resource_id).into());
-    }
-
-    if resource_snapshot.kind != R::DESCRIPTOR.resource_type
-        || resource_snapshot.api_version != R::DESCRIPTOR.api_version
-    {
-        return Err(type_mismatch::<R>(&resource_snapshot));
-    }
-
-    R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::Internal)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn list_states_by_kind<R>(
-    resource_repository: &dyn ResourceRepository,
-    account_id: odf::AccountID,
-    pagination: PaginationOpts,
-) -> Result<Vec<R::ResourceState>, InternalError>
-where
-    R: DeclarativeResource + ResourceDescriptorProvider,
-{
-    let mut resource_snapshots_stream = resource_repository.list_resource_snapshots_by_kind(
-        account_id,
-        R::DESCRIPTOR.resource_type,
-        pagination,
-    );
-
-    let mut resource_states = Vec::new();
-    while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
-        let resource_snapshot = resource_snapshot?;
+        if resource_snapshot.metadata.account != account_id {
+            return Err(ResourceNotFoundError(*resource_id).into());
+        }
 
         if resource_snapshot.kind != R::DESCRIPTOR.resource_type
             || resource_snapshot.api_version != R::DESCRIPTOR.api_version
         {
-            return Err(type_mismatch::<R>(&resource_snapshot).int_err());
+            return Err(Self::type_mismatch(&resource_snapshot));
         }
 
-        resource_states.push(R::decode_snapshot(resource_snapshot)?);
+        R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::Internal)
     }
 
-    Ok(resource_states)
+    pub async fn list_states_by_kind(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<R::ResourceState>, InternalError> {
+        let mut resource_snapshots_stream = self
+            .resource_repository
+            .list_resource_snapshots_by_kind(account_id, R::DESCRIPTOR.resource_type, pagination);
+
+        let mut resource_states = Vec::new();
+        while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
+            let resource_snapshot = resource_snapshot?;
+
+            if resource_snapshot.kind != R::DESCRIPTOR.resource_type
+                || resource_snapshot.api_version != R::DESCRIPTOR.api_version
+            {
+                return Err(Self::type_mismatch(&resource_snapshot).int_err());
+            }
+
+            resource_states.push(R::decode_snapshot(resource_snapshot)?);
+        }
+
+        Ok(resource_states)
+    }
+
+    fn type_mismatch(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError {
+        ResourceTypeMismatchError::new(
+            resource_snapshot.resource_id,
+            R::DESCRIPTOR.resource_type.to_string(),
+            R::DESCRIPTOR.api_version.to_string(),
+            resource_snapshot.kind.clone(),
+            resource_snapshot.api_version.clone(),
+        )
+        .into()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[macro_export]
 macro_rules! declare_resource_query_service {
     (
         service = $service:ident,
@@ -230,24 +220,22 @@ macro_rules! declare_resource_query_service {
                 resource_id: Option<$crate::domain::ResourceID>,
                 metadata: &$crate::domain::ResourceMetadataInput,
             ) -> Result<Option<$crate::domain::ResourceID>, internal_error::InternalError> {
-                super::shared::find_existing_id_by_name::<$resource>(
+                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
-                    resource_id,
-                    metadata,
-                )
-                .await
+                );
+
+                helper.find_existing_id_by_name(resource_id, metadata).await
             }
 
             async fn ensure_resource_id_matches_type(
                 &self,
                 resource_id: &$crate::domain::ResourceID,
             ) -> Result<(), $crate::domain::TypedResourceQueryError> {
-                super::shared::load_snapshot_by_id::<$resource>(
+                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
-                    resource_id,
-                )
-                .await
-                .map(|_| ())
+                );
+
+                helper.load_snapshot_by_id(resource_id).await.map(|_| ())
             }
 
             async fn find_owned_snapshot(
@@ -258,12 +246,11 @@ macro_rules! declare_resource_query_service {
                 Option<$crate::domain::ResourceSnapshot>,
                 $crate::domain::FindOwnedResourceError,
             > {
-                super::shared::find_owned_snapshot::<$resource>(
+                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
-                    account_id,
-                    resource_id,
-                )
-                .await
+                );
+
+                helper.find_owned_snapshot(account_id, resource_id).await
             }
 
             async fn get_state_by_id(
@@ -274,12 +261,11 @@ macro_rules! declare_resource_query_service {
                 <$resource as $crate::domain::DeclarativeResource>::ResourceState,
                 $crate::domain::TypedResourceQueryError,
             > {
-                super::shared::get_state_by_id::<$resource>(
+                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
-                    account_id,
-                    resource_id,
-                )
-                .await
+                );
+
+                helper.get_state_by_id(account_id, resource_id).await
             }
 
             async fn list_states_by_kind(
@@ -290,17 +276,16 @@ macro_rules! declare_resource_query_service {
                 Vec<<$resource as $crate::domain::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
             > {
-                super::shared::list_states_by_kind::<$resource>(
+                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
-                    account_id,
-                    pagination,
-                )
-                .await
+                );
+
+                helper.list_states_by_kind(account_id, pagination).await
             }
         }
     };
 }
 
-pub(crate) use declare_resource_query_service;
+pub use declare_resource_query_service;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

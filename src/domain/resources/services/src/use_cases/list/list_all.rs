@@ -14,6 +14,30 @@ use crate::domain::{AllResourcesQueryService, ListAllResourcesUseCase, ResourceS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct ListAllResourcesUseCaseHelper<'a> {
+    all_resources_query_service: &'a dyn AllResourcesQueryService,
+}
+
+impl<'a> ListAllResourcesUseCaseHelper<'a> {
+    pub fn new(all_resources_query_service: &'a dyn AllResourcesQueryService) -> Self {
+        Self {
+            all_resources_query_service,
+        }
+    }
+
+    pub async fn execute(
+        &self,
+        account_id: odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
+        self.all_resources_query_service
+            .list_all_snapshots(account_id, pagination)
+            .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[component]
 #[interface(dyn ListAllResourcesUseCase)]
 pub struct ListAllResourcesUseCaseImpl {
@@ -29,9 +53,9 @@ impl ListAllResourcesUseCase for ListAllResourcesUseCaseImpl {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
-        self.all_resources_query_service
-            .list_all_snapshots(account_id, pagination)
-            .await
+        let helper = ListAllResourcesUseCaseHelper::new(self.all_resources_query_service.as_ref());
+
+        helper.execute(account_id, pagination).await
     }
 }
 

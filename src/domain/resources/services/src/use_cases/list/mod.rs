@@ -15,5 +15,6 @@ mod variable_set;
 
 pub use list_all::*;
 pub use secret_set::*;
+pub use shared::*;
 pub use storage::*;
 pub use variable_set::*;

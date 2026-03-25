@@ -7,8 +7,47 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::{
+    GetResourceByIdError,
+    ReconcilableEventSourcedResource,
+    ResourceID,
+    ResourceQueryService,
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct GetResourceByIdUseCaseHelper<'a, R>
+where
+    R: ReconcilableEventSourcedResource,
+{
+    resource_query_service: &'a dyn ResourceQueryService<R>,
+}
+
+impl<'a, R> GetResourceByIdUseCaseHelper<'a, R>
+where
+    R: ReconcilableEventSourcedResource,
+{
+    pub fn new(resource_query_service: &'a dyn ResourceQueryService<R>) -> Self {
+        Self {
+            resource_query_service,
+        }
+    }
+
+    pub async fn execute(
+        &self,
+        account_id: odf::AccountID,
+        id: &ResourceID,
+    ) -> Result<R::ResourceState, GetResourceByIdError> {
+        self.resource_query_service
+            .get_state_by_id(account_id, id)
+            .await
+            .map_err(GetResourceByIdError::from)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[macro_export]
 macro_rules! declare_get_resource_by_id_use_case {
     (
         use_case = $use_case:ident,
@@ -31,15 +70,16 @@ macro_rules! declare_get_resource_by_id_use_case {
                 <$resource as $crate::domain::DeclarativeResource>::ResourceState,
                 $crate::domain::GetResourceByIdError,
             > {
-                self.resource_query_service
-                    .get_state_by_id(account_id, id)
-                    .await
-                    .map_err($crate::domain::GetResourceByIdError::from)
+                let helper = $crate::GetResourceByIdUseCaseHelper::<$resource>::new(
+                    self.resource_query_service.as_ref(),
+                );
+
+                helper.execute(account_id, id).await
             }
         }
     };
 }
 
-pub(crate) use declare_get_resource_by_id_use_case;
+pub use declare_get_resource_by_id_use_case;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
