@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod all_resources_query_service;
-mod resource_aggregate_loader;
-mod resource_persistence_service;
-mod resource_query_service;
-mod resource_reconciler;
+mod apply;
+mod delete;
+mod get_by_id;
+mod list;
+mod reconcile;
 
-pub use all_resources_query_service::*;
-pub use resource_aggregate_loader::*;
-pub use resource_persistence_service::*;
-pub use resource_query_service::*;
-pub use resource_reconciler::*;
+pub use apply::*;
+pub use delete::*;
+pub use get_by_id::*;
+pub use list::*;
+pub use reconcile::*;

@@ -7,20 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::PaginationOpts;
 use dill::{component, interface};
-use tokio_stream::StreamExt;
 
-use crate::domain::{ListAllResourcesUseCase, ResourceRepository, ResourceSnapshot};
+use crate::domain::{AllResourcesQueryService, ListAllResourcesUseCase, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
 #[interface(dyn ListAllResourcesUseCase)]
 pub struct ListAllResourcesUseCaseImpl {
-    resource_repository: Arc<dyn ResourceRepository>,
+    all_resources_query_service: std::sync::Arc<dyn AllResourcesQueryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,16 +29,9 @@ impl ListAllResourcesUseCase for ListAllResourcesUseCaseImpl {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
-        let mut resource_snapshots_stream = self
-            .resource_repository
-            .list_all_resource_snapshots(account_id, pagination);
-
-        let mut resource_snapshots = Vec::new();
-        while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
-            resource_snapshots.push(resource_snapshot?);
-        }
-
-        Ok(resource_snapshots)
+        self.all_resources_query_service
+            .list_all_snapshots(account_id, pagination)
+            .await
     }
 }
 

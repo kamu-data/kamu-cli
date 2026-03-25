@@ -19,7 +19,11 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<SecretSetDeleteResourcesUseCaseImpl>();
     catalog_builder.add::<StorageDeleteResourcesUseCaseImpl>();
 
+    catalog_builder.add::<AllResourcesQueryServiceImpl>();
     catalog_builder.add::<VariableSetEventStoreBridge>();
+    catalog_builder.add::<VariableSetResourceAggregateLoaderImpl>();
+    catalog_builder.add::<VariableSetResourcePersistenceServiceImpl>();
+    catalog_builder.add::<VariableSetResourceQueryServiceImpl>();
     catalog_builder.add::<VariableSetGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<VariableSetListResourcesByKindUseCaseImpl>();
     catalog_builder.add::<VariableSetReconcileResourceUseCaseImpl>();
@@ -27,6 +31,9 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
 
     catalog_builder.add::<SecretSetApplyResourceUseCaseImpl>();
     catalog_builder.add::<SecretSetEventStoreBridge>();
+    catalog_builder.add::<SecretSetResourceAggregateLoaderImpl>();
+    catalog_builder.add::<SecretSetResourcePersistenceServiceImpl>();
+    catalog_builder.add::<SecretSetResourceQueryServiceImpl>();
     catalog_builder.add::<SecretSetGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<SecretSetListResourcesByKindUseCaseImpl>();
     catalog_builder.add::<SecretSetReconcileResourceUseCaseImpl>();
@@ -34,6 +41,9 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
 
     catalog_builder.add::<StorageApplyResourceUseCaseImpl>();
     catalog_builder.add::<StorageEventStoreBridge>();
+    catalog_builder.add::<StorageResourceAggregateLoaderImpl>();
+    catalog_builder.add::<StorageResourcePersistenceServiceImpl>();
+    catalog_builder.add::<StorageResourceQueryServiceImpl>();
     catalog_builder.add::<StorageGetResourceByIdUseCaseImpl>();
     catalog_builder.add::<StorageListResourcesByKindUseCaseImpl>();
     catalog_builder.add::<StorageReconcileResourceUseCaseImpl>();

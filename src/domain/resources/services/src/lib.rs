@@ -9,21 +9,14 @@
 
 use kamu_resources as domain;
 
-mod apply;
-mod delete;
 mod dependencies;
-pub mod event_stores;
-pub mod get_by_id;
-pub mod list;
-mod reconcile;
+mod event_stores;
 mod reconcilers;
-mod resource_snapshot_sync;
+mod services;
+mod use_cases;
 
-pub use apply::*;
-pub use delete::*;
 pub use dependencies::*;
 pub use event_stores::*;
-pub use get_by_id::*;
-pub use list::*;
-pub use reconcile::*;
 pub use reconcilers::*;
+pub use services::*;
+pub use use_cases::*;

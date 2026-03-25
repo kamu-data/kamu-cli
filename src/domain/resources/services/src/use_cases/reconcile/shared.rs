@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::EventID;
 use serde::Serialize;
 
 use crate::domain::{
@@ -18,18 +17,16 @@ use crate::domain::{
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceDescriptorProvider,
-    ResourceRepository,
+    ResourcePersistenceError,
+    ResourcePersistenceService,
     ResourceStatusLike,
 };
-use crate::resource_snapshot_sync::{SyncResourceSnapshotError, sync_resource_snapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn persist_resource_state<R>(
-    event_store: &R::Store,
-    resource_repository: &dyn ResourceRepository,
+    resource_persistence_service: &dyn ResourcePersistenceService<R>,
     resource: &mut R,
-    expected_last_event_id: Option<EventID>,
 ) -> Result<(), ReconcileResourceUseCaseError<R>>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
@@ -37,24 +34,22 @@ where
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    // Events and the snapshot projection are updated together from the use case,
-    // so both stores observe the same aggregate revision boundary.
-    match resource.aggregate_mut().save(event_store).await {
+    match resource_persistence_service.save(resource).await {
         Ok(()) => {}
-        Err(event_sourcing::SaveError::ConcurrentModification(err)) => {
+        Err(ResourcePersistenceError::Duplicate(_)) => {
+            return Err(ReconcileResourceUseCaseError::SnapshotSyncFailed(
+                internal_error::InternalError::new(
+                    "Unexpected duplicate resource state while reconciling existing resource",
+                ),
+            ));
+        }
+        Err(ResourcePersistenceError::ConcurrentModification(err)) => {
             return Err(ReconcileResourceUseCaseError::ConcurrentModification(err));
         }
-        Err(err) => {
+        Err(ResourcePersistenceError::SaveFailed(err)) => {
             return Err(ReconcileResourceUseCaseError::SaveFailed(err));
         }
-    }
-
-    match sync_resource_snapshot(resource_repository, resource, expected_last_event_id).await {
-        Ok(()) => {}
-        Err(SyncResourceSnapshotError::ConcurrentModification(err)) => {
-            return Err(ReconcileResourceUseCaseError::ConcurrentModification(err));
-        }
-        Err(SyncResourceSnapshotError::Internal(err)) => {
+        Err(ResourcePersistenceError::Internal(err)) => {
             return Err(ReconcileResourceUseCaseError::SnapshotSyncFailed(err));
         }
     }
@@ -65,8 +60,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn start_reconciliation_phase<R>(
-    event_store: &R::Store,
-    resource_repository: &dyn ResourceRepository,
+    resource_persistence_service: &dyn ResourcePersistenceService<R>,
     mut resource: R,
     now: DateTime<Utc>,
 ) -> Result<R, ReconcileResourceUseCaseError<R>>
@@ -81,15 +75,8 @@ where
     resource
         .try_mark_reconciliation_started(now)
         .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
-    let expected_last_event_id = resource.aggregate().last_stored_event_id();
 
-    persist_resource_state(
-        event_store,
-        resource_repository,
-        &mut resource,
-        expected_last_event_id,
-    )
-    .await?;
+    persist_resource_state(resource_persistence_service, &mut resource).await?;
 
     Ok(resource)
 }
@@ -97,8 +84,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn finish_reconciliation_phase<R>(
-    event_store: &R::Store,
-    resource_repository: &dyn ResourceRepository,
+    resource_persistence_service: &dyn ResourcePersistenceService<R>,
     reconciler: &dyn Reconciler<R>,
     mut resource: R,
     now: DateTime<Utc>,
@@ -123,15 +109,7 @@ where
                 .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
         }
     }
-    let expected_last_event_id = resource.aggregate().last_stored_event_id();
-
-    persist_resource_state(
-        event_store,
-        resource_repository,
-        &mut resource,
-        expected_last_event_id,
-    )
-    .await
+    persist_resource_state(resource_persistence_service, &mut resource).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,8 +130,10 @@ macro_rules! declare_reconcile_resource_use_case {
 
         impl $use_case {
             #[::database_common_macros::transactional_method2(
-                        event_store: std::sync::Arc<dyn $crate::domain::$store_trait>,
-                        resource_repository: std::sync::Arc<dyn $crate::domain::ResourceRepository>
+                        resource_aggregate_loader:
+                            std::sync::Arc<dyn $crate::domain::ResourceAggregateLoader<$resource>>,
+                        resource_persistence_service:
+                            std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>
                     )]
             async fn start_reconciliation_phase(
                 &self,
@@ -164,16 +144,16 @@ macro_rules! declare_reconcile_resource_use_case {
 
                 // Load and persist the first transition inside a single
                 // transaction, then return the committed aggregate state.
-                let resource = <$resource>::load(&id, event_store.as_ref())
+                let resource = resource_aggregate_loader
+                    .load(&id)
                     .await
                     .map_err($crate::domain::ReconcileResourceUseCaseError::LoadFailed)?;
                 if !resource.needs_reconciliation() {
                     return Ok(None);
                 }
 
-                let resource = $crate::reconcile::shared::start_reconciliation_phase(
-                    event_store.as_ref(),
-                    resource_repository.as_ref(),
+                let resource = $crate::use_cases::reconcile::shared::start_reconciliation_phase(
+                    resource_persistence_service.as_ref(),
                     resource,
                     self.time_source.now(),
                 )
@@ -182,9 +162,9 @@ macro_rules! declare_reconcile_resource_use_case {
                 Ok(Some(resource))
             }
 
-            #[::database_common_macros::transactional_method2(
-                        event_store: std::sync::Arc<dyn $crate::domain::$store_trait>,
-                        resource_repository: std::sync::Arc<dyn $crate::domain::ResourceRepository>
+            #[::database_common_macros::transactional_method1(
+                        resource_persistence_service:
+                            std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>
                     )]
             async fn finish_reconciliation_phase(
                 &self,
@@ -192,9 +172,8 @@ macro_rules! declare_reconcile_resource_use_case {
             ) -> Result<(), $crate::domain::ReconcileResourceUseCaseError<$resource>> {
                 // Resume from the aggregate returned by phase 1 and record the
                 // reconciler outcome in a new transaction.
-                $crate::reconcile::shared::finish_reconciliation_phase(
-                    event_store.as_ref(),
-                    resource_repository.as_ref(),
+                $crate::use_cases::reconcile::shared::finish_reconciliation_phase(
+                    resource_persistence_service.as_ref(),
                     self.reconciler.as_ref(),
                     resource,
                     self.time_source.now(),
