@@ -656,6 +656,8 @@ async fn test_sync_to_from_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_sync_to_from_s3() {
     let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
     let tmp_workspace_dir_foo = tempfile::tempdir().unwrap();
     let tmp_workspace_dir_bar = tempfile::tempdir().unwrap();
 

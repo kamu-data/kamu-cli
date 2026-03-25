@@ -18,7 +18,6 @@ use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
 use kamu_adapter_http::{BearerHeader, OdfSmtpVersion};
 use kamu_core::TenancyConfig;
 use odf::metadata::testing::MetadataFactory;
-use test_utils::TEST_BUCKET_NAME;
 use url::Url;
 
 use crate::harness::{
@@ -27,7 +26,6 @@ use crate::harness::{
     ServerSideLocalFsHarness,
     ServerSideS3Harness,
     commit_add_data_event,
-    make_dataset_ref,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -343,7 +341,7 @@ async fn test_pull_object_url_s3() {
             physical_hash == test_case.data_slice_object().physical_hash &&
             download_from_url.path() == format!(
                 "/{}/{}/data/{}",
-                TEST_BUCKET_NAME,
+                server_harness.bucket(),
                 test_case.dataset_id.as_multibase(),
                 physical_hash.as_multibase()
             ).as_str() &&
@@ -369,7 +367,7 @@ async fn test_pull_object_url_s3() {
             physical_hash == test_case.checkpoint_object().physical_hash &&
             download_from_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
-                TEST_BUCKET_NAME,
+                server_harness.bucket(),
                 test_case.dataset_id.as_multibase(),
                 physical_hash.as_multibase()
             )
@@ -419,7 +417,7 @@ async fn test_pull_object_url_s3() {
             object_type == messages::ObjectType::DataSlice &&
             upload_to_url.path() == format!(
                 "/{}/{}/data/{}",
-                TEST_BUCKET_NAME,
+                server_harness.bucket(),
                 test_case.dataset_id.as_multibase(),
                 physical_hash.as_multibase()
             ).as_str() &&
@@ -444,7 +442,7 @@ async fn test_pull_object_url_s3() {
             object_type == messages::ObjectType::Checkpoint &&
             upload_to_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
-                TEST_BUCKET_NAME,
+                server_harness.bucket(),
                 test_case.dataset_id.as_multibase(),
                 physical_hash.as_multibase()
             )
@@ -491,8 +489,7 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
 
     let commit_result = commit_add_data_event(
         server_harness.cli_dataset_registry().as_ref(),
-        &make_dataset_ref(None, "foo"),
-        &server_harness.dataset_layout(&create_result.dataset_handle),
+        &create_result.dataset_handle,
         None,
     )
     .await;

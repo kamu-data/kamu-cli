@@ -69,8 +69,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
             commit_result = Some(
                 commit_add_data_event(
                     server_harness.cli_dataset_registry().as_ref(),
-                    &server_dataset_ref,
-                    &server_dataset_layout,
+                    &server_create_result.dataset_handle,
                     commit_result.map(|r| r.new_head),
                 )
                 .await,

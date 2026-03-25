@@ -182,10 +182,11 @@ impl DatasetFactoryImpl {
         //             by an endpoint.
 
         use super::DatasetS3BuilderDefault;
-        let mut s3_context = S3Context::from_url(&base_url).await;
-        if let Some(metrics) = maybe_s3_metrics {
-            s3_context = s3_context.with_metrics(metrics);
-        }
+        let s3_context = S3Context::builder()
+            .with_url(&base_url)
+            .maybe(maybe_s3_metrics, |b, v| b.with_metrics(v))
+            .build()
+            .await;
 
         DatasetImpl::new(
             MetadataChainImpl::new(

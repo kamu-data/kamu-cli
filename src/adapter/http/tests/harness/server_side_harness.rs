@@ -33,7 +33,6 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
-use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
@@ -69,8 +68,6 @@ pub(crate) trait ServerSideHarness {
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
-
-    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
 
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 

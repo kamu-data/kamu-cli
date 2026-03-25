@@ -32,7 +32,6 @@ use kamu_datasets_services::{
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -1448,16 +1447,13 @@ impl CompactTestHarness {
     async fn new_s3(s3: &LocalS3Server) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
-        let s3_context = S3Context::from_url(&s3.url).await;
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-                s3_context.clone(),
-            ))
+            .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<AlwaysHappyDatasetActionAuthorizer>()
@@ -1466,7 +1462,12 @@ impl CompactTestHarness {
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
+            .add_builder(ObjectStoreBuilderS3::builder(
+                s3.ctx.clone(),
+                true,
+                Some(s3.access_key.clone()),
+                Some(s3.secret_key.clone()),
+            ))
             .add::<VerificationServiceImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()

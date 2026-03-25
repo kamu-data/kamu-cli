@@ -1495,8 +1495,10 @@ async fn test_simple_push_to_s3_smart_pull(
     )
     .await;
 
-    let s3_server = LocalS3Server::new().await;
-    let dataset_url = format!("{}/e2e-user/{}", s3_server.url, dataset_alias.dataset_name);
+    let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
+    let dataset_url = format!("{}e2e-user/{}", s3.url, dataset_alias.dataset_name);
 
     // Push dataset
     kamu.assert_success_command_execution(

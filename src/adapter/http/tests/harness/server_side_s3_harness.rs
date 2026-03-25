@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -42,8 +41,6 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::DatasetLayout;
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
@@ -78,7 +75,7 @@ impl ServerSideS3Harness {
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let s3 = LocalS3Server::new().await;
-        let s3_context = S3Context::from_url(&s3.url).await;
+        s3.set_credentials_env_vars();
 
         let time_source = SystemTimeSourceStub::new();
 
@@ -121,9 +118,7 @@ impl ServerSideS3Harness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-                    s3_context.clone(),
-                ))
+                .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
                 .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
@@ -132,7 +127,12 @@ impl ServerSideS3Harness {
                 .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
-                .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
+                .add_builder(ObjectStoreBuilderS3::builder(
+                    s3.ctx.clone(),
+                    true,
+                    Some(s3.access_key.clone()),
+                    Some(s3.secret_key.clone()),
+                ))
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -203,8 +203,8 @@ impl ServerSideS3Harness {
         }
     }
 
-    pub fn internal_bucket_folder_path(&self) -> PathBuf {
-        self.s3.tmp_dir.path().join(&self.s3.bucket)
+    pub fn bucket(&self) -> &str {
+        &self.s3.bucket
     }
 }
 
@@ -304,14 +304,6 @@ impl ServerSideHarness for ServerSideS3Harness {
 
     fn api_server_account(&self) -> Account {
         self.account.clone()
-    }
-
-    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
-        DatasetLayout::new(
-            self.internal_bucket_folder_path()
-                .join(dataset_handle.id.as_multibase().to_stack_string())
-                .as_path(),
-        )
     }
 
     fn system_time_source(&self) -> &SystemTimeSourceStub {

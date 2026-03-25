@@ -12,7 +12,6 @@ use std::sync::Arc;
 use datafusion::execution::object_store::ObjectStoreRegistry;
 use kamu::*;
 use object_store::ObjectStoreExt as _;
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use url::Url;
 
@@ -20,10 +19,14 @@ use url::Url;
 #[test_log::test(tokio::test)]
 async fn test_auth_explicit_endpoint() {
     let s3 = LocalS3Server::new().await;
-    let s3_ctx = S3Context::from_url(&s3.url).await;
 
     let store_url = Url::parse(&format!("s3://{}/", s3.bucket)).unwrap();
-    let reg = ObjectStoreRegistryImpl::new(vec![Arc::new(ObjectStoreBuilderS3::new(s3_ctx, true))]);
+    let reg = ObjectStoreRegistryImpl::new(vec![Arc::new(ObjectStoreBuilderS3::new(
+        s3.ctx.clone(),
+        true,
+        Some(s3.access_key.clone()),
+        Some(s3.secret_key.clone()),
+    ))]);
     let store = reg.get_store(&store_url).unwrap();
 
     let path = object_store::path::Path::parse("asdf").unwrap();

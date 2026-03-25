@@ -125,13 +125,8 @@ impl<TServerHarness: ServerSideHarness>
             .await
             .unwrap();
 
-        let server_commit_result = commit_add_data_event(
-            server_repo.as_ref(),
-            &server_dataset_ref,
-            &server_dataset_layout,
-            None,
-        )
-        .await;
+        let server_commit_result =
+            commit_add_data_event(server_repo.as_ref(), &server_dataset_handle, None).await;
 
         // Let's pretend that previous attempts uploaded some data files, but the rest
         // was discarded. To mimic this, artificially copy just the data folder,

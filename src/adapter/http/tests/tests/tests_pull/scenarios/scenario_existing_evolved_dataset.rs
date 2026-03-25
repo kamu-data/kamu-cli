@@ -119,13 +119,8 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingEvolvedDatasetScenario<
             .await
             .unwrap();
 
-        let server_commit_result = commit_add_data_event(
-            server_repo.as_ref(),
-            &server_dataset_ref,
-            &server_dataset_layout,
-            None,
-        )
-        .await;
+        let server_commit_result =
+            commit_add_data_event(server_repo.as_ref(), &server_dataset_handle, None).await;
 
         let server_alias = odf::DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);

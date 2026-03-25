@@ -67,7 +67,7 @@ struct Harness {
 impl Harness {
     async fn new() -> Self {
         let s3 = LocalS3Server::new().await;
-        let s3_upload_context = S3Context::from_url(&s3.url).await;
+        let s3_upload_context = s3.ctx.clone();
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

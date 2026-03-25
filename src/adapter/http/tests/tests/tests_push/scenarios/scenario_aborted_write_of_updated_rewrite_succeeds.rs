@@ -125,13 +125,8 @@ impl<TServerHarness: ServerSideHarness>
             .await
             .unwrap();
 
-        let client_commit_result = commit_add_data_event(
-            client_registry.as_ref(),
-            &client_dataset_ref,
-            &client_dataset_layout,
-            None,
-        )
-        .await;
+        let client_commit_result =
+            commit_add_data_event(client_registry.as_ref(), &client_dataset_handle, None).await;
 
         // Let's pretend that previous attempts uploaded new data files, but the commit
         // did not succeed in general. To mimic this, artificially copy just the

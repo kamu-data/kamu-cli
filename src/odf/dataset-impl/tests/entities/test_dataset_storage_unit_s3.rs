@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use opendatafabric_dataset_impl::{DatasetStorageUnitS3, S3RegistryCache};
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
@@ -25,12 +24,10 @@ struct S3StorageUnitHarness {
 
 impl S3StorageUnitHarness {
     pub async fn create(s3: &LocalS3Server, registry_caching: bool) -> Self {
-        let s3_context = S3Context::from_url(&s3.url).await;
-
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<SystemTimeSourceDefault>()
-            .add_builder(DatasetStorageUnitS3::builder(s3_context))
+            .add_builder(DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
         if registry_caching {

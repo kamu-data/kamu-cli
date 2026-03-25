@@ -27,9 +27,7 @@ async fn test_dataset_parquet_schema(catalog: &dill::Catalog, tempdir: &TempDir)
         .unwrap();
     assert!(schema.is_some());
 
-    let mut buf = Vec::new();
-    odf::utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
-    let schema_content = String::from_utf8(buf).unwrap();
+    let schema_content = odf::utils::schema::format::format_schema_parquet_json(&schema.unwrap());
     let data_schema_json =
         serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();
 
@@ -119,8 +117,9 @@ async fn test_dataset_schema_local_fs() {
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_s3() {
-    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
-    test_dataset_schema(&catalog, &s3.tmp_dir).await;
+    let tempdir = tempfile::tempdir().unwrap();
+    let (_s3, catalog) = prepare_schema_test_s3_catalog().await;
+    test_dataset_schema(&catalog, &tempdir).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,8 +127,9 @@ async fn test_dataset_schema_s3() {
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_parquet_schema_s3() {
-    let (s3, catalog) = prepare_schema_test_s3_catalog().await;
-    test_dataset_parquet_schema(&catalog, &s3.tmp_dir).await;
+    let tempdir = tempfile::tempdir().unwrap();
+    let (_s3, catalog) = prepare_schema_test_s3_catalog().await;
+    test_dataset_parquet_schema(&catalog, &tempdir).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

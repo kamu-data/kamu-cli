@@ -67,8 +67,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingRefCollisionScenarion<T
             make_dataset_ref(client_account_name.as_ref(), "foo");
         commit_add_data_event(
             client_harness.dataset_registry().as_ref(),
-            &client_dataset_ref,
-            &client_dataset_layout,
+            &client_create_result.dataset_handle,
             None,
         )
         .await;

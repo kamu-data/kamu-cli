@@ -121,8 +121,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
 
         let client_commit_result = commit_add_data_event(
             client_registry.as_ref(),
-            &client_dataset_ref,
-            &client_dataset_layout,
+            &client_create_result.dataset_handle,
             None,
         )
         .await;

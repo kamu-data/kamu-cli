@@ -53,7 +53,6 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::DatasetLayout;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
@@ -336,13 +335,6 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
             .as_str(),
         )
         .unwrap()
-    }
-
-    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
-        let root_path = self
-            .internal_datasets_folder_path()
-            .join(dataset_handle.id.as_multibase().to_stack_string());
-        DatasetLayout::new(root_path.as_path())
     }
 
     fn system_time_source(&self) -> &SystemTimeSourceStub {

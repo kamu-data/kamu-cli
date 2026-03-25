@@ -13769,6 +13769,7 @@ dependencies = [
  "axum",
  "container-runtime",
  "rand 0.9.2",
+ "s3-utils",
  "tempfile",
  "tokio",
  "tower",
