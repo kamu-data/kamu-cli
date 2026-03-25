@@ -9,5 +9,4 @@
 
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";
-pub const MINIO: &str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
 pub const RUSTFS: &str = "docker.io/rustfs/rustfs:1.0.0-alpha.90";

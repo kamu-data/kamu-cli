@@ -45,7 +45,7 @@ odf = { workspace = true, features = ["utoipa"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 
-aws-sdk-s3 = { workspace = true }
+aws-sdk-s3 = { version = "1", default-features = false }
 
 axum = { version = "0.8", features = ["ws", "multipart"] }
 axum-extra = { version = "0.12", features = [

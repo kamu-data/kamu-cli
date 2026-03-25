@@ -42,7 +42,7 @@ async fn test_setup_pull_images() {
         .await
         .unwrap();
     container_runtime
-        .ensure_image(test_docker_images::MINIO, None)
+        .ensure_image(test_docker_images::RUSTFS, None)
         .await
         .unwrap();
 
