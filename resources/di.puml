@@ -23,6 +23,7 @@ interface "AccountRepository" <<i>>
 interface "AccountService" <<i>>
 interface "AppendDatasetMetadataBatchUseCase" <<i>>
 interface "ApplyAccountDatasetRelationsUseCase" <<i>>
+interface "ApplyResourceUseCase" <<i>>
 interface "AuthenticationProvider" <<i>>
 interface "AuthenticationService" <<i>>
 interface "BackgroundAgent" <<i>>
@@ -324,6 +325,7 @@ class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
 class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
+class "SecretSetApplyResourceUseCaseImpl"
 class "SecretSetDeleteResourcesUseCaseImpl"
 class "SecretSetEventStoreBridge"
 class "SecretSetGetResourceByIdUseCaseImpl"
@@ -374,6 +376,7 @@ class "SqliteTransactionManager"
 class "SqliteWeb3AuthEip4361NonceRepository"
 class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
+class "StorageApplyResourceUseCaseImpl"
 class "StorageDeleteResourcesUseCaseImpl"
 class "StorageEventStoreBridge"
 class "StorageGetResourceByIdUseCaseImpl"
@@ -394,6 +397,7 @@ class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
+class "VariableSetApplyResourceUseCaseImpl"
 class "VariableSetDeleteResourcesUseCaseImpl"
 class "VariableSetEventStoreBridge"
 class "VariableSetGetResourceByIdUseCaseImpl"
@@ -906,6 +910,18 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
+"ApplyResourceUseCase" <|-- "SecretSetApplyResourceUseCaseImpl"
+"SecretSetApplyResourceUseCaseImpl"  --> "ResourceRepository"
+"SecretSetApplyResourceUseCaseImpl"  --> "SecretSetEventStore"
+"SecretSetApplyResourceUseCaseImpl"  --> "SystemTimeSource"
+"ApplyResourceUseCase" <|-- "StorageApplyResourceUseCaseImpl"
+"StorageApplyResourceUseCaseImpl"  --> "ResourceRepository"
+"StorageApplyResourceUseCaseImpl"  --> "StorageEventStore"
+"StorageApplyResourceUseCaseImpl"  --> "SystemTimeSource"
+"ApplyResourceUseCase" <|-- "VariableSetApplyResourceUseCaseImpl"
+"VariableSetApplyResourceUseCaseImpl"  --> "ResourceRepository"
+"VariableSetApplyResourceUseCaseImpl"  --> "VariableSetEventStore"
+"VariableSetApplyResourceUseCaseImpl"  --> "SystemTimeSource"
 "DeleteResourcesUseCase" <|-- "SecretSetDeleteResourcesUseCaseImpl"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "ResourceRepository"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "SecretSetEventStore"
