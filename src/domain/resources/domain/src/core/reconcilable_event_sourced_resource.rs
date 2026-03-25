@@ -43,14 +43,18 @@ pub trait ReconcilableEventSourcedResource:
             Event = ReconcilableResourceEvent<
                 Self::Spec,
                 Self::ReconcileSuccess,
-                Self::FailureDetails,
+                Self::ReconcileFailureDetails,
             >,
         >,
     > + AggregateAccess<Projection = Self::ResourceState>
 {
     fn apply_event(
         &mut self,
-        event: ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails>,
+        event: ReconcilableResourceEvent<
+            Self::Spec,
+            Self::ReconcileSuccess,
+            Self::ReconcileFailureDetails,
+        >,
     ) -> Result<(), Self::LifecycleError>
     where
         Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
@@ -65,7 +69,8 @@ pub trait ReconcilableEventSourcedResource:
         resource_id: ResourceID,
         metadata: ResourceMetadataInput,
         spec: Self::Spec,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             resource_id,
@@ -78,7 +83,8 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         new_metadata: ResourceMetadataInput,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::MetadataUpdated(ResourceEventMetadataUpdated {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -91,7 +97,8 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         new_spec: Self::Spec,
         new_generation: u64,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -104,7 +111,8 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         tombstone_name: String,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -132,7 +140,8 @@ pub trait ReconcilableEventSourcedResource:
     fn make_reconciliation_started_event(
         &self,
         now: DateTime<Utc>,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -145,7 +154,8 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         expected_generation: u64,
         success: Self::ReconcileSuccess,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
             event_time: now,
             resource_id: *self.resource_id(),
@@ -159,14 +169,15 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::FailureDetails> {
+    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
+    {
         ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
             event_time: now,
             resource_id: *self.resource_id(),
             generation: expected_generation,
             reason: error.reason_code().to_string(),
             message: error.user_message(),
-            details: Self::failure_details(error),
+            details: Self::reconcile_failure_details(error),
         })
     }
 
@@ -233,14 +244,14 @@ macro_rules! impl_reconcilable_event_sourced_resource {
         resource = $resource:ty,
         reconcile_success = $reconcile_success:ty,
         reconcile_error = $reconcile_error:ty,
-        failure_details = $failure_details:ty,
+        reconcile_failure_details = $reconcile_failure_details:ty,
         lifecycle_error = $lifecycle_error:ty,
-        failure_details_fn = |$error:ident| $body:block
+        reconcile_failure_details_fn = |$error:ident| $body:block
     ) => {
         impl $crate::ReconcilableResource for $resource {
             type ReconcileSuccess = $reconcile_success;
             type ReconcileError = $reconcile_error;
-            type FailureDetails = $failure_details;
+            type ReconcileFailureDetails = $reconcile_failure_details;
             type LifecycleError = $lifecycle_error;
 
             fn try_create(
@@ -324,7 +335,7 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 )
             }
 
-            fn failure_details($error: &Self::ReconcileError) -> Self::FailureDetails $body
+            fn reconcile_failure_details($error: &Self::ReconcileError) -> Self::ReconcileFailureDetails $body
         }
 
         impl $crate::ReconcilableEventSourcedResource for $resource {

@@ -14,6 +14,7 @@ mod reconcilable_resource;
 mod reconcilable_resource_event;
 mod reconcilable_state_model;
 mod reconcilable_status_projector;
+mod resource_descriptor;
 mod resource_snapshot;
 
 pub use declarative_resource::*;
@@ -23,4 +24,5 @@ pub use reconcilable_resource::*;
 pub use reconcilable_resource_event::*;
 pub use reconcilable_state_model::*;
 pub use reconcilable_status_projector::*;
+pub use resource_descriptor::*;
 pub use resource_snapshot::*;

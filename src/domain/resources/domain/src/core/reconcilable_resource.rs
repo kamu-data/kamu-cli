@@ -16,7 +16,7 @@ use crate::{DeclarativeResource, ResourceReconcileError};
 pub trait ReconcilableResource: DeclarativeResource {
     type ReconcileSuccess;
     type ReconcileError: ResourceReconcileError;
-    type FailureDetails;
+    type ReconcileFailureDetails;
     type LifecycleError;
 
     fn needs_reconciliation(&self) -> bool {
@@ -27,7 +27,7 @@ pub trait ReconcilableResource: DeclarativeResource {
             .needs_reconciliation(self.metadata().generation)
     }
 
-    fn failure_details(error: &Self::ReconcileError) -> Self::FailureDetails;
+    fn reconcile_failure_details(error: &Self::ReconcileError) -> Self::ReconcileFailureDetails;
 
     fn try_create(
         now: DateTime<Utc>,

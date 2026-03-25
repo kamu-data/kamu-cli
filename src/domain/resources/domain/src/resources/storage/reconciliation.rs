@@ -75,9 +75,9 @@ crate::impl_reconcilable_event_sourced_resource!(
     resource = StorageResource,
     reconcile_success = StorageReconcileSuccess,
     reconcile_error = StorageReconcileError,
-    failure_details = StorageFailureDetails,
+    reconcile_failure_details = StorageFailureDetails,
     lifecycle_error = StorageLifecycleError,
-    failure_details_fn = |_error| {
+    reconcile_failure_details_fn = |_error| {
         StorageFailureDetails {
             references: StorageReferenceStatus::default(),
         }

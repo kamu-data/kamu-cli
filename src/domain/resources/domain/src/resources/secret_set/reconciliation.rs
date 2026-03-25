@@ -23,9 +23,9 @@ crate::impl_reconcilable_event_sourced_resource!(
     resource = SecretSetResource,
     reconcile_success = SecretSetReconcileSuccess,
     reconcile_error = SecretSetReconcileError,
-    failure_details = SecretSetFailureDetails,
+    reconcile_failure_details = SecretSetFailureDetails,
     lifecycle_error = SecretSetLifecycleError,
-    failure_details_fn = |_error| {
+    reconcile_failure_details_fn = |_error| {
         SecretSetFailureDetails {
             stats: SecretSetStats::default(),
         }

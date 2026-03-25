@@ -56,7 +56,7 @@ where
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
     TCreate: FnOnce(
         crate::ResourceID,
-        ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::FailureDetails>,
+        ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::ReconcileFailureDetails>,
     ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
 {
     metadata.validate()?;

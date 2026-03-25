@@ -23,9 +23,9 @@ crate::impl_reconcilable_event_sourced_resource!(
     resource = VariableSetResource,
     reconcile_success = VariableSetReconcileSuccess,
     reconcile_error = VariableSetReconcileError,
-    failure_details = VariableSetFailureDetails,
+    reconcile_failure_details = VariableSetFailureDetails,
     lifecycle_error = VariableSetLifecycleError,
-    failure_details_fn = |_error| {
+    reconcile_failure_details_fn = |_error| {
         VariableSetFailureDetails {
             stats: VariableSetStats::default(),
         }
