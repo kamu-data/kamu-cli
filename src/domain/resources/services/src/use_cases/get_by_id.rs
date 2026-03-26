@@ -54,21 +54,21 @@ macro_rules! declare_get_resource_by_id_use_case {
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::GetResourceByIdUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::GetResourceByIdUseCase<$resource>)]
         pub struct $use_case {
             resource_query_service:
-                std::sync::Arc<dyn $crate::domain::ResourceQueryService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::GetResourceByIdUseCase<$resource> for $use_case {
+        impl kamu_resources::GetResourceByIdUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
-                id: &$crate::domain::ResourceID,
+                id: &kamu_resources::ResourceID,
             ) -> Result<
-                <$resource as $crate::domain::DeclarativeResource>::ResourceState,
-                $crate::domain::GetResourceByIdError,
+                <$resource as kamu_resources::DeclarativeResource>::ResourceState,
+                kamu_resources::GetResourceByIdError,
             > {
                 let helper = $crate::GetResourceByIdUseCaseHelper::<$resource>::new(
                     self.resource_query_service.as_ref(),

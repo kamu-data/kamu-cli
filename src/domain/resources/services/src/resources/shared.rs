@@ -12,6 +12,7 @@
 #[macro_export]
 macro_rules! declare_resource_service_layer {
     (
+        domain = $domain:path,
         name = $name:ident,
         resource = $resource:ty,
         state_model = $state_model:ty
@@ -19,22 +20,22 @@ macro_rules! declare_resource_service_layer {
         ::paste::paste! {
             $crate::declare_resource_event_store_bridge!(
                 bridge = [<$name EventStoreBridge>],
-                trait = [<$name EventStore>],
+                store = $domain::[<$name EventStore>],
                 resource = $resource,
-                state = <$state_model as $crate::domain::ReconcilableStateModel>::State,
-                event = <<$state_model as $crate::domain::ReconcilableStateModel>::State as event_sourcing::Projection>::Event
+                state = <$state_model as kamu_resources::ReconcilableStateModel>::State,
+                event = <<$state_model as kamu_resources::ReconcilableStateModel>::State as event_sourcing::Projection>::Event
             );
 
             $crate::declare_resource_aggregate_loader!(
                 loader = [<$name ResourceAggregateLoaderImpl>],
                 resource = $resource,
-                store = [<$name EventStore>]
+                store = $domain::[<$name EventStore>]
             );
 
             $crate::declare_resource_persistence_service!(
                 service = [<$name ResourcePersistenceServiceImpl>],
                 resource = $resource,
-                store = [<$name EventStore>]
+                store = $domain::[<$name EventStore>]
             );
 
             $crate::declare_resource_query_service!(
@@ -44,14 +45,12 @@ macro_rules! declare_resource_service_layer {
 
             $crate::declare_apply_resource_use_case!(
                 use_case = [<$name ApplyResourceUseCaseImpl>],
-                resource = $resource,
-                store = [<$name EventStore>]
+                resource = $resource
             );
 
             $crate::declare_delete_resources_use_case!(
                 use_case = [<$name DeleteResourcesUseCaseImpl>],
-                resource = $resource,
-                store = [<$name EventStore>]
+                resource = $resource
             );
 
             $crate::declare_get_resource_by_id_use_case!(
@@ -66,8 +65,7 @@ macro_rules! declare_resource_service_layer {
 
             $crate::declare_reconcile_resource_use_case!(
                 use_case = [<$name ReconcileResourceUseCaseImpl>],
-                resource = $resource,
-                store = [<$name EventStore>]
+                resource = $resource
             );
 
             pub fn [<register_ $name:snake _resource_service_layer>](
@@ -85,6 +83,7 @@ macro_rules! declare_resource_service_layer {
             }
         }
     };
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

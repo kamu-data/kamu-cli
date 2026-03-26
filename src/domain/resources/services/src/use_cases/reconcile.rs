@@ -123,28 +123,27 @@ where
 macro_rules! declare_reconcile_resource_use_case {
     (
         use_case = $use_case:ident,
-        resource = $resource:ty,
-        store = $store_trait:ident
+        resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ReconcileResourceUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::ReconcileResourceUseCase<$resource>)]
         pub struct $use_case {
             catalog: dill::Catalog,
-            reconciler: std::sync::Arc<dyn $crate::domain::Reconciler<$resource>>,
+            reconciler: std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         impl $use_case {
             #[::database_common_macros::transactional_method2(
                         resource_aggregate_loader:
-                            std::sync::Arc<dyn $crate::domain::ResourceAggregateLoader<$resource>>,
+                            std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         resource_persistence_service:
-                            std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>
+                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>
                     )]
             async fn start_reconciliation_phase(
                 &self,
-                id: $crate::domain::ResourceID,
-            ) -> Result<Option<$resource>, $crate::domain::ReconcileResourceUseCaseError<$resource>>
+                id: kamu_resources::ResourceID,
+            ) -> Result<Option<$resource>, kamu_resources::ReconcileResourceUseCaseError<$resource>>
             {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
@@ -158,16 +157,16 @@ macro_rules! declare_reconcile_resource_use_case {
 
             #[::database_common_macros::transactional_method1(
                         resource_persistence_service:
-                            std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>
+                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>
                     )]
             async fn finish_reconciliation_phase(
                 &self,
                 resource: $resource,
-            ) -> Result<(), $crate::domain::ReconcileResourceUseCaseError<$resource>> {
+            ) -> Result<(), kamu_resources::ReconcileResourceUseCaseError<$resource>> {
                 // Resume from the aggregate returned by phase 1 and record the
                 // reconciler outcome in a new transaction.
                 let resource_aggregate_loader: std::sync::Arc<
-                    dyn $crate::domain::ResourceAggregateLoader<$resource>,
+                    dyn kamu_resources::ResourceAggregateLoader<$resource>,
                 > = self.catalog.get_one().unwrap();
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
@@ -181,11 +180,11 @@ macro_rules! declare_reconcile_resource_use_case {
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ReconcileResourceUseCase<$resource> for $use_case {
+        impl kamu_resources::ReconcileResourceUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
-                id: &$crate::domain::ResourceID,
-            ) -> Result<(), $crate::domain::ReconcileResourceUseCaseError<$resource>> {
+                id: &kamu_resources::ResourceID,
+            ) -> Result<(), kamu_resources::ReconcileResourceUseCaseError<$resource>> {
                 // The public use case only orchestrates the two committed
                 // phases; transaction-scoped dependencies stay inside helpers.
                 let Some(resource) = self.start_reconciliation_phase(id.clone()).await? else {

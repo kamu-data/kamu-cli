@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod secret_set;
-mod variable_set;
+mod storage;
 
-pub use secret_set::*;
-pub use variable_set::*;
+pub use storage::*;

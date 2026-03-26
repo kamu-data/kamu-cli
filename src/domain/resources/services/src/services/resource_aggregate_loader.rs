@@ -14,23 +14,23 @@ macro_rules! declare_resource_aggregate_loader {
     (
         loader = $loader:ident,
         resource = $resource:ty,
-        store = $store_trait:ident
+        store = $store:path
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ResourceAggregateLoader<$resource>)]
+        #[dill::interface(dyn kamu_resources::ResourceAggregateLoader<$resource>)]
         pub struct $loader {
-            event_store: std::sync::Arc<dyn $crate::domain::$store_trait>,
+            event_store: std::sync::Arc<dyn $store>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ResourceAggregateLoader<$resource> for $loader {
+        impl kamu_resources::ResourceAggregateLoader<$resource> for $loader {
             async fn load(
                 &self,
-                resource_id: &$crate::domain::ResourceID,
+                resource_id: &kamu_resources::ResourceID,
             ) -> Result<
                 $resource,
                 event_sourcing::LoadError<
-                    <$resource as $crate::domain::DeclarativeResource>::ResourceState,
+                    <$resource as kamu_resources::DeclarativeResource>::ResourceState,
                 >,
             > {
                 <$resource>::load(resource_id, self.event_store.as_ref()).await

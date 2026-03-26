@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{StorageResource, StorageStateModel};
+use dill::CatalogBuilder;
+
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::declare_resource_service_layer!(
-    name = Storage,
-    resource = StorageResource,
-    state_model = StorageStateModel
-);
+pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+    register_storage_resource_service_layer(catalog_builder);
+    catalog_builder.add::<StorageReconcilerImpl>();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

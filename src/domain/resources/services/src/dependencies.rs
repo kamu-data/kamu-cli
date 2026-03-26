@@ -22,9 +22,6 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
 
     register_secret_set_resource_service_layer(catalog_builder);
     catalog_builder.add::<SecretSetReconcilerImpl>();
-
-    register_storage_resource_service_layer(catalog_builder);
-    catalog_builder.add::<StorageReconcilerImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -202,24 +202,24 @@ macro_rules! declare_resource_query_service {
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ResourceQueryService<$resource>)]
+        #[dill::interface(dyn kamu_resources::ResourceQueryService<$resource>)]
         pub struct $service {
-            resource_repository: std::sync::Arc<dyn $crate::domain::ResourceRepository>,
+            resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ResourceQueryService<$resource> for $service {
+        impl kamu_resources::ResourceQueryService<$resource> for $service {
             async fn allocate_id(
                 &self,
-            ) -> Result<$crate::domain::ResourceID, internal_error::InternalError> {
+            ) -> Result<kamu_resources::ResourceID, internal_error::InternalError> {
                 self.resource_repository.new_resource_id().await
             }
 
             async fn find_existing_id_by_name(
                 &self,
-                resource_id: Option<$crate::domain::ResourceID>,
-                metadata: &$crate::domain::ResourceMetadataInput,
-            ) -> Result<Option<$crate::domain::ResourceID>, internal_error::InternalError> {
+                resource_id: Option<kamu_resources::ResourceID>,
+                metadata: &kamu_resources::ResourceMetadataInput,
+            ) -> Result<Option<kamu_resources::ResourceID>, internal_error::InternalError> {
                 let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
@@ -229,8 +229,8 @@ macro_rules! declare_resource_query_service {
 
             async fn ensure_resource_id_matches_type(
                 &self,
-                resource_id: &$crate::domain::ResourceID,
-            ) -> Result<(), $crate::domain::TypedResourceQueryError> {
+                resource_id: &kamu_resources::ResourceID,
+            ) -> Result<(), kamu_resources::TypedResourceQueryError> {
                 let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
@@ -241,10 +241,10 @@ macro_rules! declare_resource_query_service {
             async fn find_owned_snapshot(
                 &self,
                 account_id: &odf::AccountID,
-                resource_id: $crate::domain::ResourceID,
+                resource_id: kamu_resources::ResourceID,
             ) -> Result<
-                Option<$crate::domain::ResourceSnapshot>,
-                $crate::domain::FindOwnedResourceError,
+                Option<kamu_resources::ResourceSnapshot>,
+                kamu_resources::FindOwnedResourceError,
             > {
                 let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
@@ -256,10 +256,10 @@ macro_rules! declare_resource_query_service {
             async fn get_state_by_id(
                 &self,
                 account_id: odf::AccountID,
-                resource_id: &$crate::domain::ResourceID,
+                resource_id: &kamu_resources::ResourceID,
             ) -> Result<
-                <$resource as $crate::domain::DeclarativeResource>::ResourceState,
-                $crate::domain::TypedResourceQueryError,
+                <$resource as kamu_resources::DeclarativeResource>::ResourceState,
+                kamu_resources::TypedResourceQueryError,
             > {
                 let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
@@ -273,7 +273,7 @@ macro_rules! declare_resource_query_service {
                 account_id: odf::AccountID,
                 pagination: database_common::PaginationOpts,
             ) -> Result<
-                Vec<<$resource as $crate::domain::DeclarativeResource>::ResourceState>,
+                Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
             > {
                 let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(

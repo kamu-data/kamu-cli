@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     ReconcilableResourceEvent,
-    ResourceID,
     VariableSetReconcileSuccess,
     VariableSetSpec,
     VariableSetStats,
@@ -32,13 +30,3 @@ pub type VariableSetEvent = ReconcilableResourceEvent<
 pub struct VariableSetFailureDetails {
     pub stats: VariableSetStats,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ProjectionEvent<ResourceID> for VariableSetEvent {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

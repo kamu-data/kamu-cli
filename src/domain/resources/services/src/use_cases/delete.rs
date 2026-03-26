@@ -133,28 +133,27 @@ where
 macro_rules! declare_delete_resources_use_case {
     (
         use_case = $use_case:ident,
-        resource = $resource:ty,
-        store = $store_trait:ident
+        resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::DeleteResourcesUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::DeleteResourcesUseCase<$resource>)]
         pub struct $use_case {
             resource_query_service:
-                std::sync::Arc<dyn $crate::domain::ResourceQueryService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
             resource_aggregate_loader:
-                std::sync::Arc<dyn $crate::domain::ResourceAggregateLoader<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
-                std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::DeleteResourcesUseCase<$resource> for $use_case {
+        impl kamu_resources::DeleteResourcesUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
-                resource_ids: Vec<$crate::domain::ResourceID>,
-            ) -> Result<(), $crate::domain::DeleteResourcesError> {
+                resource_ids: Vec<kamu_resources::ResourceID>,
+            ) -> Result<(), kamu_resources::DeleteResourcesError> {
                 let helper = $crate::DeleteResourcesUseCaseHelper::<$resource>::new(
                     self.resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),

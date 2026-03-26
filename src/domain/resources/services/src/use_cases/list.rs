@@ -50,20 +50,20 @@ macro_rules! declare_list_resources_by_kind_use_case {
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ListResourcesByKindUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::ListResourcesByKindUseCase<$resource>)]
         pub struct $use_case {
             resource_query_service:
-                std::sync::Arc<dyn $crate::domain::ResourceQueryService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ListResourcesByKindUseCase<$resource> for $use_case {
+        impl kamu_resources::ListResourcesByKindUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
                 pagination: database_common::PaginationOpts,
             ) -> Result<
-                Vec<<$resource as $crate::domain::DeclarativeResource>::ResourceState>,
+                Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
             > {
                 let helper = $crate::ListResourcesByKindUseCaseHelper::<$resource>::new(

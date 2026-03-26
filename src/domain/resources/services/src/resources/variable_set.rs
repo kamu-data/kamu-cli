@@ -12,6 +12,7 @@ use crate::domain::{VariableSetResource, VariableSetStateModel};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 crate::declare_resource_service_layer!(
+    domain = kamu_resources,
     name = VariableSet,
     resource = VariableSetResource,
     state_model = VariableSetStateModel

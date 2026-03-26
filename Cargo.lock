@@ -7782,6 +7782,7 @@ dependencies = [
  "kamu-search-elasticsearch",
  "kamu-search-openai",
  "kamu-search-services",
+ "kamu-storage-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-postgres",
@@ -8803,6 +8804,42 @@ dependencies = [
  "test-log",
  "time-source",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-storage"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "event-sourcing",
+ "internal-error",
+ "kamu-resources",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "kamu-storage-services"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "internal-error",
+ "kamu-resources",
+ "kamu-resources-services",
+ "kamu-storage",
+ "opendatafabric",
+ "paste",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time-source",
  "tracing",
 ]
 

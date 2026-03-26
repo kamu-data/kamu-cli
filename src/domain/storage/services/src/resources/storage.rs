@@ -7,18 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{ReconcilableResourceEvent, SecretSetReconcileSuccess, SecretSetSpec, SecretSetStats};
+use kamu_storage::{StorageResource, StorageStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetEvent =
-    ReconcilableResourceEvent<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>;
+kamu_resources_services::declare_resource_service_layer!(
+    domain = kamu_storage,
+    name = Storage,
+    resource = StorageResource,
+    state_model = StorageStateModel
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SecretSetFailureDetails {
-    pub stats: SecretSetStats,
-}

@@ -163,21 +163,21 @@ macro_rules! declare_resource_persistence_service {
     (
         service = $service:ident,
         resource = $resource:ty,
-        store = $store_trait:ident
+        store = $store:path
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ResourcePersistenceService<$resource>)]
+        #[dill::interface(dyn kamu_resources::ResourcePersistenceService<$resource>)]
         pub struct $service {
-            resource_repository: std::sync::Arc<dyn $crate::domain::ResourceRepository>,
-            event_store: std::sync::Arc<dyn $crate::domain::$store_trait>,
+            resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
+            event_store: std::sync::Arc<dyn $store>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ResourcePersistenceService<$resource> for $service {
+        impl kamu_resources::ResourcePersistenceService<$resource> for $service {
             async fn create(
                 &self,
                 resource: &mut $resource,
-            ) -> Result<(), $crate::domain::ResourcePersistenceError> {
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
@@ -189,7 +189,7 @@ macro_rules! declare_resource_persistence_service {
             async fn save(
                 &self,
                 resource: &mut $resource,
-            ) -> Result<(), $crate::domain::ResourcePersistenceError> {
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
@@ -202,7 +202,7 @@ macro_rules! declare_resource_persistence_service {
                 &self,
                 resource: &mut $resource,
                 now: chrono::DateTime<chrono::Utc>,
-            ) -> Result<(), $crate::domain::ResourcePersistenceError> {
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),

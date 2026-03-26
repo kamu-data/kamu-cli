@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ResourceReconcileError,
     StorageFailureDetails,
     StorageLifecycleError,
     StorageProviderKind,
@@ -71,7 +71,7 @@ impl ResourceReconcileError for StorageReconcileError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_reconcilable_event_sourced_resource!(
     resource = StorageResource,
     reconcile_success = StorageReconcileSuccess,
     reconcile_error = StorageReconcileError,

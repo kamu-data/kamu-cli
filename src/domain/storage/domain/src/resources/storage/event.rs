@@ -7,16 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::ProjectionEvent;
+use kamu_resources::ReconcilableResourceEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ReconcilableResourceEvent,
-    ResourceID,
-    StorageReconcileSuccess,
-    StorageReferenceStatus,
-    StorageSpec,
-};
+use crate::{StorageReconcileSuccess, StorageReferenceStatus, StorageSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,14 +22,6 @@ pub type StorageEvent =
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StorageFailureDetails {
     pub references: StorageReferenceStatus,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ProjectionEvent<ResourceID> for StorageEvent {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

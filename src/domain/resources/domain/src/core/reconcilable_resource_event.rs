@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
+use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
 use crate::{ResourceID, ResourceMetadataInput};
@@ -120,6 +121,20 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
             ReconcilableResourceEvent::ReconciliationSucceeded(e) => e.event_time,
             ReconcilableResourceEvent::ReconciliationFailed(e) => e.event_time,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceID>
+    for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
+where
+    TSpec: std::fmt::Debug + Clone + Send + Sync + 'static,
+    TSuccess: std::fmt::Debug + Clone + Send + Sync + 'static,
+    TFailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static,
+{
+    fn matches_query(&self, query: &ResourceID) -> bool {
+        self.resource_id() == query
     }
 }
 

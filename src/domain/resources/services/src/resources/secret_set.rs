@@ -12,6 +12,7 @@ use crate::domain::{SecretSetResource, SecretSetStateModel};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 crate::declare_resource_service_layer!(
+    domain = kamu_resources,
     name = SecretSet,
     resource = SecretSetResource,
     state_model = SecretSetStateModel

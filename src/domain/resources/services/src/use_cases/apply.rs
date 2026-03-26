@@ -174,29 +174,28 @@ where
 macro_rules! declare_apply_resource_use_case {
     (
         use_case = $use_case:ident,
-        resource = $resource:ty,
-        store = $store_trait:ident
+        resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ApplyResourceUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::ApplyResourceUseCase<$resource>)]
         pub struct $use_case {
             resource_query_service:
-                std::sync::Arc<dyn $crate::domain::ResourceQueryService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
             resource_aggregate_loader:
-                std::sync::Arc<dyn $crate::domain::ResourceAggregateLoader<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
-                std::sync::Arc<dyn $crate::domain::ResourcePersistenceService<$resource>>,
+                std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ApplyResourceUseCase<$resource> for $use_case {
+        impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
-                params: $crate::domain::ApplyResourceParams<$resource>,
+                params: kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<
-                $crate::domain::ApplyResourceResult<$resource>,
-                $crate::domain::ApplyResourceUseCaseError<$resource>,
+                kamu_resources::ApplyResourceResult<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 let helper = $crate::ApplyResourceUseCaseHelper::<$resource>::new(
                     self.resource_query_service.as_ref(),

@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{
+use kamu_resources::{
     PendingStatusFromSpec,
     ReconcilableStatusProjector,
     ResourceStatus,
     ResourceStatusLike,
 };
+use serde::{Deserialize, Serialize};
+
+use crate::{StorageFailureDetails, StorageReconcileSuccess, StorageSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,12 +51,12 @@ impl ResourceStatusLike for StorageStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl PendingStatusFromSpec<crate::StorageSpec> for StorageStatus {
-    fn pending_from_spec(spec: &crate::StorageSpec) -> Self {
+impl PendingStatusFromSpec<StorageSpec> for StorageStatus {
+    fn pending_from_spec(spec: &StorageSpec) -> Self {
         Self::new_pending(spec.provider.kind())
     }
 
-    fn reset_pending_from_spec(&mut self, spec: &crate::StorageSpec) {
+    fn reset_pending_from_spec(&mut self, spec: &StorageSpec) {
         self.provider_kind = spec.provider.kind();
         self.references = StorageReferenceStatus::default();
     }
@@ -65,24 +66,17 @@ impl PendingStatusFromSpec<crate::StorageSpec> for StorageStatus {
 
 pub struct StorageStatusProjector;
 
-impl
-    ReconcilableStatusProjector<
-        crate::StorageSpec,
-        crate::StorageReconcileSuccess,
-        crate::StorageFailureDetails,
-    > for StorageStatusProjector
+impl ReconcilableStatusProjector<StorageSpec, StorageReconcileSuccess, StorageFailureDetails>
+    for StorageStatusProjector
 {
     type Status = StorageStatus;
 
-    fn on_reconciliation_succeeded(
-        status: &mut Self::Status,
-        success: crate::StorageReconcileSuccess,
-    ) {
+    fn on_reconciliation_succeeded(status: &mut Self::Status, success: StorageReconcileSuccess) {
         status.provider_kind = success.provider_kind;
         status.references = success.references;
     }
 
-    fn on_reconciliation_failed(status: &mut Self::Status, details: crate::StorageFailureDetails) {
+    fn on_reconciliation_failed(status: &mut Self::Status, details: StorageFailureDetails) {
         status.references = details.references;
     }
 }

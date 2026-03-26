@@ -167,15 +167,15 @@ where
 macro_rules! declare_resource_event_store_bridge {
     (
         bridge = $bridge:ident,
-        trait = $store_trait:ident,
+        store = $store:path,
         resource = $resource:ty,
         state = $state:ty,
         event = $event:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::$store_trait)]
+        #[dill::interface(dyn $store)]
         pub struct $bridge {
-            raw_event_store: std::sync::Arc<dyn $crate::domain::ResourceRawEventStore>,
+            raw_event_store: std::sync::Arc<dyn kamu_resources::ResourceRawEventStore>,
         }
 
         #[async_trait::async_trait]
@@ -184,7 +184,7 @@ macro_rules! declare_resource_event_store_bridge {
                 $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::total_events_stored(
                     self.raw_event_store.as_ref()
                 )
-                    .await
+                .await
             }
 
             fn get_all_events(
@@ -199,7 +199,7 @@ macro_rules! declare_resource_event_store_bridge {
 
             fn get_events(
                 &self,
-                query: &$crate::domain::ResourceID,
+                query: &kamu_resources::ResourceID,
                 opts: event_sourcing::GetEventsOpts,
             ) -> event_sourcing::EventStream<'_, $event> {
                 $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::get_events(
@@ -211,7 +211,7 @@ macro_rules! declare_resource_event_store_bridge {
 
             async fn save_events(
                 &self,
-                query: &$crate::domain::ResourceID,
+                query: &kamu_resources::ResourceID,
                 maybe_prev_stored_event_id: Option<event_sourcing::EventID>,
                 events: Vec<$event>,
             ) -> Result<event_sourcing::EventID, event_sourcing::SaveEventsError> {
@@ -225,7 +225,8 @@ macro_rules! declare_resource_event_store_bridge {
             }
         }
 
-        impl $crate::domain::$store_trait for $bridge {}
+        #[async_trait::async_trait]
+        impl $store for $bridge {}
     };
 }
 

@@ -9,19 +9,18 @@
 
 use event_sourcing::*;
 use internal_error::InternalError;
-
-use crate::{
+use kamu_resources::{
     DeclarativeResource,
     ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
+    ResourceSnapshot,
+    ResourceState,
     ResourceType,
-    StorageEventStore,
-    StorageSpec,
-    StorageState,
-    StorageStatus,
     decode_typed_resource_snapshot,
 };
+
+use crate::{StorageEventStore, StorageSpec, StorageState, StorageStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,18 +57,16 @@ impl DeclarativeResource for StorageResource {
     type Status = StorageStatus;
     type ResourceState = StorageState;
 
-    fn decode_snapshot(
-        snapshot: crate::ResourceSnapshot,
-    ) -> Result<Self::ResourceState, InternalError> {
+    fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError> {
         let (resource_id, metadata, spec, status) =
             decode_typed_resource_snapshot::<StorageSpec, StorageStatus>(snapshot)?;
 
-        Ok(StorageState {
+        Ok(StorageState(ResourceState {
             resource_id,
             metadata,
             spec,
             status,
-        })
+        }))
     }
 
     fn into_state(self) -> Self::ResourceState {
@@ -77,19 +74,19 @@ impl DeclarativeResource for StorageResource {
     }
 
     fn resource_id(&self) -> &ResourceID {
-        &self.as_ref().resource_id
+        &self.as_ref().0.resource_id
     }
 
     fn metadata(&self) -> &ResourceMetadata {
-        &self.as_ref().metadata
+        &self.as_ref().0.metadata
     }
 
     fn spec(&self) -> &Self::Spec {
-        &self.as_ref().spec
+        &self.as_ref().0.spec
     }
 
     fn status(&self) -> &Self::Status {
-        &self.as_ref().status
+        &self.as_ref().0.status
     }
 }
 

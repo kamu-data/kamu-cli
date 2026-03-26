@@ -49,6 +49,7 @@ members = [
     "src/domain/flow-system/domain",
     "src/domain/resources/domain",
     "src/domain/search/domain",
+    "src/domain/storage/domain",
     "src/domain/task-system/domain",
     "src/domain/webhooks/domain",
     # Domain service layer
@@ -59,6 +60,7 @@ members = [
     "src/domain/flow-system/services",
     "src/domain/resources/services",
     "src/domain/search/services",
+    "src/domain/storage/services",
     "src/domain/task-system/services",
     "src/domain/webhooks/services",
     # Infra
@@ -184,6 +186,7 @@ kamu-datasets = { version = "0.261.1", path = "src/domain/datasets/domain", defa
 kamu-flow-system = { version = "0.261.1", path = "src/domain/flow-system/domain", default-features = false }
 kamu-resources = { version = "0.261.1", path = "src/domain/resources/domain", default-features = false }
 kamu-search = { version = "0.261.1", path = "src/domain/search/domain", default-features = false }
+kamu-storage = { version = "0.261.1", path = "src/domain/storage/domain", default-features = false }
 kamu-task-system = { version = "0.261.1", path = "src/domain/task-system/domain", default-features = false }
 kamu-webhooks = { version = "0.261.1", path = "src/domain/webhooks/domain", default-features = false }
 
@@ -210,6 +213,7 @@ kamu-datasets-services = { version = "0.261.1", path = "src/domain/datasets/serv
 kamu-flow-system-services = { version = "0.261.1", path = "src/domain/flow-system/services", default-features = false }
 kamu-resources-services = { version = "0.261.1", path = "src/domain/resources/services", default-features = false }
 kamu-search-services = { version = "0.261.1", path = "src/domain/search/services", default-features = false }
+kamu-storage-services = { version = "0.261.1", path = "src/domain/storage/services", default-features = false }
 kamu-task-system-services = { version = "0.261.1", path = "src/domain/task-system/services", default-features = false }
 kamu-webhooks-services = { version = "0.261.1", path = "src/domain/webhooks/services", default-features = false }
 

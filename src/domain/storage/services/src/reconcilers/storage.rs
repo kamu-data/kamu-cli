@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResource, StorageReconcileSuccess, StorageReferenceStatus};
-
-use crate::domain::{DeclarativeResource, Reconciler, StorageResource};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
+use kamu_storage::{StorageReconcileSuccess, StorageReferenceStatus, StorageResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
