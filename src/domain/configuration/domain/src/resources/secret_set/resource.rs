@@ -8,15 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::*;
-use internal_error::InternalError;
-use kamu_resources::{
-    DeclarativeResource,
-    ResourceApiVersion,
-    ResourceSnapshot,
-    ResourceState,
-    ResourceType,
-    decode_typed_resource_snapshot,
-};
+use kamu_resources::{DeclarativeResource, ResourceApiVersion, ResourceType};
 
 use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus};
 
@@ -46,19 +38,6 @@ impl DeclarativeResource for SecretSetResource {
     type Spec = SecretSetSpec;
     type Status = SecretSetStatus;
     type ResourceState = SecretSetState;
-
-    fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError> {
-        let (resource_id, metadata, spec, status) =
-            decode_typed_resource_snapshot::<SecretSetSpec, SecretSetStatus>(snapshot)?;
-
-        Ok(ResourceState {
-            resource_id,
-            metadata,
-            spec,
-            status,
-        }
-        .into())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

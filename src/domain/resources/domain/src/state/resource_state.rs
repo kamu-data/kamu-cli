@@ -7,7 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{DeclarativeResourceState, ResourceID, ResourceMetadata, ResourceStatusLike};
+use internal_error::InternalError;
+use serde::de::DeserializeOwned;
+
+use crate::{
+    DeclarativeResourceState,
+    PendingStatusFromSpec,
+    ResourceID,
+    ResourceMetadata,
+    ResourceSnapshot,
+    ResourceStatusLike,
+    decode_typed_resource_snapshot,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,6 +91,32 @@ where
 
     fn status_mut(&mut self) -> &mut Self::Status {
         &mut self.status
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<TSpec, TStatus> TryFrom<ResourceSnapshot> for ResourceState<TSpec, TStatus>
+where
+    TSpec: std::fmt::Debug + Clone + Send + Sync + DeserializeOwned,
+    TStatus: ResourceStatusLike
+        + std::fmt::Debug
+        + Clone
+        + DeserializeOwned
+        + PendingStatusFromSpec<TSpec>,
+{
+    type Error = InternalError;
+
+    fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
+        let (resource_id, metadata, spec, status) =
+            decode_typed_resource_snapshot::<TSpec, TStatus>(snapshot)?;
+
+        Ok(Self {
+            resource_id,
+            metadata,
+            spec,
+            status,
+        })
     }
 }
 

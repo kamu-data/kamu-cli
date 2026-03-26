@@ -153,7 +153,7 @@ where
             return Err(Self::type_mismatch(&resource_snapshot));
         }
 
-        R::decode_snapshot(resource_snapshot).map_err(TypedResourceQueryError::Internal)
+        R::ResourceState::try_from(resource_snapshot).map_err(TypedResourceQueryError::Internal)
     }
 
     pub async fn list_states_by_kind(
@@ -175,7 +175,7 @@ where
                 return Err(Self::type_mismatch(&resource_snapshot).int_err());
             }
 
-            resource_states.push(R::decode_snapshot(resource_snapshot)?);
+            resource_states.push(R::ResourceState::try_from(resource_snapshot)?);
         }
 
         Ok(resource_states)

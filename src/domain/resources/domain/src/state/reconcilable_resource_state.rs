@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::{Projection, ProjectionError};
+use internal_error::InternalError;
 
 use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
     ReconcilableStateModel,
     ResourceID,
+    ResourceSnapshot,
     ResourceState,
     project_reconcilable_resource_state,
 };
@@ -142,6 +144,20 @@ where
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<TModel>(state, event)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<TModel> TryFrom<ResourceSnapshot> for ReconcilableResourceState<TModel>
+where
+    TModel: ReconcilableStateModel,
+    ResourceState<TModel::Spec, TModel::Status>: TryFrom<ResourceSnapshot, Error = InternalError>,
+{
+    type Error = InternalError;
+
+    fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
+        ResourceState::<TModel::Spec, TModel::Status>::try_from(snapshot).map(Into::into)
     }
 }
 

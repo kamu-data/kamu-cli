@@ -17,9 +17,8 @@ pub trait DeclarativeResource: Sized + Send + Sync + AsRef<Self::ResourceState> 
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
     type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+        + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
-
-    fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError>;
 
     fn resource_id(&self) -> &ResourceID {
         self.as_ref().resource_id()
