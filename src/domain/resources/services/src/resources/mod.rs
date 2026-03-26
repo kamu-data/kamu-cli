@@ -13,6 +13,5 @@ mod storage;
 mod variable_set;
 
 pub use secret_set::*;
-pub use shared::*;
 pub use storage::*;
 pub use variable_set::*;

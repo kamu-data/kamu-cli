@@ -8,38 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use dill::{component, interface};
 
 use crate::domain::{AllResourcesQueryService, ListAllResourcesUseCase, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ListAllResourcesUseCaseHelper<'a> {
-    all_resources_query_service: &'a dyn AllResourcesQueryService,
-}
-
-impl<'a> ListAllResourcesUseCaseHelper<'a> {
-    pub fn new(all_resources_query_service: &'a dyn AllResourcesQueryService) -> Self {
-        Self {
-            all_resources_query_service,
-        }
-    }
-
-    pub async fn execute(
-        &self,
-        account_id: odf::AccountID,
-        pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
-        self.all_resources_query_service
-            .list_all_snapshots(account_id, pagination)
-            .await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[component]
-#[interface(dyn ListAllResourcesUseCase)]
+#[dill::component]
+#[dill::interface(dyn ListAllResourcesUseCase)]
 pub struct ListAllResourcesUseCaseImpl {
     all_resources_query_service: std::sync::Arc<dyn AllResourcesQueryService>,
 }
@@ -53,9 +28,9 @@ impl ListAllResourcesUseCase for ListAllResourcesUseCaseImpl {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
-        let helper = ListAllResourcesUseCaseHelper::new(self.all_resources_query_service.as_ref());
-
-        helper.execute(account_id, pagination).await
+        self.all_resources_query_service
+            .list_all_snapshots(account_id, pagination)
+            .await
     }
 }
 

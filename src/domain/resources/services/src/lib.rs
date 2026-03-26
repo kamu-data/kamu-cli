@@ -12,11 +12,13 @@ use kamu_resources as domain;
 mod dependencies;
 mod event_stores;
 mod reconcilers;
+mod resources;
 mod services;
 mod use_cases;
 
 pub use dependencies::*;
 pub use event_stores::*;
 pub use reconcilers::*;
+pub use resources::*;
 pub use services::*;
 pub use use_cases::*;

@@ -9,7 +9,6 @@
 
 use std::marker::PhantomData;
 
-use chrono::{DateTime, Utc};
 use event_sourcing::{
     EventID,
     EventStream,
@@ -23,38 +22,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio_stream::StreamExt;
 
+use crate::ResourceBridgeEvent;
 use crate::domain::{
-    ReconcilableResourceEvent,
     ResourceDescriptorProvider,
     ResourceID,
     ResourceRawEvent,
     ResourceRawEventQuery,
     ResourceRawEventStore,
 };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceBridgeEvent {
-    fn resource_id(&self) -> &ResourceID;
-    fn event_time(&self) -> DateTime<Utc>;
-    fn typename(&self) -> &'static str;
-}
-
-impl<TSpec, TSuccess, TFailureDetails> ResourceBridgeEvent
-    for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
-{
-    fn resource_id(&self) -> &ResourceID {
-        Self::resource_id(self)
-    }
-
-    fn event_time(&self) -> DateTime<Utc> {
-        Self::event_time(self)
-    }
-
-    fn typename(&self) -> &'static str {
-        Self::typename(self)
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,7 +173,7 @@ macro_rules! declare_resource_event_store_bridge {
         event = $event:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $store_trait)]
+        #[dill::interface(dyn $crate::domain::$store_trait)]
         pub struct $bridge {
             raw_event_store: std::sync::Arc<dyn $crate::domain::ResourceRawEventStore>,
         }
@@ -206,23 +181,20 @@ macro_rules! declare_resource_event_store_bridge {
         #[async_trait::async_trait]
         impl event_sourcing::EventStore<$state> for $bridge {
             async fn total_events_stored(&self) -> Result<usize, internal_error::InternalError> {
-                $crate::event_stores::shared::RawResourceEventStoreBridge::<
-                                            $resource,
-                                            $state,
-                                            $event,
-                                        >::total_events_stored(self.raw_event_store.as_ref())
-                                        .await
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::total_events_stored(
+                    self.raw_event_store.as_ref()
+                )
+                    .await
             }
 
             fn get_all_events(
                 &self,
                 opts: event_sourcing::GetEventsOpts,
             ) -> event_sourcing::EventStream<'_, $event> {
-                $crate::event_stores::shared::RawResourceEventStoreBridge::<
-                                            $resource,
-                                            $state,
-                                            $event,
-                                        >::get_all_events(self.raw_event_store.as_ref(), opts)
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::get_all_events(
+                    self.raw_event_store.as_ref(),
+                    opts
+                )
             }
 
             fn get_events(
@@ -230,11 +202,11 @@ macro_rules! declare_resource_event_store_bridge {
                 query: &$crate::domain::ResourceID,
                 opts: event_sourcing::GetEventsOpts,
             ) -> event_sourcing::EventStream<'_, $event> {
-                $crate::event_stores::shared::RawResourceEventStoreBridge::<
-                                            $resource,
-                                            $state,
-                                            $event,
-                                        >::get_events(self.raw_event_store.as_ref(), query, opts)
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::get_events(
+                    self.raw_event_store.as_ref(),
+                    query,
+                    opts
+                )
             }
 
             async fn save_events(
@@ -243,21 +215,17 @@ macro_rules! declare_resource_event_store_bridge {
                 maybe_prev_stored_event_id: Option<event_sourcing::EventID>,
                 events: Vec<$event>,
             ) -> Result<event_sourcing::EventID, event_sourcing::SaveEventsError> {
-                $crate::event_stores::shared::RawResourceEventStoreBridge::<
-                                            $resource,
-                                            $state,
-                                            $event,
-                                        >::save_events(
-                                            self.raw_event_store.as_ref(),
-                                            query,
-                                            maybe_prev_stored_event_id,
-                                            events,
-                                        )
-                                        .await
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::save_events(
+                    self.raw_event_store.as_ref(),
+                    query,
+                    maybe_prev_stored_event_id,
+                    events,
+                )
+                .await
             }
         }
 
-        impl $store_trait for $bridge {}
+        impl $crate::domain::$store_trait for $bridge {}
     };
 }
 

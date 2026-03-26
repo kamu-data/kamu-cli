@@ -10,16 +10,14 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use dill::{component, interface};
 use internal_error::InternalError;
-use tokio_stream::StreamExt;
 
 use crate::domain::{AllResourcesQueryService, ResourceRepository, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AllResourcesQueryService)]
+#[dill::component]
+#[dill::interface(dyn AllResourcesQueryService)]
 pub struct AllResourcesQueryServiceImpl {
     resource_repository: Arc<dyn ResourceRepository>,
 }
@@ -36,6 +34,8 @@ impl AllResourcesQueryService for AllResourcesQueryServiceImpl {
         let mut resource_snapshots_stream = self
             .resource_repository
             .list_all_resource_snapshots(account_id, pagination);
+
+        use tokio_stream::StreamExt;
 
         let mut resource_snapshots = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {

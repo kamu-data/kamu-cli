@@ -8609,6 +8609,7 @@ dependencies = [
  "internal-error",
  "kamu-resources",
  "opendatafabric",
+ "paste",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

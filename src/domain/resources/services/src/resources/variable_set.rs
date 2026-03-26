@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::shared::declare_get_resource_by_id_use_case;
-use crate::domain::StorageResource;
+use crate::domain::{VariableSetResource, VariableSetStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-declare_get_resource_by_id_use_case!(
-    use_case = StorageGetResourceByIdUseCaseImpl,
-    resource = StorageResource
+crate::declare_resource_service_layer!(
+    name = VariableSet,
+    resource = VariableSetResource,
+    state_model = VariableSetStateModel
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

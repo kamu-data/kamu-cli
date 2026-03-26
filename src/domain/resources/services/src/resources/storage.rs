@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::VariableSetResource;
+use crate::domain::{StorageResource, StorageStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-super::shared::declare_reconcile_resource_use_case!(
-    use_case = VariableSetReconcileResourceUseCaseImpl,
-    resource = VariableSetResource,
-    store = VariableSetEventStore
+crate::declare_resource_service_layer!(
+    name = Storage,
+    resource = StorageResource,
+    state_model = StorageStateModel
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

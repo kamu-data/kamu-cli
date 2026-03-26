@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod all_resources_query;
 mod resource_aggregate_loader;
 mod resource_persistence;
 mod resource_query;
 
-pub use resource_aggregate_loader::*;
+pub use all_resources_query::*;
 pub use resource_persistence::*;
 pub use resource_query::*;

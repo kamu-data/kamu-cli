@@ -7,20 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
-
-use crate::domain::{ReconcilableEventSourcedResource, ResourceQueryService};
+use crate::domain::{
+    GetResourceByIdError,
+    ReconcilableEventSourcedResource,
+    ResourceID,
+    ResourceQueryService,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ListResourcesByKindUseCaseHelper<'a, R>
+pub struct GetResourceByIdUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
     resource_query_service: &'a dyn ResourceQueryService<R>,
 }
 
-impl<'a, R> ListResourcesByKindUseCaseHelper<'a, R>
+impl<'a, R> GetResourceByIdUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
@@ -33,49 +36,48 @@ where
     pub async fn execute(
         &self,
         account_id: odf::AccountID,
-        pagination: PaginationOpts,
-    ) -> Result<Vec<R::ResourceState>, internal_error::InternalError> {
+        id: &ResourceID,
+    ) -> Result<R::ResourceState, GetResourceByIdError> {
         self.resource_query_service
-            .list_states_by_kind(account_id, pagination)
+            .get_state_by_id(account_id, id)
             .await
+            .map_err(GetResourceByIdError::from)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! declare_list_resources_by_kind_use_case {
+macro_rules! declare_get_resource_by_id_use_case {
     (
         use_case = $use_case:ident,
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn $crate::domain::ListResourcesByKindUseCase<$resource>)]
+        #[dill::interface(dyn $crate::domain::GetResourceByIdUseCase<$resource>)]
         pub struct $use_case {
             resource_query_service:
                 std::sync::Arc<dyn $crate::domain::ResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
-        impl $crate::domain::ListResourcesByKindUseCase<$resource> for $use_case {
+        impl $crate::domain::GetResourceByIdUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
-                pagination: database_common::PaginationOpts,
+                id: &$crate::domain::ResourceID,
             ) -> Result<
-                Vec<<$resource as $crate::domain::DeclarativeResource>::ResourceState>,
-                internal_error::InternalError,
+                <$resource as $crate::domain::DeclarativeResource>::ResourceState,
+                $crate::domain::GetResourceByIdError,
             > {
-                let helper = $crate::ListResourcesByKindUseCaseHelper::<$resource>::new(
+                let helper = $crate::GetResourceByIdUseCaseHelper::<$resource>::new(
                     self.resource_query_service.as_ref(),
                 );
 
-                helper.execute(account_id, pagination).await
+                helper.execute(account_id, id).await
             }
         }
     };
 }
-
-pub use declare_list_resources_by_kind_use_case;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
