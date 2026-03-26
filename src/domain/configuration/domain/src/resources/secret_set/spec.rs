@@ -9,9 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use kamu_resources::ResourceValidateSpec;
 use serde::{Deserialize, Serialize};
-
-use crate::ResourceValidateSpec;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +21,7 @@ pub struct SecretSetSpec {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecretSpec {
-    pub value: String, // TODO: encrypted value
+    pub value: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

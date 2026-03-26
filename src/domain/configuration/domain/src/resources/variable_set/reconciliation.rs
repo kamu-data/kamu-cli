@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ResourceReconcileError,
     VariableSetFailureDetails,
     VariableSetLifecycleError,
     VariableSetResource,
@@ -19,7 +19,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_reconcilable_event_sourced_resource!(
     resource = VariableSetResource,
     reconcile_success = VariableSetReconcileSuccess,
     reconcile_error = VariableSetReconcileError,

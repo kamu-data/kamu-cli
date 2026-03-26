@@ -7,15 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources as domain;
+#![feature(error_generic_member_access)]
 
-mod dependencies;
-mod event_stores;
 mod resources;
-mod services;
-mod use_cases;
+mod values;
 
-pub use dependencies::*;
-pub use event_stores::*;
-pub use services::*;
-pub use use_cases::*;
+pub use resources::*;
+pub use values::*;

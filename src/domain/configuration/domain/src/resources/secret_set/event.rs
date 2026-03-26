@@ -7,15 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use kamu_resources::ReconcilableResourceEvent;
+use serde::{Deserialize, Serialize};
 
-use crate::*;
+use crate::{SecretSetReconcileSuccess, SecretSetSpec, SecretSetStats};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<AllResourcesQueryServiceImpl>();
-    catalog_builder.add::<ListAllResourcesUseCaseImpl>();
+pub type SecretSetEvent =
+    ReconcilableResourceEvent<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretSetFailureDetails {
+    pub stats: SecretSetStats,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

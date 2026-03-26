@@ -8,23 +8,28 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::{Projection, ProjectionError};
-
-use crate::{
+use kamu_resources::{
+    DeclarativeResourceState,
     ReconcilableStateModel,
     ResourceID,
+    ResourceMetadata,
     ResourceState,
+    project_reconcilable_resource_state,
+};
+
+use crate::{
     VariableSetEvent,
     VariableSetFailureDetails,
     VariableSetReconcileSuccess,
     VariableSetSpec,
     VariableSetStatus,
     VariableSetStatusProjector,
-    project_reconcilable_resource_state,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetState = ResourceState<VariableSetSpec, VariableSetStatus>;
+#[derive(Debug, Clone)]
+pub struct VariableSetState(pub ResourceState<VariableSetSpec, VariableSetStatus>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +52,49 @@ impl Projection for VariableSetState {
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<VariableSetStateModel>(state, event)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DeclarativeResourceState for VariableSetState {
+    type Spec = VariableSetSpec;
+    type Status = VariableSetStatus;
+
+    fn resource_id(&self) -> &ResourceID {
+        &self.0.resource_id
+    }
+
+    fn metadata(&self) -> &ResourceMetadata {
+        &self.0.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut ResourceMetadata {
+        &mut self.0.metadata
+    }
+
+    fn spec(&self) -> &Self::Spec {
+        &self.0.spec
+    }
+
+    fn spec_mut(&mut self) -> &mut Self::Spec {
+        &mut self.0.spec
+    }
+
+    fn status(&self) -> &Self::Status {
+        &self.0.status
+    }
+
+    fn status_mut(&mut self) -> &mut Self::Status {
+        &mut self.0.status
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ResourceState<VariableSetSpec, VariableSetStatus>> for VariableSetState {
+    fn from(value: ResourceState<VariableSetSpec, VariableSetStatus>) -> Self {
+        Self(value)
     }
 }
 

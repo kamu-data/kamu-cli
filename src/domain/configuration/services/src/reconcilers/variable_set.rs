@@ -7,36 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResource, SecretSetReconcileSuccess};
-
-use crate::domain::{DeclarativeResource, Reconciler, SecretSetResource, SecretSetStats};
+use kamu_configuration::{VariableSetReconcileSuccess, VariableSetResource, VariableSetStats};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn Reconciler<SecretSetResource>)]
-pub struct SecretSetReconcilerImpl {}
+#[dill::interface(dyn Reconciler<VariableSetResource>)]
+pub struct VariableSetReconcilerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
+impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
     async fn reconcile(
         &self,
-        resource: &SecretSetResource,
+        resource: &VariableSetResource,
     ) -> Result<
-        <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
-        <SecretSetResource as ReconcilableResource>::ReconcileError,
+        <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
+        <VariableSetResource as ReconcilableResource>::ReconcileError,
     > {
-        let total = resource.spec().secrets.len();
+        let total = resource.spec().variables.len();
 
-        // TODO: actually synchronize secrets
+        // TODO: actually synchronize variables
 
-        Ok(SecretSetReconcileSuccess {
-            stats: SecretSetStats {
-                total_secrets: total,
-                valid_secrets: total,
-                invalid_secrets: 0,
+        Ok(VariableSetReconcileSuccess {
+            stats: VariableSetStats {
+                total_variables: total,
+                valid_variables: total,
+                invalid_variables: 0,
             },
         })
     }

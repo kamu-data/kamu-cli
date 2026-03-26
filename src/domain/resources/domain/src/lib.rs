@@ -12,7 +12,6 @@
 mod core;
 mod errors;
 mod repo;
-mod resources;
 mod services;
 mod state;
 mod use_cases;
@@ -23,7 +22,6 @@ pub use core::*;
 
 pub use errors::*;
 pub use repo::*;
-pub use resources::*;
 pub use services::*;
 pub use state::*;
 pub use use_cases::*;

@@ -12,11 +12,9 @@ mod resource_id;
 mod resource_metadata;
 mod resource_metadata_input;
 mod resource_phase;
-mod value_ref;
 
 pub use resource_condition::*;
 pub use resource_id::*;
 pub use resource_metadata::*;
 pub use resource_metadata_input::*;
 pub use resource_phase::*;
-pub use value_ref::*;

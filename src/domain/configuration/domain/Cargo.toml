@@ -1,6 +1,6 @@
 [package]
-name = "kamu-storage"
-description = "Domain model of managed storage resources"
+name = "kamu-configuration"
+description = "Domain model of managed configuration resources"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -28,7 +28,6 @@ default = []
 [dependencies]
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
-kamu-configuration = { workspace = true }
 kamu-resources = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

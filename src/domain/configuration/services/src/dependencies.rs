@@ -7,15 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{SecretSetResource, SecretSetStateModel};
+use dill::CatalogBuilder;
+
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::declare_resource_service_layer!(
-    domain = kamu_resources,
-    name = SecretSet,
-    resource = SecretSetResource,
-    state_model = SecretSetStateModel
-);
+pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+    register_variable_set_resource_service_layer(catalog_builder);
+    catalog_builder.add::<VariableSetReconcilerImpl>();
+
+    register_secret_set_resource_service_layer(catalog_builder);
+    catalog_builder.add::<SecretSetReconcilerImpl>();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{
+use kamu_resources::{
     PendingStatusFromSpec,
     ReconcilableStatusProjector,
     ResourceStatus,
     ResourceStatusLike,
 };
+use serde::{Deserialize, Serialize};
+
+use crate::{SecretSetFailureDetails, SecretSetReconcileSuccess, SecretSetSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,12 +48,12 @@ impl ResourceStatusLike for SecretSetStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl PendingStatusFromSpec<crate::SecretSetSpec> for SecretSetStatus {
-    fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
+impl PendingStatusFromSpec<SecretSetSpec> for SecretSetStatus {
+    fn pending_from_spec(spec: &SecretSetSpec) -> Self {
         Self::new_pending(SecretSetStats::pending_from_spec(spec))
     }
 
-    fn reset_pending_from_spec(&mut self, spec: &crate::SecretSetSpec) {
+    fn reset_pending_from_spec(&mut self, spec: &SecretSetSpec) {
         self.stats = SecretSetStats::pending_from_spec(spec);
     }
 }
@@ -61,26 +62,16 @@ impl PendingStatusFromSpec<crate::SecretSetSpec> for SecretSetStatus {
 
 pub struct SecretSetStatusProjector;
 
-impl
-    ReconcilableStatusProjector<
-        crate::SecretSetSpec,
-        crate::SecretSetReconcileSuccess,
-        crate::SecretSetFailureDetails,
-    > for SecretSetStatusProjector
+impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>
+    for SecretSetStatusProjector
 {
     type Status = SecretSetStatus;
 
-    fn on_reconciliation_succeeded(
-        status: &mut Self::Status,
-        success: crate::SecretSetReconcileSuccess,
-    ) {
+    fn on_reconciliation_succeeded(status: &mut Self::Status, success: SecretSetReconcileSuccess) {
         status.stats = success.stats;
     }
 
-    fn on_reconciliation_failed(
-        status: &mut Self::Status,
-        details: crate::SecretSetFailureDetails,
-    ) {
+    fn on_reconciliation_failed(status: &mut Self::Status, details: SecretSetFailureDetails) {
         status.stats = details.stats;
     }
 }
@@ -95,7 +86,7 @@ pub struct SecretSetStats {
 }
 
 impl SecretSetStats {
-    pub fn pending_from_spec(spec: &crate::SecretSetSpec) -> Self {
+    pub fn pending_from_spec(spec: &SecretSetSpec) -> Self {
         let total = spec.secrets.len();
         Self {
             total_secrets: total,

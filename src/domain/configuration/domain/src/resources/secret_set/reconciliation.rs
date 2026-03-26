@@ -7,19 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ResourceReconcileError,
-    SecretSetFailureDetails,
-    SecretSetLifecycleError,
-    SecretSetResource,
-    SecretSetStats,
-};
+use crate::{SecretSetFailureDetails, SecretSetLifecycleError, SecretSetResource, SecretSetStats};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_reconcilable_event_sourced_resource!(
     resource = SecretSetResource,
     reconcile_success = SecretSetReconcileSuccess,
     reconcile_error = SecretSetReconcileError,

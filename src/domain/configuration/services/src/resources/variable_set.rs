@@ -7,26 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    ReconcilableResourceEvent,
-    VariableSetReconcileSuccess,
-    VariableSetSpec,
-    VariableSetStats,
-};
+use kamu_configuration::{VariableSetResource, VariableSetStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetEvent = ReconcilableResourceEvent<
-    VariableSetSpec,
-    VariableSetReconcileSuccess,
-    VariableSetFailureDetails,
->;
+kamu_resources_services::declare_resource_service_layer!(
+    domain = kamu_configuration,
+    name = VariableSet,
+    resource = VariableSetResource,
+    state_model = VariableSetStateModel
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VariableSetFailureDetails {
-    pub stats: VariableSetStats,
-}

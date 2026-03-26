@@ -7756,6 +7756,7 @@ dependencies = [
  "kamu-auth-web3-services",
  "kamu-auth-web3-sqlite",
  "kamu-cli-puppet",
+ "kamu-configuration-services",
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -7976,6 +7977,42 @@ dependencies = [
  "tempfile",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "kamu-configuration"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "event-sourcing",
+ "internal-error",
+ "kamu-resources",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "kamu-configuration-services"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-resources",
+ "kamu-resources-services",
+ "opendatafabric",
+ "paste",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time-source",
+ "tracing",
 ]
 
 [[package]]
@@ -8815,6 +8852,7 @@ dependencies = [
  "chrono",
  "event-sourcing",
  "internal-error",
+ "kamu-configuration",
  "kamu-resources",
  "serde",
  "thiserror 2.0.18",

@@ -44,6 +44,7 @@ members = [
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
     "src/domain/auth-web3/domain",
+    "src/domain/configuration/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
@@ -56,6 +57,7 @@ members = [
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
     "src/domain/auth-web3/services",
+    "src/domain/configuration/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
     "src/domain/resources/services",
@@ -181,6 +183,7 @@ tracing-perfetto = { version = "0.261.1", path = "src/utils/tracing-perfetto", d
 kamu-accounts = { version = "0.261.1", path = "src/domain/accounts/domain", default-features = false }
 kamu-auth-rebac = { version = "0.261.1", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-auth-web3 = { version = "0.261.1", path = "src/domain/auth-web3/domain", default-features = false }
+kamu-configuration = { version = "0.261.1", path = "src/domain/configuration/domain", default-features = false }
 kamu-core = { version = "0.261.1", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.261.1", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.261.1", path = "src/domain/flow-system/domain", default-features = false }
@@ -206,6 +209,7 @@ odf-storage-s3 = { version = "0.261.1", path = "src/odf/storage-s3", default-fea
 kamu-accounts-services = { version = "0.261.1", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.261.1", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-auth-web3-services = { version = "0.261.1", path = "src/domain/auth-web3/services", default-features = false }
+kamu-configuration-services = { version = "0.261.1", path = "src/domain/configuration/services", default-features = false }
 kamu-datasets-services = { version = "0.261.1", path = "src/domain/datasets/services", default-features = false, features = [
     "lfs",
     "s3",

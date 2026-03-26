@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{
+use kamu_resources::{
     PendingStatusFromSpec,
     ReconcilableStatusProjector,
     ResourceStatus,
     ResourceStatusLike,
 };
+use serde::{Deserialize, Serialize};
+
+use crate::{VariableSetFailureDetails, VariableSetReconcileSuccess, VariableSetSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,12 +48,12 @@ impl ResourceStatusLike for VariableSetStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl PendingStatusFromSpec<crate::VariableSetSpec> for VariableSetStatus {
-    fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
+impl PendingStatusFromSpec<VariableSetSpec> for VariableSetStatus {
+    fn pending_from_spec(spec: &VariableSetSpec) -> Self {
         Self::new_pending(VariableSetStats::pending_from_spec(spec))
     }
 
-    fn reset_pending_from_spec(&mut self, spec: &crate::VariableSetSpec) {
+    fn reset_pending_from_spec(&mut self, spec: &VariableSetSpec) {
         self.stats = VariableSetStats::pending_from_spec(spec);
     }
 }
@@ -63,24 +64,21 @@ pub struct VariableSetStatusProjector;
 
 impl
     ReconcilableStatusProjector<
-        crate::VariableSetSpec,
-        crate::VariableSetReconcileSuccess,
-        crate::VariableSetFailureDetails,
+        VariableSetSpec,
+        VariableSetReconcileSuccess,
+        VariableSetFailureDetails,
     > for VariableSetStatusProjector
 {
     type Status = VariableSetStatus;
 
     fn on_reconciliation_succeeded(
         status: &mut Self::Status,
-        success: crate::VariableSetReconcileSuccess,
+        success: VariableSetReconcileSuccess,
     ) {
         status.stats = success.stats;
     }
 
-    fn on_reconciliation_failed(
-        status: &mut Self::Status,
-        details: crate::VariableSetFailureDetails,
-    ) {
+    fn on_reconciliation_failed(status: &mut Self::Status, details: VariableSetFailureDetails) {
         status.stats = details.stats;
     }
 }
@@ -95,7 +93,7 @@ pub struct VariableSetStats {
 }
 
 impl VariableSetStats {
-    pub fn pending_from_spec(spec: &crate::VariableSetSpec) -> Self {
+    pub fn pending_from_spec(spec: &VariableSetSpec) -> Self {
         let total = spec.variables.len();
         Self {
             total_variables: total,

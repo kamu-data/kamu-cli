@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceValidateSpec, ValueRef};
+use kamu_configuration::ValueRef;
+use kamu_resources::ResourceValidateSpec;
 use serde::{Deserialize, Serialize};
 
 use crate::StorageProviderKind;

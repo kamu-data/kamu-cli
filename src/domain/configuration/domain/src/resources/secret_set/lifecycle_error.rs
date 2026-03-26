@@ -8,26 +8,26 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ProjectionError;
-use thiserror::Error;
+use kamu_resources::ResourceMetadataValidationError;
 
-use crate::{ResourceMetadataValidationError, VariableSetSpecValidationError, VariableSetState};
+use crate::{SecretSetSpecValidationError, SecretSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
-pub enum VariableSetLifecycleError {
+#[derive(Debug, thiserror::Error)]
+pub enum SecretSetLifecycleError {
     #[error(transparent)]
     MetadataValidation(#[from] ResourceMetadataValidationError),
 
     #[error(transparent)]
-    SpecValidation(#[from] VariableSetSpecValidationError),
+    SpecValidation(#[from] SecretSetSpecValidationError),
 
     #[error("resource invariant violation: {0}")]
-    InvariantViolation(Box<ProjectionError<VariableSetState>>),
+    InvariantViolation(Box<ProjectionError<SecretSetState>>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-crate::impl_invariant_violation_lifecycle_error!(VariableSetLifecycleError, VariableSetState);
+kamu_resources::impl_invariant_violation_lifecycle_error!(SecretSetLifecycleError, SecretSetState);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,67 +9,64 @@
 
 use event_sourcing::*;
 use internal_error::InternalError;
-
-use crate::{
+use kamu_resources::{
     DeclarativeResource,
     ResourceApiVersion,
     ResourceID,
     ResourceMetadata,
+    ResourceSnapshot,
+    ResourceState,
     ResourceType,
-    SecretSetEventStore,
-    SecretSetSpec,
-    SecretSetState,
-    SecretSetStatus,
     decode_typed_resource_snapshot,
 };
+
+use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState, VariableSetStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, SecretSetEventStoreStatic>);
+pub struct VariableSetResource(pub(crate) Aggregate<VariableSetState, VariableSetEventStoreStatic>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
+type VariableSetEventStoreStatic = dyn VariableSetEventStore + 'static;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretSetResource {
-    pub const RESOURCE_TYPE: &'static str = "secret_set";
+impl VariableSetResource {
+    pub const RESOURCE_TYPE: &'static str = "variable_set";
     pub const API_VERSION: &'static str = "v1alpha1";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceType for SecretSetResource {
+impl ResourceType for VariableSetResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceApiVersion for SecretSetResource {
+impl ResourceApiVersion for VariableSetResource {
     const API_VERSION: &'static str = Self::API_VERSION;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl DeclarativeResource for SecretSetResource {
-    type Spec = SecretSetSpec;
-    type Status = SecretSetStatus;
-    type ResourceState = SecretSetState;
+impl DeclarativeResource for VariableSetResource {
+    type Spec = VariableSetSpec;
+    type Status = VariableSetStatus;
+    type ResourceState = VariableSetState;
 
-    fn decode_snapshot(
-        snapshot: crate::ResourceSnapshot,
-    ) -> Result<Self::ResourceState, InternalError> {
+    fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError> {
         let (resource_id, metadata, spec, status) =
-            decode_typed_resource_snapshot::<SecretSetSpec, SecretSetStatus>(snapshot)?;
+            decode_typed_resource_snapshot::<VariableSetSpec, VariableSetStatus>(snapshot)?;
 
-        Ok(SecretSetState {
+        Ok(VariableSetState(ResourceState {
             resource_id,
             metadata,
             spec,
             status,
-        })
+        }))
     }
 
     fn into_state(self) -> Self::ResourceState {
@@ -77,19 +74,19 @@ impl DeclarativeResource for SecretSetResource {
     }
 
     fn resource_id(&self) -> &ResourceID {
-        &self.as_ref().resource_id
+        &self.as_ref().0.resource_id
     }
 
     fn metadata(&self) -> &ResourceMetadata {
-        &self.as_ref().metadata
+        &self.as_ref().0.metadata
     }
 
     fn spec(&self) -> &Self::Spec {
-        &self.as_ref().spec
+        &self.as_ref().0.spec
     }
 
     fn status(&self) -> &Self::Status {
-        &self.as_ref().status
+        &self.as_ref().0.status
     }
 }
 
