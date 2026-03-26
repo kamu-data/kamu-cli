@@ -13,21 +13,29 @@ use crate::{ResourceID, ResourceMetadata, ResourceSnapshot, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait DeclarativeResource: Send + Sync {
+pub trait DeclarativeResource: Sized + Send + Sync + AsRef<Self::ResourceState> {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
-    type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>;
+    type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+        + From<Self>;
 
     fn decode_snapshot(snapshot: ResourceSnapshot) -> Result<Self::ResourceState, InternalError>;
 
-    fn into_state(self) -> Self::ResourceState
-    where
-        Self: Sized;
+    fn resource_id(&self) -> &ResourceID {
+        self.as_ref().resource_id()
+    }
 
-    fn resource_id(&self) -> &ResourceID;
-    fn metadata(&self) -> &ResourceMetadata;
-    fn spec(&self) -> &Self::Spec;
-    fn status(&self) -> &Self::Status;
+    fn metadata(&self) -> &ResourceMetadata {
+        self.as_ref().metadata()
+    }
+
+    fn spec(&self) -> &Self::Spec {
+        self.as_ref().spec()
+    }
+
+    fn status(&self) -> &Self::Status {
+        self.as_ref().status()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

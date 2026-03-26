@@ -12,8 +12,6 @@ use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
     ResourceApiVersion,
-    ResourceID,
-    ResourceMetadata,
     ResourceSnapshot,
     ResourceState,
     ResourceType,
@@ -25,11 +23,7 @@ use crate::{StorageEventStore, StorageSpec, StorageState, StorageStatus};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct StorageResource(pub(crate) Aggregate<StorageState, StorageEventStoreStatic>);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type StorageEventStoreStatic = dyn StorageEventStore + 'static;
+pub struct StorageResource(pub(crate) Aggregate<StorageState, dyn StorageEventStore>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,13 +32,9 @@ impl StorageResource {
     pub const API_VERSION: &'static str = "v1alpha1";
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl ResourceType for StorageResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceApiVersion for StorageResource {
     const API_VERSION: &'static str = Self::API_VERSION;
@@ -68,26 +58,6 @@ impl DeclarativeResource for StorageResource {
             status,
         }
         .into())
-    }
-
-    fn into_state(self) -> Self::ResourceState {
-        self.0.into_state()
-    }
-
-    fn resource_id(&self) -> &ResourceID {
-        &self.as_ref().resource_id
-    }
-
-    fn metadata(&self) -> &ResourceMetadata {
-        &self.as_ref().metadata
-    }
-
-    fn spec(&self) -> &Self::Spec {
-        &self.as_ref().spec
-    }
-
-    fn status(&self) -> &Self::Status {
-        &self.as_ref().status
     }
 }
 

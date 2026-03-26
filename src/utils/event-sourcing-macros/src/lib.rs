@@ -214,9 +214,9 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
         }
 
-        impl Into<#proj_type> for #type_name {
-            fn into(self) -> #proj_type {
-                self.0.into_state()
+        impl From<#type_name> for #proj_type {
+            fn from(value: #type_name) -> #proj_type {
+                value.0.into_state()
             }
         }
     }

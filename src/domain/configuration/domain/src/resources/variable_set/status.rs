@@ -46,8 +46,6 @@ impl ResourceStatusLike for VariableSetStatus {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl PendingStatusFromSpec<VariableSetSpec> for VariableSetStatus {
     fn pending_from_spec(spec: &VariableSetSpec) -> Self {
         Self::new_pending(VariableSetStats::pending_from_spec(spec))

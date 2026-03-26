@@ -46,8 +46,6 @@ impl ResourceStatusLike for SecretSetStatus {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl PendingStatusFromSpec<SecretSetSpec> for SecretSetStatus {
     fn pending_from_spec(spec: &SecretSetSpec) -> Self {
         Self::new_pending(SecretSetStats::pending_from_spec(spec))

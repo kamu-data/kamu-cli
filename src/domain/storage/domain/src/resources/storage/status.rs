@@ -49,8 +49,6 @@ impl ResourceStatusLike for StorageStatus {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl PendingStatusFromSpec<StorageSpec> for StorageStatus {
     fn pending_from_spec(spec: &StorageSpec) -> Self {
         Self::new_pending(spec.provider.kind())

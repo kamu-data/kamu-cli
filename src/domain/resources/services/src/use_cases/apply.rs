@@ -96,7 +96,7 @@ where
     fn make_result(resource: R, outcome: ApplyResourceOutcome) -> ApplyResourceResult<R> {
         ApplyResourceResult {
             resource_id: *resource.resource_id(),
-            state: resource.into_state(),
+            state: resource.into(),
             outcome,
         }
     }

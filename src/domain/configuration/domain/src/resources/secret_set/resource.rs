@@ -12,8 +12,6 @@ use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
     ResourceApiVersion,
-    ResourceID,
-    ResourceMetadata,
     ResourceSnapshot,
     ResourceState,
     ResourceType,
@@ -25,11 +23,7 @@ use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, SecretSetEventStoreStatic>);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type SecretSetEventStoreStatic = dyn SecretSetEventStore + 'static;
+pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, dyn SecretSetEventStore>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,13 +32,9 @@ impl SecretSetResource {
     pub const API_VERSION: &'static str = "v1alpha1";
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl ResourceType for SecretSetResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceApiVersion for SecretSetResource {
     const API_VERSION: &'static str = Self::API_VERSION;
@@ -68,26 +58,6 @@ impl DeclarativeResource for SecretSetResource {
             status,
         }
         .into())
-    }
-
-    fn into_state(self) -> Self::ResourceState {
-        self.0.into_state()
-    }
-
-    fn resource_id(&self) -> &ResourceID {
-        &self.as_ref().resource_id
-    }
-
-    fn metadata(&self) -> &ResourceMetadata {
-        &self.as_ref().metadata
-    }
-
-    fn spec(&self) -> &Self::Spec {
-        &self.as_ref().spec
-    }
-
-    fn status(&self) -> &Self::Status {
-        &self.as_ref().status
     }
 }
 
