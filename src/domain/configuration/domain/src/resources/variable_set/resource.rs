@@ -61,12 +61,13 @@ impl DeclarativeResource for VariableSetResource {
         let (resource_id, metadata, spec, status) =
             decode_typed_resource_snapshot::<VariableSetSpec, VariableSetStatus>(snapshot)?;
 
-        Ok(VariableSetState(ResourceState {
+        Ok(ResourceState {
             resource_id,
             metadata,
             spec,
             status,
-        }))
+        }
+        .into())
     }
 
     fn into_state(self) -> Self::ResourceState {
@@ -74,19 +75,19 @@ impl DeclarativeResource for VariableSetResource {
     }
 
     fn resource_id(&self) -> &ResourceID {
-        &self.as_ref().0.resource_id
+        &self.as_ref().resource_id
     }
 
     fn metadata(&self) -> &ResourceMetadata {
-        &self.as_ref().0.metadata
+        &self.as_ref().metadata
     }
 
     fn spec(&self) -> &Self::Spec {
-        &self.as_ref().0.spec
+        &self.as_ref().spec
     }
 
     fn status(&self) -> &Self::Status {
-        &self.as_ref().0.status
+        &self.as_ref().status
     }
 }
 

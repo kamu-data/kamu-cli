@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod reconcilable_resource_state;
 mod resource_state;
 mod resource_status;
 
+pub use reconcilable_resource_state::*;
 pub use resource_state::*;
 pub use resource_status::*;
