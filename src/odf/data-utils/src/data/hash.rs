@@ -11,7 +11,7 @@ use std::path::Path;
 
 use arrow::array::RecordBatch;
 use arrow::datatypes::Schema;
-use datafusion::arrow::record_batch::RecordBatchReader;
+use arrow::record_batch::RecordBatchReader;
 use odf_metadata::{Multicodec, Multihash};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,9 +40,9 @@ pub fn get_batches_logical_hash(schema: &Schema, record_batches: &[RecordBatch])
 #[tracing::instrument(level = "info")]
 pub fn get_parquet_logical_hash(
     data_path: &Path,
-) -> Result<Multihash, datafusion::parquet::errors::ParquetError> {
+) -> Result<Multihash, parquet::errors::ParquetError> {
     use arrow_digest::{RecordDigest, RecordDigestV0};
-    use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
     let file = std::fs::File::open(data_path)?;
 

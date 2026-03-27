@@ -22,10 +22,11 @@ doctest = false
 
 
 [features]
-default = ["arrow"]
+default = []
 
 arrow = ["dep:arrow"]
 did-pkh = ["dep:ssi-caips"]
+engine-rpc = ["dep:prost", "dep:tonic", "dep:tonic-prost"]
 sqlx = ["dep:sqlx"]
 sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
@@ -40,6 +41,7 @@ enum-variants = { workspace = true }
 internal-error = { workspace = true }
 multiformats = { workspace = true }
 
+bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
 thiserror = { version = "2", default-features = false, features = ["std"] }
@@ -68,19 +70,19 @@ serde_with = { version = "3", default-features = false, features = [
 ] }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
-# gRPC
-prost = { version = "0.14", default-features = false, features = [
+# Optional
+arrow = { optional = true, version = "58", default-features = false, features = [
+    "ipc",
+] }
+prost = { optional = true, version = "0.14", default-features = false, features = [
     "std",
     "derive",
 ] }
-tonic = { version = "0.14", default-features = false, features = [
+tonic = { optional = true, version = "0.14", default-features = false, features = [
     "transport",
     "codegen",
 ] }
-tonic-prost = { version = "0.14", default-features = false }
-
-# Optional
-arrow = { optional = true, version = "58", default-features = false, features = ["ipc"] }
+tonic-prost = { optional = true, version = "0.14", default-features = false }
 rand = { optional = true, version = "0.9", default-features = false }
 schemars = { optional = true, version = "1", default-features = false, features = [
     "derive",

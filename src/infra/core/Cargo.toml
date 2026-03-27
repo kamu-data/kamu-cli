@@ -64,7 +64,13 @@ kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, default-features = false, features = ["lfs", "s3"] }
+odf = { workspace = true, default-features = false, features = [
+    "datafusion",
+    "engine-rpc",
+    "http",
+    "lfs",
+    "s3",
+] }
 random-strings = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }

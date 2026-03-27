@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![cfg(feature = "datafusion")]
+
 use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
 use odf_metadata::{DatasetVocabulary, OperationType};

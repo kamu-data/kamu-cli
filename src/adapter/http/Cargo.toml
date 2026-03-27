@@ -41,7 +41,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
+odf = { workspace = true, features = ["utoipa"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 

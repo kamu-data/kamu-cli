@@ -9,9 +9,9 @@
 
 use std::io::Write;
 
-use datafusion::arrow::datatypes::Schema;
-use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
-use datafusion::parquet::schema::types::Type;
+use arrow::datatypes::Schema;
+use parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
+use parquet::schema::types::Type;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +51,7 @@ pub fn format_schema_odf_yaml(schema: &odf_metadata::DataSchema) -> String {
 
 /// Prints schema in a style of `parquet-schema` output
 pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(), std::io::Error> {
-    datafusion::parquet::schema::printer::print_schema(output, schema);
+    parquet::schema::printer::print_schema(output, schema);
     Ok(())
 }
 

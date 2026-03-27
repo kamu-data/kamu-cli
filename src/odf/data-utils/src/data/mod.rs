@@ -14,4 +14,5 @@ pub mod hash;
 pub mod local_url;
 pub mod udf;
 
+#[cfg(feature = "datafusion")]
 pub use dataframe_ext::{DataFrameExt, ExprExt};

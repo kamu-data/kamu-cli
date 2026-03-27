@@ -25,8 +25,14 @@ doctest = false
 default = ["lfs"]
 
 arrow = ["odf-metadata/arrow"]
-datafusion = ["arrow", "dep:odf-data-utils"]
+dataset = [
+    "dep:odf-dataset-impl",
+    # Dataset requires arrow for logical data hashing
+    "arrow",
+]
+datafusion = ["arrow", "odf-data-utils?/datafusion"]
 did-pkh = ["odf-metadata/did-pkh"]
+engine-rpc = ["odf-metadata/engine-rpc"]
 http = ["dep:odf-storage-http", "odf-dataset-impl/http"]
 lfs = ["dep:odf-storage-lfs", "odf-dataset/lfs", "odf-dataset-impl/lfs"]
 s3 = ["dep:odf-storage-s3", "odf-dataset/s3", "odf-dataset-impl/s3"]
@@ -41,6 +47,7 @@ testing = [
     "odf-data-utils?/testing",
 ]
 schemars = ["odf-metadata/schemars"]
+utils = ["dep:odf-data-utils"]
 utoipa = ["odf-metadata/utoipa"]
 
 
@@ -49,8 +56,7 @@ odf-dataset = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 
-odf-dataset-impl = { workspace = true }
-
+odf-dataset-impl = { optional = true, workspace = true }
 odf-data-utils = { optional = true, workspace = true }
 odf-storage-http = { optional = true, workspace = true }
 odf-storage-inmem = { workspace = true }

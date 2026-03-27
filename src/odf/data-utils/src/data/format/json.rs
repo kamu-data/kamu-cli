@@ -11,7 +11,7 @@ use std::io::Write;
 
 use arrow::array::{AsArray, OffsetSizeTrait};
 use arrow::datatypes::{DataType, SchemaRef};
-use datafusion::arrow::record_batch::RecordBatch;
+use arrow::record_batch::RecordBatch;
 use serde::ser::Serializer;
 
 use super::*;
