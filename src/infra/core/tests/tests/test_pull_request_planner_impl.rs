@@ -251,12 +251,7 @@ async fn create_graph_remote(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn copy_folder_recursively(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
-    if src.exists() {
-        std::fs::create_dir_all(dst)?;
-        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
-    }
-    Ok(())
+    file_utils::copy_dir_contents_recursively(src, dst)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use file_utils::OwnedFile;
+use file_utils::{OwnedFile, list_relative_files_recursively};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use odf::dataset::DatasetLayout;
 
@@ -49,35 +49,8 @@ impl DatasetTestHelper {
         assert_eq!(head_1, head_2);
     }
 
-    #[allow(clippy::assigning_clones)]
-    fn list_files(dir: &Path) -> Vec<PathBuf> {
-        if !dir.exists() {
-            return Vec::new();
-        }
-
-        let mut v = DatasetTestHelper::_list_files_rec(dir);
-
-        for path in &mut v {
-            *path = path.strip_prefix(dir).unwrap().to_owned();
-        }
-
-        v.sort();
-        v
-    }
-
-    fn _list_files_rec(dir: &Path) -> Vec<PathBuf> {
-        std::fs::read_dir(dir)
-            .unwrap()
-            .flat_map(|e| {
-                let entry = e.unwrap();
-                let path = entry.path();
-                if path.is_dir() {
-                    DatasetTestHelper::_list_files_rec(&path)
-                } else {
-                    vec![path]
-                }
-            })
-            .collect()
+    fn list_files(dir: &Path) -> Vec<std::path::PathBuf> {
+        list_relative_files_recursively(dir).unwrap()
     }
 
     pub async fn append_random_data(

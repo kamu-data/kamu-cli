@@ -5024,6 +5024,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 name = "file-utils"
 version = "0.261.0"
 dependencies = [
+ "fs_extra",
  "serde",
 ]
 
@@ -6809,7 +6810,6 @@ dependencies = [
  "filetime",
  "flatbuffers",
  "flate2",
- "fs_extra",
  "futures",
  "glob",
  "hex",
@@ -7328,7 +7328,6 @@ dependencies = [
  "email-utils",
  "file-utils",
  "flate2",
- "fs_extra",
  "futures",
  "graphql-parser",
  "headers",

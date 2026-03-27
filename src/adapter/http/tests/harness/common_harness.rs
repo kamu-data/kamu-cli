@@ -7,72 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{fs, io};
 
 use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu_datasets::DatasetRegistry;
-use odf::dataset::{AddDataParams, CheckpointRef, DatasetLayout};
+use odf::dataset::{AddDataParams, CheckpointRef};
 use odf::metadata::OffsetInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const PROTOCOL_TRANSFER_SUBDIRS: [&str; 4] = ["blocks", "checkpoints", "data", "refs"];
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn copy_lfs_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.exists() {
-        fs::create_dir_all(dst)?;
-        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
-    }
-    Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn copy_lfs_dataset_files(
-    src_layout: &DatasetLayout,
-    dst_layout: &DatasetLayout,
-) -> io::Result<()> {
-    // Only copy the protocol-relevant directories. Storage-specific extensions are
-    // intentionally ignored.
-    for subdir in PROTOCOL_TRANSFER_SUBDIRS {
-        copy_lfs_folder_recursively(
-            &src_layout.root_dir.join(subdir),
-            &dst_layout.root_dir.join(subdir),
-        )?;
-    }
-    Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn write_lfs_dataset_alias(
-    dataset_layout: &DatasetLayout,
-    alias: &odf::DatasetAlias,
-) {
-    if !dataset_layout.info_dir.is_dir() {
-        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
-    }
-
-    use tokio::io::AsyncWriteExt;
-
-    let alias_path = dataset_layout.info_dir.join("alias");
-    let mut alias_file = tokio::fs::File::create(alias_path).await.unwrap();
-
-    alias_file
-        .write_all(alias.to_string().as_bytes())
-        .await
-        .unwrap();
-    alias_file.flush().await.unwrap();
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

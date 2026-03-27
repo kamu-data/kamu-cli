@@ -36,49 +36,12 @@ use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
+use super::ServerSideDatasetFixture;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait(?Send)]
-pub(crate) trait ServerSideDatasetFixture {
-    async fn assert_dataset_in_sync(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        client_dataset_layout: &odf::dataset::DatasetLayout,
-    ) -> Result<(), InternalError>;
-
-    async fn download_dataset_to(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        client_dataset_layout: &odf::dataset::DatasetLayout,
-        scope: DatasetTransferScope,
-    ) -> Result<(), InternalError>;
-
-    async fn upload_dataset_from(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        client_dataset_layout: &odf::dataset::DatasetLayout,
-        scope: DatasetTransferScope,
-    ) -> Result<(), InternalError>;
-
-    async fn write_dataset_alias(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        dataset_alias: &odf::DatasetAlias,
-    ) -> Result<(), InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum DatasetTransferScope {
-    Full,
-    DataOnly,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

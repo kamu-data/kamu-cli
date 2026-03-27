@@ -16,6 +16,15 @@ pub(crate) use client_side_harness::*;
 mod server_side_harness;
 pub(crate) use server_side_harness::*;
 
+mod server_side_dataset_fixture;
+pub(crate) use server_side_dataset_fixture::*;
+
+mod server_side_local_fs_dataset_fixture;
+pub(crate) use server_side_local_fs_dataset_fixture::*;
+
+mod server_side_s3_dataset_fixture;
+pub(crate) use server_side_s3_dataset_fixture::*;
+
 mod server_side_s3_harness;
 pub(crate) use server_side_s3_harness::*;
 
