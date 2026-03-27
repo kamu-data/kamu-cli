@@ -418,11 +418,11 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 Our Jupyter demo at https://demo.kamu.dev includes a special Jupyter notebook image that embeds `kamu-cli`, multiple examples, and some other tools. The tutorials also guide users to interact with `kamu-node` deployed in the demo environment. Because of this - it's important to update Jupyter whenever we break any protocol compatibility.
 
 1. Increment `DEMO_VERSION` version in the [Makefile](https://github.com/kamu-data/kamu-cli/blob/master/images/demo/Makefile)
-2. Set the same version for `jupyter` and `minio` images in [`docker-compose.yml`](https://github.com/kamu-data/kamu-cli/blob/master/images/demo/docker-compose.yml) (`minio` image that we will build is used to run the demo environment locally)
+2. Set the same version for `jupyter` and `rustfs` images in [`docker-compose.yml`](https://github.com/kamu-data/kamu-cli/blob/master/images/demo/docker-compose.yml) (`rustfs` image that we will build is used to run the demo environment locally)
 3. Run `make clean`
-4. Run `make minio-data` - this will prepare example datasets to be included into `minio` image
+4. Run `make data` - this will prepare example datasets to be included into `rustfs` image
 5. Prepare your `docker buildx` to build multi-platform images (see [instructions below](#building-multi-platform-images))
-6. Run `make minio-multi-arch` to build **and push** multi-arch `minio` image
+6. Run `make rustfs-multi-arch` to build **and push** multi-arch `rustfs` image
 7. Setup GitHub access token:
   7.1. Go to [GitHub access token page](https://github.com/settings/tokens/new?description=Upload%20Kamu%20packages&scopes=write%3Apackages) and generate 
     access token with `write:packages` permissions.
