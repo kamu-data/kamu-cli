@@ -17,8 +17,8 @@ use crate::harness::{ClientSideHarness, ServerSideHarness, commit_add_data_event
 pub(crate) struct SmartPullNewDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
-    pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
+    pub server_dataset_handle: odf::DatasetHandle,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub server_commit_result: odf::dataset::CommitResult,
 }
@@ -49,9 +49,6 @@ impl<TServerHarness: ServerSideHarness> SmartPullNewDatasetScenario<TServerHarne
             .await
             .unwrap();
 
-        let server_dataset_layout =
-            server_harness.dataset_layout(&server_create_result.dataset_handle);
-
         let server_commit_result = commit_add_data_event(
             server_harness.cli_dataset_registry().as_ref(),
             &server_create_result.dataset_handle,
@@ -66,12 +63,13 @@ impl<TServerHarness: ServerSideHarness> SmartPullNewDatasetScenario<TServerHarne
             odf::DatasetAlias::new(server_account_name, odf::DatasetName::new_unchecked("foo"));
         let server_odf_url = server_harness.dataset_url(&server_alias);
         let server_dataset_ref = odf::DatasetRefRemote::from(&server_odf_url);
+        let server_dataset_handle = server_create_result.dataset_handle;
 
         Self {
             client_harness,
             server_harness,
-            server_dataset_layout,
             client_dataset_layout,
+            server_dataset_handle,
             server_dataset_ref,
             server_commit_result,
         }

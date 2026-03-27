@@ -22,7 +22,11 @@ use odf::metadata::OffsetInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
+pub(crate) const PROTOCOL_TRANSFER_SUBDIRS: [&str; 4] = ["blocks", "checkpoints", "data", "refs"];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn copy_lfs_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
     if src.exists() {
         fs::create_dir_all(dst)?;
         let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
@@ -33,21 +37,27 @@ pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn copy_dataset_files(
+pub(crate) fn copy_lfs_dataset_files(
     src_layout: &DatasetLayout,
     dst_layout: &DatasetLayout,
 ) -> io::Result<()> {
-    // Don't copy `info`
-    copy_folder_recursively(&src_layout.blocks_dir, &dst_layout.blocks_dir)?;
-    copy_folder_recursively(&src_layout.checkpoints_dir, &dst_layout.checkpoints_dir)?;
-    copy_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)?;
-    copy_folder_recursively(&src_layout.refs_dir, &dst_layout.refs_dir)?;
+    // Only copy the protocol-relevant directories. Storage-specific extensions are
+    // intentionally ignored.
+    for subdir in PROTOCOL_TRANSFER_SUBDIRS {
+        copy_lfs_folder_recursively(
+            &src_layout.root_dir.join(subdir),
+            &dst_layout.root_dir.join(subdir),
+        )?;
+    }
     Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &odf::DatasetAlias) {
+pub(crate) async fn write_lfs_dataset_alias(
+    dataset_layout: &DatasetLayout,
+    alias: &odf::DatasetAlias,
+) {
     if !dataset_layout.info_dir.is_dir() {
         std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
     }
@@ -66,20 +76,20 @@ pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_random_file(path: PathBuf) -> OwnedFile {
+fn create_random_file(path: PathBuf) -> OwnedFile {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
     rand::rng().fill_bytes(&mut data);
 
-    std::fs::write(&path, &data).unwrap();
+    std::fs::write(&path, data).unwrap();
 
     OwnedFile::new(path)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -> OwnedFile {
+fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -> OwnedFile {
     use rand::RngCore;
 
     let schema = Arc::new(Schema::new(vec![
@@ -141,9 +151,9 @@ pub(crate) async fn commit_add_data_event(
         end: prev_offset.map_or(0, |offset| offset + 1) + num_records - 1,
     };
 
-    let data = create_random_parquet_file(tempdir.path().join("data"), &new_offset_interval).await;
+    let data = create_random_parquet_file(tempdir.path().join("data"), &new_offset_interval);
 
-    let checkpoint = create_random_file(tempdir.path().join("checkpoint")).await;
+    let checkpoint = create_random_file(tempdir.path().join("checkpoint"));
 
     let add_data = AddDataParams {
         prev_checkpoint,

@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{CacheDir, RunInfoDir, ServerUrlConfig};
+use kamu::testing::DatasetTestHelper;
 use kamu::*;
 use kamu_accounts::{
     Account,
@@ -58,13 +59,20 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
 use super::{
+    DatasetTransferScope,
     SERVER_ACCOUNT_NAME,
+    ServerSideDatasetFixture,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
     create_cli_user_catalog,
     create_web_user_catalog,
     make_server_account,
+};
+use crate::harness::{
+    copy_lfs_dataset_files,
+    copy_lfs_folder_recursively,
+    write_lfs_dataset_alias,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +87,109 @@ pub(crate) struct ServerSideLocalFsHarness {
     account: Account,
 }
 
+struct LocalFsDatasetFixture {
+    datasets_dir: PathBuf,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ServerSideDatasetFixture for LocalFsDatasetFixture {
+    async fn assert_dataset_in_sync(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        client_dataset_layout: &odf::dataset::DatasetLayout,
+    ) -> Result<(), InternalError> {
+        let server_dataset_layout = odf::dataset::DatasetLayout::new(
+            self.datasets_dir
+                .join(dataset_handle.id.as_multibase().to_stack_string())
+                .as_path(),
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, client_dataset_layout);
+
+        Ok(())
+    }
+    async fn download_dataset_to(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        client_dataset_layout: &odf::dataset::DatasetLayout,
+        scope: DatasetTransferScope,
+    ) -> Result<(), InternalError> {
+        let server_dataset_layout = odf::dataset::DatasetLayout::new(
+            self.datasets_dir
+                .join(dataset_handle.id.as_multibase().to_stack_string())
+                .as_path(),
+        );
+
+        ServerSideLocalFsHarness::copy_dataset_scope(
+            &server_dataset_layout,
+            client_dataset_layout,
+            scope,
+        )
+        .int_err()
+    }
+
+    async fn upload_dataset_from(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        client_dataset_layout: &odf::dataset::DatasetLayout,
+        scope: DatasetTransferScope,
+    ) -> Result<(), InternalError> {
+        let server_dataset_layout = odf::dataset::DatasetLayout::new(
+            self.datasets_dir
+                .join(dataset_handle.id.as_multibase().to_stack_string())
+                .as_path(),
+        );
+
+        ServerSideLocalFsHarness::copy_dataset_scope(
+            client_dataset_layout,
+            &server_dataset_layout,
+            scope,
+        )
+        .int_err()
+    }
+
+    async fn write_dataset_alias(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> Result<(), InternalError> {
+        let server_dataset_layout = odf::dataset::DatasetLayout::new(
+            self.datasets_dir
+                .join(dataset_handle.id.as_multibase().to_stack_string())
+                .as_path(),
+        );
+
+        write_lfs_dataset_alias(&server_dataset_layout, dataset_alias).await;
+        Ok(())
+    }
+}
+
 impl ServerSideLocalFsHarness {
+    fn internal_datasets_folder_path(&self) -> PathBuf {
+        self.tempdir.path().join("datasets")
+    }
+
+    pub fn base_catalog(&self) -> &dill::Catalog {
+        &self.base_catalog
+    }
+
+    pub fn server_account(&self) -> &Account {
+        &self.account
+    }
+
+    fn copy_dataset_scope(
+        src_layout: &odf::dataset::DatasetLayout,
+        dst_layout: &odf::dataset::DatasetLayout,
+        scope: DatasetTransferScope,
+    ) -> std::io::Result<()> {
+        match scope {
+            DatasetTransferScope::Full => copy_lfs_dataset_files(src_layout, dst_layout),
+            DatasetTransferScope::DataOnly => {
+                copy_lfs_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)
+            }
+        }
+    }
+
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -221,21 +331,9 @@ impl ServerSideLocalFsHarness {
             account,
         }
     }
-
-    fn internal_datasets_folder_path(&self) -> PathBuf {
-        self.tempdir.path().join("datasets")
-    }
-
-    pub fn base_catalog(&self) -> &dill::Catalog {
-        &self.base_catalog
-    }
-
-    pub fn server_account(&self) -> &Account {
-        &self.account
-    }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl ServerSideHarness for ServerSideLocalFsHarness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
@@ -339,6 +437,12 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
 
     fn system_time_source(&self) -> &SystemTimeSourceStub {
         &self.time_source
+    }
+
+    fn dataset_fixture(&self) -> Arc<dyn ServerSideDatasetFixture> {
+        Arc::new(LocalFsDatasetFixture {
+            datasets_dir: self.internal_datasets_folder_path(),
+        })
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {

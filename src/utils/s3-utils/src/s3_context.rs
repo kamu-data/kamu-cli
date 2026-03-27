@@ -375,6 +375,35 @@ impl S3Context {
         .await
     }
 
+    pub async fn bucket_list_object_keys(
+        &self,
+        key_prefix: &str,
+    ) -> Result<Vec<String>, InternalError> {
+        self.api_call("list_objects_v2(bucket_list_object_keys)", || async {
+            let mut keys = Vec::new();
+
+            let mut paginator = self
+                .client
+                .list_objects_v2()
+                .bucket(self.shared_state.bucket.clone())
+                .prefix(self.get_key(key_prefix))
+                .max_keys(Self::MAX_LISTED_OBJECTS)
+                .into_paginator()
+                .send();
+
+            while let Some(page) = paginator.next().await {
+                let page = page.int_err()?;
+
+                for object in page.contents.unwrap_or_default() {
+                    keys.push(object.key.unwrap());
+                }
+            }
+
+            Ok(keys)
+        })
+        .await
+    }
+
     pub async fn recursive_delete(&self, key_prefix: String) -> Result<(), InternalError> {
         // ListObjectsV2Request returns at most S3Context::MAX_LISTED_OBJECTS=1000 items
         let mut has_next_page = true;

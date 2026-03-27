@@ -13,12 +13,11 @@ use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{
     ClientSideHarness,
+    DatasetTransferScope,
     ServerSideHarness,
     commit_add_data_event,
-    copy_dataset_files,
-    copy_folder_recursively,
     make_dataset_ref,
-    write_dataset_alias,
+    write_lfs_dataset_alias,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +27,6 @@ pub(crate) struct SmartPullAbortedReadOfExistingEvolvedRereadSucceedsScenario<
 > {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
-    pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub server_create_result: CreateDatasetResult,
@@ -43,6 +41,7 @@ impl<TServerHarness: ServerSideHarness>
         server_harness: TServerHarness,
     ) -> Self {
         let server_account_name = server_harness.operating_account_name();
+        let dataset_fixture = server_harness.dataset_fixture();
 
         let create_dataset_from_snapshot =
             server_harness.cli_create_dataset_from_snapshot_use_case();
@@ -63,17 +62,21 @@ impl<TServerHarness: ServerSideHarness>
             .await
             .unwrap();
 
-        let server_dataset_layout =
-            server_harness.dataset_layout(&server_create_result.dataset_handle);
-
         let client_dataset_layout =
             client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Hard folder synchronization
-        copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();
+        dataset_fixture
+            .download_dataset_to(
+                &server_create_result.dataset_handle,
+                &client_dataset_layout,
+                DatasetTransferScope::Full,
+            )
+            .await
+            .unwrap();
 
         let foo_name = odf::DatasetName::new_unchecked("foo");
-        write_dataset_alias(
+        write_lfs_dataset_alias(
             &client_dataset_layout,
             &odf::DatasetAlias::new(client_harness.operating_account_name(), foo_name.clone()),
         )
@@ -131,11 +134,14 @@ impl<TServerHarness: ServerSideHarness>
         // Let's pretend that previous attempts uploaded some data files, but the rest
         // was discarded. To mimic this, artificially copy just the data folder,
         // containing a data block
-        copy_folder_recursively(
-            &server_dataset_layout.data_dir,
-            &client_dataset_layout.data_dir,
-        )
-        .unwrap();
+        dataset_fixture
+            .download_dataset_to(
+                &server_create_result.dataset_handle,
+                &client_dataset_layout,
+                DatasetTransferScope::DataOnly,
+            )
+            .await
+            .unwrap();
 
         let server_alias = odf::DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
@@ -144,7 +150,6 @@ impl<TServerHarness: ServerSideHarness>
         Self {
             client_harness,
             server_harness,
-            server_dataset_layout,
             client_dataset_layout,
             server_dataset_ref,
             server_create_result,

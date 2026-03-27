@@ -19,7 +19,6 @@
 use std::assert_matches;
 
 use kamu::domain::PullResult;
-use kamu::testing::DatasetTestHelper;
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
@@ -50,6 +49,7 @@ async fn test_smart_pull_unauthenticated() {
         .await,
     )
     .await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -71,10 +71,13 @@ async fn test_smart_pull_unauthenticated() {
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
