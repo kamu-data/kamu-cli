@@ -12284,6 +12284,7 @@ dependencies = [
  "bon",
  "common-macros",
  "dill",
+ "file-utils",
  "internal-error",
  "observability",
  "prometheus",

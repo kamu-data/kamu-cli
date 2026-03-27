@@ -47,11 +47,10 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
-use s3_utils::S3Context;
+use s3_utils::{S3Context, S3PrefixFiles};
 use serde_json::json;
 use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
-use tokio::io::AsyncReadExt;
 
 use crate::harness::{TestAPIServer, await_client_server_flow};
 
@@ -146,11 +145,9 @@ impl Harness {
     }
 
     async fn read_bucket_file_as_string(bucket_contest: &S3Context, file_key: String) -> String {
-        let get_object_output = bucket_contest.get_object(file_key).await.unwrap();
-        let mut stream = get_object_output.body.into_async_read();
-        let mut data: Vec<u8> = Vec::new();
-        stream.read_to_end(&mut data).await.unwrap();
-        String::from_utf8(data).expect("Our bytes should be valid utf8")
+        S3PrefixFiles::read_object_as_string(bucket_contest, file_key)
+            .await
+            .unwrap()
     }
 
     fn make_header_map(upload_context: &UploadContext) -> HeaderMap {
