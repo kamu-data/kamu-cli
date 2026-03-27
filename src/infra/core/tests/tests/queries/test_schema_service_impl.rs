@@ -90,7 +90,7 @@ async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, dill::Catalog) {
         .returning(|_, _| Ok(vec![]));
 
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(&s3, authorizer).await;
+    let catalog = create_catalog_with_s3_workspace(&s3, authorizer);
     (s3, catalog)
 }
 
@@ -148,12 +148,12 @@ fn create_catalog_with_local_workspace(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_catalog_with_s3_workspace(
+fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
     let base_s3_catalog =
-        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer).await;
+        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer);
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<SchemaServiceImpl>()

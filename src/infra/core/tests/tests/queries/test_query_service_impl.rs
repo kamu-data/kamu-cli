@@ -45,12 +45,12 @@ fn create_catalog_with_local_workspace(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_catalog_with_s3_workspace(
+fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
     let base_s3_catalog =
-        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer).await;
+        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer);
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<QueryServiceImpl>()
@@ -122,8 +122,7 @@ async fn test_dataset_tail_local_fs() {
 async fn test_dataset_tail_s3() {
     let tempdir = tempfile::tempdir().unwrap();
     let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::allowing()).await;
+    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::allowing());
     test_dataset_tail_common(catalog, &tempdir).await;
 }
 
@@ -196,8 +195,7 @@ async fn test_dataset_sql_authorized_s3() {
     let catalog = create_catalog_with_s3_workspace(
         &s3,
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
-    )
-    .await;
+    );
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
 
@@ -233,8 +231,7 @@ async fn test_dataset_sql_unauthorized_infer_local_fs() {
 async fn test_dataset_sql_unauthorized_infer_local_s3() {
     let tempdir = tempfile::tempdir().unwrap();
     let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
+    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying());
     test_dataset_sql_unauthorized_infer_common(catalog, &tempdir).await;
 }
 

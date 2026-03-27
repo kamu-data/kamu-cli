@@ -181,7 +181,7 @@ pub(crate) fn create_base_catalog_with_local_workspace(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn create_base_catalog_with_s3_workspace(
+pub(crate) fn create_base_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {

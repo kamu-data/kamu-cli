@@ -67,7 +67,7 @@ impl LocalS3Server {
             .unwrap();
 
         let address = container_runtime.get_runtime_host_addr();
-        let endpoint_url = format!("http://{}:{}", address, host_port);
+        let endpoint_url = format!("http://{address}:{host_port}");
         let url = Url::parse(&format!("s3+{endpoint_url}/{bucket}/")).unwrap();
 
         // Create test bucket

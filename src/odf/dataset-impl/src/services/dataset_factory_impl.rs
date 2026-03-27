@@ -181,10 +181,12 @@ impl DatasetFactoryImpl {
         //             Perhaps in future we should create a cache of S3Contexts keyed
         //             by an endpoint.
 
+        use s3_utils::S3ContextBuilder;
+
         use super::DatasetS3BuilderDefault;
         let s3_context = S3Context::builder()
             .with_url(&base_url)
-            .maybe(maybe_s3_metrics, |b, v| b.with_metrics(v))
+            .maybe(maybe_s3_metrics, S3ContextBuilder::with_metrics)
             .build()
             .await;
 

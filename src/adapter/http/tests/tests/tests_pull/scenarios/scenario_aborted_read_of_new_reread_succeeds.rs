@@ -15,7 +15,6 @@ use crate::harness::{
     ServerSideHarness,
     commit_add_data_event,
     copy_folder_recursively,
-    make_dataset_ref,
     write_dataset_alias,
 };
 

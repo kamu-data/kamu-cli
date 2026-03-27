@@ -178,7 +178,7 @@ async fn test_dataset_compact() {
 #[tokio::test]
 async fn test_dataset_compact_s3() {
     let s3 = LocalS3Server::new().await;
-    let harness = CompactTestHarness::new_s3(&s3).await;
+    let harness = CompactTestHarness::new_s3(&s3);
 
     let target = harness.create_test_root_dataset().await;
     let dataset_ref = target.get_handle().as_local_ref();
@@ -1444,7 +1444,7 @@ impl CompactTestHarness {
         }
     }
 
-    async fn new_s3(s3: &LocalS3Server) -> Self {
+    fn new_s3(s3: &LocalS3Server) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();

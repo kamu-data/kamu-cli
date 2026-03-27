@@ -10,12 +10,7 @@
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::harness::{
-    ClientSideHarness,
-    ServerSideHarness,
-    commit_add_data_event,
-    make_dataset_ref,
-};
+use crate::harness::{ClientSideHarness, ServerSideHarness, commit_add_data_event};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
