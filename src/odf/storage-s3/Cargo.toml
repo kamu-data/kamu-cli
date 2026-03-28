@@ -29,6 +29,9 @@ odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 s3-utils = { workspace = true }
 
+aws-smithy-types = { version = "1", default-features = false, features = [
+    "rt-tokio",
+] }
 async-trait = "0.1"
 aws-sdk-s3 = { version = "1", default-features = false }
 bytes = { version = "1", default-features = false }
@@ -37,7 +40,7 @@ digest = "0.10"
 http = "1"
 
 sha3 = "0.10"
-tokio = { version = "1", default-features = false }
+tokio = { version = "1.50.0", default-features = false, features = ["io-util"] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 

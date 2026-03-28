@@ -57,6 +57,7 @@ pub mod metadata {
 
 pub mod dataset {
     pub use odf_dataset::*;
+    #[cfg(feature = "dataset")]
     pub use odf_dataset_impl::*;
 }
 
