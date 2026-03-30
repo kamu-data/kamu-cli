@@ -11,6 +11,16 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Minio usage replaced with RustFS
+- Large rework of smart transfer protocol tests:
+    - polymorphic upload/download and comparison behavior depending 
+      on the server's storage technology (lfs vs S3/RustFS)
+- ODF feature slicing improved
+- Datafusion 52 -> 53
+- AWS API unpinned, using the latest version
+
 ## [0.261.0] - 2026-03-19
 ### Added
 - Implemented flexible flow listing ordering at service level + 2 high-level ordering modes in GQL API.
