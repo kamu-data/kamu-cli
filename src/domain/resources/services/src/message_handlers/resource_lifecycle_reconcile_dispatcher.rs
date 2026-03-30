@@ -36,6 +36,20 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
                     .await
                     .map_err(internal_error::ErrorIntoInternal::int_err)
             }
+
+            async fn handle_reconciliation_succeeded(
+                &self,
+                _resource: &kamu_resources::ResourceSnapshot,
+            ) -> Result<(), internal_error::InternalError> {
+                Ok(())
+            }
+
+            async fn handle_reconciliation_failed(
+                &self,
+                _resource: &kamu_resources::ResourceSnapshot,
+            ) -> Result<(), internal_error::InternalError> {
+                Ok(())
+            }
         }
     };
 }

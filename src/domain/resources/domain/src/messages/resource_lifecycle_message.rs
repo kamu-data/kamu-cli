@@ -15,13 +15,15 @@ use crate::ResourceSnapshot;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
+const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
+    ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
+    ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
 }
 
 impl ResourceLifecycleMessage {
@@ -36,7 +38,23 @@ impl ResourceLifecycleMessage {
             resource,
         })
     }
+
+    pub fn reconciliation_succeeded(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
+        Self::ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded {
+            event_time,
+            resource,
+        })
+    }
+
+    pub fn reconciliation_failed(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
+        Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
+            event_time,
+            resource,
+        })
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Message for ResourceLifecycleMessage {
     fn version() -> u32 {
@@ -58,6 +76,22 @@ pub enum ResourceLifecycleMessageOutcome {
 pub struct ResourceLifecycleMessageApplied {
     pub event_time: DateTime<Utc>,
     pub outcome: ResourceLifecycleMessageOutcome,
+    pub resource: ResourceSnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageReconciliationSucceeded {
+    pub event_time: DateTime<Utc>,
+    pub resource: ResourceSnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageReconciliationFailed {
+    pub event_time: DateTime<Utc>,
     pub resource: ResourceSnapshot,
 }
 

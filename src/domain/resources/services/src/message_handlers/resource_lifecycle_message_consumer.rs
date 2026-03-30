@@ -67,6 +67,26 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
                 dispatcher.handle_applied(&applied_message.resource).await
             }
+            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
+                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
+                    target_catalog,
+                    &succeeded_message.resource,
+                )?;
+
+                dispatcher
+                    .handle_reconciliation_succeeded(&succeeded_message.resource)
+                    .await
+            }
+            ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
+                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
+                    target_catalog,
+                    &failed_message.resource,
+                )?;
+
+                dispatcher
+                    .handle_reconciliation_failed(&failed_message.resource)
+                    .await
+            }
         }
     }
 }
