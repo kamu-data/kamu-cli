@@ -1,0 +1,109 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use dill::{Singleton, component, interface, scope};
+use internal_error::InternalError;
+use kamu_configuration::{
+    ReplaceProjectionEntriesError,
+    VariableSetEntry,
+    VariableSetProjectionRepository,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct InMemoryVariableSetProjectionRepository {
+    state: Arc<Mutex<State>>,
+}
+
+#[component(pub)]
+#[interface(dyn VariableSetProjectionRepository)]
+#[scope(Singleton)]
+impl InMemoryVariableSetProjectionRepository {
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(State::default())),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct State {
+    entries_by_resource_id_generation:
+        HashMap<(kamu_resources::ResourceID, u64), Vec<VariableSetEntry>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository {
+    async fn replace_entries(
+        &self,
+        resource_id: &kamu_resources::ResourceID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        let mut guard = self.state.lock().unwrap();
+        let key = (*resource_id, resource_generation);
+        if guard.entries_by_resource_id_generation.contains_key(&key) {
+            return Err(ReplaceProjectionEntriesError::concurrent_modification());
+        }
+        guard
+            .entries_by_resource_id_generation
+            .insert(key, entries.to_vec());
+        Ok(())
+    }
+
+    async fn find_entry(
+        &self,
+        resource_id: &kamu_resources::ResourceID,
+        resource_generation: u64,
+        key: &str,
+    ) -> Result<Option<VariableSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .entries_by_resource_id_generation
+            .get(&(*resource_id, resource_generation))
+            .and_then(|entries| entries.iter().find(|entry| entry.key == key))
+            .cloned())
+    }
+
+    async fn get_entries(
+        &self,
+        resource_id: &kamu_resources::ResourceID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .entries_by_resource_id_generation
+            .get(&(*resource_id, resource_generation))
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    async fn cleanup_entries_before_generation(
+        &self,
+        resource_id: &kamu_resources::ResourceID,
+        resource_generation: u64,
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard.entries_by_resource_id_generation.retain(
+            |(stored_resource_id, stored_generation), _| {
+                stored_resource_id != resource_id || *stored_generation >= resource_generation
+            },
+        );
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

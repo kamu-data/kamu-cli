@@ -7,14 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod secret_set_entry;
+mod variable_set_entry;
 
-mod projections;
-mod repositories;
-mod resources;
-mod values;
-
-pub use projections::*;
-pub use repositories::*;
-pub use resources::*;
-pub use values::*;
+pub use secret_set_entry::*;
+pub use variable_set_entry::*;

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use event_sourcing::ConcurrentModificationError;
 use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
@@ -38,8 +39,8 @@ pub struct SecretSetReconcileSuccess {
 
 #[derive(thiserror::Error, Debug)]
 pub enum SecretSetReconcileError {
-    #[error("Reference missing: {name}")]
-    ReferenceMissing { name: String },
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
 
     #[error(transparent)]
     Internal(
@@ -52,15 +53,15 @@ pub enum SecretSetReconcileError {
 impl ResourceReconcileError for SecretSetReconcileError {
     fn reason_code(&self) -> &'static str {
         match self {
-            SecretSetReconcileError::ReferenceMissing { .. } => "reference_missing",
+            SecretSetReconcileError::ConcurrentModification(_) => "concurrent_modification",
             SecretSetReconcileError::Internal(_) => "internal_error",
         }
     }
 
     fn user_message(&self) -> String {
         match self {
-            SecretSetReconcileError::ReferenceMissing { name } => {
-                format!("Referenced resource '{name}' is missing.")
+            SecretSetReconcileError::ConcurrentModification(_) => {
+                "Resource was modified concurrently during reconciliation.".to_owned()
             }
             SecretSetReconcileError::Internal(e) => format!("Internal error: {e}"),
         }
@@ -68,8 +69,8 @@ impl ResourceReconcileError for SecretSetReconcileError {
 
     fn is_transient(&self) -> bool {
         match self {
-            SecretSetReconcileError::ReferenceMissing { .. } => false,
-            SecretSetReconcileError::Internal(_) => true,
+            SecretSetReconcileError::ConcurrentModification(_)
+            | SecretSetReconcileError::Internal(_) => true,
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
-name = "kamu-configuration"
-description = "Domain model of managed configuration resources"
+name = "kamu-configuration-postgres"
+description = "Postgres-specific implementation of configuration projections"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,27 +21,24 @@ workspace = true
 doctest = false
 
 
-[features]
-default = []
-sqlx = ["dep:sqlx"]
-
-
 [dependencies]
-event-sourcing = { workspace = true }
+database-common = { workspace = true }
 internal-error = { workspace = true }
+kamu-configuration = { workspace = true, features = ["sqlx"] }
 kamu-resources = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, features = ["sqlx-postgres"] }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
-uuid = { version = "1", default-features = false, features = ["v4"] }
-
-# Optional
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+dill = { version = "0.15", default-features = false }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
     "macros",
+    "postgres",
+    "chrono",
+    "uuid",
 ] }
+uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]

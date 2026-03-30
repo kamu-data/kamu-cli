@@ -88,6 +88,10 @@ members = [
     "src/infra/resources/inmem",
     "src/infra/resources/postgres",
     "src/infra/resources/sqlite",
+    ## Configuration
+    "src/infra/configuration/inmem",
+    "src/infra/configuration/postgres",
+    "src/infra/configuration/sqlite",
     ## Search
     "src/infra/search/openai",
     "src/infra/search/elasticsearch",
@@ -245,6 +249,10 @@ kamu-datasets-repo-tests = { version = "0.261.1", path = "src/infra/datasets/rep
 kamu-resources-postgres = { version = "0.261.1", path = "src/infra/resources/postgres", default-features = false }
 kamu-resources-inmem = { version = "0.261.1", path = "src/infra/resources/inmem", default-features = false }
 kamu-resources-sqlite = { version = "0.261.1", path = "src/infra/resources/sqlite", default-features = false }
+## Configuration
+kamu-configuration-postgres = { version = "0.261.1", path = "src/infra/configuration/postgres", default-features = false }
+kamu-configuration-inmem = { version = "0.261.1", path = "src/infra/configuration/inmem", default-features = false }
+kamu-configuration-sqlite = { version = "0.261.1", path = "src/infra/configuration/sqlite", default-features = false }
 ## Search
 kamu-search-openai = { version = "0.261.1", path = "src/infra/search/openai", default-features = false }
 kamu-search-elasticsearch = { version = "0.261.1", path = "src/infra/search/elasticsearch", default-features = false }

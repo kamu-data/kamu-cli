@@ -7,14 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod replace_projection_entries_error;
+mod secret_set_projection_repository;
+mod variable_set_projection_repository;
 
-mod projections;
-mod repositories;
-mod resources;
-mod values;
-
-pub use projections::*;
-pub use repositories::*;
-pub use resources::*;
-pub use values::*;
+pub use replace_projection_entries_error::*;
+pub use secret_set_projection_repository::*;
+pub use variable_set_projection_repository::*;

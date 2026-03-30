@@ -8,18 +8,18 @@
 // by the Apache License, Version 2.0.
 
 mod event;
+mod event_store;
 mod lifecycle_error;
 mod reconciliation;
-mod repo;
 mod resource;
 mod spec;
 mod state;
 mod status;
 
 pub use event::*;
+pub use event_store::*;
 pub use lifecycle_error::*;
 pub use reconciliation::*;
-pub use repo::*;
 pub use resource::*;
 pub use spec::*;
 pub use state::*;

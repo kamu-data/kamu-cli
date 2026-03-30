@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use event_sourcing::ConcurrentModificationError;
 use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +44,8 @@ pub struct VariableSetReconcileSuccess {
 
 #[derive(thiserror::Error, Debug)]
 pub enum VariableSetReconcileError {
-    #[error("Reference missing: {name}")]
-    ReferenceMissing { name: String },
+    #[error(transparent)]
+    ConcurrentModification(ConcurrentModificationError),
 
     #[error(transparent)]
     Internal(
@@ -57,15 +58,15 @@ pub enum VariableSetReconcileError {
 impl ResourceReconcileError for VariableSetReconcileError {
     fn reason_code(&self) -> &'static str {
         match self {
-            VariableSetReconcileError::ReferenceMissing { .. } => "reference_missing",
+            VariableSetReconcileError::ConcurrentModification(_) => "concurrent_modification",
             VariableSetReconcileError::Internal(_) => "internal_error",
         }
     }
 
     fn user_message(&self) -> String {
         match self {
-            VariableSetReconcileError::ReferenceMissing { name } => {
-                format!("Referenced resource '{name}' is missing.")
+            VariableSetReconcileError::ConcurrentModification(_) => {
+                "Resource was modified concurrently during reconciliation.".to_owned()
             }
             VariableSetReconcileError::Internal(e) => format!("Internal error: {e}"),
         }
@@ -73,8 +74,8 @@ impl ResourceReconcileError for VariableSetReconcileError {
 
     fn is_transient(&self) -> bool {
         match self {
-            VariableSetReconcileError::ReferenceMissing { .. } => false,
-            VariableSetReconcileError::Internal(_) => true,
+            VariableSetReconcileError::ConcurrentModification(_)
+            | VariableSetReconcileError::Internal(_) => true,
         }
     }
 }

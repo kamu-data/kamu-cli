@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO config_variable_set_entries (\n                    entry_id,\n                    resource_id,\n                    resource_generation,\n                    account_id,\n                    variable_key,\n                    value,\n                    updated_at\n                )\n                VALUES ($1, $2, $3, $4, $5, $6, $7)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a1a65c52f177cfd8575d6d475734ef05251887df826824b4950ec3e7d7e1ad8c"
+}

@@ -142,6 +142,7 @@ interface "SearchEntitySchemaProvider" <<i>>
 interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
 interface "SecretSetEventStore" <<i>>
+interface "SecretSetProjectionRepository" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
 interface "SetDatasetRebacPropertiesUseCase" <<i>>
@@ -161,6 +162,7 @@ interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionedFileUseCase" <<i>>
 interface "VariableSetEventStore" <<i>>
+interface "VariableSetProjectionRepository" <<i>>
 interface "VerificationService" <<i>>
 interface "VerifyDatasetUseCase" <<i>>
 interface "ViewCollectionEntriesUseCase" <<i>>
@@ -388,8 +390,10 @@ class "SqlitePlugin"
 class "SqliteRebacRepository"
 class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
+class "SqliteSecretSetProjectionRepository"
 class "SqliteTaskEventStore"
 class "SqliteTransactionManager"
+class "SqliteVariableSetProjectionRepository"
 class "SqliteWeb3AuthEip4361NonceRepository"
 class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
@@ -750,7 +754,12 @@ class "WsSmartTransferProtocolClient"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
 "Reconciler" <|-- "SecretSetReconcilerImpl"
+"SecretSetReconcilerImpl"  --> "SecretSetProjectionRepository"
+"SecretSetReconcilerImpl"  --> "SystemTimeSource"
+"SecretSetReconcilerImpl"  --> "DatasetEnvVarsConfig"
 "Reconciler" <|-- "VariableSetReconcilerImpl"
+"VariableSetReconcilerImpl"  --> "VariableSetProjectionRepository"
+"VariableSetReconcilerImpl"  --> "SystemTimeSource"
 "ApplyResourceUseCase" <|-- "SecretSetApplyResourceUseCaseImpl"
 "SecretSetApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"
 "SecretSetApplyResourceUseCaseImpl"  --> "ResourcePersistenceService"
@@ -817,6 +826,10 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "ResourceQueryService" <|-- "VariableSetResourceQueryServiceImpl"
 "VariableSetResourceQueryServiceImpl"  --> "ResourceRepository"
+"SecretSetProjectionRepository" <|-- "SqliteSecretSetProjectionRepository"
+"SqliteSecretSetProjectionRepository"  --> "TransactionRefT"
+"VariableSetProjectionRepository" <|-- "SqliteVariableSetProjectionRepository"
+"SqliteVariableSetProjectionRepository"  --> "TransactionRefT"
 "DidGenerator" <|-- "DidGeneratorDefault"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"

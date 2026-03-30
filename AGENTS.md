@@ -25,6 +25,10 @@ cargo nextest run -E 'test(test_name_here)'
 - Do not assume Postgres is unavailable.
 - This repo relies local Dockerized Postgres instance for `sqlx` macro validation and related checks.
 - Similarly, there is a local SQLite database created for similar purposes.
+- In Postgres/SQLite repositories, prefer `sqlx::query!`, `sqlx::query_as!`, and similar macros over function-based queries for compile-time SQL checking.
+- When adding new DB-backed infra crates to the Makefile SQLx crate lists, or when adding new migrations, run `make sqlx-local-setup` to recreate the local databases, rerun migrations, and refresh `.env` bindings for all affected crates.
+- When modifying SQLx queries, run `make sqlx-prepare`.
+- `make lint` includes SQLx cache validation via `make lint-sqlx`.
 - If a sandbox blocks DB access, rerun the relevant command with the needed permissions rather than changing the workflow.
 
 

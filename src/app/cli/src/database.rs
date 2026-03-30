@@ -123,6 +123,9 @@ pub fn configure_database_components(
             b.add::<kamu_resources_postgres::PostgresRawResourceEventStore>();
             b.add::<kamu_resources_postgres::PostgresResourceRepository>();
 
+            b.add::<kamu_configuration_postgres::PostgresVariableSetProjectionRepository>();
+            b.add::<kamu_configuration_postgres::PostgresSecretSetProjectionRepository>();
+
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowEventStore>();
@@ -166,6 +169,9 @@ pub fn configure_database_components(
             b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
             b.add::<kamu_resources_inmem::InMemoryResourceRepository>();
 
+            b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
+            b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
+
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
@@ -204,6 +210,9 @@ pub fn configure_database_components(
 
             b.add::<kamu_resources_sqlite::SqliteResourceRawEventStore>();
             b.add::<kamu_resources_sqlite::SqliteResourceRepository>();
+
+            b.add::<kamu_configuration_sqlite::SqliteVariableSetProjectionRepository>();
+            b.add::<kamu_configuration_sqlite::SqliteSecretSetProjectionRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
@@ -262,6 +271,9 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
     b.add::<kamu_resources_inmem::InMemoryResourceRepository>();
+
+    b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
+    b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 

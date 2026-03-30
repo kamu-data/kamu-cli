@@ -26,12 +26,14 @@ default = []
 
 
 [dependencies]
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 time-source = { workspace = true }
 kamu-configuration = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-services = { workspace = true }
 odf = { workspace = true }
@@ -40,10 +42,12 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 paste = { version = "1", default-features = false }
+secrecy = { version = "0.10", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]

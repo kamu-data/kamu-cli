@@ -7756,7 +7756,10 @@ dependencies = [
  "kamu-auth-web3-services",
  "kamu-auth-web3-sqlite",
  "kamu-cli-puppet",
+ "kamu-configuration-inmem",
+ "kamu-configuration-postgres",
  "kamu-configuration-services",
+ "kamu-configuration-sqlite",
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -7988,8 +7991,38 @@ dependencies = [
  "event-sourcing",
  "internal-error",
  "kamu-resources",
+ "opendatafabric",
  "serde",
+ "sqlx",
  "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-inmem"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "dill",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-resources",
+]
+
+[[package]]
+name = "kamu-configuration-postgres"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-resources",
+ "opendatafabric",
+ "sqlx",
+ "uuid",
 ]
 
 [[package]]
@@ -7998,21 +8031,41 @@ version = "0.261.1"
 dependencies = [
  "async-trait",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
  "event-sourcing",
  "internal-error",
  "kamu-configuration",
+ "kamu-datasets",
  "kamu-resources",
  "kamu-resources-services",
  "opendatafabric",
  "paste",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "time-source",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-sqlite"
+version = "0.261.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-resources",
+ "opendatafabric",
+ "sqlx",
+ "uuid",
 ]
 
 [[package]]

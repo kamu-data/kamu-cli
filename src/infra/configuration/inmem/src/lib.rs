@@ -7,14 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+// Re-exports
+pub use kamu_configuration as domain;
 
-mod projections;
-mod repositories;
-mod resources;
-mod values;
+mod inmem_secret_set_projection_repository;
+mod inmem_variable_set_projection_repository;
 
-pub use projections::*;
-pub use repositories::*;
-pub use resources::*;
-pub use values::*;
+pub use inmem_secret_set_projection_repository::*;
+pub use inmem_variable_set_projection_repository::*;
