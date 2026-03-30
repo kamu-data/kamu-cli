@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod resource_lifecycle_message;
-mod resource_message_consumers;
-mod resource_message_producers;
+mod resource_lifecycle_event_dispatcher;
 
-pub use resource_lifecycle_message::*;
-pub use resource_message_consumers::*;
-pub use resource_message_producers::*;
+pub use resource_lifecycle_event_dispatcher::*;

@@ -27,6 +27,7 @@ default = []
 
 [dependencies]
 database-common = { workspace = true }
+dill = { version = "0.15", default-features = false }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }

@@ -643,6 +643,11 @@ pub fn configure_base_catalog(
         kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     );
 
+    register_message_dispatcher::<kamu_resources::ResourceLifecycleMessage>(
+        &mut b,
+        kamu_resources::MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    );
+
     b
 }
 

@@ -10,6 +10,7 @@
 #![feature(error_generic_member_access)]
 
 mod core;
+mod dispatchers;
 mod errors;
 mod messages;
 mod repo;
@@ -21,6 +22,7 @@ mod values;
 
 pub use core::*;
 
+pub use dispatchers::*;
 pub use errors::*;
 pub use messages::*;
 pub use repo::*;

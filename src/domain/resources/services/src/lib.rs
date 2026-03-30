@@ -12,6 +12,7 @@ pub use messaging_outbox;
 
 mod dependencies;
 mod event_stores;
+mod message_handlers;
 mod resources;
 mod services;
 mod use_cases;

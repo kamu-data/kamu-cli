@@ -7,16 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<AllResourcesQueryServiceImpl>();
-    catalog_builder.add::<ListAllResourcesUseCaseImpl>();
-    catalog_builder.add::<crate::message_handlers::ResourceLifecycleMessageConsumer>();
-}
+pub const MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE: &str =
+    "dev.kamu.domain.resources.ResourceLifecycleEventBridge";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
