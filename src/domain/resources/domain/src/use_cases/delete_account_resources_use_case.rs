@@ -7,18 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
+use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<AllResourcesQueryServiceImpl>();
-    catalog_builder.add::<DeleteAccountResourcesUsecaseImpl>();
-    catalog_builder.add::<ListAllResourcesUseCaseImpl>();
-    catalog_builder.add::<crate::message_handlers::AccountLifecycleMessageConsumer>();
-    catalog_builder.add::<crate::message_handlers::ResourceLifecycleMessageConsumer>();
+#[async_trait::async_trait]
+pub trait DeleteAccountResourcesUseCase: Send + Sync {
+    async fn execute(&self, account_id: odf::AccountID) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

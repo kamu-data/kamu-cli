@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod apply_resource_use_case;
+mod delete_account_resources_use_case;
 mod delete_resources_use_case;
 mod get_resource_by_id_use_case;
 mod list_all_resources_use_case;
@@ -15,6 +16,7 @@ mod list_resources_by_kind_use_case;
 mod reconcile_resource_use_case;
 
 pub use apply_resource_use_case::*;
+pub use delete_account_resources_use_case::*;
 pub use delete_resources_use_case::*;
 pub use get_resource_by_id_use_case::*;
 pub use list_all_resources_use_case::*;

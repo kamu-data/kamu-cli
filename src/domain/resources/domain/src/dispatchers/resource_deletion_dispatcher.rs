@@ -17,17 +17,21 @@ use crate::{ResourceSnapshot, get_resource_dispatcher_from_catalog};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceLifecycleEventDispatcher: Send + Sync {
-    async fn handle_applied(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
+pub trait ResourceDeletionDispatcher: Send + Sync {
+    async fn delete_resources(
+        &self,
+        account_id: &odf::AccountID,
+        resource_ids: Vec<crate::ResourceID>,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_resource_lifecycle_dispatcher_from_catalog(
+pub fn get_resource_deletion_dispatcher_from_catalog(
     target_catalog: &Catalog,
     resource: &ResourceSnapshot,
-) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
-    get_resource_dispatcher_from_catalog(target_catalog, resource, "resource lifecycle dispatcher")
+) -> Result<Arc<dyn ResourceDeletionDispatcher>, InternalError> {
+    get_resource_dispatcher_from_catalog(target_catalog, resource, "resource deletion dispatcher")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

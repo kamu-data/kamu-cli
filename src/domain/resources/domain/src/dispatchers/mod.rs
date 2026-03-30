@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resource_deletion_dispatcher;
+mod resource_dispatcher;
 mod resource_lifecycle_event_dispatcher;
 
+pub use resource_deletion_dispatcher::*;
+pub use resource_dispatcher::*;
 pub use resource_lifecycle_event_dispatcher::*;

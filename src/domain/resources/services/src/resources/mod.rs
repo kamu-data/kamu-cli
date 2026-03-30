@@ -73,6 +73,11 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
+            $crate::declare_resource_deletion_dispatcher!(
+                dispatcher = [<$name ResourceDeletionDispatcher>],
+                resource = $resource
+            );
+
             pub fn [<register_ $name:snake _resource_service_layer>](
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
@@ -80,6 +85,7 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name DeleteResourcesUseCaseImpl>]>();
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
+                catalog_builder.add::<[<$name ResourceDeletionDispatcher>]>();
                 catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name ResourceQueryServiceImpl>]>();

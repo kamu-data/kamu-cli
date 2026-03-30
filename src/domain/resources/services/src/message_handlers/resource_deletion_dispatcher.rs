@@ -10,29 +10,30 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
+macro_rules! declare_resource_deletion_dispatcher {
     (
         dispatcher = $dispatcher:ident,
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn kamu_resources::ResourceLifecycleEventDispatcher)]
+        #[dill::interface(dyn kamu_resources::ResourceDeletionDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
             descriptor: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR,
         })]
         pub struct $dispatcher {
-            reconcile_resource_use_case:
-                std::sync::Arc<dyn kamu_resources::ReconcileResourceUseCase<$resource>>,
+            delete_resources_use_case:
+                std::sync::Arc<dyn kamu_resources::DeleteResourcesUseCase<$resource>>,
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::ResourceLifecycleEventDispatcher for $dispatcher {
-            async fn handle_applied(
+        impl kamu_resources::ResourceDeletionDispatcher for $dispatcher {
+            async fn delete_resources(
                 &self,
-                resource: &kamu_resources::ResourceSnapshot,
+                account_id: &odf::AccountID,
+                resource_ids: Vec<kamu_resources::ResourceID>,
             ) -> Result<(), internal_error::InternalError> {
-                self.reconcile_resource_use_case
-                    .execute(&resource.resource_id)
+                self.delete_resources_use_case
+                    .execute(account_id.clone(), resource_ids)
                     .await
                     .map_err(internal_error::ErrorIntoInternal::int_err)
             }

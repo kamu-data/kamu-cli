@@ -8646,6 +8646,7 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "internal-error",
+ "kamu-accounts",
  "kamu-resources",
  "messaging-outbox",
  "opendatafabric",

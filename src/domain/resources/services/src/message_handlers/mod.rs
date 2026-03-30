@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod account_lifecycle_message_consumer;
+mod resource_deletion_dispatcher;
 mod resource_lifecycle_message_consumer;
 mod resource_lifecycle_reconcile_dispatcher;
 
+pub(crate) use account_lifecycle_message_consumer::AccountLifecycleMessageConsumer;
 pub(crate) use resource_lifecycle_message_consumer::ResourceLifecycleMessageConsumer;
