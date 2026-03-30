@@ -8041,6 +8041,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-resources",
  "kamu-resources-services",
+ "messaging-outbox",
  "opendatafabric",
  "paste",
  "secrecy",

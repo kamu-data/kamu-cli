@@ -9,11 +9,14 @@
 
 use dill::CatalogBuilder;
 
+use crate::message_handlers::ConfigurationResourceLifecycleMessageConsumer;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add::<ConfigurationResourceLifecycleMessageConsumer>();
+
     register_variable_set_resource_service_layer(catalog_builder);
     catalog_builder.add::<VariableSetReconcilerImpl>();
 

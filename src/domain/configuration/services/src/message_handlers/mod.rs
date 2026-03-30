@@ -7,11 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dependencies;
-mod message_handlers;
-mod reconcilers;
-mod resources;
+mod configuration_resource_lifecycle_message_consumer;
 
-pub use dependencies::*;
-pub use reconcilers::*;
-pub use resources::*;
+pub(crate) use configuration_resource_lifecycle_message_consumer::ConfigurationResourceLifecycleMessageConsumer;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
