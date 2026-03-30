@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -18,11 +19,14 @@ use crate::domain::{
     ApplyResourceUseCaseError,
     DeclarativeResource,
     InvariantViolationOf,
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcilableEventSourcedResource,
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
     ResourceID,
+    ResourceLifecycleMessage,
+    ResourceLifecycleMessageOutcome,
     ResourceLoadError,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
@@ -41,6 +45,7 @@ where
     resource_query_service: &'a dyn ResourceQueryService<R>,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+    outbox: &'a dyn Outbox,
     time_source: &'a dyn SystemTimeSource,
 }
 
@@ -57,12 +62,14 @@ where
         resource_query_service: &'a dyn ResourceQueryService<R>,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+        outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             resource_query_service,
             resource_aggregate_loader,
             resource_persistence_service,
+            outbox,
             time_source,
         }
     }
@@ -141,6 +148,9 @@ where
             .await
             .map_err(ApplyResourceUseCaseError::from)?;
 
+        self.notify_resource_applied(&resource, now, ApplyResourceOutcome::Created)
+            .await?;
+
         Ok(Self::make_result(resource, ApplyResourceOutcome::Created))
     }
 
@@ -164,7 +174,34 @@ where
             .await
             .map_err(ApplyResourceUseCaseError::from)?;
 
+        self.notify_resource_applied(&resource, now, ApplyResourceOutcome::Updated)
+            .await?;
+
         Ok(Self::make_result(resource, ApplyResourceOutcome::Updated))
+    }
+
+    async fn notify_resource_applied(
+        &self,
+        resource: &R,
+        event_time: DateTime<Utc>,
+        outcome: ApplyResourceOutcome,
+    ) -> Result<(), ApplyResourceUseCaseError<R>> {
+        let snapshot = resource
+            .make_resource_snapshot()
+            .map_err(ApplyResourceUseCaseError::Internal)?;
+
+        let outcome = match outcome {
+            ApplyResourceOutcome::Created => ResourceLifecycleMessageOutcome::Created,
+            ApplyResourceOutcome::Updated => ResourceLifecycleMessageOutcome::Updated,
+        };
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                ResourceLifecycleMessage::applied(event_time, outcome, snapshot),
+            )
+            .await
+            .map_err(ApplyResourceUseCaseError::Internal)
     }
 }
 
@@ -185,6 +222,7 @@ macro_rules! declare_apply_resource_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
@@ -201,6 +239,7 @@ macro_rules! declare_apply_resource_use_case {
                     self.resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
+                    self.outbox.as_ref(),
                     self.time_source.as_ref(),
                 );
 

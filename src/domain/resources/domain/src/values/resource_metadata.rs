@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::ResourceMetadataInput;
 
@@ -19,7 +20,7 @@ pub type ResourceName = String;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceMetadata {
     pub account: odf::AccountID,
     pub name: ResourceName,

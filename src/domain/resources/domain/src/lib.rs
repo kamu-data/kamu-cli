@@ -11,6 +11,7 @@
 
 mod core;
 mod errors;
+mod messages;
 mod repo;
 mod services;
 mod state;
@@ -21,6 +22,7 @@ mod values;
 pub use core::*;
 
 pub use errors::*;
+pub use messages::*;
 pub use repo::*;
 pub use services::*;
 pub use state::*;

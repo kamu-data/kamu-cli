@@ -10,14 +10,14 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
 use internal_error::{InternalError, ResultIntoInternal};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
     pub resource_id: ResourceID,
     pub kind: String,

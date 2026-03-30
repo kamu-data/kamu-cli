@@ -29,6 +29,7 @@ default = []
 database-common = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 kamu-resources = { workspace = true }
 odf = { workspace = true }

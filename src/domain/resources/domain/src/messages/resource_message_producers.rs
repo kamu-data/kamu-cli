@@ -7,16 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources as domain;
-pub use messaging_outbox;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod dependencies;
-mod event_stores;
-mod resources;
-mod services;
-mod use_cases;
+pub const MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE: &str =
+    "dev.kamu.domain.resources.ResourceService";
 
-pub use dependencies::*;
-pub use event_stores::*;
-pub use services::*;
-pub use use_cases::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
