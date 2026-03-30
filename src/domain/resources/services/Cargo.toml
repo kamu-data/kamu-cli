@@ -27,7 +27,6 @@ default = []
 
 [dependencies]
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 time-source = { workspace = true }

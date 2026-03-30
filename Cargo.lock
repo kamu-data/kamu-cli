@@ -8640,7 +8640,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
- "database-common-macros",
  "dill",
  "enum-variants",
  "event-sourcing",
