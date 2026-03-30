@@ -354,23 +354,6 @@
             "secretName"
           ],
           "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "AwsIamToken",
-              "type": "string"
-            },
-            "userName": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "userName"
-          ],
-          "type": "object"
         }
       ]
     },

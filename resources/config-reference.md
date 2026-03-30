@@ -568,7 +568,6 @@ Base type: `string`
 <tbody>
 <tr><td><a href="#databasecredentialsourceconfigrawpassword"><code>RawPassword</code></a></td></tr>
 <tr><td><a href="#databasecredentialsourceconfigawssecret"><code>AwsSecret</code></a></td></tr>
-<tr><td><a href="#databasecredentialsourceconfigawsiamtoken"><code>AwsIamToken</code></a></td></tr>
 </tbody>
 </table>
 
@@ -613,27 +612,6 @@ Base type: `string`
 </tr>
 <tr>
 <td><code>secretName</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-
-## `DatabaseCredentialSourceConfig::AwsIamToken`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>kind</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>userName</code></td>
 <td><code>string</code></td>
 <td></td>
 <td></td>

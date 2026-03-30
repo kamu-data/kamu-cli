@@ -22,6 +22,11 @@ Recommendation: for ease of reading, use the following order:
   - Datafusion 52 -> 53
   - AWS API unpinned, using the latest version
   - sha2 0.10 => 0.11
+  - cron 0.15 => 0.16
+  - async-openai 0.33 => 0.34
+  - shapefile 0.7 => 0.8
+  - rustyline 17 => 18
+  - toml 1.0 => 1.1 (unpinned)
 
 ## [0.261.0] - 2026-03-19
 ### Added

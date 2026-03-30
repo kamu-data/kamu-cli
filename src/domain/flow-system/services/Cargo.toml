@@ -63,7 +63,7 @@ kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
-cron = { version = "0.15", default-features = false }
+cron = { version = "0.16", default-features = false }
 indoc = "2"
 mockall = "0.14"
 pretty_assertions = "1"
