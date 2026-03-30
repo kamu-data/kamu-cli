@@ -54,7 +54,7 @@ dill = { version = "0.15", default-features = false }
 elasticsearch = { version = "9.1.0-alpha.1", default-features = false, features = ["rustls-tls"] }
 hex = { version = "0.4", default-features = false }
 serde = { version = "1", features = ["derive"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }

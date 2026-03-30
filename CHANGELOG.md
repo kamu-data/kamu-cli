@@ -18,8 +18,10 @@ Recommendation: for ease of reading, use the following order:
     - polymorphic upload/download and comparison behavior depending 
       on the server's storage technology (lfs vs S3/RustFS)
 - ODF feature slicing improved
-- Datafusion 52 -> 53
-- AWS API unpinned, using the latest version
+- Dependency updates:
+  - Datafusion 52 -> 53
+  - AWS API unpinned, using the latest version
+  - sha2 0.10 => 0.11
 
 ## [0.261.0] - 2026-03-19
 ### Added
