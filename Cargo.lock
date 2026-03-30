@@ -3611,7 +3611,6 @@ dependencies = [
  "dill",
  "futures",
  "hex",
- "hmac",
  "internal-error",
  "mockall",
  "pretty_assertions",

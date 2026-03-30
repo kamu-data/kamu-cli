@@ -395,11 +395,6 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
                     aws_secret_config.secret_name.clone(),
                 ));
             }
-            DatabaseCredentialSourceConfig::AwsIamToken(aws_iam_config) => {
-                b.add_builder(DatabaseAwsIamTokenProvider::builder(SecretString::from(
-                    aws_iam_config.user_name.clone(),
-                )));
-            }
         },
     }
 }

@@ -542,7 +542,6 @@ pub struct DatabaseCredentialsPolicyConfig {
 pub enum DatabaseCredentialSourceConfig {
     RawPassword(RawDatabasePasswordPolicyConfig),
     AwsSecret(AwsSecretDatabasePasswordPolicyConfig),
-    AwsIamToken(AwsIamTokenPasswordPolicyConfig),
 }
 
 #[derive(setty::Config)]
@@ -554,11 +553,6 @@ pub struct RawDatabasePasswordPolicyConfig {
 #[derive(setty::Config)]
 pub struct AwsSecretDatabasePasswordPolicyConfig {
     pub secret_name: String,
-}
-
-#[derive(setty::Config)]
-pub struct AwsIamTokenPasswordPolicyConfig {
-    pub user_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
