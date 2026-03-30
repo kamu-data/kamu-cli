@@ -51,8 +51,9 @@ async-trait = { version = "0.1", default-features = false }
 canonical_json = { version = "0.5", default-features = false }
 chrono = { version = "0.4", default-features = false, optional = true }
 dill = { version = "0.15", default-features = false }
-elasticsearch = { version = "9.1.0-alpha.1", default-features = false, features = ["rustls-tls"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 hex = { version = "0.4", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["gzip", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 sha2 = { version = "0.11", default-features = false }
 serde_json = { version = "1", default-features = false }

@@ -27,6 +27,7 @@ Recommendation: for ease of reading, use the following order:
   - shapefile 0.7 => 0.8
   - rustyline 17 => 18
   - toml 1.0 => 1.1 (unpinned)
+- Elasticsearch: got rid of Rust client in favor of direct REST API calls
 
 ## [0.261.0] - 2026-03-19
 ### Added
