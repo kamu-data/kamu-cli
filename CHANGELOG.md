@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.261.1] - 2026-03-30
 ### Changed
 - Minio usage replaced with RustFS
 - Large rework of smart transfer protocol tests:
