@@ -10,12 +10,13 @@
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
+use kamu_resources_repo_tests::resource_raw_event_store_test_suite as event_store_suite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_event_store_empty,
+    fixture = event_store_suite::test_event_store_empty,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -23,7 +24,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_save_and_get_events,
+    fixture = event_store_suite::test_save_and_get_events,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -31,7 +32,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_events_isolated_by_query,
+    fixture = event_store_suite::test_events_isolated_by_query,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -39,7 +40,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_get_all_events,
+    fixture = event_store_suite::test_get_all_events,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -47,7 +48,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_events_filtered_by_kind,
+    fixture = event_store_suite::test_events_filtered_by_kind,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -55,7 +56,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_get_events_with_windowing,
+    fixture = event_store_suite::test_get_events_with_windowing,
     harness = InMemoryRawResourceEventStoreHarness
 );
 
@@ -63,7 +64,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_resources_repo_tests::test_concurrent_modification_rejected,
+    fixture = event_store_suite::test_concurrent_modification_rejected,
     harness = InMemoryRawResourceEventStoreHarness
 );
 

@@ -9,6 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_resources_repo_tests::resource_raw_event_store_test_suite as event_store_suite;
 use kamu_resources_sqlite::{SqliteResourceRawEventStore, SqliteResourceRepository};
 use sqlx::SqlitePool;
 
@@ -16,7 +17,7 @@ use sqlx::SqlitePool;
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_event_store_empty,
+    fixture = event_store_suite::test_event_store_empty,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -24,7 +25,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_save_and_get_events,
+    fixture = event_store_suite::test_save_and_get_events,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -32,7 +33,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_events_isolated_by_query,
+    fixture = event_store_suite::test_events_isolated_by_query,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -40,7 +41,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_get_all_events,
+    fixture = event_store_suite::test_get_all_events,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -48,7 +49,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_events_filtered_by_kind,
+    fixture = event_store_suite::test_events_filtered_by_kind,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -56,7 +57,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_get_events_with_windowing,
+    fixture = event_store_suite::test_get_events_with_windowing,
     harness = SqliteResourceRawEventStoreHarness
 );
 
@@ -64,7 +65,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_concurrent_modification_rejected,
+    fixture = event_store_suite::test_concurrent_modification_rejected,
     harness = SqliteResourceRawEventStoreHarness
 );
 

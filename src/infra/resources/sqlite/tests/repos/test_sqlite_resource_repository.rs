@@ -10,6 +10,7 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 use kamu_resources_sqlite::SqliteResourceRepository;
 use sqlx::SqlitePool;
 
@@ -17,7 +18,7 @@ use sqlx::SqlitePool;
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_no_resources_initially,
+    fixture = resource_repo_suite::test_no_resources_initially,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -25,7 +26,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_create_and_find_resource,
+    fixture = resource_repo_suite::test_create_and_find_resource,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -33,7 +34,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_create_resource_duplicate_fails,
+    fixture = resource_repo_suite::test_create_resource_duplicate_fails,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -41,7 +42,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_update_resource,
+    fixture = resource_repo_suite::test_update_resource,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -49,7 +50,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_update_resource_wrong_event_id_fails,
+    fixture = resource_repo_suite::test_update_resource_wrong_event_id_fails,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -57,7 +58,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_update_resource_optimistic_locking,
+    fixture = resource_repo_suite::test_update_resource_optimistic_locking,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -65,7 +66,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_list_resource_ids_with_pagination,
+    fixture = resource_repo_suite::test_list_resource_ids_with_pagination,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -73,7 +74,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_list_resource_snapshots_by_kind,
+    fixture = resource_repo_suite::test_list_resource_snapshots_by_kind,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -81,7 +82,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_list_all_resource_snapshots,
+    fixture = resource_repo_suite::test_list_all_resource_snapshots,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -89,7 +90,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_count_resources,
+    fixture = resource_repo_suite::test_count_resources,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -97,7 +98,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_resources_repo_tests::test_find_deleted_resource_not_returned,
+    fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
     harness = SqliteResourceRepositoryHarness
 );
 
