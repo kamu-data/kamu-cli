@@ -1,6 +1,6 @@
 [package]
-name = "kamu-resources-sqlite"
-description = "SQLite-specific implementation of the managed resources event store"
+name = "kamu-resources-repo-tests"
+description = "Shared repository tests for Kamu managed resources"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -25,30 +25,14 @@ doctest = false
 database-common = { workspace = true }
 event-sourcing = { workspace = true }
 kamu-resources = { workspace = true }
+odf = { workspace = true }
 internal-error = { workspace = true }
-odf = { workspace = true, features = ["sqlx-sqlite"] }
 
-async-stream = "0.3"
-async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = "0.3"
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
-    "json",
-    "macros",
-    "sqlite",
-    "chrono",
-    "uuid",
-] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]
-database-common-macros = { workspace = true }
-kamu-resources-repo-tests = { workspace = true }
-
-test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }

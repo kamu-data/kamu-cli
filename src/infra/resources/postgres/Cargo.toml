@@ -47,3 +47,8 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
+kamu-resources-repo-tests = { workspace = true }
+
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }

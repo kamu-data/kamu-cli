@@ -19,6 +19,38 @@ Small project-specific guidance for coding agents working in this repository.
 cargo nextest run -E 'test(test_name_here)'
 ```
 
+### Repository test suites
+
+Storage-backed repository traits follow a shared three-layer pattern. When adding tests for a new repository trait, replicate this structure:
+
+1. **`repo-tests` crate** (`src/infra/<domain>/repo-tests/`) — a plain library crate with no dev-dependencies. Contains one `*_test_suite.rs` file per repository trait, exporting `pub async fn test_*(catalog: &Catalog)` functions. Each function resolves the trait from the catalog via `catalog.get_one::<dyn MyRepo>().unwrap()` and calls only the public interface. `lib.rs` declares each suite file as a `mod` and re-exports everything with `pub use`. Dependencies are the domain crate, `database-common`, supporting utility crates, and test data helpers (e.g., `uuid`, `serde_json`, `chrono`). Add the crate to `[workspace]` members and `[workspace.dependencies]` in the root `Cargo.toml`.
+
+2. **Test wiring in each implementation crate** (`inmem/`, `postgres/`, `sqlite/`) — a `tests/` directory with `mod.rs`, `repos/mod.rs`, and one `test_<storage>_<repo>.rs` file. That file uses the `database_transactional_test!` macro once per suite function, wires it to a local *harness* struct, and nothing else. The harness has a `catalog: Catalog` field and a `new()` constructor (plus `new(pool)` for DB-backed storages) that registers the concrete implementation and transaction manager into the catalog. Add `database-common-macros` and `kamu-<domain>-repo-tests` to `[dev-dependencies]` of each implementation crate.
+
+3. **`database_transactional_test!` macro** from `database-common-macros` generates the `#[test]` boilerplate. `storage = inmem` emits a plain tokio test; `storage = postgres` / `storage = sqlite` emits an `sqlx::test` that receives a pool, runs migrations, and wraps the fixture in a transaction runner.
+
+Example skeleton for an `inmem` test file:
+```rust
+use database_common_macros::database_transactional_test;
+use dill::{Catalog, CatalogBuilder};
+use kamu_<domain>_inmem::InMemory<Repo>;
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_<domain>_repo_tests::test_something,
+    harness = InMemory<Repo>Harness
+);
+
+struct InMemory<Repo>Harness { catalog: Catalog }
+impl InMemory<Repo>Harness {
+    pub fn new() -> Self {
+        let mut b = CatalogBuilder::new();
+        b.add::<InMemory<Repo>>();
+        Self { catalog: b.build() }
+    }
+}
+```
+
 
 ## Postgres / sqlx
 

@@ -85,6 +85,7 @@ members = [
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
     ## Resources
+    "src/infra/resources/repo-tests",
     "src/infra/resources/inmem",
     "src/infra/resources/postgres",
     "src/infra/resources/sqlite",
@@ -246,6 +247,7 @@ kamu-datasets-postgres = { version = "0.261.1", path = "src/infra/datasets/postg
 kamu-datasets-sqlite = { version = "0.261.1", path = "src/infra/datasets/sqlite", default-features = false }
 kamu-datasets-repo-tests = { version = "0.261.1", path = "src/infra/datasets/repo-tests", default-features = false }
 ## Resources
+kamu-resources-repo-tests = { version = "0.261.1", path = "src/infra/resources/repo-tests", default-features = false }
 kamu-resources-postgres = { version = "0.261.1", path = "src/infra/resources/postgres", default-features = false }
 kamu-resources-inmem = { version = "0.261.1", path = "src/infra/resources/inmem", default-features = false }
 kamu-resources-sqlite = { version = "0.261.1", path = "src/infra/resources/sqlite", default-features = false }
