@@ -7,4 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_sqlite_raw_resource_event_store;
 mod test_sqlite_resource_repository;

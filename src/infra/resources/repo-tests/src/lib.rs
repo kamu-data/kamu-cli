@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resource_raw_event_store_test_suite;
 mod resource_repository_test_suite;
 
+pub use resource_raw_event_store_test_suite::*;
 pub use resource_repository_test_suite::*;
