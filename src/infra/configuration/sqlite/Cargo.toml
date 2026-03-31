@@ -42,3 +42,9 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
+kamu-configuration-repo-tests = { workspace = true }
+kamu-resources-sqlite = { workspace = true }
+
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }

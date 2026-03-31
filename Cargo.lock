@@ -8003,10 +8003,16 @@ name = "kamu-configuration-inmem"
 version = "0.261.1"
 dependencies = [
  "async-trait",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-configuration",
+ "kamu-configuration-repo-tests",
  "kamu-resources",
+ "kamu-resources-inmem",
+ "test-group",
+ "test-log",
+ "tokio",
 ]
 
 [[package]]
@@ -8016,12 +8022,30 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-configuration",
+ "kamu-configuration-repo-tests",
  "kamu-resources",
+ "kamu-resources-postgres",
  "opendatafabric",
  "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-repo-tests"
+version = "0.261.1"
+dependencies = [
+ "chrono",
+ "dill",
+ "kamu-configuration",
+ "kamu-resources",
+ "opendatafabric",
+ "serde_json",
  "uuid",
 ]
 
@@ -8060,12 +8084,17 @@ dependencies = [
  "async-trait",
  "chrono",
  "database-common",
+ "database-common-macros",
  "dill",
  "internal-error",
  "kamu-configuration",
+ "kamu-configuration-repo-tests",
  "kamu-resources",
+ "kamu-resources-sqlite",
  "opendatafabric",
  "sqlx",
+ "test-group",
+ "test-log",
  "uuid",
 ]
 
