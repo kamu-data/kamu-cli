@@ -7,31 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use dill::Catalog;
-use internal_error::InternalError;
-
-use crate::{ResourceSnapshot, get_resource_dispatcher_from_catalog};
+use kamu_configuration::VariableSetResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait ResourceDeletionDispatcher: Send + Sync {
-    async fn delete_resources(
-        &self,
-        account_id: &odf::AccountID,
-        uids: Vec<crate::ResourceUID>,
-    ) -> Result<(), InternalError>;
-}
+kamu_resources_services::declare_resource_crud_dispatcher!(
+    dispatcher = VariableSetResourceCrudDispatcher,
+    resource = VariableSetResource
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_resource_deletion_dispatcher_from_catalog(
-    target_catalog: &Catalog,
-    resource: &ResourceSnapshot,
-) -> Result<Arc<dyn ResourceDeletionDispatcher>, InternalError> {
-    get_resource_dispatcher_from_catalog(target_catalog, resource, "resource deletion dispatcher")
+pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
+    catalog_builder.add::<VariableSetResourceCrudDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -105,6 +105,7 @@ kamu-datasets-sqlite = { workspace = true }
 
 kamu-resources = { workspace = true }
 kamu-resources-services = { workspace = true }
+kamu-resources-facade = { workspace = true }
 kamu-configuration-services = { workspace = true }
 kamu-configuration-inmem = { workspace = true }
 kamu-configuration-postgres = { workspace = true }

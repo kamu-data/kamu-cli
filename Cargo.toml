@@ -48,6 +48,7 @@ members = [
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
+    "src/domain/resources/facade",
     "src/domain/resources/domain",
     "src/domain/search/domain",
     "src/domain/storage/domain",
@@ -193,6 +194,7 @@ kamu-configuration = { version = "0.261.1", path = "src/domain/configuration/dom
 kamu-core = { version = "0.261.1", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.261.1", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.261.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-resources-facade = { version = "0.261.1", path = "src/domain/resources/facade", default-features = false }
 kamu-resources = { version = "0.261.1", path = "src/domain/resources/domain", default-features = false }
 kamu-search = { version = "0.261.1", path = "src/domain/search/domain", default-features = false }
 kamu-storage = { version = "0.261.1", path = "src/domain/storage/domain", default-features = false }

@@ -51,6 +51,56 @@ impl ResourceMetadataInput {
         key.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/')
     }
+
+    pub fn try_new(
+        account: odf::AccountID,
+        name: ResourceName,
+        description: Option<String>,
+        labels: Vec<(String, String)>,
+        annotations: Vec<(String, String)>,
+    ) -> Result<Self, ResourceMetadataValidationError> {
+        let metadata = Self {
+            account,
+            name,
+            description,
+            labels: Self::entries_to_map(labels, ResourceMetadataField::Labels)?,
+            annotations: Self::entries_to_map(annotations, ResourceMetadataField::Annotations)?,
+        };
+
+        metadata.validate()?;
+
+        Ok(metadata)
+    }
+
+    fn entries_to_map(
+        entries: Vec<(String, String)>,
+        field: ResourceMetadataField,
+    ) -> Result<BTreeMap<String, String>, ResourceMetadataValidationError> {
+        let mut map = BTreeMap::new();
+
+        for (key, value) in entries {
+            if map.insert(key.clone(), value).is_some() {
+                return Err(match field {
+                    ResourceMetadataField::Labels => {
+                        ResourceMetadataValidationError::DuplicateLabelKey { key }
+                    }
+                    ResourceMetadataField::Annotations => {
+                        ResourceMetadataValidationError::DuplicateAnnotationKey { key }
+                    }
+                });
+            }
+        }
+
+        Ok(map)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum ResourceMetadataField {
+    Labels,
+    Annotations,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,6 +205,9 @@ pub enum ResourceMetadataValidationError {
     #[error("invalid label key '{key}'")]
     InvalidLabelKey { key: String },
 
+    #[error("duplicate label key '{key}'")]
+    DuplicateLabelKey { key: String },
+
     #[error("label '{key}' value is too long: got {actual}, max is {max}")]
     LabelValueTooLong {
         key: String,
@@ -167,6 +220,9 @@ pub enum ResourceMetadataValidationError {
 
     #[error("invalid annotation key '{key}'")]
     InvalidAnnotationKey { key: String },
+
+    #[error("duplicate annotation key '{key}'")]
+    DuplicateAnnotationKey { key: String },
 
     #[error("annotation '{key}' value is too long: got {actual}, max is {max}")]
     AnnotationValueTooLong {

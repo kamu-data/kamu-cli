@@ -7,10 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod resource_crud_dispatcher;
-mod resource_dispatcher;
-mod resource_lifecycle_event_dispatcher;
+mod dependencies;
+mod facade;
 
-pub use resource_crud_dispatcher::*;
-pub use resource_dispatcher::*;
-pub use resource_lifecycle_event_dispatcher::*;
+pub use dependencies::*;
+pub use facade::*;
+pub use kamu_resources::{
+    ApplyManifestResult,
+    ResourceStatusSummaryView,
+    ResourceSummaryView,
+    ResourceView,
+    ResourceViewAccount,
+    ResourceViewMetadata,
+};

@@ -572,6 +572,7 @@ pub fn configure_base_catalog(
         },
     );
 
+    kamu_resources_facade::register_dependencies(&mut b);
     kamu_resources_services::register_dependencies(&mut b);
     kamu_configuration_services::register_dependencies(&mut b);
     kamu_storage_services::register_dependencies(&mut b);

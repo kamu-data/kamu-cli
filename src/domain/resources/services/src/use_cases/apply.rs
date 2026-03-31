@@ -166,7 +166,7 @@ where
             .map_err(ApplyResourceUseCaseError::Lifecycle)?;
 
         if !resource.aggregate().has_updates() {
-            return Ok(Self::make_result(resource, ApplyResourceOutcome::Updated));
+            return Ok(Self::make_result(resource, ApplyResourceOutcome::Untouched));
         }
 
         self.resource_persistence_service
@@ -193,6 +193,9 @@ where
         let outcome = match outcome {
             ApplyResourceOutcome::Created => ResourceLifecycleMessageOutcome::Created,
             ApplyResourceOutcome::Updated => ResourceLifecycleMessageOutcome::Updated,
+            ApplyResourceOutcome::Untouched => {
+                unreachable!("notify_resource_applied() must not be called for untouched resources")
+            }
         };
 
         self.outbox

@@ -10,6 +10,7 @@
 use kamu_resources as domain;
 pub use messaging_outbox;
 
+mod crud_dispatchers;
 mod dependencies;
 mod event_stores;
 mod message_handlers;
@@ -17,6 +18,7 @@ mod resources;
 mod services;
 mod use_cases;
 
+pub use crud_dispatchers::*;
 pub use dependencies::*;
 pub use event_stores::*;
 pub use services::*;

@@ -11,18 +11,32 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     AllResourcesQueryService,
     DeleteAccountResourcesUseCase,
+    ResourceCrudDispatcherDeleteRequest,
     ResourceSnapshot,
     ResourceUID,
-    get_resource_deletion_dispatcher_from_catalog,
+    UnsupportedResourceDescriptorError,
 };
+
+use crate::get_resource_crud_dispatcher;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const PAGE_SIZE: usize = 100;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+enum DeleteAccountResourceDispatchError {
+    #[error(transparent)]
+    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -98,10 +112,20 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
 
         for (resource_snapshot, uids) in self.group_resource_uids_by_descriptor(resource_snapshots)
         {
-            let dispatcher =
-                get_resource_deletion_dispatcher_from_catalog(&self.catalog, &resource_snapshot)?;
+            let dispatcher = get_resource_crud_dispatcher::<DeleteAccountResourceDispatchError>(
+                &self.catalog,
+                &resource_snapshot.kind,
+                &resource_snapshot.api_version,
+            )
+            .map_err(ErrorIntoInternal::int_err)?;
 
-            dispatcher.delete_resources(&account_id, uids).await?;
+            dispatcher
+                .delete(ResourceCrudDispatcherDeleteRequest {
+                    account_id: account_id.clone(),
+                    uids,
+                })
+                .await
+                .map_err(ErrorIntoInternal::int_err)?;
         }
 
         Ok(())

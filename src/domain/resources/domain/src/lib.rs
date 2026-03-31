@@ -12,6 +12,7 @@
 mod core;
 mod dispatchers;
 mod errors;
+mod manifests;
 mod messages;
 mod repo;
 mod services;
@@ -19,11 +20,13 @@ mod state;
 mod use_cases;
 mod validation;
 mod values;
+mod views;
 
 pub use core::*;
 
 pub use dispatchers::*;
 pub use errors::*;
+pub use manifests::*;
 pub use messages::*;
 pub use repo::*;
 pub use services::*;
@@ -31,3 +34,4 @@ pub use state::*;
 pub use use_cases::*;
 pub use validation::*;
 pub use values::*;
+pub use views::*;

@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod resource_crud_dispatcher;
-mod resource_dispatcher;
-mod resource_lifecycle_event_dispatcher;
+mod resource_account_resolver_impl;
+mod resource_facade_impl;
 
-pub use resource_crud_dispatcher::*;
-pub use resource_dispatcher::*;
-pub use resource_lifecycle_event_dispatcher::*;
+pub(crate) use resource_account_resolver_impl::*;
+pub use resource_facade_impl::*;

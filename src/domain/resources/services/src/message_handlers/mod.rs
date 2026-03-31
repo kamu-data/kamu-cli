@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod account_lifecycle_message_consumer;
-mod resource_deletion_dispatcher;
 mod resource_lifecycle_message_consumer;
 mod resource_lifecycle_reconcile_dispatcher;
 

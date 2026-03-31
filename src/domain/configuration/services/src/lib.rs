@@ -10,8 +10,10 @@
 mod dependencies;
 mod message_handlers;
 mod reconcilers;
+mod resource_crud_dispatchers;
 mod resources;
 
 pub use dependencies::*;
 pub use reconcilers::*;
+pub use resource_crud_dispatchers::*;
 pub use resources::*;
