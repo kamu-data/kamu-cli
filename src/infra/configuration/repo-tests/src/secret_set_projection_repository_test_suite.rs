@@ -17,7 +17,7 @@ use kamu_configuration::{
     SecretSetSpec,
     SecretSpec,
 };
-use kamu_resources::ResourceID;
+use kamu_resources::ResourceUID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +32,7 @@ fn make_entry(key: &str, value: &[u8]) -> SecretSetEntry {
     }
 }
 
-async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
+async fn make_secret_set_resource(catalog: &Catalog) -> ResourceUID {
     use std::collections::BTreeMap;
 
     use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot};
@@ -42,7 +42,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
     let now = Utc::now();
 
     repo.create_resource(&ResourceSnapshot {
-        resource_id: secret_set_id,
+        uid: secret_set_id,
         kind: SecretSetResource::RESOURCE_TYPE.to_string(),
         api_version: SecretSetResource::API_VERSION.to_string(),
         metadata: ResourceMetadata {
@@ -82,12 +82,12 @@ pub async fn test_entries_empty_initially(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
-    let entries = repo.get_entries(&resource_id, 0).await.unwrap();
+    let entries = repo.get_entries(&resource_uid, 0).await.unwrap();
     assert!(entries.is_empty());
 
-    let entry = repo.find_entry(&resource_id, 0, "key").await.unwrap();
+    let entry = repo.find_entry(&resource_uid, 0, "key").await.unwrap();
     assert!(entry.is_none());
 }
 
@@ -97,7 +97,7 @@ pub async fn test_replace_and_get_entries(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
     let entries = vec![
         make_entry("ALPHA", b"val-a"),
@@ -105,11 +105,11 @@ pub async fn test_replace_and_get_entries(catalog: &Catalog) {
         make_entry("GAMMA", b"val-c"),
     ];
 
-    repo.replace_entries(&resource_id, 1, &entries)
+    repo.replace_entries(&resource_uid, 1, &entries)
         .await
         .unwrap();
 
-    let stored = repo.get_entries(&resource_id, 1).await.unwrap();
+    let stored = repo.get_entries(&resource_uid, 1).await.unwrap();
     assert_eq!(3, stored.len());
 
     let keys: Vec<&str> = stored.iter().map(|e| e.key.as_str()).collect();
@@ -133,10 +133,10 @@ pub async fn test_find_entry_by_key(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
     repo.replace_entries(
-        &resource_id,
+        &resource_uid,
         1,
         &[
             make_entry("DB_HOST", b"localhost"),
@@ -146,12 +146,12 @@ pub async fn test_find_entry_by_key(catalog: &Catalog) {
     .await
     .unwrap();
 
-    let found = repo.find_entry(&resource_id, 1, "DB_HOST").await.unwrap();
+    let found = repo.find_entry(&resource_uid, 1, "DB_HOST").await.unwrap();
     assert!(found.is_some());
     assert_eq!(found.unwrap().value, b"localhost");
 
     let missing = repo
-        .find_entry(&resource_id, 1, "nonexistent")
+        .find_entry(&resource_uid, 1, "nonexistent")
         .await
         .unwrap();
     assert!(missing.is_none());
@@ -188,25 +188,25 @@ pub async fn test_entries_isolated_by_generation(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
-    repo.replace_entries(&resource_id, 1, &[make_entry("KEY", b"gen1")])
+    repo.replace_entries(&resource_uid, 1, &[make_entry("KEY", b"gen1")])
         .await
         .unwrap();
-    repo.replace_entries(&resource_id, 2, &[make_entry("KEY", b"gen2")])
+    repo.replace_entries(&resource_uid, 2, &[make_entry("KEY", b"gen2")])
         .await
         .unwrap();
 
-    let gen1 = repo.get_entries(&resource_id, 1).await.unwrap();
+    let gen1 = repo.get_entries(&resource_uid, 1).await.unwrap();
     assert_eq!(1, gen1.len());
     assert_eq!(gen1[0].value, b"gen1");
 
-    let gen2 = repo.get_entries(&resource_id, 2).await.unwrap();
+    let gen2 = repo.get_entries(&resource_uid, 2).await.unwrap();
     assert_eq!(1, gen2.len());
     assert_eq!(gen2[0].value, b"gen2");
 
     // Generation 3 has no entries
-    let gen3 = repo.get_entries(&resource_id, 3).await.unwrap();
+    let gen3 = repo.get_entries(&resource_uid, 3).await.unwrap();
     assert!(gen3.is_empty());
 }
 
@@ -216,15 +216,15 @@ pub async fn test_replace_entries_concurrent_modification(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
-    repo.replace_entries(&resource_id, 1, &[make_entry("KEY", b"value")])
+    repo.replace_entries(&resource_uid, 1, &[make_entry("KEY", b"value")])
         .await
         .unwrap();
 
-    // Replacing the same (resource_id, generation) again must fail
+    // Replacing the same (resource_uid, generation) again must fail
     let result = repo
-        .replace_entries(&resource_id, 1, &[make_entry("KEY", b"other")])
+        .replace_entries(&resource_uid, 1, &[make_entry("KEY", b"other")])
         .await;
     assert!(
         matches!(
@@ -241,27 +241,27 @@ pub async fn test_cleanup_entries_before_generation(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
         .unwrap();
-    let resource_id = make_secret_set_resource(catalog).await;
+    let resource_uid = make_secret_set_resource(catalog).await;
 
-    repo.replace_entries(&resource_id, 1, &[make_entry("K", b"gen1")])
+    repo.replace_entries(&resource_uid, 1, &[make_entry("K", b"gen1")])
         .await
         .unwrap();
-    repo.replace_entries(&resource_id, 2, &[make_entry("K", b"gen2")])
+    repo.replace_entries(&resource_uid, 2, &[make_entry("K", b"gen2")])
         .await
         .unwrap();
-    repo.replace_entries(&resource_id, 3, &[make_entry("K", b"gen3")])
+    repo.replace_entries(&resource_uid, 3, &[make_entry("K", b"gen3")])
         .await
         .unwrap();
 
     // Cleanup entries with generation < 3 (i.e. gens 1 and 2 are removed)
-    repo.cleanup_entries_before_generation(&resource_id, 3)
+    repo.cleanup_entries_before_generation(&resource_uid, 3)
         .await
         .unwrap();
 
-    assert!(repo.get_entries(&resource_id, 1).await.unwrap().is_empty());
-    assert!(repo.get_entries(&resource_id, 2).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_uid, 1).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_uid, 2).await.unwrap().is_empty());
 
-    let surviving = repo.get_entries(&resource_id, 3).await.unwrap();
+    let surviving = repo.get_entries(&resource_uid, 3).await.unwrap();
     assert_eq!(1, surviving.len());
     assert_eq!(surviving[0].value, b"gen3");
 }

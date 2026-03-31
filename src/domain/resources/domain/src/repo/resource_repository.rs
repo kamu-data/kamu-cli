@@ -13,19 +13,19 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
-    ResourceID,
-    ResourceIDStream,
     ResourceName,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceUID,
+    ResourceUIDStream,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
-    async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
+    async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError>;
 
     async fn create_resource(
         &self,
@@ -38,29 +38,29 @@ pub trait ResourceRepository: Send + Sync {
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError>;
 
-    async fn find_resource_id_by_name(
+    async fn find_resource_uid_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError>;
+    ) -> Result<Option<ResourceUID>, InternalError>;
 
     async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    async fn find_resource_snapshot_by_id(
+    async fn find_resource_snapshot_by_uid(
         &self,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    fn list_resource_ids(
+    fn list_resource_uids(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_>;
+    ) -> ResourceUIDStream<'_>;
 
     fn list_resource_snapshots_by_kind(
         &self,

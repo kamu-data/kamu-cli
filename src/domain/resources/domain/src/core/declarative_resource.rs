@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{ResourceID, ResourceMetadata, ResourceSnapshot, ResourceStatusLike};
+use crate::{ResourceMetadata, ResourceSnapshot, ResourceStatusLike, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,8 +20,8 @@ pub trait DeclarativeResource: Sized + Send + Sync + AsRef<Self::ResourceState> 
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
-    fn resource_id(&self) -> &ResourceID {
-        self.as_ref().resource_id()
+    fn uid(&self) -> &ResourceUID {
+        self.as_ref().uid()
     }
 
     fn metadata(&self) -> &ResourceMetadata {
@@ -43,7 +43,7 @@ pub trait DeclarativeResourceState: Send + Sync {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
 
-    fn resource_id(&self) -> &ResourceID;
+    fn uid(&self) -> &ResourceUID;
 
     fn metadata(&self) -> &ResourceMetadata;
     fn metadata_mut(&mut self) -> &mut ResourceMetadata;

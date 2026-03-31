@@ -25,10 +25,10 @@ use tokio_stream::StreamExt;
 use crate::ResourceBridgeEvent;
 use crate::domain::{
     ResourceDescriptorProvider,
-    ResourceID,
     ResourceRawEvent,
     ResourceRawEventQuery,
     ResourceRawEventStore,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ use crate::domain::{
 pub struct RawResourceEventStoreBridge<TResource, TState, TEvent>
 where
     TResource: ResourceDescriptorProvider,
-    TState: Projection<Query = ResourceID, Event = TEvent>,
+    TState: Projection<Query = ResourceUID, Event = TEvent>,
     TEvent: ResourceBridgeEvent + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
     _phantom: PhantomData<(TResource, TState, TEvent)>,
@@ -45,13 +45,13 @@ where
 impl<TResource, TState, TEvent> RawResourceEventStoreBridge<TResource, TState, TEvent>
 where
     TResource: ResourceDescriptorProvider,
-    TState: Projection<Query = ResourceID, Event = TEvent>,
+    TState: Projection<Query = ResourceUID, Event = TEvent>,
     TEvent: ResourceBridgeEvent + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
-    fn make_raw_query(resource_id: &ResourceID) -> ResourceRawEventQuery {
+    fn make_raw_query(uid: &ResourceUID) -> ResourceRawEventQuery {
         ResourceRawEventQuery {
             kind: TResource::DESCRIPTOR.resource_type.to_string(),
-            id: *resource_id,
+            uid: *uid,
         }
     }
 
@@ -83,25 +83,23 @@ where
     }
 
     fn encode_raw_event(
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
         event: &TEvent,
     ) -> Result<ResourceRawEvent, InternalError> {
-        if event.resource_id() != resource_id {
+        if event.uid() != uid {
             return InternalError::bail(format!(
-                "Resource event id does not match save query: expected='{resource_id}', \
-                 actual='{}'",
-                event.resource_id()
+                "Resource event uid does not match save query: expected='{uid}', actual='{}'",
+                event.uid()
             ));
         }
 
         Ok(ResourceRawEvent {
             event_id: EventID::new(0),
-            query: Self::make_raw_query(resource_id),
+            query: Self::make_raw_query(uid),
             event_time: event.event_time(),
             event_type: event.typename().to_string(),
-            payload: serde_json::to_value(event).context_int_err(format!(
-                "Failed to serialize resource event: resource_id={resource_id}"
-            ))?,
+            payload: serde_json::to_value(event)
+                .context_int_err(format!("Failed to serialize resource event: uid={uid}"))?,
         })
     }
 
@@ -130,7 +128,7 @@ where
 
     pub fn get_events<'a>(
         raw_event_store: &'a dyn ResourceRawEventStore,
-        query: &ResourceID,
+        query: &ResourceUID,
         opts: GetEventsOpts,
     ) -> EventStream<'a, TEvent> {
         let raw_query = Self::make_raw_query(query);
@@ -144,7 +142,7 @@ where
 
     pub async fn save_events(
         raw_event_store: &dyn ResourceRawEventStore,
-        query: &ResourceID,
+        query: &ResourceUID,
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<TEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -199,7 +197,7 @@ macro_rules! declare_resource_event_store_bridge {
 
             fn get_events(
                 &self,
-                query: &kamu_resources::ResourceID,
+                query: &kamu_resources::ResourceUID,
                 opts: event_sourcing::GetEventsOpts,
             ) -> event_sourcing::EventStream<'_, $event> {
                 $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::get_events(
@@ -211,7 +209,7 @@ macro_rules! declare_resource_event_store_bridge {
 
             async fn save_events(
                 &self,
-                query: &kamu_resources::ResourceID,
+                query: &kamu_resources::ResourceUID,
                 maybe_prev_stored_event_id: Option<event_sourcing::EventID>,
                 events: Vec<$event>,
             ) -> Result<event_sourcing::EventID, event_sourcing::SaveEventsError> {

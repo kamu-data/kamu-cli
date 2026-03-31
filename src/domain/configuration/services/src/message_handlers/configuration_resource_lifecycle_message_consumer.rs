@@ -75,7 +75,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     .map_err(ErrorIntoInternal::int_err)?;
 
                 repo.cleanup_entries_before_generation(
-                    &succeeded_message.resource.resource_id,
+                    &succeeded_message.resource.uid,
                     succeeded_message.resource.metadata.generation,
                 )
                 .await
@@ -86,7 +86,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     .map_err(ErrorIntoInternal::int_err)?;
 
                 repo.cleanup_entries_before_generation(
-                    &succeeded_message.resource.resource_id,
+                    &succeeded_message.resource.uid,
                     succeeded_message.resource.metadata.generation,
                 )
                 .await

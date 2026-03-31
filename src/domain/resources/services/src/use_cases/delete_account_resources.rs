@@ -15,8 +15,8 @@ use internal_error::InternalError;
 use kamu_resources::{
     AllResourcesQueryService,
     DeleteAccountResourcesUseCase,
-    ResourceID,
     ResourceSnapshot,
+    ResourceUID,
     get_resource_deletion_dispatcher_from_catalog,
 };
 
@@ -64,14 +64,14 @@ impl DeleteAccountResourcesUsecaseImpl {
         Ok(all_snapshots)
     }
 
-    fn group_resource_ids_by_descriptor(
+    fn group_resource_uids_by_descriptor(
         &self,
         resource_snapshots: Vec<ResourceSnapshot>,
-    ) -> Vec<(ResourceSnapshot, Vec<ResourceID>)> {
+    ) -> Vec<(ResourceSnapshot, Vec<ResourceUID>)> {
         let mut grouped = HashMap::new();
 
         for resource_snapshot in resource_snapshots {
-            let resource_id = resource_snapshot.resource_id;
+            let uid = resource_snapshot.uid;
             let descriptor_key = (
                 resource_snapshot.kind.clone(),
                 resource_snapshot.api_version.clone(),
@@ -79,12 +79,10 @@ impl DeleteAccountResourcesUsecaseImpl {
 
             grouped
                 .entry(descriptor_key)
-                .and_modify(
-                    |(_, resource_ids): &mut (ResourceSnapshot, Vec<ResourceID>)| {
-                        resource_ids.push(resource_id);
-                    },
-                )
-                .or_insert_with(|| (resource_snapshot, vec![resource_id]));
+                .and_modify(|(_, uids): &mut (ResourceSnapshot, Vec<ResourceUID>)| {
+                    uids.push(uid);
+                })
+                .or_insert_with(|| (resource_snapshot, vec![uid]));
         }
 
         grouped.into_values().collect()
@@ -98,15 +96,12 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
     async fn execute(&self, account_id: odf::AccountID) -> Result<(), InternalError> {
         let resource_snapshots = self.list_owned_resource_snapshots(&account_id).await?;
 
-        for (resource_snapshot, resource_ids) in
-            self.group_resource_ids_by_descriptor(resource_snapshots)
+        for (resource_snapshot, uids) in self.group_resource_uids_by_descriptor(resource_snapshots)
         {
             let dispatcher =
                 get_resource_deletion_dispatcher_from_catalog(&self.catalog, &resource_snapshot)?;
 
-            dispatcher
-                .delete_resources(&account_id, resource_ids)
-                .await?;
+            dispatcher.delete_resources(&account_id, uids).await?;
         }
 
         Ok(())

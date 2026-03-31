@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceID, ResourceMetadataInput};
+use crate::{ResourceMetadataInput, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +32,7 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub metadata: ResourceMetadataInput,
     pub spec: TSpec,
 }
@@ -40,14 +40,14 @@ pub struct ResourceEventCreated<TSpec> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventMetadataUpdated {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub new_metadata: ResourceMetadataInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventSpecUpdated<TSpec> {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub new_spec: TSpec,
     pub new_generation: u64,
 }
@@ -55,21 +55,21 @@ pub struct ResourceEventSpecUpdated<TSpec> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub tombstone_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationStarted {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub generation: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationSucceeded<TSuccess> {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub generation: u64,
     pub success: TSuccess,
 }
@@ -77,7 +77,7 @@ pub struct ResourceEventReconciliationSucceeded<TSuccess> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationFailed<TFailureDetails> {
     pub event_time: DateTime<Utc>,
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub generation: u64,
     pub reason: String,
     pub message: String,
@@ -99,15 +99,15 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
         }
     }
 
-    pub fn resource_id(&self) -> &ResourceID {
+    pub fn uid(&self) -> &ResourceUID {
         match self {
-            ReconcilableResourceEvent::Created(e) => &e.resource_id,
-            ReconcilableResourceEvent::MetadataUpdated(e) => &e.resource_id,
-            ReconcilableResourceEvent::SpecUpdated(e) => &e.resource_id,
-            ReconcilableResourceEvent::Deleted(e) => &e.resource_id,
-            ReconcilableResourceEvent::ReconciliationStarted(e) => &e.resource_id,
-            ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.resource_id,
-            ReconcilableResourceEvent::ReconciliationFailed(e) => &e.resource_id,
+            ReconcilableResourceEvent::Created(e) => &e.uid,
+            ReconcilableResourceEvent::MetadataUpdated(e) => &e.uid,
+            ReconcilableResourceEvent::SpecUpdated(e) => &e.uid,
+            ReconcilableResourceEvent::Deleted(e) => &e.uid,
+            ReconcilableResourceEvent::ReconciliationStarted(e) => &e.uid,
+            ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.uid,
+            ReconcilableResourceEvent::ReconciliationFailed(e) => &e.uid,
         }
     }
 
@@ -126,15 +126,15 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceID>
+impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceUID>
     for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync + 'static,
     TSuccess: std::fmt::Debug + Clone + Send + Sync + 'static,
     TFailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    fn matches_query(&self, query: &ResourceID) -> bool {
-        self.resource_id() == query
+    fn matches_query(&self, query: &ResourceUID) -> bool {
+        self.uid() == query
     }
 }
 

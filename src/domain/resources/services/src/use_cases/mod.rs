@@ -10,7 +10,7 @@
 mod apply;
 mod delete;
 mod delete_account_resources;
-mod get_by_id;
+mod get_by_uid;
 mod list;
 mod list_all;
 mod reconcile;
@@ -18,7 +18,7 @@ mod reconcile;
 pub use apply::*;
 pub use delete::*;
 pub use delete_account_resources::*;
-pub use get_by_id::*;
+pub use get_by_uid::*;
 pub use list::*;
 pub use list_all::*;
 pub use reconcile::*;

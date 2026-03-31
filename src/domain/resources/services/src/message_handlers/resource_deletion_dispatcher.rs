@@ -30,10 +30,10 @@ macro_rules! declare_resource_deletion_dispatcher {
             async fn delete_resources(
                 &self,
                 account_id: &odf::AccountID,
-                resource_ids: Vec<kamu_resources::ResourceID>,
+                uids: Vec<kamu_resources::ResourceUID>,
             ) -> Result<(), internal_error::InternalError> {
                 self.delete_resources_use_case
-                    .execute(account_id.clone(), resource_ids)
+                    .execute(account_id.clone(), uids)
                     .await
                     .map_err(internal_error::ErrorIntoInternal::int_err)
             }

@@ -11,7 +11,7 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DeclarativeResource, FindOwnedResourceError, ResourceID};
+use crate::{DeclarativeResource, FindOwnedResourceError, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub trait DeleteResourcesUseCase<R: DeclarativeResource>: Send + Sync {
     async fn execute(
         &self,
         account_id: odf::AccountID,
-        resource_ids: Vec<ResourceID>,
+        uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError>;
 }
 

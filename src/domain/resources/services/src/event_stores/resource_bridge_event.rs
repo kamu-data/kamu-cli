@@ -9,12 +9,12 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::{ReconcilableResourceEvent, ResourceID};
+use crate::domain::{ReconcilableResourceEvent, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceBridgeEvent {
-    fn resource_id(&self) -> &ResourceID;
+    fn uid(&self) -> &ResourceUID;
     fn event_time(&self) -> DateTime<Utc>;
     fn typename(&self) -> &'static str;
 }
@@ -24,8 +24,8 @@ pub trait ResourceBridgeEvent {
 impl<TSpec, TSuccess, TFailureDetails> ResourceBridgeEvent
     for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
 {
-    fn resource_id(&self) -> &ResourceID {
-        Self::resource_id(self)
+    fn uid(&self) -> &ResourceUID {
+        Self::uid(self)
     }
 
     fn event_time(&self) -> DateTime<Utc> {

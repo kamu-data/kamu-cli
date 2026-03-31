@@ -39,8 +39,8 @@ impl InMemorySecretSetProjectionRepository {
 
 #[derive(Default)]
 struct State {
-    entries_by_resource_id_generation:
-        HashMap<(kamu_resources::ResourceID, u64), Vec<SecretSetEntry>>,
+    entries_by_resource_uid_generation:
+        HashMap<(kamu_resources::ResourceUID, u64), Vec<SecretSetEntry>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,57 +49,57 @@ struct State {
 impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
     async fn replace_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         entries: &[SecretSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
         let mut guard = self.state.lock().unwrap();
-        let key = (*resource_id, resource_generation);
-        if guard.entries_by_resource_id_generation.contains_key(&key) {
+        let key = (*resource_uid, resource_generation);
+        if guard.entries_by_resource_uid_generation.contains_key(&key) {
             return Err(ReplaceProjectionEntriesError::concurrent_modification());
         }
         guard
-            .entries_by_resource_id_generation
+            .entries_by_resource_uid_generation
             .insert(key, entries.to_vec());
         Ok(())
     }
 
     async fn find_entry(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<SecretSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .entries_by_resource_id_generation
-            .get(&(*resource_id, resource_generation))
+            .entries_by_resource_uid_generation
+            .get(&(*resource_uid, resource_generation))
             .and_then(|entries| entries.iter().find(|entry| entry.key == key))
             .cloned())
     }
 
     async fn get_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .entries_by_resource_id_generation
-            .get(&(*resource_id, resource_generation))
+            .entries_by_resource_uid_generation
+            .get(&(*resource_uid, resource_generation))
             .cloned()
             .unwrap_or_default())
     }
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.entries_by_resource_id_generation.retain(
-            |(stored_resource_id, stored_generation), _| {
-                stored_resource_id != resource_id || *stored_generation >= resource_generation
+        guard.entries_by_resource_uid_generation.retain(
+            |(stored_resource_uid, stored_generation), _| {
+                stored_resource_uid != resource_uid || *stored_generation >= resource_generation
             },
         );
         Ok(())

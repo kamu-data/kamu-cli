@@ -14,9 +14,9 @@ use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
     ReconcilableStateModel,
-    ResourceID,
     ResourceSnapshot,
     ResourceState,
+    ResourceUID,
     project_reconcilable_resource_state,
 };
 
@@ -104,8 +104,8 @@ where
     type Spec = TModel::Spec;
     type Status = TModel::Status;
 
-    fn resource_id(&self) -> &ResourceID {
-        &self.inner.resource_id
+    fn uid(&self) -> &ResourceUID {
+        &self.inner.uid
     }
 
     fn metadata(&self) -> &crate::ResourceMetadata {
@@ -139,7 +139,7 @@ impl<TModel> Projection for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel<State = Self> + 'static,
 {
-    type Query = ResourceID;
+    type Query = ResourceUID;
     type Event = ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {

@@ -13,13 +13,13 @@ use internal_error::{InternalError, ResultIntoInternal};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::{PendingStatusFromSpec, ResourceID, ResourceMetadata, ResourceStatusLike};
+use crate::{PendingStatusFromSpec, ResourceMetadata, ResourceStatusLike, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub kind: String,
     pub api_version: String,
     pub metadata: ResourceMetadata,
@@ -41,7 +41,7 @@ pub type ResourceSnapshotStream<'a> = std::pin::Pin<
 
 pub fn decode_typed_resource_snapshot<TSpec, TStatus>(
     snapshot: ResourceSnapshot,
-) -> Result<(ResourceID, ResourceMetadata, TSpec, TStatus), InternalError>
+) -> Result<(ResourceUID, ResourceMetadata, TSpec, TStatus), InternalError>
 where
     TSpec: DeserializeOwned,
     TStatus: DeserializeOwned + PendingStatusFromSpec<TSpec>,
@@ -52,13 +52,13 @@ where
         None => TStatus::pending_from_spec(&spec),
     };
 
-    Ok((snapshot.resource_id, snapshot.metadata, spec, status))
+    Ok((snapshot.uid, snapshot.metadata, spec, status))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_typed_resource_snapshot<TSpec, TStatus>(
-    resource_id: ResourceID,
+    uid: ResourceUID,
     kind: &'static str,
     api_version: &'static str,
     metadata: ResourceMetadata,
@@ -75,7 +75,7 @@ where
     let last_reconciled_at = status.resource_status().last_reconciled_at();
 
     Ok(ResourceSnapshot {
-        resource_id,
+        uid,
         kind: kind.to_string(),
         api_version: api_version.to_string(),
         metadata,

@@ -13,10 +13,10 @@ use serde::de::DeserializeOwned;
 use crate::{
     DeclarativeResourceState,
     PendingStatusFromSpec,
-    ResourceID,
     ResourceMetadata,
     ResourceSnapshot,
     ResourceStatusLike,
+    ResourceUID,
     decode_typed_resource_snapshot,
 };
 
@@ -27,7 +27,7 @@ pub struct ResourceState<
     TSpec: std::fmt::Debug + Clone + Send + Sync,
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 > {
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub metadata: ResourceMetadata,
     pub spec: TSpec,
     pub status: TStatus,
@@ -40,14 +40,9 @@ where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 {
-    pub fn new(
-        resource_id: ResourceID,
-        metadata: ResourceMetadata,
-        spec: TSpec,
-        status: TStatus,
-    ) -> Self {
+    pub fn new(uid: ResourceUID, metadata: ResourceMetadata, spec: TSpec, status: TStatus) -> Self {
         Self {
-            resource_id,
+            uid,
             metadata,
             spec,
             status,
@@ -65,8 +60,8 @@ where
     type Spec = TSpec;
     type Status = TStatus;
 
-    fn resource_id(&self) -> &ResourceID {
-        &self.resource_id
+    fn uid(&self) -> &ResourceUID {
+        &self.uid
     }
 
     fn metadata(&self) -> &ResourceMetadata {
@@ -108,11 +103,11 @@ where
     type Error = InternalError;
 
     fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
-        let (resource_id, metadata, spec, status) =
+        let (uid, metadata, spec, status) =
             decode_typed_resource_snapshot::<TSpec, TStatus>(snapshot)?;
 
         Ok(Self {
-            resource_id,
+            uid,
             metadata,
             spec,
             status,

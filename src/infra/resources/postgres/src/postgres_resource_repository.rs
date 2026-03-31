@@ -14,13 +14,13 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
-    ResourceID,
-    ResourceIDStream,
     ResourceName,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceUID,
+    ResourceUIDStream,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -37,8 +37,8 @@ pub struct PostgresResourceRepository {
 
 #[async_trait::async_trait]
 impl ResourceRepository for PostgresResourceRepository {
-    async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
-        Ok(ResourceID::new_v4())
+    async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError> {
+        Ok(ResourceUID::new_v4())
     }
 
     async fn create_resource(
@@ -58,7 +58,7 @@ impl ResourceRepository for PostgresResourceRepository {
         sqlx::query!(
             r#"
             INSERT INTO resources (
-                resource_id,
+                resource_uid,
                 account_id,
                 resource_kind,
                 api_version,
@@ -77,7 +77,7 @@ impl ResourceRepository for PostgresResourceRepository {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
-            resource_snapshot.resource_id,
+            resource_snapshot.uid,
             account_id_str,
             resource_snapshot.kind,
             resource_snapshot.api_version,
@@ -143,13 +143,13 @@ impl ResourceRepository for PostgresResourceRepository {
                 deleted_at = $12,
                 last_reconciled_at = $13,
                 last_event_id = $14
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND (
                     last_event_id IS NULL AND CAST($15 as BIGINT) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($15 as BIGINT) IS NOT NULL AND last_event_id = $15
               )
             "#,
-            resource_snapshot.resource_id,
+            resource_snapshot.uid,
             account_id_str,
             resource_snapshot.api_version,
             resource_snapshot.metadata.name,
@@ -185,20 +185,20 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(())
     }
 
-    async fn find_resource_id_by_name(
+    async fn find_resource_uid_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError> {
+    ) -> Result<Option<ResourceUID>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
 
-        let maybe_resource_id = sqlx::query_scalar!(
+        let maybe_resource_uid = sqlx::query_scalar!(
             r#"
-            SELECT resource_id as "resource_id: _"
+            SELECT resource_uid as "uid: _"
             FROM resources
             WHERE account_id = $1
               AND resource_kind = $2
@@ -213,7 +213,7 @@ impl ResourceRepository for PostgresResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_resource_id)
+        Ok(maybe_resource_uid)
     }
 
     async fn find_resource_snapshot(
@@ -226,7 +226,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "resource_id: uuid::Uuid",
+                resource_uid as "uid: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
                 resource_kind,
                 api_version,
@@ -243,11 +243,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_reconciled_at,
                 last_event_id
             FROM resources
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_kind = $2
               AND deleted_at IS NULL
             "#,
-            query.id,
+            query.uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -255,7 +255,7 @@ impl ResourceRepository for PostgresResourceRepository {
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            resource_id: row.resource_id,
+            uid: row.uid,
             kind: row.resource_kind,
             api_version: row.api_version,
             metadata: kamu_resources::ResourceMetadata {
@@ -276,9 +276,9 @@ impl ResourceRepository for PostgresResourceRepository {
         }))
     }
 
-    async fn find_resource_snapshot_by_id(
+    async fn find_resource_snapshot_by_uid(
         &self,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -286,7 +286,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "resource_id: uuid::Uuid",
+                resource_uid as "uid: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
                 resource_kind,
                 api_version,
@@ -303,17 +303,17 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_reconciled_at,
                 last_event_id
             FROM resources
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND deleted_at IS NULL
             "#,
-            resource_id,
+            uid,
         )
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            resource_id: row.resource_id,
+            uid: row.uid,
             kind: row.resource_kind,
             api_version: row.api_version,
             metadata: kamu_resources::ResourceMetadata {
@@ -334,12 +334,12 @@ impl ResourceRepository for PostgresResourceRepository {
         }))
     }
 
-    fn list_resource_ids(
+    fn list_resource_uids(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
+    ) -> ResourceUIDStream<'_> {
         let resource_kind = kind.to_owned();
 
         Box::pin(async_stream::stream! {
@@ -352,12 +352,12 @@ impl ResourceRepository for PostgresResourceRepository {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT resource_id as "resource_id: uuid::Uuid"
+                SELECT resource_uid as "uid: uuid::Uuid"
                 FROM resources
                 WHERE account_id = $1
                   AND resource_kind = $2
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_stack.as_str(),
@@ -369,7 +369,7 @@ impl ResourceRepository for PostgresResourceRepository {
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
-                yield Ok(row.resource_id);
+                yield Ok(row.uid);
             }
         })
     }
@@ -393,7 +393,7 @@ impl ResourceRepository for PostgresResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "resource_id: uuid::Uuid",
+                    resource_uid as "uid: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
                     resource_kind,
                     api_version,
@@ -413,7 +413,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE account_id = $1
                   AND resource_kind = $2
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_stack.as_str(),
@@ -426,7 +426,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    resource_id: row.resource_id,
+                    uid: row.uid,
                     kind: row.resource_kind,
                     api_version: row.api_version,
                     metadata: kamu_resources::ResourceMetadata {
@@ -465,7 +465,7 @@ impl ResourceRepository for PostgresResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "resource_id: uuid::Uuid",
+                    resource_uid as "uid: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
                     resource_kind,
                     api_version,
@@ -484,7 +484,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 FROM resources
                 WHERE account_id = $1
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 account_id_stack.as_str(),
@@ -496,7 +496,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    resource_id: row.resource_id,
+                    uid: row.uid,
                     kind: row.resource_kind,
                     api_version: row.api_version,
                     metadata: kamu_resources::ResourceMetadata {

@@ -15,13 +15,13 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
-    ResourceID,
-    ResourceIDStream,
     ResourceName,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceUID,
+    ResourceUIDStream,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -38,8 +38,8 @@ pub struct SqliteResourceRepository {
 
 #[async_trait::async_trait]
 impl ResourceRepository for SqliteResourceRepository {
-    async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
-        Ok(ResourceID::new_v4())
+    async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError> {
+        Ok(ResourceUID::new_v4())
     }
 
     async fn create_resource(
@@ -59,7 +59,7 @@ impl ResourceRepository for SqliteResourceRepository {
         sqlx::query!(
             r#"
             INSERT INTO resources (
-                resource_id,
+                resource_uid,
                 account_id,
                 resource_kind,
                 api_version,
@@ -78,7 +78,7 @@ impl ResourceRepository for SqliteResourceRepository {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
-            resource_snapshot.resource_id,
+            resource_snapshot.uid,
             account_id_str,
             resource_snapshot.kind,
             resource_snapshot.api_version,
@@ -144,13 +144,13 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at = $12,
                 last_reconciled_at = $13,
                 last_event_id = $14
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND (
                     last_event_id IS NULL AND CAST($15 as INT8) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($15 as INT8) IS NOT NULL AND last_event_id = $15
               )
             "#,
-            resource_snapshot.resource_id,
+            resource_snapshot.uid,
             account_id_str,
             resource_snapshot.api_version,
             resource_snapshot.metadata.name,
@@ -186,21 +186,21 @@ impl ResourceRepository for SqliteResourceRepository {
         Ok(())
     }
 
-    async fn find_resource_id_by_name(
+    async fn find_resource_uid_by_name(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceID>, InternalError> {
+    ) -> Result<Option<ResourceUID>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
 
-        let maybe_resource_id = sqlx::query_scalar!(
+        let maybe_resource_uid = sqlx::query_scalar!(
             r#"
-            SELECT resource_id as "resource_id: uuid::Uuid"
+            SELECT resource_uid as "uid: uuid::Uuid"
             FROM resources
             WHERE account_id = $1
               AND resource_kind = $2
@@ -215,7 +215,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_resource_id)
+        Ok(maybe_resource_uid)
     }
 
     async fn find_resource_snapshot(
@@ -228,7 +228,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "resource_id: uuid::Uuid",
+                resource_uid as "uid: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
                 resource_kind,
                 api_version,
@@ -245,11 +245,11 @@ impl ResourceRepository for SqliteResourceRepository {
                 last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                 last_event_id
             FROM resources
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_kind = $2
               AND deleted_at IS NULL
             "#,
-            query.id,
+            query.uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -257,7 +257,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            resource_id: row.resource_id,
+            uid: row.uid,
             kind: row.resource_kind,
             api_version: row.api_version,
             metadata: kamu_resources::ResourceMetadata {
@@ -278,9 +278,9 @@ impl ResourceRepository for SqliteResourceRepository {
         }))
     }
 
-    async fn find_resource_snapshot_by_id(
+    async fn find_resource_snapshot_by_uid(
         &self,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -288,7 +288,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "resource_id: uuid::Uuid",
+                resource_uid as "uid: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
                 resource_kind,
                 api_version,
@@ -305,17 +305,17 @@ impl ResourceRepository for SqliteResourceRepository {
                 last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                 last_event_id
             FROM resources
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND deleted_at IS NULL
             "#,
-            resource_id,
+            uid,
         )
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            resource_id: row.resource_id,
+            uid: row.uid,
             kind: row.resource_kind,
             api_version: row.api_version,
             metadata: kamu_resources::ResourceMetadata {
@@ -336,12 +336,12 @@ impl ResourceRepository for SqliteResourceRepository {
         }))
     }
 
-    fn list_resource_ids(
+    fn list_resource_uids(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
+    ) -> ResourceUIDStream<'_> {
         let resource_kind = kind.to_owned();
 
         Box::pin(async_stream::stream! {
@@ -355,12 +355,12 @@ impl ResourceRepository for SqliteResourceRepository {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT resource_id as "resource_id: uuid::Uuid"
+                SELECT resource_uid as "uid: uuid::Uuid"
                 FROM resources
                 WHERE account_id = $1
                   AND resource_kind = $2
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_str,
@@ -372,7 +372,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
-                yield Ok(row.resource_id);
+                yield Ok(row.uid);
             }
         })
     }
@@ -397,7 +397,7 @@ impl ResourceRepository for SqliteResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "resource_id: uuid::Uuid",
+                    resource_uid as "uid: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
                     resource_kind,
                     api_version,
@@ -417,7 +417,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 WHERE account_id = $1
                   AND resource_kind = $2
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_str,
@@ -430,7 +430,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    resource_id: row.resource_id,
+                    uid: row.uid,
                     kind: row.resource_kind,
                     api_version: row.api_version,
                     metadata: kamu_resources::ResourceMetadata {
@@ -470,7 +470,7 @@ impl ResourceRepository for SqliteResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "resource_id: uuid::Uuid",
+                    resource_uid as "uid: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
                     resource_kind,
                     api_version,
@@ -489,7 +489,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 FROM resources
                 WHERE account_id = $1
                   AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                ORDER BY updated_at DESC, resource_uid DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 account_id_str,
@@ -501,7 +501,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    resource_id: row.resource_id,
+                    uid: row.uid,
                     kind: row.resource_kind,
                     api_version: row.api_version,
                     metadata: kamu_resources::ResourceMetadata {

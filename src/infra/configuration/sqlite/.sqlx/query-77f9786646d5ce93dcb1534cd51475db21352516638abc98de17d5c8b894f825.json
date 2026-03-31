@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                entry_id as \"entry_id: Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                variable_key as key,\n                value,\n                updated_at as \"updated_at: DateTime<Utc>\"\n            FROM config_variable_set_entries\n            WHERE resource_uid = $1\n              AND resource_generation = $2\n            ORDER BY variable_key\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "entry_id: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id: odf::AccountID",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "key",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "value",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "77f9786646d5ce93dcb1534cd51475db21352516638abc98de17d5c8b894f825"
+}

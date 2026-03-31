@@ -1,7 +1,7 @@
 /* ------------------------------ */
 
 CREATE TABLE resources (
-    resource_id            UUID PRIMARY KEY,
+    resource_uid           UUID PRIMARY KEY,
     account_id             VARCHAR(100) NOT NULL,
     resource_kind          VARCHAR(100) NOT NULL,
     api_version            VARCHAR(100) NOT NULL,
@@ -36,19 +36,19 @@ CREATE SEQUENCE resource_event_id_seq AS BIGINT;
 
 CREATE TABLE resource_events (
     event_id               BIGINT PRIMARY KEY DEFAULT nextval('resource_event_id_seq'),
-    resource_id            UUID NOT NULL,
+    resource_uid           UUID NOT NULL,
     resource_kind          VARCHAR(100) NOT NULL,
 
     event_time             TIMESTAMPTZ NOT NULL,
     event_type             VARCHAR(100) NOT NULL,
     event_payload          JSONB NOT NULL,
 
-    CONSTRAINT fk_resource_events_resource_id
-        FOREIGN KEY (resource_id) REFERENCES resources(resource_id)
+    CONSTRAINT fk_resource_events_resource_uid
+        FOREIGN KEY (resource_uid) REFERENCES resources(resource_uid)
 );
 
-CREATE INDEX idx_resource_events_resource_id_event_id
-    ON resource_events (resource_id, event_id);
+CREATE INDEX idx_resource_events_resource_uid_event_id
+    ON resource_events (resource_uid, event_id);
 
 CREATE INDEX idx_resource_events_kind_event_id
     ON resource_events (resource_kind, event_id);

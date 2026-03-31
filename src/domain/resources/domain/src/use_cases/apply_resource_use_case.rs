@@ -13,19 +13,19 @@ use internal_error::InternalError;
 use crate::{
     DeclarativeResource,
     ReconcilableEventSourcedResource,
-    ResourceID,
     ResourceLoadError,
     ResourceNotFoundError,
     ResourcePersistenceError,
     ResourceSnapshot,
     ResourceTypeMismatchError,
+    ResourceUID,
     TypedResourceQueryError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ApplyResourceParams<R: DeclarativeResource> {
-    pub resource_id: Option<ResourceID>,
+    pub uid: Option<ResourceUID>,
     pub metadata: crate::ResourceMetadataInput,
     pub spec: R::Spec,
 }
@@ -41,7 +41,7 @@ pub enum ApplyResourceOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ApplyResourceResult<R: DeclarativeResource> {
-    pub resource_id: ResourceID,
+    pub uid: ResourceUID,
     pub state: R::ResourceState,
     pub outcome: ApplyResourceOutcome,
 }
@@ -89,14 +89,12 @@ where
     R: ReconcilableEventSourcedResource,
 {
     pub fn type_mismatch(
-        resource_id: ResourceID,
+        uid: ResourceUID,
         expected: &crate::ResourceDescriptor,
         actual: &ResourceSnapshot,
     ) -> Self {
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
-            resource_id,
-            expected,
-            actual,
+            uid, expected, actual,
         ))
     }
 }

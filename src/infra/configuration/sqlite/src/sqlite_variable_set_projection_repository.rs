@@ -30,7 +30,7 @@ pub struct SqliteVariableSetProjectionRepository {
 impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
     async fn replace_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
@@ -45,7 +45,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 r#"
                 INSERT INTO config_variable_set_entries (
                     entry_id,
-                    resource_id,
+                    resource_uid,
                     resource_generation,
                     account_id,
                     variable_key,
@@ -55,7 +55,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 "#,
                 entry.entry_id,
-                resource_id,
+                resource_uid,
                 resource_generation,
                 account_id,
                 entry.key,
@@ -79,7 +79,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
 
     async fn find_entry(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError> {
@@ -97,11 +97,11 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 value,
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_variable_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation = $2
               AND variable_key = $3
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
             key,
         )
@@ -114,7 +114,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
 
     async fn get_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -131,11 +131,11 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 value,
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_variable_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation = $2
             ORDER BY variable_key
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -147,7 +147,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -157,10 +157,10 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
         sqlx::query!(
             r#"
             DELETE FROM config_variable_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation < $2
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
         )
         .execute(&mut *connection_mut)

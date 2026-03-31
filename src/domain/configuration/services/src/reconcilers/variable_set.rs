@@ -44,7 +44,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
     > {
         let total = resource.spec().variables.len();
         let now = self.time_source.now();
-        let resource_id = *resource.resource_id();
+        let resource_uid = *resource.uid();
         let resource_generation = resource.metadata().generation;
         let account_id = resource.metadata().account.clone();
 
@@ -62,7 +62,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
             .collect();
 
         self.variable_set_projection_repository
-            .replace_entries(&resource_id, resource_generation, &entries)
+            .replace_entries(&resource_uid, resource_generation, &entries)
             .await
             .map_err(|e| match e {
                 ReplaceProjectionEntriesError::ConcurrentModification(err) => {

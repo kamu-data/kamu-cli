@@ -12,40 +12,40 @@ use internal_error::InternalError;
 
 use crate::{
     DeclarativeResource,
-    ResourceID,
     ResourceMetadataInput,
     ResourceNotFoundError,
     ResourceSnapshot,
     ResourceTypeMismatchError,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceQueryService<R: DeclarativeResource>: Send + Sync {
-    async fn allocate_id(&self) -> Result<ResourceID, InternalError>;
+    async fn allocate_uid(&self) -> Result<ResourceUID, InternalError>;
 
     async fn find_existing_id_by_name(
         &self,
-        resource_id: Option<ResourceID>,
+        uid: Option<ResourceUID>,
         metadata: &ResourceMetadataInput,
-    ) -> Result<Option<ResourceID>, InternalError>;
+    ) -> Result<Option<ResourceUID>, InternalError>;
 
-    async fn ensure_resource_id_matches_type(
+    async fn ensure_resource_uid_matches_type(
         &self,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<(), TypedResourceQueryError>;
 
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
-        resource_id: ResourceID,
+        uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
-    async fn get_state_by_id(
+    async fn get_state_by_uid(
         &self,
         account_id: odf::AccountID,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<R::ResourceState, TypedResourceQueryError>;
 
     async fn list_states_by_kind(

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT event_id\n            FROM resource_events\n            WHERE resource_uid = $1\n              AND resource_kind = $2\n            ORDER BY event_id DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6528dc5ff73bcc6ecb5fb9b53cd09dc2ea3cdd48ddd339aaac8fba31eb9f4439"
+}

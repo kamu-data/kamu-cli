@@ -104,13 +104,14 @@ where
         resource: &mut R,
         now: DateTime<Utc>,
     ) -> Result<(), ResourcePersistenceError> {
-        let tombstone_name = format!("deleted-{}", resource.resource_id());
+        let tombstone_name = format!("deleted-{}", resource.uid());
 
         resource.try_delete(now, tombstone_name).map_err(|err| {
-            ResourcePersistenceError::Internal(format!("{err}").int_err().with_context(format!(
-                "Failed to delete resource {}",
-                resource.resource_id()
-            )))
+            ResourcePersistenceError::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context(format!("Failed to delete resource {}", resource.uid())),
+            )
         })?;
 
         match self.save(resource).await {
@@ -119,7 +120,7 @@ where
                 Err(ResourcePersistenceError::Internal(
                     format!("{err}").int_err().with_context(format!(
                         "Unexpected duplicate resource state while deleting resource {}",
-                        resource.resource_id()
+                        resource.uid()
                     )),
                 ))
             }

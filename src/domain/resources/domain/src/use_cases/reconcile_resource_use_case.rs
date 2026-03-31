@@ -12,16 +12,16 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     ReconcilableEventSourcedResource,
-    ResourceID,
     ResourceLoadError,
     ResourcePersistenceError,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ReconcileResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
-    async fn execute(&self, id: &ResourceID) -> Result<(), ReconcileResourceUseCaseError<R>>;
+    async fn execute(&self, id: &ResourceUID) -> Result<(), ReconcileResourceUseCaseError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

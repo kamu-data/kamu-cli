@@ -18,12 +18,12 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
-    ResourceID,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceQueryService,
     ResourceSnapshot,
     ResourceStatusLike,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,24 +63,23 @@ where
     pub async fn execute(
         &self,
         account_id: odf::AccountID,
-        resource_ids: Vec<ResourceID>,
+        uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError> {
-        for resource_id in resource_ids {
-            let Some(_resource_snapshot) = self
-                .find_owned_resource_snapshot(&account_id, resource_id)
-                .await?
+        for uid in uids {
+            let Some(_resource_snapshot) =
+                self.find_owned_resource_snapshot(&account_id, uid).await?
             else {
                 continue;
             };
 
-            self.delete_resource(&resource_id).await?;
+            self.delete_resource(&uid).await?;
         }
 
         Ok(())
     }
 
     async fn delete_and_sync_resource(&self, mut resource: R) -> Result<(), DeleteResourcesError> {
-        let resource_id = *resource.resource_id();
+        let uid = *resource.uid();
         match self
             .resource_persistence_service
             .delete(&mut resource, self.time_source.now())
@@ -94,7 +93,7 @@ where
                 Err(DeleteResourcesError::ConcurrentModification(err))
             }
             Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
-                err.with_context(format!("Failed to persist deleted resource {resource_id}")),
+                err.with_context(format!("Failed to persist deleted resource {uid}")),
             )),
         }
     }
@@ -102,24 +101,24 @@ where
     async fn find_owned_resource_snapshot(
         &self,
         account_id: &odf::AccountID,
-        resource_id: ResourceID,
+        uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, DeleteResourcesError> {
         self.resource_query_service
-            .find_owned_snapshot(account_id, resource_id)
+            .find_owned_snapshot(account_id, uid)
             .await
             .map_err(DeleteResourcesError::from)
     }
 
-    async fn delete_resource(&self, resource_id: &ResourceID) -> Result<(), DeleteResourcesError> {
+    async fn delete_resource(&self, uid: &ResourceUID) -> Result<(), DeleteResourcesError> {
         let resource = self
             .resource_aggregate_loader
-            .load(resource_id)
+            .load(uid)
             .await
             .map_err(|err| {
                 DeleteResourcesError::Internal(
                     format!("{err}")
                         .int_err()
-                        .with_context(format!("Failed to load resource {resource_id}")),
+                        .with_context(format!("Failed to load resource {uid}")),
                 )
             })?;
 
@@ -152,7 +151,7 @@ macro_rules! declare_delete_resources_use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
-                resource_ids: Vec<kamu_resources::ResourceID>,
+                uids: Vec<kamu_resources::ResourceUID>,
             ) -> Result<(), kamu_resources::DeleteResourcesError> {
                 let helper = $crate::DeleteResourcesUseCaseHelper::<$resource>::new(
                     self.resource_query_service.as_ref(),
@@ -161,7 +160,7 @@ macro_rules! declare_delete_resources_use_case {
                     self.time_source.as_ref(),
                 );
 
-                helper.execute(account_id, resource_ids).await
+                helper.execute(account_id, uids).await
             }
         }
     };

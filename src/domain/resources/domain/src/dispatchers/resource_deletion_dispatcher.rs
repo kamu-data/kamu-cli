@@ -21,7 +21,7 @@ pub trait ResourceDeletionDispatcher: Send + Sync {
     async fn delete_resources(
         &self,
         account_id: &odf::AccountID,
-        resource_ids: Vec<crate::ResourceID>,
+        uids: Vec<crate::ResourceUID>,
     ) -> Result<(), InternalError>;
 }
 

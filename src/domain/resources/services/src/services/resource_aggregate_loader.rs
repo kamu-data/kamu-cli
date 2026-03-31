@@ -26,14 +26,14 @@ macro_rules! declare_resource_aggregate_loader {
         impl kamu_resources::ResourceAggregateLoader<$resource> for $loader {
             async fn load(
                 &self,
-                resource_id: &kamu_resources::ResourceID,
+                uid: &kamu_resources::ResourceUID,
             ) -> Result<
                 $resource,
                 event_sourcing::LoadError<
                     <$resource as kamu_resources::DeclarativeResource>::ResourceState,
                 >,
             > {
-                <$resource>::load(resource_id, self.event_store.as_ref()).await
+                <$resource>::load(uid, self.event_store.as_ref()).await
             }
         }
     };

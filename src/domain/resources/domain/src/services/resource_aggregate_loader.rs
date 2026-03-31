@@ -9,13 +9,13 @@
 
 use event_sourcing::LoadError;
 
-use crate::{ReconcilableEventSourcedResource, ResourceID};
+use crate::{ReconcilableEventSourcedResource, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceAggregateLoader<R: ReconcilableEventSourcedResource>: Send + Sync {
-    async fn load(&self, resource_id: &ResourceID) -> Result<R, LoadError<R::ResourceState>>;
+    async fn load(&self, uid: &ResourceUID) -> Result<R, LoadError<R::ResourceState>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

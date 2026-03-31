@@ -30,7 +30,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let now = Utc::now();
 
     let snapshot = ResourceSnapshot {
-        resource_id: id,
+        uid: id,
         kind: kind.to_string(),
         api_version: "v1".to_string(),
         metadata: ResourceMetadata {
@@ -54,7 +54,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
 
     ResourceRawEventQuery {
         kind: kind.to_string(),
-        id,
+        uid: id,
     }
 }
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceID;
+use kamu_resources::ResourceUID;
 
 use crate::{ReplaceProjectionEntriesError, VariableSetEntry};
 
@@ -18,27 +18,27 @@ use crate::{ReplaceProjectionEntriesError, VariableSetEntry};
 pub trait VariableSetProjectionRepository: Send + Sync {
     async fn replace_entries(
         &self,
-        resource_id: &ResourceID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError>;
 
     async fn find_entry(
         &self,
-        resource_id: &ResourceID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError>;
 
     async fn get_entries(
         &self,
-        resource_id: &ResourceID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError>;
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_id: &ResourceID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError>;
 }

@@ -46,7 +46,7 @@ impl PostgresRawResourceEventStore {
             let inserted = sqlx::query_scalar!(
                 r#"
                 INSERT INTO resource_events (
-                    resource_id,
+                    resource_uid,
                     resource_kind,
                     event_time,
                     event_type,
@@ -55,7 +55,7 @@ impl PostgresRawResourceEventStore {
                     VALUES ($1, $2, $3, $4, $5)
                     RETURNING event_id
                 "#,
-                query.id,
+                query.uid,
                 query.kind,
                 event.event_time,
                 event.event_type,
@@ -81,11 +81,11 @@ impl PostgresRawResourceEventStore {
             SELECT event_id
             FROM resource_events
             WHERE
-                resource_id = $1 AND resource_kind = $2
+                resource_uid = $1 AND resource_kind = $2
             ORDER BY event_id DESC
             LIMIT 1
             "#,
-            query.id,
+            query.uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -126,7 +126,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id,
+                    resource_uid as uid,
                     resource_kind as "kind!",
                     event_time,
                     event_type,
@@ -148,7 +148,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -173,19 +173,19 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id,
+                    resource_uid as uid,
                     resource_kind as "kind!",
                     event_time,
                     event_type,
                     event_payload as "payload!"
                 FROM resource_events
-                WHERE resource_id = $1
+                WHERE resource_uid = $1
                   AND resource_kind = $2
                   AND ($3::bigint IS NULL OR event_id > $3)
                   AND ($4::bigint IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
-                key.id,
+                key.uid,
                 key.kind,
                 opts.from.map(EventID::into_inner),
                 opts.to.map(EventID::into_inner),
@@ -199,7 +199,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -278,7 +278,7 @@ impl ResourceRawEventStore for PostgresRawResourceEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id,
+                    resource_uid as uid,
                     resource_kind as "kind!",
                     event_time,
                     event_type,
@@ -302,7 +302,7 @@ impl ResourceRawEventStore for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,

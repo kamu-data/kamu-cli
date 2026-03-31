@@ -28,7 +28,7 @@ use kamu_resources::{
 fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> ResourceSnapshot {
     let now = Utc::now();
     ResourceSnapshot {
-        resource_id: uuid::Uuid::new_v4(),
+        uid: uuid::Uuid::new_v4(),
         kind: kind.to_string(),
         api_version: "v1".to_string(),
         metadata: ResourceMetadata {
@@ -62,7 +62,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     assert_eq!(0, count);
 
     let ids: Vec<_> = repo
-        .list_resource_ids(
+        .list_resource_uids(
             account_id.clone(),
             "TestKind",
             PaginationOpts {
@@ -96,46 +96,43 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "my-resource");
-    snapshot.resource_id = repo.new_resource_id().await.unwrap();
-    let resource_id = snapshot.resource_id;
+    snapshot.uid = repo.new_resource_uid().await.unwrap();
+    let uid = snapshot.uid;
 
     repo.create_resource(&snapshot).await.unwrap();
 
     // find by id
-    let found = repo
-        .find_resource_snapshot_by_id(&resource_id)
-        .await
-        .unwrap();
+    let found = repo.find_resource_snapshot_by_uid(&uid).await.unwrap();
     assert!(found.is_some());
     let found = found.unwrap();
-    assert_eq!(found.resource_id, resource_id);
+    assert_eq!(found.uid, uid);
     assert_eq!(found.kind, "TestKind");
     assert_eq!(found.metadata.name, "my-resource");
     assert_eq!(found.last_event_id, None);
 
     // find by name
     let found_id = repo
-        .find_resource_id_by_name(account_id.clone(), "TestKind", &"my-resource".to_string())
+        .find_resource_uid_by_name(account_id.clone(), "TestKind", &"my-resource".to_string())
         .await
         .unwrap();
-    assert_eq!(found_id, Some(resource_id));
+    assert_eq!(found_id, Some(uid));
 
     // find via raw event query
     let found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             kind: "TestKind".to_string(),
-            id: resource_id,
+            uid,
         })
         .await
         .unwrap();
     assert!(found.is_some());
-    assert_eq!(found.unwrap().resource_id, resource_id);
+    assert_eq!(found.unwrap().uid, uid);
 
     // wrong kind returns nothing
     let not_found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             kind: "OtherKind".to_string(),
-            id: resource_id,
+            uid,
         })
         .await
         .unwrap();
@@ -149,11 +146,11 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut first = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
-    first.resource_id = repo.new_resource_id().await.unwrap();
+    first.uid = repo.new_resource_uid().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
     let mut second = make_test_snapshot(account_id, "TestKind", "duplicate-resource");
-    second.resource_id = repo.new_resource_id().await.unwrap();
+    second.uid = repo.new_resource_uid().await.unwrap();
     let result = repo.create_resource(&second).await;
 
     assert!(matches!(result, Err(CreateResourceError::Duplicate(_))));
@@ -166,8 +163,8 @@ pub async fn test_update_resource(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "update-me");
-    snapshot.resource_id = repo.new_resource_id().await.unwrap();
-    let resource_id = snapshot.resource_id;
+    snapshot.uid = repo.new_resource_uid().await.unwrap();
+    let uid = snapshot.uid;
     repo.create_resource(&snapshot).await.unwrap();
 
     let event_id = EventID::new(1);
@@ -185,7 +182,7 @@ pub async fn test_update_resource(catalog: &Catalog) {
     repo.update_resource(&updated, None).await.unwrap();
 
     let found = repo
-        .find_resource_snapshot_by_id(&resource_id)
+        .find_resource_snapshot_by_uid(&uid)
         .await
         .unwrap()
         .unwrap();
@@ -204,7 +201,7 @@ pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut snapshot = make_test_snapshot(account_id, "TestKind", "concurrent-resource");
-    snapshot.resource_id = repo.new_resource_id().await.unwrap();
+    snapshot.uid = repo.new_resource_uid().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
     // Resource has last_event_id = None, but we pass Some(...)
@@ -224,7 +221,7 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut snapshot = make_test_snapshot(account_id, "TestKind", "locked-resource");
-    snapshot.resource_id = repo.new_resource_id().await.unwrap();
+    snapshot.uid = repo.new_resource_uid().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
     // First update: sets last_event_id to Some(1)
@@ -268,12 +265,12 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
     for i in 1..=5_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "TestKind", &format!("resource-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     let first_page: Vec<_> = repo
-        .list_resource_ids(
+        .list_resource_uids(
             account_id.clone(),
             "TestKind",
             PaginationOpts {
@@ -287,7 +284,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
     assert_eq!(first_page.len(), 3);
 
     let second_page: Vec<_> = repo
-        .list_resource_ids(
+        .list_resource_uids(
             account_id.clone(),
             "TestKind",
             PaginationOpts {
@@ -318,13 +315,13 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
     for i in 1..=3_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "KindA", &format!("resource-a-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "KindB", &format!("resource-b-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
@@ -383,19 +380,19 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     for i in 1..=2_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "KindA", &format!("resource-a-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "KindB", &format!("resource-b-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     // Resources for a different account — must not appear in results
     let mut other = make_test_snapshot(other_account_id, "KindA", "other-resource");
-    other.resource_id = repo.new_resource_id().await.unwrap();
+    other.uid = repo.new_resource_uid().await.unwrap();
     repo.create_resource(&other).await.unwrap();
 
     let all: Vec<_> = repo
@@ -421,7 +418,7 @@ pub async fn test_count_resources(catalog: &Catalog) {
     for i in 1..=3_u32 {
         let mut snapshot =
             make_test_snapshot(account_id.clone(), "TestKind", &format!("resource-{i}"));
-        snapshot.resource_id = repo.new_resource_id().await.unwrap();
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
@@ -442,8 +439,8 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "to-delete");
-    snapshot.resource_id = repo.new_resource_id().await.unwrap();
-    let resource_id = snapshot.resource_id;
+    snapshot.uid = repo.new_resource_uid().await.unwrap();
+    let uid = snapshot.uid;
     repo.create_resource(&snapshot).await.unwrap();
 
     // Mark as deleted
@@ -456,23 +453,20 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     };
     repo.update_resource(&deleted, None).await.unwrap();
 
-    let by_id = repo
-        .find_resource_snapshot_by_id(&resource_id)
-        .await
-        .unwrap();
+    let by_id = repo.find_resource_snapshot_by_uid(&uid).await.unwrap();
     assert!(by_id.is_none());
 
     let by_query = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             kind: "TestKind".to_string(),
-            id: resource_id,
+            uid,
         })
         .await
         .unwrap();
     assert!(by_query.is_none());
 
     let by_name = repo
-        .find_resource_id_by_name(account_id.clone(), "TestKind", &"to-delete".to_string())
+        .find_resource_uid_by_name(account_id.clone(), "TestKind", &"to-delete".to_string())
         .await
         .unwrap();
     assert!(by_name.is_none());
@@ -484,7 +478,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert_eq!(0, count);
 
     let ids: Vec<_> = repo
-        .list_resource_ids(
+        .list_resource_uids(
             account_id.clone(),
             "TestKind",
             PaginationOpts {

@@ -40,7 +40,7 @@ pub struct SqliteResourceRawEventStore {
 #[derive(Debug, sqlx::FromRow)]
 struct EventRow {
     event_id: i64,
-    resource_id: uuid::Uuid,
+    uid: uuid::Uuid,
     kind: String,
     event_time: DateTime<Utc>,
     event_type: String,
@@ -61,7 +61,7 @@ impl SqliteResourceRawEventStore {
             let inserted = sqlx::query_scalar!(
                 r#"
                 INSERT INTO resource_events (
-                    resource_id,
+                    resource_uid,
                     resource_kind,
                     event_time,
                     event_type,
@@ -71,7 +71,7 @@ impl SqliteResourceRawEventStore {
 
                 RETURNING event_id
                 "#,
-                query.id,
+                query.uid,
                 query.kind,
                 event.event_time,
                 event.event_type,
@@ -96,12 +96,12 @@ impl SqliteResourceRawEventStore {
             r#"
             SELECT event_id
             FROM resource_events
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_kind = $2
             ORDER BY event_id DESC
             LIMIT 1
             "#,
-            query.id,
+            query.uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -146,7 +146,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id as "resource_id: _",
+                    resource_uid as "uid: _",
                     resource_kind as "kind!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
@@ -168,7 +168,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -196,19 +196,19 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id as "resource_id: _",
+                    resource_uid as "uid: _",
                     resource_kind as "kind!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
                     event_payload as "payload: serde_json::Value"
                 FROM resource_events
-                WHERE resource_id = $1
+                WHERE resource_uid = $1
                   AND resource_kind = $2
                   AND ($3 IS NULL OR event_id > $3)
                   AND ($4 IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
-                query.id,
+                query.uid,
                 query.kind,
                 maybe_from_id,
                 maybe_to_id,
@@ -222,7 +222,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -302,7 +302,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                 r#"
                 SELECT
                     event_id,
-                    resource_id as "resource_id: _",
+                    resource_uid as "uid: _",
                     resource_kind as "kind!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
@@ -326,7 +326,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        id: row.resource_id,
+                        uid: row.uid,
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,

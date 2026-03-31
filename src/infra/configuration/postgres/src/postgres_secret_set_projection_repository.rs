@@ -28,7 +28,7 @@ pub struct PostgresSecretSetProjectionRepository {
 impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
     async fn replace_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         entries: &[SecretSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
@@ -41,7 +41,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 r#"
                 INSERT INTO config_secret_set_entries (
                     entry_id,
-                    resource_id,
+                    resource_uid,
                     resource_generation,
                     account_id,
                     secret_key,
@@ -52,7 +52,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 "#,
                 entry.entry_id,
-                resource_id,
+                resource_uid,
                 resource_generation,
                 entry.account_id.to_string(),
                 entry.key,
@@ -77,7 +77,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn find_entry(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<SecretSetEntry>, InternalError> {
@@ -96,11 +96,11 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 secret_nonce as "secret_nonce: Vec<u8>",
                 updated_at
             FROM config_secret_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation = $2
               AND secret_key = $3
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
             key,
         )
@@ -113,7 +113,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn get_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -131,11 +131,11 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 secret_nonce as "secret_nonce: Vec<u8>",
                 updated_at
             FROM config_secret_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation = $2
             ORDER BY secret_key
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -147,7 +147,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_uid: &kamu_resources::ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -157,10 +157,10 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
         sqlx::query!(
             r#"
             DELETE FROM config_secret_set_entries
-            WHERE resource_id = $1
+            WHERE resource_uid = $1
               AND resource_generation < $2
             "#,
-            resource_id,
+            resource_uid,
             resource_generation,
         )
         .execute(&mut *connection_mut)

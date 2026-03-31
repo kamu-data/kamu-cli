@@ -59,7 +59,7 @@ where
         (None, E::Created(e)) => {
             let pending_status = TModel::StatusProjector::new_pending(&e.spec);
             Ok(ResourceState::new(
-                e.resource_id,
+                e.uid,
                 ResourceMetadata::from_input(e.event_time, e.metadata),
                 e.spec,
                 pending_status,
@@ -72,7 +72,7 @@ where
         }
 
         (Some(mut s), E::MetadataUpdated(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             s.metadata_mut().apply_update(e.event_time, e.new_metadata);
 
@@ -80,7 +80,7 @@ where
         }
 
         (Some(mut s), E::SpecUpdated(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             *s.spec_mut() = e.new_spec;
             s.metadata_mut().generation = e.new_generation;
@@ -97,7 +97,7 @@ where
         }
 
         (Some(mut s), E::Deleted(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             s.metadata_mut().deleted_at = Some(e.event_time);
             s.metadata_mut().updated_at = e.event_time;
@@ -107,7 +107,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationStarted(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             s.status_mut()
                 .resource_status_mut()
@@ -117,7 +117,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationSucceeded(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             s.status_mut()
                 .resource_status_mut()
@@ -128,7 +128,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationFailed(e)) => {
-            assert_eq!(s.resource_id(), &e.resource_id);
+            assert_eq!(s.uid(), &e.uid);
 
             s.status_mut().resource_status_mut().mark_failed(
                 e.event_time,

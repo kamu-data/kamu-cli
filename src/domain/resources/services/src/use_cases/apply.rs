@@ -24,7 +24,6 @@ use crate::domain::{
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
-    ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceLoadError,
@@ -33,6 +32,7 @@ use crate::domain::{
     ResourcePersistenceService,
     ResourceQueryService,
     ResourceStatusLike,
+    ResourceUID,
     ResourceValidateSpec,
 };
 
@@ -79,20 +79,20 @@ where
         params: ApplyResourceParams<R>,
     ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
         let maybe_existing_id = self
-            .resolve_existing_resource_id(params.resource_id, &params.metadata)
+            .resolve_existing_resource_uid(params.uid, &params.metadata)
             .await?;
 
         let now = self.time_source.now();
 
-        let Some(resource_id) = maybe_existing_id else {
+        let Some(uid) = maybe_existing_id else {
             return self.apply_create_resource(params, now).await;
         };
 
-        self.ensure_resource_id_matches_type(&resource_id).await?;
+        self.ensure_resource_uid_matches_type(&uid).await?;
 
         let resource = self
             .resource_aggregate_loader
-            .load(&resource_id)
+            .load(&uid)
             .await
             .map_err(ResourceLoadError)
             .map_err(ApplyResourceUseCaseError::LoadFailed)?;
@@ -102,29 +102,29 @@ where
 
     fn make_result(resource: R, outcome: ApplyResourceOutcome) -> ApplyResourceResult<R> {
         ApplyResourceResult {
-            resource_id: *resource.resource_id(),
+            uid: *resource.uid(),
             state: resource.into(),
             outcome,
         }
     }
 
-    async fn resolve_existing_resource_id(
+    async fn resolve_existing_resource_uid(
         &self,
-        resource_id: Option<ResourceID>,
+        uid: Option<ResourceUID>,
         metadata: &ResourceMetadataInput,
-    ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<Option<ResourceUID>, ApplyResourceUseCaseError<R>> {
         self.resource_query_service
-            .find_existing_id_by_name(resource_id, metadata)
+            .find_existing_id_by_name(uid, metadata)
             .await
             .map_err(ApplyResourceUseCaseError::Internal)
     }
 
-    async fn ensure_resource_id_matches_type(
+    async fn ensure_resource_uid_matches_type(
         &self,
-        resource_id: &ResourceID,
+        uid: &ResourceUID,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
         self.resource_query_service
-            .ensure_resource_id_matches_type(resource_id)
+            .ensure_resource_uid_matches_type(uid)
             .await
             .map_err(ApplyResourceUseCaseError::from)
     }
@@ -134,13 +134,13 @@ where
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
     ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
-        let resource_id = self
+        let uid = self
             .resource_query_service
-            .allocate_id()
+            .allocate_uid()
             .await
             .map_err(ApplyResourceUseCaseError::Internal)?;
         let mut resource =
-            <R as ReconcilableResource>::try_create(now, resource_id, params.metadata, params.spec)
+            <R as ReconcilableResource>::try_create(now, uid, params.metadata, params.spec)
                 .map_err(ApplyResourceUseCaseError::Lifecycle)?;
 
         self.resource_persistence_service
