@@ -7,6 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod variable_set_projection_repository_test_suite;
-
-pub use variable_set_projection_repository_test_suite::*;
+pub mod secret_set_projection_repository_test_suite;
+pub mod variable_set_projection_repository_test_suite;

@@ -10,6 +10,7 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_configuration_repo_tests::variable_set_projection_repository_test_suite as variable_set_repo;
 use kamu_configuration_sqlite::SqliteVariableSetProjectionRepository;
 use kamu_resources_sqlite::SqliteResourceRepository;
 use sqlx::SqlitePool;
@@ -18,7 +19,7 @@ use sqlx::SqlitePool;
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_entries_empty_initially,
+    fixture = variable_set_repo::test_entries_empty_initially,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -26,7 +27,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_replace_and_get_entries,
+    fixture = variable_set_repo::test_replace_and_get_entries,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -34,7 +35,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_find_entry_by_key,
+    fixture = variable_set_repo::test_find_entry_by_key,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -42,7 +43,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_entries_isolated_by_resource,
+    fixture = variable_set_repo::test_entries_isolated_by_resource,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -50,7 +51,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_entries_isolated_by_generation,
+    fixture = variable_set_repo::test_entries_isolated_by_generation,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -58,7 +59,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_replace_entries_concurrent_modification,
+    fixture = variable_set_repo::test_replace_entries_concurrent_modification,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -66,7 +67,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_cleanup_entries_before_generation,
+    fixture = variable_set_repo::test_cleanup_entries_before_generation,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
@@ -74,7 +75,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_configuration_repo_tests::test_cleanup_does_not_affect_other_resources,
+    fixture = variable_set_repo::test_cleanup_does_not_affect_other_resources,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 
