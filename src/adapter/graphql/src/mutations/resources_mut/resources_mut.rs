@@ -37,8 +37,7 @@ impl ResourcesMut {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
     ) -> Result<ResourceDeleteResult> {
-        let _ = (ctx, selector);
-        todo!("ResourcesMut.delete is not implemented yet");
+        super::helpers::delete_resource(ctx, selector, None).await
     }
 }
 

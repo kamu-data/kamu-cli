@@ -44,8 +44,15 @@ impl AdminResourcesMut {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
     ) -> Result<ResourceDeleteResult> {
-        let _ = (&self.account, ctx, selector);
-        todo!("AdminResourcesMut.delete is not implemented yet");
+        super::helpers::delete_resource(
+            ctx,
+            selector,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
     }
 }
 

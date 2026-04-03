@@ -90,24 +90,6 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
-    async fn get_snapshots_by_uids(
-        &self,
-        uids: &[crate::domain::ResourceUID],
-    ) -> Result<Vec<Option<ResourceSnapshot>>, InternalError> {
-        let mut snapshots = Vec::with_capacity(uids.len());
-
-        // TODO: bulk query in repository instead of one by one
-        for uid in uids {
-            snapshots.push(
-                self.resource_repository
-                    .find_resource_snapshot_by_uid(uid)
-                    .await?,
-            );
-        }
-
-        Ok(snapshots)
-    }
-
     async fn list_all_snapshots(
         &self,
         account_id: odf::AccountID,

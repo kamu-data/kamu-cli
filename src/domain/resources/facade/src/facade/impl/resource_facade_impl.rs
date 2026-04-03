@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use internal_error::InternalError;
 use kamu_resources::{
     ApplyManifestResult,
     GenericResourceQueryService,
@@ -32,8 +32,8 @@ use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_di
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
-    DeleteResourcesError,
-    DeleteResourcesRequest,
+    DeleteResourceError,
+    DeleteResourceRequest,
     GetResourceError,
     GetResourceRef,
     GetResourceRequest,
@@ -105,7 +105,11 @@ impl ResourceFacade for ResourceFacadeImpl {
             .await?;
 
         let uid = self
-            .resolve_resource_uid(&request.kind, &target_account.id, &request.resource_ref)
+            .resolve_resource_uid::<GetResourceError>(
+                &request.kind,
+                &target_account.id,
+                &request.resource_ref,
+            )
             .await?;
 
         let snapshot = self
@@ -181,58 +185,59 @@ impl ResourceFacade for ResourceFacadeImpl {
         Ok(snapshots.into_iter().map(Into::into).collect())
     }
 
-    async fn delete(&self, request: DeleteResourcesRequest) -> Result<(), DeleteResourcesError> {
+    async fn delete(
+        &self,
+        request: DeleteResourceRequest,
+    ) -> Result<ResourceUID, DeleteResourceError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let snapshots = self
-            .generic_resource_query_service
-            .get_snapshots_by_uids(&request.uids)
-            .await?;
-
-        let mut uids_by_api_version: BTreeMap<String, Vec<ResourceUID>> = BTreeMap::new();
-        for (uid, maybe_snapshot) in std::iter::zip(request.uids, snapshots) {
-            let snapshot = self.ensure_snapshot_matches_kind(
+        let uid = self
+            .resolve_resource_uid::<DeleteResourceError>(
                 &request.kind,
                 &target_account.id,
-                uid,
-                maybe_snapshot,
-            )?;
-            uids_by_api_version
-                .entry(snapshot.api_version)
-                .or_default()
-                .push(uid);
-        }
+                &request.resource_ref,
+            )
+            .await?;
 
-        for (api_version, uids) in uids_by_api_version {
-            let dispatcher = get_resource_crud_dispatcher::<DeleteResourcesError>(
-                &self.catalog,
-                &request.kind,
-                &api_version,
-            )?;
-            dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: target_account.id.clone(),
-                    uids,
-                })
-                .await?;
-        }
+        let snapshot = self
+            .generic_resource_query_service
+            .get_snapshot_by_uid(&uid)
+            .await?;
 
-        Ok(())
+        let snapshot =
+            self.ensure_snapshot_matches_kind(&request.kind, &target_account.id, uid, snapshot)?;
+
+        let dispatcher = get_resource_crud_dispatcher::<DeleteResourceError>(
+            &self.catalog,
+            &request.kind,
+            &snapshot.api_version,
+        )?;
+        dispatcher
+            .delete(ResourceCrudDispatcherDeleteRequest {
+                account_id: target_account.id.clone(),
+                uids: vec![uid],
+            })
+            .await?;
+
+        Ok(uid)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceFacadeImpl {
-    async fn resolve_resource_uid(
+    async fn resolve_resource_uid<E>(
         &self,
         kind: &str,
         account_id: &odf::AccountID,
         resource_ref: &GetResourceRef,
-    ) -> Result<ResourceUID, GetResourceError> {
+    ) -> Result<ResourceUID, E>
+    where
+        E: From<InternalError> + From<ResourceNameNotFoundError>,
+    {
         match resource_ref {
             GetResourceRef::ById(uid) => Ok(*uid),
             GetResourceRef::ByName(name) => self
@@ -319,7 +324,7 @@ impl ResourceFacadeImpl {
         account_id: &odf::AccountID,
         uid: ResourceUID,
         maybe_snapshot: Option<ResourceSnapshot>,
-    ) -> Result<ResourceSnapshot, DeleteResourcesError> {
+    ) -> Result<ResourceSnapshot, DeleteResourceError> {
         let Some(snapshot) = maybe_snapshot else {
             return Err(ResourceUIDNotFoundError(uid).into());
         };

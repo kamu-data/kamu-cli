@@ -128,6 +128,15 @@ impl ResourceBuiltinKind {
     }
 }
 
+impl ResourceKindInput {
+    pub fn into_resource_type(self) -> String {
+        match self {
+            Self::Builtin(kind) => kind.as_resource_type().to_string(),
+            Self::Custom(kind) => kind,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject, Debug, Clone)]

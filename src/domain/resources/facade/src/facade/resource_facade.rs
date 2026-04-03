@@ -53,7 +53,10 @@ pub trait ResourceFacade: Send + Sync {
         request: ListAllResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
 
-    async fn delete(&self, request: DeleteResourcesRequest) -> Result<(), DeleteResourcesError>;
+    async fn delete(
+        &self,
+        request: DeleteResourceRequest,
+    ) -> Result<ResourceUID, DeleteResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,10 +113,10 @@ pub struct ListAllResourcesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DeleteResourcesRequest {
+pub struct DeleteResourceRequest {
     pub kind: String,
     pub account: Option<ResourceManifestAccount>,
-    pub uids: Vec<ResourceUID>,
+    pub resource_ref: GetResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +255,7 @@ pub enum ListAllResourcesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteResourcesError {
+pub enum DeleteResourceError {
     #[error(transparent)]
     UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
 
@@ -263,13 +266,16 @@ pub enum DeleteResourcesError {
     UIDNotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
+    NameNotFound(#[from] ResourceNameNotFoundError),
+
+    #[error(transparent)]
     KindMismatch(#[from] ResourceKindMismatchError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
-impl From<DeleteResourcesCrudDispatcherError> for DeleteResourcesError {
+impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
     fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
         use DeleteResourcesCrudDispatcherError as E;
         match err {

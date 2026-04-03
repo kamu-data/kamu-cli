@@ -34,7 +34,7 @@ pub(crate) async fn get_resource(
         resource_ref,
     } = selector;
 
-    let kind = resource_type_from_input(kind);
+    let kind = kind.into_resource_type();
 
     let resource = resource_facade
         .get(kamu_resources_facade::GetResourceRequest {
@@ -80,7 +80,7 @@ pub(crate) async fn list_resources_connection(
 
     let items = resource_facade
         .list(kamu_resources_facade::ListResourcesRequest {
-            kind: resource_type_from_input(kind),
+            kind: kind.into_resource_type(),
             account,
             pagination: PaginationOpts::from_page(page, per_page),
         })
@@ -115,15 +115,6 @@ pub(crate) async fn list_all_resources_connection(
     let items = items.into_iter().map(ResourceSummary::from).collect();
 
     Ok(ResourceConnection::new(items, page, per_page, total_count))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn resource_type_from_input(kind: ResourceKindInput) -> String {
-    match kind {
-        ResourceKindInput::Builtin(kind) => kind.as_resource_type().to_string(),
-        ResourceKindInput::Custom(kind) => kind,
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

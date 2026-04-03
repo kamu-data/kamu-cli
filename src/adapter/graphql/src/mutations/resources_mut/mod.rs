@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod admin_resources_mut;
+pub(crate) mod helpers;
 mod resources_mut;
 
 pub(crate) use admin_resources_mut::*;

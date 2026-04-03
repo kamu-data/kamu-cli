@@ -37,11 +37,6 @@ pub trait GenericResourceQueryService: Send + Sync {
         uid: &crate::ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    async fn get_snapshots_by_uids(
-        &self,
-        uids: &[crate::ResourceUID],
-    ) -> Result<Vec<Option<ResourceSnapshot>>, InternalError>;
-
     async fn list_all_snapshots(
         &self,
         account_id: odf::AccountID,
