@@ -72,6 +72,13 @@ impl InMemory<Repo>Harness {
 - Respect exact long separator comment style where surrounding files use it.
 - Name lookup methods consistently: `get_xxx` returns the thing or a not-found error, while `find_xxx` returns `Option<T>` and treats absence as non-error.
 
+## GraphQL
+
+- GraphQL schema is code-first in `kamu-adapter-graphql`; never edit `resources/schema.gql` by hand.
+- Add new API surface through grouped root objects in `src/adapter/graphql/src/root.rs`, with query and mutation modules following the existing crate structure.
+- For schema-only prototypes explicitly requested by the user, resolver bodies may be left as `todo!()`.
+- Regenerate the schema with the existing test / `make codegen-graphql-schema`.
+
 
 ## Design Notes
 

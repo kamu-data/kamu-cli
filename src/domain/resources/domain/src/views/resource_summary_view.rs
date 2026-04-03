@@ -24,7 +24,7 @@ pub struct ResourceSummaryView {
     pub generation: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub status: ResourceStatusSummaryView,
+    pub status: Option<ResourceStatusSummaryView>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::AdminGuard;
-use crate::mutations::AdminSearchMut;
+use crate::mutations::{AdminResourcesMut, AdminSearchMut};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,6 +21,12 @@ impl AdminMut {
     #[graphql(guard = "AdminGuard::new()")]
     async fn search(&self) -> AdminSearchMut {
         AdminSearchMut
+    }
+
+    #[allow(clippy::unused_async)]
+    #[graphql(guard = "AdminGuard::new()")]
+    async fn resources(&self, account_id: AccountID<'_>) -> AdminResourcesMut {
+        AdminResourcesMut::new(account_id)
     }
 }
 

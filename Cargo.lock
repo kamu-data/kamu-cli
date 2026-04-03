@@ -7283,6 +7283,7 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-auth-web3",
+ "kamu-configuration",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",

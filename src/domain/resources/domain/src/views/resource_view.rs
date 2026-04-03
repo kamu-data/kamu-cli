@@ -22,6 +22,7 @@ pub struct ResourceView {
     pub api_version: String,
     pub account: ResourceViewAccount,
     pub metadata: ResourceViewMetadata,
+    pub last_reconciled_at: Option<DateTime<Utc>>,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
 }

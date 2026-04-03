@@ -469,10 +469,37 @@ type AddPushSource {
 
 type Admin {
 	selfTest: String!
+	resources(accountId: AccountID!): AdminResources!
 }
 
 type AdminMut {
 	search: AdminSearchMut!
+	resources(accountId: AccountID!): AdminResourcesMut!
+}
+
+type AdminResources {
+	"""
+	Returns a resource by selector from the target account, if found
+	"""
+	resource(selector: ResourceSelectorInput!): Resource
+	"""
+	Returns resources of the specified kind from the target account
+	"""
+	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
+	"""
+	Returns resources across all kinds from the target account
+	"""
+	listAll(page: Int, perPage: Int): ResourceConnection!
+	"""
+	Renders a canonical manifest representation from a stored resource in
+	the target account
+	"""
+	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!): ResourceRenderManifestResult!
+}
+
+type AdminResourcesMut {
+	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyResult!
+	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
 }
 
 type AdminSearchMut {
@@ -3196,6 +3223,10 @@ type Mutation {
 	"""
 	collaboration: CollaborationMut!
 	"""
+	Resource-related functionality group
+	"""
+	resources: ResourcesMut!
+	"""
 	Admin-related functionality group
 	"""
 	admin: AdminMut!
@@ -3382,6 +3413,10 @@ type Query {
 	Search-related functionality group
 	"""
 	search: Search!
+	"""
+	Resource-related functionality group
+	"""
+	resources: Resources!
 	"""
 	Querying and data manipulations
 	"""
@@ -3691,6 +3726,171 @@ type RequestHeader {
 	Value of the header.
 	"""
 	value: String!
+}
+
+type Resource {
+	apiVersion: String!
+	kind: ResourceKind!
+	metadata: ResourceMetadata!
+	spec: JSON!
+	status: JSON
+}
+
+enum ResourceApplyOperation {
+	CREATED
+	UPDATED
+	UNCHANGED
+}
+
+type ResourceApplyResult {
+	operation: ResourceApplyOperation!
+	resource: Resource!
+}
+
+enum ResourceBuiltinKind {
+	SECRET_SET
+	VARIABLE_SET
+}
+
+input ResourceByNameSelectorInput {
+	name: String!
+}
+
+type ResourceConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ResourceSummary!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ResourceEdge!]!
+}
+
+type ResourceDeleteResult {
+	resourceId: ResourceID!
+	kind: ResourceKind
+}
+
+type ResourceEdge {
+	node: ResourceSummary!
+}
+
+scalar ResourceID
+
+type ResourceKind {
+	value: String!
+	builtin: ResourceBuiltinKind
+}
+
+input ResourceKindInput @oneOf {
+	builtin: ResourceBuiltinKind
+	custom: String
+}
+
+enum ResourceManifestFormat {
+	JSON
+	YAML
+}
+
+type ResourceMetadata {
+	id: ResourceID!
+	accountId: AccountID!
+	name: String!
+	description: String
+	labels: JSON!
+	annotations: JSON!
+	generation: Int!
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	deletedAt: DateTime
+	lastReconciledAt: DateTime
+}
+
+input ResourceRefInput @oneOf {
+	byId: ResourceID
+	byName: ResourceByNameSelectorInput
+}
+
+type ResourceRenderManifestResult {
+	manifest: String!
+	format: ResourceManifestFormat!
+}
+
+input ResourceSelectorInput {
+	kind: ResourceKindInput!
+	apiVersion: String
+	ref: ResourceRefInput!
+}
+
+type ResourceStatusSummary {
+	phase: String
+	observedGeneration: Int
+	ready: Boolean
+}
+
+type ResourceSummary {
+	id: ResourceID!
+	apiVersion: String!
+	kind: ResourceKind!
+	name: String!
+	description: String
+	generation: Int!
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	status: ResourceStatusSummary
+}
+
+type ResourceValidateManifestResult {
+	valid: Boolean!
+	issues: [ResourceValidationIssue!]!
+	kind: ResourceKind
+	apiVersion: String
+}
+
+type ResourceValidationIssue {
+	severity: ResourceValidationIssueSeverity!
+	code: String
+	path: String
+	message: String!
+}
+
+enum ResourceValidationIssueSeverity {
+	ERROR
+	WARNING
+}
+
+type Resources {
+	"""
+	Validates a resource manifest without applying it
+	"""
+	validateManifest(manifest: String!, format: ResourceManifestFormat!): ResourceValidateManifestResult!
+	"""
+	Returns a resource by selector, if found
+	"""
+	resource(selector: ResourceSelectorInput!): Resource
+	"""
+	Returns resources of the specified kind
+	"""
+	listByKind(kind: ResourceKindInput!, accountId: AccountID, page: Int, perPage: Int): ResourceConnection!
+	"""
+	Returns resources across all kinds
+	"""
+	listAll(accountId: AccountID, page: Int, perPage: Int): ResourceConnection!
+	"""
+	Renders a canonical manifest representation from a stored resource
+	"""
+	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!): ResourceRenderManifestResult!
+}
+
+type ResourcesMut {
+	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyResult!
+	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
 }
 
 type RestProtocolDesc {

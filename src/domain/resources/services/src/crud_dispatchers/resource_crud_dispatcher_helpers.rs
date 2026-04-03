@@ -65,7 +65,7 @@ pub fn typed_resource_state_to_view<R>(
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
 {
     Ok(ResourceView {
         kind: R::DESCRIPTOR.resource_type.to_string(),
@@ -85,6 +85,7 @@ where
             updated_at: state.metadata().updated_at,
             deleted_at: state.metadata().deleted_at,
         },
+        last_reconciled_at: state.status().resource_status().last_reconciled_at(),
         spec: serde_json::to_value(state.spec()).int_err()?,
         status: Some(serde_json::to_value(state.status()).int_err()?),
     })
@@ -106,7 +107,7 @@ where
         generation: state.metadata().generation,
         created_at: state.metadata().created_at,
         updated_at: state.metadata().updated_at,
-        status: resource_status_summary_view(state.status()),
+        status: Some(resource_status_summary_view(state.status())),
     }
 }
 

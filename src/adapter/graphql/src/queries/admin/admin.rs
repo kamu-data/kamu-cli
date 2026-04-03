@@ -9,6 +9,7 @@
 
 use crate::AdminGuard;
 use crate::prelude::*;
+use crate::queries::AdminResources;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +21,12 @@ impl Admin {
     #[graphql(guard = "AdminGuard::new()")]
     async fn self_test(&self) -> Result<String> {
         Ok("OK".to_string())
+    }
+
+    #[allow(clippy::unused_async)]
+    #[graphql(guard = "AdminGuard::new()")]
+    async fn resources(&self, account_id: AccountID<'_>) -> AdminResources {
+        AdminResources::new(account_id)
     }
 }
 
