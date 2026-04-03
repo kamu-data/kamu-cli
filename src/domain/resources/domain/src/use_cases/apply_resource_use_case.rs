@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ConcurrentModificationError;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     DeclarativeResource,
@@ -71,9 +71,6 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     ResourceTypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
-    Duplicate(crate::ResourceDuplicateError),
-
-    #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
 
     #[error(transparent)]
@@ -108,10 +105,10 @@ where
 {
     fn from(err: ResourcePersistenceError) -> Self {
         match err {
-            ResourcePersistenceError::Duplicate(err) => Self::Duplicate(err),
             ResourcePersistenceError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }
+            ResourcePersistenceError::Duplicate(err) => Self::Internal(err.int_err()),
             ResourcePersistenceError::Internal(err) => Self::Internal(err),
         }
     }

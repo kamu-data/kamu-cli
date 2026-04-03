@@ -201,6 +201,7 @@ impl ResourceKind {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources_facade::ResourceManifestFormat")]
 pub enum ResourceManifestFormat {
     Json,
     Yaml,

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use internal_error::ErrorIntoInternal;
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -155,10 +156,17 @@ where
             <R as ReconcilableResource>::try_create(now, uid, params.metadata, params.spec)
                 .map_err(ApplyResourceUseCaseError::Lifecycle)?;
 
-        self.resource_persistence_service
+        match self
+            .resource_persistence_service
             .create(&mut resource)
             .await
-            .map_err(ApplyResourceUseCaseError::from)?;
+        {
+            Ok(()) => {}
+            Err(crate::domain::ResourcePersistenceError::Duplicate(_)) => {
+                return self.retry_apply_after_duplicate_create(resource, now).await;
+            }
+            Err(err) => return Err(ApplyResourceUseCaseError::from(err)),
+        }
 
         self.notify_resource_applied(&resource, now, ApplyResourceOutcome::Created)
             .await?;
@@ -190,6 +198,64 @@ where
             .await?;
 
         Ok(Self::make_result(resource, ApplyResourceOutcome::Updated))
+    }
+
+    async fn retry_apply_after_duplicate_create(
+        &self,
+        resource: R,
+        now: DateTime<Utc>,
+    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
+        let metadata = resource.metadata();
+        let Some(uid) = self
+            .resolve_existing_resource_uid(
+                None,
+                &ResourceMetadataInput {
+                    account: metadata.account.clone(),
+                    name: metadata.name.clone(),
+                    description: metadata.description.clone(),
+                    labels: metadata.labels.clone(),
+                    annotations: metadata.annotations.clone(),
+                },
+            )
+            .await?
+        else {
+            return Err(ApplyResourceUseCaseError::Internal(
+                "Resource create hit duplicate constraint, but no existing resource was found"
+                    .int_err()
+                    .with_context(format!(
+                        "account_id={}, kind='{}', name='{}'",
+                        metadata.account,
+                        R::DESCRIPTOR.resource_type,
+                        metadata.name
+                    )),
+            ));
+        };
+
+        self.ensure_resource_uid_matches_type(&uid).await?;
+
+        let existing_resource = self
+            .resource_aggregate_loader
+            .load(&uid)
+            .await
+            .map_err(ResourceLoadError)
+            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
+
+        self.apply_update_resource(
+            existing_resource,
+            ApplyResourceParams {
+                uid: Some(uid),
+                metadata: ResourceMetadataInput {
+                    account: metadata.account.clone(),
+                    name: metadata.name.clone(),
+                    description: metadata.description.clone(),
+                    labels: metadata.labels.clone(),
+                    annotations: metadata.annotations.clone(),
+                },
+                spec: resource.spec().clone(),
+            },
+            now,
+        )
+        .await
     }
 
     async fn notify_resource_applied(

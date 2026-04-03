@@ -16,7 +16,6 @@ use kamu_resources::{
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
     ResourceAPIVersionMismatchError,
-    ResourceDuplicateError,
     ResourceInvalidSpecError,
     ResourceManifestAccount,
     ResourceMetadataValidationError,
@@ -145,9 +144,6 @@ pub enum ApplyManifestError {
     TypeMismatch(#[from] kamu_resources::ResourceTypeMismatchError),
 
     #[error(transparent)]
-    Duplicate(#[from] ResourceDuplicateError),
-
-    #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
 
     #[error(transparent)]
@@ -161,7 +157,6 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
             E::Internal(err) => Self::Internal(err),
             E::NotFound(err) => Self::UIDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
-            E::Duplicate(err) => Self::Duplicate(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
             E::Lifecycle(err) => Self::Internal(err.int_err()),
             E::InvalidSpec {

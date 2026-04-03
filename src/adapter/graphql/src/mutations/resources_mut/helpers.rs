@@ -9,9 +9,51 @@
 
 use async_graphql::Context;
 
-use crate::mutations::ResourceDeleteResult;
+use crate::mutations::{ResourceApplyResult, ResourceDeleteResult};
 use crate::prelude::*;
-use crate::queries::{ResourceKind, ResourceSelectorInput};
+use crate::queries::helpers::map_resolve_manifest_account_error;
+use crate::queries::{ResourceKind, ResourceManifestFormat, ResourceSelectorInput};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn apply_resource_manifest(
+    ctx: &Context<'_>,
+    manifest: String,
+    format: ResourceManifestFormat,
+) -> Result<ResourceApplyResult> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let result = resource_facade
+        .apply_manifest(kamu_resources_facade::ApplyManifestRequest {
+            format: format.into(),
+            manifest,
+        })
+        .await
+        .map_err(map_apply_resource_error)?;
+
+    Ok(result.into())
+}
+
+pub(crate) fn map_apply_resource_error(
+    error: kamu_resources_facade::ApplyManifestError,
+) -> GqlError {
+    use kamu_resources_facade::ApplyManifestError as E;
+
+    match error {
+        E::ParseManifest(error) => GqlError::gql(error.to_string()),
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidMetadata(error) => GqlError::gql(error.to_string()),
+        E::InvalidSpec(error) => GqlError::gql(error.to_string()),
+        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
+        E::TypeMismatch(error) => GqlError::gql(error.to_string()),
+        E::ConcurrentModification(error) => {
+            tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
+            GqlError::gql("Resource was modified concurrently")
+        }
+        E::Internal(error) => error.into(),
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,8 +79,6 @@ pub(crate) async fn delete_resource(
         kind: ResourceKind::new(kind).into(),
     })
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn map_delete_resource_error(
     error: kamu_resources_facade::DeleteResourceError,

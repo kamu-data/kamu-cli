@@ -26,8 +26,11 @@ impl ResourcesMut {
         format: ResourceManifestFormat,
         dry_run: Option<bool>,
     ) -> Result<ResourceApplyResult> {
-        let _ = (ctx, manifest, format, dry_run);
-        todo!("ResourcesMut.apply_manifest is not implemented yet");
+        if dry_run.unwrap_or(false) {
+            return Err(GqlError::gql("dryRun is not supported yet"));
+        }
+
+        super::helpers::apply_resource_manifest(ctx, manifest, format).await
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]

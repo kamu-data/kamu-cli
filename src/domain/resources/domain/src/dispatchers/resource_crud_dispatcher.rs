@@ -17,7 +17,6 @@ use crate::{
     ApplyResourceUseCaseError,
     DeleteResourcesError,
     GetResourceByUidError,
-    ResourceDuplicateError,
     ResourceMetadataInput,
     ResourceSummaryView,
     ResourceTypeMismatchError,
@@ -102,9 +101,6 @@ pub enum ApplyResourceCrudDispatcherError {
     TypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
-    Duplicate(#[from] ResourceDuplicateError),
-
-    #[error(transparent)]
     ConcurrentModification(#[from] ConcurrentModificationError),
 
     #[error(transparent)]
@@ -182,7 +178,6 @@ where
             }
             ApplyResourceUseCaseError::ResourceUIDNotFound(err) => Self::NotFound(err),
             ApplyResourceUseCaseError::ResourceTypeMismatch(err) => Self::TypeMismatch(err),
-            ApplyResourceUseCaseError::Duplicate(err) => Self::Duplicate(err),
             ApplyResourceUseCaseError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }

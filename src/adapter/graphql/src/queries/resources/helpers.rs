@@ -138,7 +138,7 @@ fn map_list_all_resources_error(error: kamu_resources_facade::ListAllResourcesEr
     }
 }
 
-fn map_resolve_manifest_account_error(
+pub(crate) fn map_resolve_manifest_account_error(
     error: kamu_resources_facade::ResolveManifestAccountError,
 ) -> GqlError {
     use kamu_resources_facade::ResolveManifestAccountError as E;
