@@ -12,35 +12,19 @@ use internal_error::InternalError;
 
 use crate::{
     DeclarativeResource,
-    ResourceMetadataInput,
-    ResourceNotFoundError,
-    ResourceSnapshot,
     ResourceTypeMismatchError,
     ResourceUID,
+    ResourceUIDNotFoundError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceQueryService<R: DeclarativeResource>: Send + Sync {
-    async fn allocate_uid(&self) -> Result<ResourceUID, InternalError>;
-
-    async fn find_existing_id_by_name(
-        &self,
-        uid: Option<ResourceUID>,
-        metadata: &ResourceMetadataInput,
-    ) -> Result<Option<ResourceUID>, InternalError>;
-
+pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
     async fn ensure_resource_uid_matches_type(
         &self,
         uid: &ResourceUID,
     ) -> Result<(), TypedResourceQueryError>;
-
-    async fn find_owned_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        uid: ResourceUID,
-    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
     async fn get_state_by_uid(
         &self,
@@ -55,27 +39,10 @@ pub trait ResourceQueryService<R: DeclarativeResource>: Send + Sync {
     ) -> Result<Vec<R::ResourceState>, InternalError>;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum FindOwnedResourceError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
-    #[error(transparent)]
-    Internal(#[from] internal_error::InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, thiserror::Error)]
 pub enum TypedResourceQueryError {
     #[error(transparent)]
-    NotFound(#[from] ResourceNotFoundError),
+    NotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),

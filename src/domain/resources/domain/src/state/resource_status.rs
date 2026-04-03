@@ -24,6 +24,25 @@ pub struct ResourceStatus {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceStatus {
+    pub fn from_json(value: &serde_json::Value) -> Option<Self> {
+        let serde_json::Value::Object(status_map) = value else {
+            return None;
+        };
+
+        let mut status_json = serde_json::Map::with_capacity(3);
+        status_json.insert("phase".to_string(), status_map.get("phase")?.clone());
+        status_json.insert(
+            "observed_generation".to_string(),
+            status_map.get("observed_generation")?.clone(),
+        );
+        status_json.insert(
+            "conditions".to_string(),
+            status_map.get("conditions")?.clone(),
+        );
+
+        serde_json::from_value(serde_json::Value::Object(status_json)).ok()
+    }
+
     pub fn new_pending() -> Self {
         Self {
             phase: ResourcePhase::Pending,

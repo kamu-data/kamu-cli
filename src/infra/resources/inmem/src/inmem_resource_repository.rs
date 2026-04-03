@@ -148,7 +148,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
     async fn find_resource_uid_by_name(
         &self,
-        account_id: odf::AccountID,
+        account_id: &odf::AccountID,
         kind: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceUID>, InternalError> {
@@ -157,7 +157,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(guard
             .ids_by_lookup_key
             .get(&ResourceLookupKey {
-                account_id,
+                account_id: account_id.clone(),
                 kind: kind.to_owned(),
                 name: name.clone(),
             })

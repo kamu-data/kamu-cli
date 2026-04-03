@@ -49,6 +49,7 @@ kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-search = { workspace = true }
 kamu-resources = { workspace = true }
+kamu-resources-facade = { workspace = true }
 kamu-webhooks = { workspace = true }
 kamu-task-system = { workspace = true }
 observability = { workspace = true, features = ["dill"] }

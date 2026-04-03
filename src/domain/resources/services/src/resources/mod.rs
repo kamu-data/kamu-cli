@@ -38,8 +38,8 @@ macro_rules! declare_resource_service_layer {
                 store = $domain::[<$name EventStore>]
             );
 
-            $crate::declare_resource_query_service!(
-                service = [<$name ResourceQueryServiceImpl>],
+            $crate::declare_typed_resource_query_service!(
+                service = [<$name TypedResourceQueryServiceImpl>],
                 resource = $resource
             );
 
@@ -82,7 +82,7 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
                 catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
-                catalog_builder.add::<[<$name ResourceQueryServiceImpl>]>();
+                catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
                 catalog_builder.add::<[<$name GetResourceByUidUseCaseImpl>]>();
                 catalog_builder.add::<[<$name ListResourcesByKindUseCaseImpl>]>();
                 catalog_builder.add::<[<$name ReconcileResourceUseCaseImpl>]>();

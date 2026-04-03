@@ -191,7 +191,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
     async fn find_resource_uid_by_name(
         &self,
-        account_id: odf::AccountID,
+        account_id: &odf::AccountID,
         kind: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceUID>, InternalError> {

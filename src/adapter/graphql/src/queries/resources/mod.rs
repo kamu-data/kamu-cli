@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod admin;
+mod admin_resources;
+pub(crate) mod helpers;
+mod resources;
 
-pub(crate) use admin::*;
+pub(crate) use admin_resources::*;
+pub(crate) use resources::*;

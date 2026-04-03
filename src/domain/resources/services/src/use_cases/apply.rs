@@ -18,6 +18,7 @@ use crate::domain::{
     ApplyResourceResult,
     ApplyResourceUseCaseError,
     DeclarativeResource,
+    GenericResourceQueryService,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcilableEventSourcedResource,
@@ -30,10 +31,10 @@ use crate::domain::{
     ResourceMetadataInput,
     ResourceMetadataValidationError,
     ResourcePersistenceService,
-    ResourceQueryService,
     ResourceStatusLike,
     ResourceUID,
     ResourceValidateSpec,
+    TypedResourceQueryService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +43,8 @@ pub struct ApplyResourceUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
 {
-    resource_query_service: &'a dyn ResourceQueryService<R>,
+    generic_resource_query_service: &'a dyn GenericResourceQueryService,
+    typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     outbox: &'a dyn Outbox,
@@ -59,14 +61,16 @@ where
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
 {
     pub fn new(
-        resource_query_service: &'a dyn ResourceQueryService<R>,
+        generic_resource_query_service: &'a dyn GenericResourceQueryService,
+        typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
         outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
-            resource_query_service,
+            generic_resource_query_service,
+            typed_resource_query_service,
             resource_aggregate_loader,
             resource_persistence_service,
             outbox,
@@ -113,17 +117,25 @@ where
         uid: Option<ResourceUID>,
         metadata: &ResourceMetadataInput,
     ) -> Result<Option<ResourceUID>, ApplyResourceUseCaseError<R>> {
-        self.resource_query_service
-            .find_existing_id_by_name(uid, metadata)
-            .await
-            .map_err(ApplyResourceUseCaseError::Internal)
+        match uid {
+            Some(uid) => Ok(Some(uid)),
+            None => self
+                .generic_resource_query_service
+                .find_resource_uid_by_name(
+                    &metadata.account,
+                    R::DESCRIPTOR.resource_type,
+                    &metadata.name,
+                )
+                .await
+                .map_err(ApplyResourceUseCaseError::Internal),
+        }
     }
 
     async fn ensure_resource_uid_matches_type(
         &self,
         uid: &ResourceUID,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
-        self.resource_query_service
+        self.typed_resource_query_service
             .ensure_resource_uid_matches_type(uid)
             .await
             .map_err(ApplyResourceUseCaseError::from)
@@ -135,7 +147,7 @@ where
         now: DateTime<Utc>,
     ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
         let uid = self
-            .resource_query_service
+            .generic_resource_query_service
             .allocate_uid()
             .await
             .map_err(ApplyResourceUseCaseError::Internal)?;
@@ -219,8 +231,10 @@ macro_rules! declare_apply_resource_use_case {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ApplyResourceUseCase<$resource>)]
         pub struct $use_case {
-            resource_query_service:
-                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
+            generic_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
+            typed_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::TypedResourceQueryService<$resource>>,
             resource_aggregate_loader:
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
@@ -239,7 +253,8 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 let helper = $crate::ApplyResourceUseCaseHelper::<$resource>::new(
-                    self.resource_query_service.as_ref(),
+                    self.generic_resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
                     self.outbox.as_ref(),

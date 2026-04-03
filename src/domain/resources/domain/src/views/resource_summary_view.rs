@@ -10,7 +10,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceName, ResourceUID};
+use crate::{
+    ResourceConditionStatus,
+    ResourceConditionType,
+    ResourceName,
+    ResourceSnapshot,
+    ResourceStatus,
+    ResourceUID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,6 +41,47 @@ pub struct ResourceStatusSummaryView {
     pub phase: Option<String>,
     pub observed_generation: Option<u64>,
     pub ready: Option<bool>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ResourceSnapshot> for ResourceSummaryView {
+    fn from(value: ResourceSnapshot) -> Self {
+        let status = value.basic_status().map(Into::into);
+
+        Self {
+            kind: value.kind,
+            api_version: value.api_version,
+            uid: value.uid,
+            name: value.metadata.name,
+            description: value.metadata.description,
+            generation: value.metadata.generation,
+            created_at: value.metadata.created_at,
+            updated_at: value.metadata.updated_at,
+            status,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ResourceStatus> for ResourceStatusSummaryView {
+    fn from(value: ResourceStatus) -> Self {
+        let ready = value
+            .conditions
+            .iter()
+            .find(|condition| condition.type_ == ResourceConditionType::Ready)
+            .map(|condition| match condition.status {
+                ResourceConditionStatus::True => true,
+                ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
+            });
+
+        Self {
+            phase: Some(value.phase.to_string()),
+            observed_generation: Some(value.observed_generation),
+            ready,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

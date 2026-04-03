@@ -14,14 +14,12 @@ use crate::queries::{ResourceManifestFormat, ResourceSelectorInput};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AdminResourcesMut {
-    account_id: odf::AccountID,
+    account: kamu_accounts::Account,
 }
 
 impl AdminResourcesMut {
-    pub fn new(account_id: AccountID<'_>) -> Self {
-        Self {
-            account_id: account_id.into(),
-        }
+    pub fn from_account(account: kamu_accounts::Account) -> Self {
+        Self { account }
     }
 }
 
@@ -36,7 +34,7 @@ impl AdminResourcesMut {
         format: ResourceManifestFormat,
         dry_run: Option<bool>,
     ) -> Result<ResourceApplyResult> {
-        let _ = (&self.account_id, ctx, manifest, format, dry_run);
+        let _ = (&self.account, ctx, manifest, format, dry_run);
         todo!("AdminResourcesMut.apply_manifest is not implemented yet");
     }
 
@@ -46,7 +44,7 @@ impl AdminResourcesMut {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
     ) -> Result<ResourceDeleteResult> {
-        let _ = (&self.account_id, ctx, selector);
+        let _ = (&self.account, ctx, selector);
         todo!("AdminResourcesMut.delete is not implemented yet");
     }
 }

@@ -55,7 +55,7 @@ pub struct ResourceManifestMetadata {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifestAccount {
     pub name: Option<String>,
-    pub id: Option<String>,
+    pub id: Option<odf::AccountID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

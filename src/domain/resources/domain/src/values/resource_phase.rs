@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Display, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ResourcePhase {
     Pending,
     Reconciling,

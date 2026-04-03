@@ -9,14 +9,14 @@
 
 use database_common::PaginationOpts;
 
-use crate::domain::{AllResourcesQueryService, ListAllResourcesUseCase, ResourceSnapshot};
+use crate::domain::{GenericResourceQueryService, ListAllResourcesUseCase, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn ListAllResourcesUseCase)]
 pub struct ListAllResourcesUseCaseImpl {
-    all_resources_query_service: std::sync::Arc<dyn AllResourcesQueryService>,
+    generic_resource_query_service: std::sync::Arc<dyn GenericResourceQueryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +28,7 @@ impl ListAllResourcesUseCase for ListAllResourcesUseCaseImpl {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
-        self.all_resources_query_service
+        self.generic_resource_query_service
             .list_all_snapshots(account_id, pagination)
             .await
     }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::helpers as resource_helpers;
 use crate::prelude::*;
 use crate::queries::{
     Resource,
@@ -20,16 +21,14 @@ use crate::queries::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AdminResources {
-    account_id: odf::AccountID,
+    of_account: kamu_accounts::Account,
 }
 
 impl AdminResources {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    pub fn new(account_id: AccountID<'_>) -> Self {
-        Self {
-            account_id: account_id.into(),
-        }
+    pub fn from_account(of_account: kamu_accounts::Account) -> Self {
+        Self { of_account }
     }
 }
 
@@ -43,8 +42,15 @@ impl AdminResources {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
     ) -> Result<Option<Resource>> {
-        let _ = (&self.account_id, ctx, selector);
-        todo!("AdminResources.resource is not implemented yet");
+        resource_helpers::get_resource(
+            ctx,
+            selector,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
     }
 
     /// Returns resources of the specified kind from the target account
@@ -59,9 +65,17 @@ impl AdminResources {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let _prototype_connection = ResourceConnection::new(vec![], page, per_page, 0);
-        let _ = (&self.account_id, ctx, kind, page, per_page);
-        todo!("AdminResources.list_by_kind is not implemented yet");
+        resource_helpers::list_resources_connection(
+            ctx,
+            kind,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+            page,
+            per_page,
+        )
+        .await
     }
 
     /// Returns resources across all kinds from the target account
@@ -75,9 +89,16 @@ impl AdminResources {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let _prototype_connection = ResourceConnection::new(vec![], page, per_page, 0);
-        let _ = (&self.account_id, ctx, page, per_page);
-        todo!("AdminResources.list_all is not implemented yet");
+        resource_helpers::list_all_resources_connection(
+            ctx,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+            page,
+            per_page,
+        )
+        .await
     }
 
     /// Renders a canonical manifest representation from a stored resource in
@@ -89,7 +110,7 @@ impl AdminResources {
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<ResourceRenderManifestResult> {
-        let _ = (&self.account_id, ctx, selector, format);
+        let _ = (&self.of_account, ctx, selector, format);
         todo!("AdminResources.render_manifest is not implemented yet");
     }
 }

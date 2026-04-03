@@ -9,7 +9,7 @@
 
 use event_sourcing::{LoadError, Projection};
 
-use crate::{ResourceDescriptor, ResourceSnapshot, ResourceUID};
+use crate::{ResourceDescriptor, ResourceName, ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,38 @@ pub struct ResourceLoadError<S: Projection>(pub LoadError<S>);
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[error("Resource with uid {0} was not found")]
-pub struct ResourceNotFoundError(pub ResourceUID);
+pub struct ResourceUIDNotFoundError(pub ResourceUID);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Resource '{name}' of kind '{kind}' was not found")]
+pub struct ResourceNameNotFoundError {
+    pub kind: String,
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error(
+    "Resource api version mismatch: expected '{expected_api_version}', actual \
+     '{actual_api_version}'"
+)]
+pub struct ResourceAPIVersionMismatchError {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Invalid spec for resource {kind}/{api_version}: {message}")]
+pub struct ResourceInvalidSpecError {
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

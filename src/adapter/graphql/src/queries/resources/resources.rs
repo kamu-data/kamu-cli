@@ -10,6 +10,8 @@
 use chrono::{DateTime, Utc};
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 
+use super::helpers as resource_helpers;
+use crate::LoggedInGuard;
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +25,56 @@ pub struct Resources;
 impl Resources {
     const DEFAULT_PER_PAGE: usize = 15;
 
+    /// Returns a resource by selector, if found
+    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?selector))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resource(
+        &self,
+        ctx: &Context<'_>,
+        selector: ResourceSelectorInput,
+    ) -> Result<Option<Resource>> {
+        resource_helpers::get_resource(ctx, selector, None /* current subject */).await
+    }
+
+    /// Returns resources of the specified kind
+    #[tracing::instrument(level = "info", name = Resources_list_by_kind, skip_all, fields(?kind, ?page, ?per_page))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn list_by_kind(
+        &self,
+        ctx: &Context<'_>,
+        kind: ResourceKindInput,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_resources_connection(
+            ctx, kind, None, /* current subject */
+            page, per_page,
+        )
+        .await
+    }
+
+    /// Returns resources across all kinds
+    #[tracing::instrument(level = "info", name = Resources_list_all, skip_all, fields(?page, ?per_page))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn list_all(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_all_resources_connection(
+            ctx, None, /* current subject */
+            page, per_page,
+        )
+        .await
+    }
+
     /// Validates a resource manifest without applying it
     #[tracing::instrument(level = "info", name = Resources_validate_manifest, skip_all)]
     async fn validate_manifest(
@@ -35,54 +87,9 @@ impl Resources {
         todo!("Resources.validate_manifest is not implemented yet");
     }
 
-    /// Returns a resource by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?selector))]
-    async fn resource(
-        &self,
-        ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
-    ) -> Result<Option<Resource>> {
-        let _ = (ctx, selector);
-        todo!("Resources.resource is not implemented yet");
-    }
-
-    /// Returns resources of the specified kind
-    #[tracing::instrument(level = "info", name = Resources_list_by_kind, skip_all, fields(?kind, ?account_id, ?page, ?per_page))]
-    async fn list_by_kind(
-        &self,
-        ctx: &Context<'_>,
-        kind: ResourceKindInput,
-        account_id: Option<AccountID<'_>>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<ResourceConnection> {
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-
-        let _prototype_connection = ResourceConnection::new(vec![], page, per_page, 0);
-        let _ = (ctx, kind, account_id, page, per_page);
-        todo!("Resources.list_by_kind is not implemented yet");
-    }
-
-    /// Returns resources across all kinds
-    #[tracing::instrument(level = "info", name = Resources_list_all, skip_all, fields(?account_id, ?page, ?per_page))]
-    async fn list_all(
-        &self,
-        ctx: &Context<'_>,
-        account_id: Option<AccountID<'_>>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<ResourceConnection> {
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-
-        let _prototype_connection = ResourceConnection::new(vec![], page, per_page, 0);
-        let _ = (ctx, account_id, page, per_page);
-        todo!("Resources.list_all is not implemented yet");
-    }
-
     /// Renders a canonical manifest representation from a stored resource
     #[tracing::instrument(level = "info", name = Resources_render_manifest, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn render_manifest(
         &self,
         ctx: &Context<'_>,
@@ -147,6 +154,15 @@ pub enum ResourceRefInput {
     ByName(ResourceByNameSelectorInput),
 }
 
+impl From<ResourceRefInput> for kamu_resources_facade::GetResourceRef {
+    fn from(value: ResourceRefInput) -> Self {
+        match value {
+            ResourceRefInput::ById(uid) => Self::ById(uid.into()),
+            ResourceRefInput::ByName(by_name) => Self::ByName(by_name.name.clone()),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
@@ -183,6 +199,7 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(dead_code)]
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceValidateManifestResult {
     pub valid: bool,
@@ -193,6 +210,7 @@ pub struct ResourceValidateManifestResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(dead_code)]
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceValidationIssue {
     pub severity: ResourceValidationIssueSeverity,

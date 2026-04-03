@@ -85,12 +85,9 @@ impl ResourceAccountResolverImpl {
 
         match (&selector.id, &selector.name) {
             (Some(id), maybe_name) => {
-                let account_id = odf::AccountID::from_did_str(id)
-                    .or_else(|_| odf::AccountID::parse_id_without_did_prefix(id))
-                    .map_err(ResolveManifestAccountError::InvalidAccountId)?;
                 let account = self
                     .account_service
-                    .get_account_by_id(&account_id)
+                    .get_account_by_id(id)
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 

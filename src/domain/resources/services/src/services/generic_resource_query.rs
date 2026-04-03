@@ -12,20 +12,75 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::domain::{AllResourcesQueryService, ResourceRepository, ResourceSnapshot};
+use crate::domain::{
+    FindOwnedResourceError,
+    GenericResourceQueryService,
+    ResourceNotOwnedByAccountError,
+    ResourceRawEventQuery,
+    ResourceRepository,
+    ResourceSnapshot,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn AllResourcesQueryService)]
-pub struct AllResourcesQueryServiceImpl {
+#[dill::interface(dyn GenericResourceQueryService)]
+pub struct GenericResourceQueryServiceImpl {
     resource_repository: Arc<dyn ResourceRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AllResourcesQueryService for AllResourcesQueryServiceImpl {
+impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
+    async fn allocate_uid(&self) -> Result<crate::domain::ResourceUID, InternalError> {
+        self.resource_repository.new_resource_uid().await
+    }
+
+    async fn find_resource_uid_by_name(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        name: &crate::domain::ResourceName,
+    ) -> Result<Option<crate::domain::ResourceUID>, InternalError> {
+        self.resource_repository
+            .find_resource_uid_by_name(account_id, kind, name)
+            .await
+    }
+
+    async fn find_owned_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        uid: crate::domain::ResourceUID,
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
+        let query = ResourceRawEventQuery {
+            kind: kind.to_string(),
+            uid,
+        };
+
+        let Some(resource_snapshot) = self
+            .resource_repository
+            .find_resource_snapshot(&query)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        if resource_snapshot.metadata.account != *account_id {
+            return Err(odf::AccessError::Unauthorized(
+                ResourceNotOwnedByAccountError {
+                    uid: resource_snapshot.uid,
+                    resource_type: kind,
+                }
+                .into(),
+            )
+            .into());
+        }
+
+        Ok(Some(resource_snapshot))
+    }
+
     async fn get_snapshot_by_uid(
         &self,
         uid: &crate::domain::ResourceUID,

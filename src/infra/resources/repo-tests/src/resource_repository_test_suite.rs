@@ -113,7 +113,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
     // find by name
     let found_id = repo
-        .find_resource_uid_by_name(account_id.clone(), "TestKind", &"my-resource".to_string())
+        .find_resource_uid_by_name(&account_id, "TestKind", &"my-resource".to_string())
         .await
         .unwrap();
     assert_eq!(found_id, Some(uid));
@@ -467,7 +467,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert!(by_query.is_none());
 
     let by_name = repo
-        .find_resource_uid_by_name(account_id.clone(), "TestKind", &"to-delete".to_string())
+        .find_resource_uid_by_name(&account_id, "TestKind", &"to-delete".to_string())
         .await
         .unwrap();
     assert!(by_name.is_none());

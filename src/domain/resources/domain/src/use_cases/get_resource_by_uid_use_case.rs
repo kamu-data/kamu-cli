@@ -11,9 +11,9 @@ use internal_error::InternalError;
 
 use crate::{
     DeclarativeResource,
-    ResourceNotFoundError,
     ResourceTypeMismatchError,
     ResourceUID,
+    ResourceUIDNotFoundError,
     TypedResourceQueryError,
 };
 
@@ -33,7 +33,7 @@ pub trait GetResourceByUidUseCase<R: DeclarativeResource>: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 pub enum GetResourceByUidError {
     #[error(transparent)]
-    NotFound(#[from] ResourceNotFoundError),
+    NotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),

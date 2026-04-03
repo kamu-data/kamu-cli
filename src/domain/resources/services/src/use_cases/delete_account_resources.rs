@@ -13,8 +13,8 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
-    AllResourcesQueryService,
     DeleteAccountResourcesUseCase,
+    GenericResourceQueryService,
     ResourceCrudDispatcherDeleteRequest,
     ResourceSnapshot,
     ResourceUID,
@@ -44,7 +44,7 @@ enum DeleteAccountResourceDispatchError {
 #[dill::interface(dyn DeleteAccountResourcesUseCase)]
 pub struct DeleteAccountResourcesUsecaseImpl {
     catalog: dill::Catalog,
-    all_resources_query_service: Arc<dyn AllResourcesQueryService>,
+    generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
 }
 
 impl DeleteAccountResourcesUsecaseImpl {
@@ -57,7 +57,7 @@ impl DeleteAccountResourcesUsecaseImpl {
 
         loop {
             let page = self
-                .all_resources_query_service
+                .generic_resource_query_service
                 .list_all_snapshots(
                     account_id.clone(),
                     PaginationOpts {

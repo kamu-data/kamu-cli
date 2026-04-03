@@ -18,6 +18,7 @@ pub struct ResourcesMut;
 #[Object]
 impl ResourcesMut {
     #[tracing::instrument(level = "info", name = ResourcesMut_apply_manifest, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn apply_manifest(
         &self,
         ctx: &Context<'_>,
@@ -30,6 +31,7 @@ impl ResourcesMut {
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
         &self,
         ctx: &Context<'_>,

@@ -48,9 +48,6 @@ pub enum ResolveManifestAccountError {
     EmptySelector,
 
     #[error(transparent)]
-    InvalidAccountId(odf::metadata::AccountIdParseStrError),
-
-    #[error(transparent)]
     AccountNotFoundById(kamu_accounts::AccountNotFoundByIdError),
 
     #[error(transparent)]

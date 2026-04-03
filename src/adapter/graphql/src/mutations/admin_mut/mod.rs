@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod admin_mut;
-mod admin_resources_mut;
 mod admin_search_mut;
 
 pub(crate) use admin_mut::*;
-pub(crate) use admin_resources_mut::*;
 pub(crate) use admin_search_mut::*;

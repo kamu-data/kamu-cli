@@ -3867,21 +3867,21 @@ enum ResourceValidationIssueSeverity {
 
 type Resources {
 	"""
-	Validates a resource manifest without applying it
-	"""
-	validateManifest(manifest: String!, format: ResourceManifestFormat!): ResourceValidateManifestResult!
-	"""
 	Returns a resource by selector, if found
 	"""
 	resource(selector: ResourceSelectorInput!): Resource
 	"""
 	Returns resources of the specified kind
 	"""
-	listByKind(kind: ResourceKindInput!, accountId: AccountID, page: Int, perPage: Int): ResourceConnection!
+	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
 	"""
 	Returns resources across all kinds
 	"""
-	listAll(accountId: AccountID, page: Int, perPage: Int): ResourceConnection!
+	listAll(page: Int, perPage: Int): ResourceConnection!
+	"""
+	Validates a resource manifest without applying it
+	"""
+	validateManifest(manifest: String!, format: ResourceManifestFormat!): ResourceValidateManifestResult!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""

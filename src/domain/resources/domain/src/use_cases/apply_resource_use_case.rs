@@ -14,11 +14,11 @@ use crate::{
     DeclarativeResource,
     ReconcilableEventSourcedResource,
     ResourceLoadError,
-    ResourceNotFoundError,
     ResourcePersistenceError,
     ResourceSnapshot,
     ResourceTypeMismatchError,
     ResourceUID,
+    ResourceUIDNotFoundError,
     TypedResourceQueryError,
 };
 
@@ -65,7 +65,7 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
-    ResourceIdNotFound(#[from] ResourceNotFoundError),
+    ResourceUIDNotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
     ResourceTypeMismatch(#[from] ResourceTypeMismatchError),
@@ -125,7 +125,7 @@ where
 {
     fn from(err: TypedResourceQueryError) -> Self {
         match err {
-            TypedResourceQueryError::NotFound(err) => Self::ResourceIdNotFound(err),
+            TypedResourceQueryError::NotFound(err) => Self::ResourceUIDNotFound(err),
             TypedResourceQueryError::TypeMismatch(err) => Self::ResourceTypeMismatch(err),
             TypedResourceQueryError::Internal(err) => Self::Internal(err),
         }

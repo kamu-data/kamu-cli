@@ -91,7 +91,7 @@ macro_rules! declare_resource_crud_dispatcher {
             async fn list(
                 &self,
                 request: $crate::ResourceCrudDispatcherListRequest,
-            ) -> Result<Vec<kamu_resources::ResourceSummaryView>, $crate::ListResourcesCrudDispatcherError> {
+            ) -> Result<Vec<kamu_resources::ResourceSummaryView>, internal_error::InternalError> {
                 let states = self
                     .list_resources_by_kind_use_case
                     .execute(request.account_id, request.pagination)

@@ -10,12 +10,28 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::ResourceSnapshot;
+use crate::{ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait AllResourcesQueryService: Send + Sync {
+pub trait GenericResourceQueryService: Send + Sync {
+    async fn allocate_uid(&self) -> Result<ResourceUID, InternalError>;
+
+    async fn find_resource_uid_by_name(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        name: &crate::ResourceName,
+    ) -> Result<Option<crate::ResourceUID>, InternalError>;
+
+    async fn find_owned_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        uid: ResourceUID,
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
+
     async fn get_snapshot_by_uid(
         &self,
         uid: &crate::ResourceUID,
@@ -31,6 +47,21 @@ pub trait AllResourcesQueryService: Send + Sync {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum FindOwnedResourceError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] internal_error::InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

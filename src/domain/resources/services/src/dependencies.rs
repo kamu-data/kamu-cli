@@ -14,7 +14,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<AllResourcesQueryServiceImpl>();
+    catalog_builder.add::<GenericResourceQueryServiceImpl>();
     catalog_builder.add::<DeleteAccountResourcesUsecaseImpl>();
     catalog_builder.add::<ListAllResourcesUseCaseImpl>();
     catalog_builder.add::<crate::message_handlers::AccountLifecycleMessageConsumer>();

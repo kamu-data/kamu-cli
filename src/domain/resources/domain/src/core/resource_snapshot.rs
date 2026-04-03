@@ -13,7 +13,13 @@ use internal_error::{InternalError, ResultIntoInternal};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::{PendingStatusFromSpec, ResourceMetadata, ResourceStatusLike, ResourceUID};
+use crate::{
+    PendingStatusFromSpec,
+    ResourceMetadata,
+    ResourceStatus,
+    ResourceStatusLike,
+    ResourceUID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,6 +35,14 @@ pub struct ResourceSnapshot {
 
     pub last_reconciled_at: Option<DateTime<Utc>>,
     pub last_event_id: Option<EventID>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceSnapshot {
+    pub fn basic_status(&self) -> Option<ResourceStatus> {
+        self.status.as_ref().and_then(ResourceStatus::from_json)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

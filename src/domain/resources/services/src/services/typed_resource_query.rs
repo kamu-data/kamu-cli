@@ -13,22 +13,19 @@ use tokio_stream::StreamExt;
 
 use crate::domain::{
     DeclarativeResource,
-    FindOwnedResourceError,
     ResourceDescriptorProvider,
-    ResourceMetadataInput,
-    ResourceNotFoundError,
-    ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceTypeMismatchError,
     ResourceUID,
+    ResourceUIDNotFoundError,
     TypedResourceQueryError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResourceQueryServiceHelper<'a, R>
+pub struct TypedResourceQueryServiceHelper<'a, R>
 where
     R: ResourceDescriptorProvider,
 {
@@ -36,7 +33,7 @@ where
     _marker: std::marker::PhantomData<R>,
 }
 
-impl<'a, R> ResourceQueryServiceHelper<'a, R>
+impl<'a, R> TypedResourceQueryServiceHelper<'a, R>
 where
     R: ResourceDescriptorProvider,
 {
@@ -55,7 +52,7 @@ where
             .resource_repository
             .find_resource_snapshot_by_uid(uid)
             .await?
-            .ok_or(ResourceNotFoundError(*uid))?;
+            .ok_or(ResourceUIDNotFoundError(*uid))?;
 
         if snapshot.kind != R::DESCRIPTOR.resource_type
             || snapshot.api_version != R::DESCRIPTOR.api_version
@@ -73,48 +70,6 @@ where
         Ok(snapshot)
     }
 
-    pub async fn find_existing_id_by_name(
-        &self,
-        uid: Option<ResourceUID>,
-        metadata: &ResourceMetadataInput,
-    ) -> Result<Option<ResourceUID>, InternalError> {
-        match uid {
-            Some(uid) => Ok(Some(uid)),
-            None => {
-                self.resource_repository
-                    .find_resource_uid_by_name(
-                        metadata.account.clone(),
-                        R::DESCRIPTOR.resource_type,
-                        &metadata.name,
-                    )
-                    .await
-            }
-        }
-    }
-
-    pub async fn find_owned_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        uid: ResourceUID,
-    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
-        let Some(resource_snapshot) = self.get_snapshot_by_query(&uid).await? else {
-            return Ok(None);
-        };
-
-        if resource_snapshot.metadata.account != *account_id {
-            return Err(odf::AccessError::Unauthorized(
-                ResourceNotOwnedByAccountError {
-                    uid: resource_snapshot.uid,
-                    resource_type: R::DESCRIPTOR.resource_type,
-                }
-                .into(),
-            )
-            .into());
-        }
-
-        Ok(Some(resource_snapshot))
-    }
-
     async fn get_snapshot_by_query(
         &self,
         uid: &ResourceUID,
@@ -130,7 +85,7 @@ where
     }
 }
 
-impl<R> ResourceQueryServiceHelper<'_, R>
+impl<R> TypedResourceQueryServiceHelper<'_, R>
 where
     R: DeclarativeResource + ResourceDescriptorProvider,
 {
@@ -140,11 +95,11 @@ where
         uid: &ResourceUID,
     ) -> Result<R::ResourceState, TypedResourceQueryError> {
         let Some(resource_snapshot) = self.get_snapshot_by_query(uid).await? else {
-            return Err(ResourceNotFoundError(*uid).into());
+            return Err(ResourceUIDNotFoundError(*uid).into());
         };
 
         if resource_snapshot.metadata.account != account_id {
-            return Err(ResourceNotFoundError(*uid).into());
+            return Err(ResourceUIDNotFoundError(*uid).into());
         }
 
         if resource_snapshot.kind != R::DESCRIPTOR.resource_type
@@ -196,61 +151,28 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! declare_resource_query_service {
+macro_rules! declare_typed_resource_query_service {
     (
         service = $service:ident,
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn kamu_resources::ResourceQueryService<$resource>)]
+        #[dill::interface(dyn kamu_resources::TypedResourceQueryService<$resource>)]
         pub struct $service {
             resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::ResourceQueryService<$resource> for $service {
-            async fn allocate_uid(
-                &self,
-            ) -> Result<kamu_resources::ResourceUID, internal_error::InternalError> {
-                self.resource_repository.new_resource_uid().await
-            }
-
-            async fn find_existing_id_by_name(
-                &self,
-                uid: Option<kamu_resources::ResourceUID>,
-                metadata: &kamu_resources::ResourceMetadataInput,
-            ) -> Result<Option<kamu_resources::ResourceUID>, internal_error::InternalError> {
-                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                );
-
-                helper.find_existing_id_by_name(uid, metadata).await
-            }
-
+        impl kamu_resources::TypedResourceQueryService<$resource> for $service {
             async fn ensure_resource_uid_matches_type(
                 &self,
                 uid: &kamu_resources::ResourceUID,
             ) -> Result<(), kamu_resources::TypedResourceQueryError> {
-                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
+                let helper = $crate::TypedResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
 
                 helper.load_snapshot_by_uid(uid).await.map(|_| ())
-            }
-
-            async fn find_owned_snapshot(
-                &self,
-                account_id: &odf::AccountID,
-                uid: kamu_resources::ResourceUID,
-            ) -> Result<
-                Option<kamu_resources::ResourceSnapshot>,
-                kamu_resources::FindOwnedResourceError,
-            > {
-                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                );
-
-                helper.find_owned_snapshot(account_id, uid).await
             }
 
             async fn get_state_by_uid(
@@ -261,7 +183,7 @@ macro_rules! declare_resource_query_service {
                 <$resource as kamu_resources::DeclarativeResource>::ResourceState,
                 kamu_resources::TypedResourceQueryError,
             > {
-                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
+                let helper = $crate::TypedResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
 
@@ -276,7 +198,7 @@ macro_rules! declare_resource_query_service {
                 Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
             > {
-                let helper = $crate::ResourceQueryServiceHelper::<$resource>::new(
+                let helper = $crate::TypedResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
 

@@ -77,7 +77,7 @@ impl InMemory<Repo>Harness {
 - GraphQL schema is code-first in `kamu-adapter-graphql`; never edit `resources/schema.gql` by hand.
 - Add new API surface through grouped root objects in `src/adapter/graphql/src/root.rs`, with query and mutation modules following the existing crate structure.
 - For schema-only prototypes explicitly requested by the user, resolver bodies may be left as `todo!()`.
-- Regenerate the schema with the existing test / `make codegen-graphql-schema`.
+- Regenerate the schema with the existing test: `cargo nextest run -E 'test(update_graphql_schema)`.
 
 
 ## Design Notes

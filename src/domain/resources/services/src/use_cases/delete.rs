@@ -14,13 +14,13 @@ use time_source::SystemTimeSource;
 use crate::domain::{
     DeclarativeResource,
     DeleteResourcesError,
+    GenericResourceQueryService,
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
     ResourcePersistenceError,
     ResourcePersistenceService,
-    ResourceQueryService,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceUID,
@@ -32,7 +32,7 @@ pub struct DeleteResourcesUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
 {
-    resource_query_service: &'a dyn ResourceQueryService<R>,
+    generic_resource_query_service: &'a dyn GenericResourceQueryService,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     time_source: &'a dyn SystemTimeSource,
@@ -47,13 +47,13 @@ where
     R::Status: Serialize + ResourceStatusLike,
 {
     pub fn new(
-        resource_query_service: &'a dyn ResourceQueryService<R>,
+        generic_resource_query_service: &'a dyn GenericResourceQueryService,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
-            resource_query_service,
+            generic_resource_query_service,
             resource_aggregate_loader,
             resource_persistence_service,
             time_source,
@@ -103,8 +103,8 @@ where
         account_id: &odf::AccountID,
         uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, DeleteResourcesError> {
-        self.resource_query_service
-            .find_owned_snapshot(account_id, uid)
+        self.generic_resource_query_service
+            .find_owned_snapshot(account_id, R::DESCRIPTOR.resource_type, uid)
             .await
             .map_err(DeleteResourcesError::from)
     }
@@ -137,8 +137,8 @@ macro_rules! declare_delete_resources_use_case {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::DeleteResourcesUseCase<$resource>)]
         pub struct $use_case {
-            resource_query_service:
-                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
+            generic_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
             resource_aggregate_loader:
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
@@ -154,7 +154,7 @@ macro_rules! declare_delete_resources_use_case {
                 uids: Vec<kamu_resources::ResourceUID>,
             ) -> Result<(), kamu_resources::DeleteResourcesError> {
                 let helper = $crate::DeleteResourcesUseCaseHelper::<$resource>::new(
-                    self.resource_query_service.as_ref(),
+                    self.generic_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
                     self.time_source.as_ref(),

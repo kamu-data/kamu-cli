@@ -10,8 +10,8 @@
 use crate::domain::{
     GetResourceByUidError,
     ReconcilableEventSourcedResource,
-    ResourceQueryService,
     ResourceUID,
+    TypedResourceQueryService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,16 +20,16 @@ pub struct GetResourceByUidUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    resource_query_service: &'a dyn ResourceQueryService<R>,
+    typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
 }
 
 impl<'a, R> GetResourceByUidUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    pub fn new(resource_query_service: &'a dyn ResourceQueryService<R>) -> Self {
+    pub fn new(typed_resource_query_service: &'a dyn TypedResourceQueryService<R>) -> Self {
         Self {
-            resource_query_service,
+            typed_resource_query_service,
         }
     }
 
@@ -38,7 +38,7 @@ where
         account_id: odf::AccountID,
         uid: &ResourceUID,
     ) -> Result<R::ResourceState, GetResourceByUidError> {
-        self.resource_query_service
+        self.typed_resource_query_service
             .get_state_by_uid(account_id, uid)
             .await
             .map_err(GetResourceByUidError::from)
@@ -56,8 +56,8 @@ macro_rules! declare_get_resource_by_uid_use_case {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::GetResourceByUidUseCase<$resource>)]
         pub struct $use_case {
-            resource_query_service:
-                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
+            typed_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::TypedResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
@@ -71,7 +71,7 @@ macro_rules! declare_get_resource_by_uid_use_case {
                 kamu_resources::GetResourceByUidError,
             > {
                 let helper = $crate::GetResourceByUidUseCaseHelper::<$resource>::new(
-                    self.resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
                 );
 
                 helper.execute(account_id, uid).await

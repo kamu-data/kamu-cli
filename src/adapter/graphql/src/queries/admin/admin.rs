@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::AdminGuard;
 use crate::prelude::*;
 use crate::queries::AdminResources;
+use crate::{AdminGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,10 +23,15 @@ impl Admin {
         Ok("OK".to_string())
     }
 
-    #[allow(clippy::unused_async)]
     #[graphql(guard = "AdminGuard::new()")]
-    async fn resources(&self, account_id: AccountID<'_>) -> AdminResources {
-        AdminResources::new(account_id)
+    async fn resources(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID<'_>,
+    ) -> Result<AdminResources> {
+        Ok(AdminResources::from_account(
+            utils::get_account_by_id(ctx, &account_id).await?,
+        ))
     }
 }
 

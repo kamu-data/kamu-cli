@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 
-use crate::domain::{ReconcilableEventSourcedResource, ResourceQueryService};
+use crate::domain::{ReconcilableEventSourcedResource, TypedResourceQueryService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,16 +17,16 @@ pub struct ListResourcesByKindUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    resource_query_service: &'a dyn ResourceQueryService<R>,
+    typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
 }
 
 impl<'a, R> ListResourcesByKindUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    pub fn new(resource_query_service: &'a dyn ResourceQueryService<R>) -> Self {
+    pub fn new(typed_resource_query_service: &'a dyn TypedResourceQueryService<R>) -> Self {
         Self {
-            resource_query_service,
+            typed_resource_query_service,
         }
     }
 
@@ -35,7 +35,7 @@ where
         account_id: odf::AccountID,
         pagination: PaginationOpts,
     ) -> Result<Vec<R::ResourceState>, internal_error::InternalError> {
-        self.resource_query_service
+        self.typed_resource_query_service
             .list_states_by_kind(account_id, pagination)
             .await
     }
@@ -52,8 +52,8 @@ macro_rules! declare_list_resources_by_kind_use_case {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ListResourcesByKindUseCase<$resource>)]
         pub struct $use_case {
-            resource_query_service:
-                std::sync::Arc<dyn kamu_resources::ResourceQueryService<$resource>>,
+            typed_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::TypedResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
@@ -67,7 +67,7 @@ macro_rules! declare_list_resources_by_kind_use_case {
                 internal_error::InternalError,
             > {
                 let helper = $crate::ListResourcesByKindUseCaseHelper::<$resource>::new(
-                    self.resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
                 );
 
                 helper.execute(account_id, pagination).await

@@ -11,18 +11,20 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use kamu_resources::{
-    AllResourcesQueryService,
     ApplyManifestResult,
+    GenericResourceQueryService,
+    ResourceAPIVersionMismatchError,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
     ResourceManifest,
     ResourceMetadataInput,
-    ResourceNotFoundError,
+    ResourceNameNotFoundError,
     ResourceSnapshot,
     ResourceSummaryView,
     ResourceUID,
+    ResourceUIDNotFoundError,
     ResourceView,
 };
 use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_dispatcher_by_kind};
@@ -33,7 +35,10 @@ use crate::{
     DeleteResourcesError,
     DeleteResourcesRequest,
     GetResourceError,
+    GetResourceRef,
     GetResourceRequest,
+    ListAllResourcesError,
+    ListAllResourcesRequest,
     ListResourcesError,
     ListResourcesRequest,
     ParseResourceManifestError,
@@ -51,7 +56,7 @@ use crate::{
 pub struct ResourceFacadeImpl {
     catalog: dill::Catalog,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
-    all_resources_query_service: Arc<dyn AllResourcesQueryService>,
+    generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,9 +104,23 @@ impl ResourceFacade for ResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let snapshot = self
-            .resolve_snapshot_for_kind(&request.kind, &target_account.id, &request.uid)
+        let uid = self
+            .resolve_resource_uid(&request.kind, &target_account.id, &request.resource_ref)
             .await?;
+
+        let snapshot = self
+            .resolve_snapshot_for_kind(&request.kind, &target_account.id, &uid)
+            .await?;
+
+        if let Some(expected_api_version) = request.api_version.as_ref()
+            && snapshot.api_version != *expected_api_version
+        {
+            return Err(ResourceAPIVersionMismatchError {
+                expected_api_version: expected_api_version.clone(),
+                actual_api_version: snapshot.api_version,
+            }
+            .into());
+        }
 
         let dispatcher = get_resource_crud_dispatcher::<GetResourceError>(
             &self.catalog,
@@ -112,7 +131,7 @@ impl ResourceFacade for ResourceFacadeImpl {
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
                 account_id: target_account.id.clone(),
-                uid: request.uid,
+                uid,
             })
             .await?;
 
@@ -145,6 +164,23 @@ impl ResourceFacade for ResourceFacadeImpl {
             .map_err(Into::into)
     }
 
+    async fn list_all(
+        &self,
+        request: ListAllResourcesRequest,
+    ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        let snapshots = self
+            .generic_resource_query_service
+            .list_all_snapshots(target_account.id.clone(), request.pagination)
+            .await?;
+
+        Ok(snapshots.into_iter().map(Into::into).collect())
+    }
+
     async fn delete(&self, request: DeleteResourcesRequest) -> Result<(), DeleteResourcesError> {
         let target_account = self
             .resource_account_resolver
@@ -152,7 +188,7 @@ impl ResourceFacade for ResourceFacadeImpl {
             .await?;
 
         let snapshots = self
-            .all_resources_query_service
+            .generic_resource_query_service
             .get_snapshots_by_uids(&request.uids)
             .await?;
 
@@ -191,6 +227,28 @@ impl ResourceFacade for ResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceFacadeImpl {
+    async fn resolve_resource_uid(
+        &self,
+        kind: &str,
+        account_id: &odf::AccountID,
+        resource_ref: &GetResourceRef,
+    ) -> Result<ResourceUID, GetResourceError> {
+        match resource_ref {
+            GetResourceRef::ById(uid) => Ok(*uid),
+            GetResourceRef::ByName(name) => self
+                .generic_resource_query_service
+                .find_resource_uid_by_name(account_id, kind, name)
+                .await?
+                .ok_or_else(|| {
+                    ResourceNameNotFoundError {
+                        kind: kind.to_string(),
+                        name: name.clone(),
+                    }
+                    .into()
+                }),
+        }
+    }
+
     fn parse_manifest(
         &self,
         format: ResourceManifestFormat,
@@ -232,11 +290,11 @@ impl ResourceFacadeImpl {
         uid: &ResourceUID,
     ) -> Result<ResourceSnapshot, GetResourceError> {
         let Some(snapshot) = self
-            .all_resources_query_service
+            .generic_resource_query_service
             .get_snapshot_by_uid(uid)
             .await?
         else {
-            return Err(ResourceNotFoundError(*uid).into());
+            return Err(ResourceUIDNotFoundError(*uid).into());
         };
 
         if snapshot.kind != kind {
@@ -249,7 +307,7 @@ impl ResourceFacadeImpl {
         }
 
         if snapshot.metadata.account != *account_id {
-            return Err(ResourceNotFoundError(*uid).into());
+            return Err(ResourceUIDNotFoundError(*uid).into());
         }
 
         Ok(snapshot)
@@ -263,7 +321,7 @@ impl ResourceFacadeImpl {
         maybe_snapshot: Option<ResourceSnapshot>,
     ) -> Result<ResourceSnapshot, DeleteResourcesError> {
         let Some(snapshot) = maybe_snapshot else {
-            return Err(ResourceNotFoundError(uid).into());
+            return Err(ResourceUIDNotFoundError(uid).into());
         };
 
         if snapshot.kind != kind {
@@ -276,7 +334,7 @@ impl ResourceFacadeImpl {
         }
 
         if snapshot.metadata.account != *account_id {
-            return Err(ResourceNotFoundError(uid).into());
+            return Err(ResourceUIDNotFoundError(uid).into());
         }
 
         Ok(snapshot)

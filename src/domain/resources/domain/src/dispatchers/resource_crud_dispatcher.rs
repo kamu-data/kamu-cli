@@ -19,10 +19,10 @@ use crate::{
     GetResourceByUidError,
     ResourceDuplicateError,
     ResourceMetadataInput,
-    ResourceNotFoundError,
     ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceUID,
+    ResourceUIDNotFoundError,
     ResourceView,
 };
 
@@ -43,7 +43,7 @@ pub trait ResourceCrudDispatcher: Send + Sync {
     async fn list(
         &self,
         request: ResourceCrudDispatcherListRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListResourcesCrudDispatcherError>;
+    ) -> Result<Vec<ResourceSummaryView>, InternalError>;
 
     async fn delete(
         &self,
@@ -96,7 +96,7 @@ pub enum ApplyResourceCrudDispatcherError {
     },
 
     #[error(transparent)]
-    NotFound(#[from] ResourceNotFoundError),
+    NotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),
@@ -119,19 +119,11 @@ pub enum ApplyResourceCrudDispatcherError {
 #[derive(Debug, Error)]
 pub enum GetResourceCrudDispatcherError {
     #[error(transparent)]
-    NotFound(#[from] ResourceNotFoundError),
+    NotFound(#[from] ResourceUIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),
 
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListResourcesCrudDispatcherError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -188,7 +180,7 @@ where
             ApplyResourceUseCaseError::LoadFailed(err) => {
                 Self::Internal(format!("{err}").int_err())
             }
-            ApplyResourceUseCaseError::ResourceIdNotFound(err) => Self::NotFound(err),
+            ApplyResourceUseCaseError::ResourceUIDNotFound(err) => Self::NotFound(err),
             ApplyResourceUseCaseError::ResourceTypeMismatch(err) => Self::TypeMismatch(err),
             ApplyResourceUseCaseError::Duplicate(err) => Self::Duplicate(err),
             ApplyResourceUseCaseError::ConcurrentModification(err) => {
