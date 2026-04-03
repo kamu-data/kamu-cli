@@ -17,7 +17,7 @@ use kamu_configuration::{
     VariableSetSpec,
     VariableSpec,
 };
-use kamu_resources::ResourceUID;
+use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,10 +36,8 @@ fn make_entry(key: &str, value: &str) -> VariableSetEntry {
 async fn make_variable_set_resource(catalog: &Catalog) -> ResourceUID {
     use std::collections::BTreeMap;
 
-    use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot};
-
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let variable_set_id = uuid::Uuid::new_v4();
+    let variable_set_id = ResourceUID::new(uuid::Uuid::new_v4());
     let now = Utc::now();
 
     repo.create_resource(&ResourceSnapshot {

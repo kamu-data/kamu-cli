@@ -15,6 +15,8 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
+    ResourceDuplicateError,
+    ResourceMetadata,
     ResourceName,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -39,7 +41,7 @@ pub struct SqliteResourceRepository {
 #[async_trait::async_trait]
 impl ResourceRepository for SqliteResourceRepository {
     async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError> {
-        Ok(ResourceUID::new_v4())
+        Ok(ResourceUID::new(uuid::Uuid::new_v4()))
     }
 
     async fn create_resource(
@@ -55,6 +57,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let annotations = serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap();
         let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
+        let resource_uid: &uuid::Uuid = resource_snapshot.uid.as_ref();
 
         sqlx::query!(
             r#"
@@ -78,7 +81,7 @@ impl ResourceRepository for SqliteResourceRepository {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
-            resource_snapshot.uid,
+            resource_uid,
             account_id_str,
             resource_snapshot.kind,
             resource_snapshot.api_version,
@@ -99,7 +102,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
-                CreateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
+                CreateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.metadata.account.clone(),
                     kind: resource_snapshot.kind.clone(),
                     name: resource_snapshot.metadata.name.clone(),
@@ -126,6 +129,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
+        let resource_uid: &uuid::Uuid = resource_snapshot.uid.as_ref();
 
         let update_result = sqlx::query!(
             r#"
@@ -150,7 +154,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     last_event_id IS NOT NULL AND CAST($15 as INT8) IS NOT NULL AND last_event_id = $15
               )
             "#,
-            resource_snapshot.uid,
+            resource_uid,
             account_id_str,
             resource_snapshot.api_version,
             resource_snapshot.metadata.name,
@@ -170,7 +174,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
-                UpdateResourceError::Duplicate(kamu_resources::ResourceDuplicateError {
+                UpdateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.metadata.account.clone(),
                     kind: resource_snapshot.kind.clone(),
                     name: resource_snapshot.metadata.name.clone(),
@@ -215,7 +219,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_resource_uid)
+        Ok(maybe_resource_uid.map(ResourceUID::new))
     }
 
     async fn find_resource_snapshot(
@@ -225,6 +229,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        let query_uid: &uuid::Uuid = query.uid.as_ref();
         let maybe_row = sqlx::query!(
             r#"
             SELECT
@@ -249,7 +254,7 @@ impl ResourceRepository for SqliteResourceRepository {
               AND resource_kind = $2
               AND deleted_at IS NULL
             "#,
-            query.uid,
+            query_uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -257,10 +262,10 @@ impl ResourceRepository for SqliteResourceRepository {
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            uid: row.uid,
+            uid: ResourceUID::new(row.uid),
             kind: row.resource_kind,
             api_version: row.api_version,
-            metadata: kamu_resources::ResourceMetadata {
+            metadata: ResourceMetadata {
                 account: row.account_id,
                 name: row.resource_name,
                 description: row.description,
@@ -285,6 +290,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        let resource_uid: &uuid::Uuid = uid.as_ref();
         let maybe_row = sqlx::query!(
             r#"
             SELECT
@@ -308,17 +314,17 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE resource_uid = $1
               AND deleted_at IS NULL
             "#,
-            uid,
+            resource_uid,
         )
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
-            uid: row.uid,
+            uid: ResourceUID::new(row.uid),
             kind: row.resource_kind,
             api_version: row.api_version,
-            metadata: kamu_resources::ResourceMetadata {
+            metadata: ResourceMetadata {
                 account: row.account_id,
                 name: row.resource_name,
                 description: row.description,
@@ -372,7 +378,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
-                yield Ok(row.uid);
+                yield Ok(ResourceUID::new(row.uid));
             }
         })
     }
@@ -430,10 +436,10 @@ impl ResourceRepository for SqliteResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    uid: row.uid,
+                    uid: ResourceUID::new(row.uid),
                     kind: row.resource_kind,
                     api_version: row.api_version,
-                    metadata: kamu_resources::ResourceMetadata {
+                    metadata: ResourceMetadata {
                         account: row.account_id,
                         name: row.resource_name,
                         description: row.description,
@@ -501,10 +507,10 @@ impl ResourceRepository for SqliteResourceRepository {
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
-                    uid: row.uid,
+                    uid: ResourceUID::new(row.uid),
                     kind: row.resource_kind,
                     api_version: row.api_version,
-                    metadata: kamu_resources::ResourceMetadata {
+                    metadata: ResourceMetadata {
                         account: row.account_id,
                         name: row.resource_name,
                         description: row.description,

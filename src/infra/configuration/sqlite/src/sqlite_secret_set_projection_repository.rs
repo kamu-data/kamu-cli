@@ -16,6 +16,7 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
 };
+use kamu_resources::ResourceUID;
 use uuid::Uuid;
 
 #[component]
@@ -30,13 +31,14 @@ pub struct SqliteSecretSetProjectionRepository {
 impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
     async fn replace_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
         entries: &[SecretSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
         let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
         for entry in entries {
             let account_id = entry.account_id.to_string();
@@ -81,13 +83,14 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
 
     async fn find_entry(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
         let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
         let row = sqlx::query_as!(
             SecretSetEntry,
@@ -117,12 +120,13 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
 
     async fn get_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
         let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
         let rows = sqlx::query_as!(
             SecretSetEntry,
@@ -151,12 +155,13 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
         let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
         sqlx::query!(
             r#"

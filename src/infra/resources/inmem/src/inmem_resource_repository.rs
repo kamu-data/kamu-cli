@@ -62,7 +62,7 @@ impl InMemoryResourceRepository {
 #[async_trait::async_trait]
 impl ResourceRepository for InMemoryResourceRepository {
     async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError> {
-        Ok(ResourceUID::new_v4())
+        Ok(ResourceUID::new(uuid::Uuid::new_v4()))
     }
 
     async fn create_resource(

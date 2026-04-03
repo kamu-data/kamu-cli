@@ -8,10 +8,27 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use nutype::nutype;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceUID = uuid::Uuid;
+#[nutype(derive(
+    Debug,
+    Display,
+    AsRef,
+    Copy,
+    Clone,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize
+))]
+pub struct ResourceUID(uuid::Uuid);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type ResourceUIDStream<'a> = std::pin::Pin<
     Box<dyn tokio_stream::Stream<Item = Result<ResourceUID, InternalError>> + Send + 'a>,

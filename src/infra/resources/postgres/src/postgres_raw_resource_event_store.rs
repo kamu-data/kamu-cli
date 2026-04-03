@@ -24,6 +24,7 @@ use kamu_resources::{
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +42,7 @@ impl PostgresRawResourceEventStore {
         events: &[ResourceRawEvent],
     ) -> Result<EventID, SaveEventsError> {
         let mut last_event_id = None;
+        let query_uid: &uuid::Uuid = query.uid.as_ref();
 
         for event in events {
             let inserted = sqlx::query_scalar!(
@@ -55,7 +57,7 @@ impl PostgresRawResourceEventStore {
                     VALUES ($1, $2, $3, $4, $5)
                     RETURNING event_id
                 "#,
-                query.uid,
+                query_uid,
                 query.kind,
                 event.event_time,
                 event.event_type,
@@ -76,6 +78,7 @@ impl PostgresRawResourceEventStore {
         connection_mut: &mut sqlx::PgConnection,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
+        let query_uid: &uuid::Uuid = query.uid.as_ref();
         let last_event_id = sqlx::query_scalar!(
             r#"
             SELECT event_id
@@ -85,7 +88,7 @@ impl PostgresRawResourceEventStore {
             ORDER BY event_id DESC
             LIMIT 1
             "#,
-            query.uid,
+            query_uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -148,7 +151,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -168,6 +171,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
+            let query_uid: &uuid::Uuid = key.uid.as_ref();
 
             let mut rows = sqlx::query!(
                 r#"
@@ -185,7 +189,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                   AND ($4::bigint IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
-                key.uid,
+                query_uid,
                 key.kind,
                 opts.from.map(EventID::into_inner),
                 opts.to.map(EventID::into_inner),
@@ -199,7 +203,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -302,7 +306,7 @@ impl ResourceRawEventStore for PostgresRawResourceEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,

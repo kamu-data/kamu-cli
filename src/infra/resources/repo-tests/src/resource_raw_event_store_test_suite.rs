@@ -20,13 +20,14 @@ use kamu_resources::{
     ResourceRawEventStore,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let id = uuid::Uuid::new_v4();
+    let id = ResourceUID::new(uuid::Uuid::new_v4());
     let now = Utc::now();
 
     let snapshot = ResourceSnapshot {

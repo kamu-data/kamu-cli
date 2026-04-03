@@ -25,6 +25,7 @@ use kamu_resources::{
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,6 +57,7 @@ impl SqliteResourceRawEventStore {
         events: &[ResourceRawEvent],
     ) -> Result<EventID, SaveEventsError> {
         let mut last_event_id = None;
+        let query_uid: &uuid::Uuid = query.uid.as_ref();
 
         for event in events {
             let inserted = sqlx::query_scalar!(
@@ -71,7 +73,7 @@ impl SqliteResourceRawEventStore {
 
                 RETURNING event_id
                 "#,
-                query.uid,
+                query_uid,
                 query.kind,
                 event.event_time,
                 event.event_type,
@@ -92,6 +94,7 @@ impl SqliteResourceRawEventStore {
         connection_mut: &mut sqlx::SqliteConnection,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
+        let query_uid: &uuid::Uuid = query.uid.as_ref();
         let last_event_id = sqlx::query_scalar!(
             r#"
             SELECT event_id
@@ -101,7 +104,7 @@ impl SqliteResourceRawEventStore {
             ORDER BY event_id DESC
             LIMIT 1
             "#,
-            query.uid,
+            query_uid,
             query.kind,
         )
         .fetch_optional(connection_mut)
@@ -168,7 +171,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -190,6 +193,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
             let connection_mut = tr.connection_mut().await?;
             let maybe_from_id = opts.from.map(EventID::into_inner);
             let maybe_to_id = opts.to.map(EventID::into_inner);
+            let query_uid: &uuid::Uuid = query.uid.as_ref();
 
             let mut rows = sqlx::query_as!(
                 EventRow,
@@ -208,7 +212,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                   AND ($4 IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
-                query.uid,
+                query_uid,
                 query.kind,
                 maybe_from_id,
                 maybe_to_id,
@@ -222,7 +226,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,
@@ -326,7 +330,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                     event_id,
                     query: ResourceRawEventQuery {
                         kind: row.kind,
-                        uid: row.uid,
+                        uid: ResourceUID::new(row.uid),
                     },
                     event_time: row.event_time,
                     event_type: row.event_type,

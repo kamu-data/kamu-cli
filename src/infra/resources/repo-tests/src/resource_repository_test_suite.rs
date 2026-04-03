@@ -20,6 +20,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceUID,
     UpdateResourceError,
 };
 
@@ -28,7 +29,7 @@ use kamu_resources::{
 fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> ResourceSnapshot {
     let now = Utc::now();
     ResourceSnapshot {
-        uid: uuid::Uuid::new_v4(),
+        uid: ResourceUID::new(uuid::Uuid::new_v4()),
         kind: kind.to_string(),
         api_version: "v1".to_string(),
         metadata: ResourceMetadata {
