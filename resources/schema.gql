@@ -498,7 +498,6 @@ type AdminResources {
 }
 
 type AdminResourcesMut {
-	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyResult!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
 }
 
