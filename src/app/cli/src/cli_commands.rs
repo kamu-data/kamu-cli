@@ -15,7 +15,7 @@ use crate::accounts::CurrentAccountIndication;
 use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
 use crate::config::ConfigScope;
-use crate::{WorkspaceService, accounts, cli, odf_server};
+use crate::{WorkspaceService, accounts, cli, odf_server, resource_context};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,6 +79,43 @@ pub fn get_command(
                 )
                 .cast(),
             ),
+        },
+
+        cli::Command::Ctx(c) => match c.subcommand {
+            Some(cli::CtxSubCommand::Add(sc)) => Box::new(
+                ContextAddCommand::builder(
+                    sc.name,
+                    sc.url.into(),
+                    if sc.user {
+                        resource_context::ResourceContextStoreScope::User
+                    } else {
+                        resource_context::ResourceContextStoreScope::Workspace
+                    },
+                )
+                .cast(),
+            ),
+            Some(cli::CtxSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
+            Some(cli::CtxSubCommand::Remove(sc)) => Box::new(
+                ContextRemoveCommand::builder(
+                    sc.name,
+                    if sc.user {
+                        resource_context::ResourceContextStoreScope::User
+                    } else {
+                        resource_context::ResourceContextStoreScope::Workspace
+                    },
+                )
+                .cast(),
+            ),
+            Some(cli::CtxSubCommand::Use(sc)) => {
+                Box::new(ContextUseCommand::builder(sc.name).cast())
+            }
+            None => {
+                if let Some(name) = c.name {
+                    Box::new(ContextUseCommand::builder(name).cast())
+                } else {
+                    Box::new(ContextCommand::builder().cast())
+                }
+            }
         },
 
         cli::Command::Delete(c) => Box::new(
@@ -491,7 +528,10 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         },
         // False for set_watermark option
         cli::Command::Pull(c) => c.set_watermark.is_some(),
-        cli::Command::Ui(_) | cli::Command::Login(_) | cli::Command::Push(_) => false,
+        cli::Command::Ctx(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Login(_)
+        | cli::Command::Push(_) => false,
         _ => true,
     }
 }
@@ -514,6 +554,7 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
+        | cli::Command::Ctx(_)
         | cli::Command::New(_)
         | cli::Command::Sql(_)
         | cli::Command::Version(_)
@@ -527,6 +568,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
+        | cli::Command::Ctx(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
         | cli::Command::Version(_) => false,

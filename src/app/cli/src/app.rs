@@ -60,6 +60,7 @@ use crate::{
     get_app_database_config,
     move_initial_database_to_workspace,
     odf_server,
+    resource_context,
     spawn_password_refreshing_job,
 };
 
@@ -561,6 +562,7 @@ pub fn configure_base_catalog(
     );
 
     odf_server::register_dependencies(&mut b, is_e2e_testing);
+    resource_context::register_dependencies(&mut b);
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 

@@ -15,6 +15,7 @@ pub use workspace::*;
 
 pub mod accounts;
 pub mod config;
+pub mod resource_context;
 
 mod confirm_delete_service;
 pub use confirm_delete_service::*;

@@ -99,6 +99,7 @@ pub enum Command {
     Complete(Complete),
     Completions(Completions),
     Config(Config),
+    Ctx(Ctx),
     Delete(Delete),
     Export(Export),
     Ingest(Ingest),
@@ -144,6 +145,169 @@ impl Cli {
             _ => None,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Manage resource contexts
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Contexts determine which workspace future resource commands will target.
+
+When running inside a workspace, an implicit local context named `local` is
+available automatically whenever no current context is selected. You can still
+select `local` explicitly. Remote contexts can be registered either in the
+workspace or in the user home scope.
+
+**Examples:**
+
+Show current context:
+
+    kamu ctx
+
+List configured contexts:
+
+    kamu ctx ls
+
+Switch to a context:
+
+    kamu ctx prod
+
+Switch back to the local workspace context:
+
+    kamu ctx local
+
+Register a workspace-scoped remote context:
+
+    kamu ctx add prod --url https://example.com
+
+Register a user-scoped remote context:
+
+    kamu ctx add prod --url https://example.com --user
+"#)]
+#[command(args_conflicts_with_subcommands = true)]
+pub struct Ctx {
+    #[command(subcommand)]
+    pub subcommand: Option<CtxSubCommand>,
+
+    /// Context name to switch to
+    #[arg()]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub enum CtxSubCommand {
+    Add(CtxAdd),
+    #[command(visible_alias = "ls")]
+    List(CtxList),
+    #[command(visible_alias = "rm")]
+    Remove(CtxRemove),
+    Use(CtxUse),
+}
+
+/// Register a new remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Registers a remote workspace context under a local name.
+
+By default the context is stored in the current workspace. Use `--user` to
+store it in the user home scope instead.
+
+The name `local` is reserved for the implicit workspace context and cannot be
+registered explicitly.
+
+**Examples:**
+
+Add a workspace-scoped remote context:
+
+    kamu ctx add prod --url https://example.com
+
+Add a user-scoped remote context:
+
+    kamu ctx add prod --url https://example.com --user
+"#)]
+pub struct CtxAdd {
+    /// Store context in the user home folder rather than in the workspace
+    #[arg(long)]
+    pub user: bool,
+
+    /// Backend URL of the remote workspace
+    #[arg(long, value_name = "URL")]
+    pub url: parsers::UrlHttps,
+
+    /// Context name
+    #[arg()]
+    pub name: String,
+}
+
+/// List configured resource contexts
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Lists effective resource contexts configured in the workspace and user scopes.
+
+When running inside a workspace, the implicit `local` context is also included.
+
+**Examples:**
+
+List contexts:
+
+    kamu ctx ls
+"#)]
+pub struct CtxList {}
+
+/// Remove a remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Removes a previously registered remote context from the selected scope.
+
+By default removal happens in the current workspace. Use `--user` to remove a
+user-scoped context instead.
+
+The name `local` is reserved and cannot be removed.
+
+**Examples:**
+
+Remove a workspace-scoped context:
+
+    kamu ctx rm prod
+
+Remove a user-scoped context:
+
+    kamu ctx rm prod --user
+"#)]
+pub struct CtxRemove {
+    /// Remove context from the user home folder rather than in the workspace
+    #[arg(long)]
+    pub user: bool,
+
+    /// Context name
+    #[arg()]
+    pub name: String,
+}
+
+/// Switch the current resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Switches the current resource context to the specified named remote context.
+
+This is the explicit form of `kamu ctx <name>`.
+
+The special name `local` refers to the current workspace when one is available.
+
+**Examples:**
+
+Switch to a context:
+
+    kamu ctx use prod
+
+Switch to the local workspace context:
+
+    kamu ctx use local
+"#)]
+pub struct CtxUse {
+    /// Context name
+    #[arg()]
+    pub name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

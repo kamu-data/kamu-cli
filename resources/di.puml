@@ -131,6 +131,7 @@ interface "ResetExecutor" <<i>>
 interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
+interface "ResourceContextStore" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
 interface "ResourceLifecycleEventDispatcher" <<i>>
@@ -189,6 +190,7 @@ class "AuthConfig" <<singleton>>
 class "AuthenticationServiceImpl"
 class "BuildInfo" <<singleton>>
 class "CLIAccessTokenStore"
+class "CLIResourceContextStore"
 class "CacheDir" <<singleton>>
 class "CommitDatasetEventUseCaseImpl"
 class "CompactDatasetUseCaseImpl"
@@ -204,6 +206,7 @@ class "CreateDatasetFromSnapshotUseCaseImpl"
 class "CreateDatasetUseCaseHelper"
 class "CreateDatasetUseCaseImpl"
 class "CurrentAccountSubject" <<singleton>>
+class "CurrentContextStateService"
 class "DataFormatRegistryImpl"
 class "DatabaseConnectionSettings" <<singleton>>
 class "DatabaseNoPasswordProvider"
@@ -337,6 +340,8 @@ class "ResetDatasetUseCaseImpl"
 class "ResetExecutorImpl"
 class "ResetPlannerImpl"
 class "ResourceAccountResolverImpl"
+class "ResourceContextRegistryService"
+class "ResourceContextResolver"
 class "ResourceFacadeImpl"
 class "ResourceLifecycleMessageConsumer"
 class "ResourceLoaderImpl"
@@ -755,6 +760,13 @@ class "WsSmartTransferProtocolClient"
 "AccessTokenStore" <|-- "CLIAccessTokenStore"
 "CLIAccessTokenStore"  --> "WorkspaceLayout"
 "LoginService"  --> "SystemTimeSource"
+"CurrentContextStateService"  --> "ResourceContextStore"
+"ResourceContextRegistryService"  --> "ResourceContextStore"
+"ResourceContextResolver"  --> "CurrentContextStateService"
+"ResourceContextResolver"  --> "ResourceContextRegistryService"
+"ResourceContextResolver"  --> "WorkspaceService"
+"ResourceContextStore" <|-- "CLIResourceContextStore"
+"CLIResourceContextStore"  --> "WorkspaceLayout"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"

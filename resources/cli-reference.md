@@ -14,6 +14,7 @@ To regenerate this schema from existing code, use the following command:
 * `add` — Add a new dataset or modify an existing one
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
+* `ctx` — Manage resource contexts
 * `delete [rm]` — Delete a dataset
 * `export` — Exports a dataset
 * `ingest` — Adds data to the root dataset according to its push source configuration
@@ -276,6 +277,178 @@ Set or unset configuration value
   Default value: `yaml`
 
   Possible values: `yaml`, `json`
+
+
+
+
+## `kamu ctx`
+
+Manage resource contexts
+
+**Usage:** `kamu ctx [NAME]
+       ctx <COMMAND>`
+
+**Subcommands:**
+
+* `add` — Register a new remote resource context
+* `list [ls]` — List configured resource contexts
+* `remove [rm]` — Remove a remote resource context
+* `use` — Switch the current resource context
+
+**Arguments:**
+
+* `<NAME>` — Context name to switch to
+
+Contexts determine which workspace future resource commands will target.
+
+When running inside a workspace, an implicit local context named `local` is
+available automatically whenever no current context is selected. You can still
+select `local` explicitly. Remote contexts can be registered either in the
+workspace or in the user home scope.
+
+**Examples:**
+
+Show current context:
+
+    kamu ctx
+
+List configured contexts:
+
+    kamu ctx ls
+
+Switch to a context:
+
+    kamu ctx prod
+
+Switch back to the local workspace context:
+
+    kamu ctx local
+
+Register a workspace-scoped remote context:
+
+    kamu ctx add prod --url https://example.com
+
+Register a user-scoped remote context:
+
+    kamu ctx add prod --url https://example.com --user
+
+
+
+
+## `kamu ctx add`
+
+Register a new remote resource context
+
+**Usage:** `kamu ctx add [OPTIONS] --url <URL> <NAME>`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+**Options:**
+
+* `--user` — Store context in the user home folder rather than in the workspace
+* `--url <URL>` — Backend URL of the remote workspace
+
+Registers a remote workspace context under a local name.
+
+By default the context is stored in the current workspace. Use `--user` to
+store it in the user home scope instead.
+
+The name `local` is reserved for the implicit workspace context and cannot be
+registered explicitly.
+
+**Examples:**
+
+Add a workspace-scoped remote context:
+
+    kamu ctx add prod --url https://example.com
+
+Add a user-scoped remote context:
+
+    kamu ctx add prod --url https://example.com --user
+
+
+
+
+## `kamu ctx list`
+
+List configured resource contexts
+
+**Usage:** `kamu ctx list`
+
+Lists effective resource contexts configured in the workspace and user scopes.
+
+When running inside a workspace, the implicit `local` context is also included.
+
+**Examples:**
+
+List contexts:
+
+    kamu ctx ls
+
+
+
+
+## `kamu ctx remove`
+
+Remove a remote resource context
+
+**Usage:** `kamu ctx remove [OPTIONS] <NAME>`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+**Options:**
+
+* `--user` — Remove context from the user home folder rather than in the workspace
+
+Removes a previously registered remote context from the selected scope.
+
+By default removal happens in the current workspace. Use `--user` to remove a
+user-scoped context instead.
+
+The name `local` is reserved and cannot be removed.
+
+**Examples:**
+
+Remove a workspace-scoped context:
+
+    kamu ctx rm prod
+
+Remove a user-scoped context:
+
+    kamu ctx rm prod --user
+
+
+
+
+## `kamu ctx use`
+
+Switch the current resource context
+
+**Usage:** `kamu ctx use <NAME>`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+Switches the current resource context to the specified named remote context.
+
+This is the explicit form of `kamu ctx <name>`.
+
+The special name `local` refers to the current workspace when one is available.
+
+**Examples:**
+
+Switch to a context:
+
+    kamu ctx use prod
+
+Switch to the local workspace context:
+
+    kamu ctx use local
 
 
 
