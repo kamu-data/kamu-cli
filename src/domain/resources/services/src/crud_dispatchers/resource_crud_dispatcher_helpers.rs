@@ -9,13 +9,21 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlan,
+    ApplyManifestPlanningDecision,
+    ApplyManifestResult,
+    ApplyResourceApplicationDecision,
     ApplyResourceCrudDispatcherError,
+    ApplyResourcePlanningDecision,
     DeclarativeResource,
     DeclarativeResourceState,
+    GenericResourceQueryService,
     ReconcilableEventSourcedResource,
     ResourceConditionStatus,
     ResourceConditionType,
     ResourceDescriptorProvider,
+    ResourceSnapshot,
     ResourceStatusLike,
     ResourceStatusSummaryView,
     ResourceSummaryView,
@@ -59,35 +67,99 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn map_apply_resource_planning_decision<R>(
+    decision: ApplyResourcePlanningDecision<R>,
+    generic_resource_query_service: &dyn GenericResourceQueryService,
+) -> Result<ApplyManifestPlanningDecision, InternalError>
+where
+    R: ResourceDescriptorProvider + DeclarativeResource,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
+{
+    Ok(match decision {
+        ApplyResourcePlanningDecision::Planned(plan) => {
+            let kamu_resources::ApplyResourcePlan {
+                uid,
+                state,
+                action,
+                reconciliation_required,
+                executable,
+            } = plan;
+
+            let resource = typed_resource_state_to_view::<R>(state)?;
+            let previous_resource =
+                super::resource_crud_dispatcher_diff_helpers::load_previous_resource_view(
+                    action,
+                    uid,
+                    generic_resource_query_service,
+                )
+                .await?;
+            let changes =
+                super::resource_crud_dispatcher_diff_helpers::make_apply_manifest_changes(
+                    previous_resource.as_ref(),
+                    &resource,
+                )?;
+
+            ApplyManifestPlanningDecision::Planned(ApplyManifestPlan {
+                resource,
+                outcome: action.into(),
+                reconciliation_required,
+                executable,
+                changes,
+            })
+        }
+        ApplyResourcePlanningDecision::Rejected(rejection) => {
+            ApplyManifestPlanningDecision::Rejected(rejection.into())
+        }
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn map_apply_resource_application_decision<R>(
+    decision: ApplyResourceApplicationDecision<R>,
+) -> Result<ApplyManifestApplicationDecision, InternalError>
+where
+    R: ResourceDescriptorProvider + DeclarativeResource,
+    R::Spec: Serialize,
+    R::Status: Serialize + ResourceStatusLike,
+{
+    Ok(match decision {
+        ApplyResourceApplicationDecision::Applied(result) => {
+            let kamu_resources::ApplyResourceResult { state, outcome, .. } = result;
+            let resource = typed_resource_state_to_view::<R>(state)?;
+
+            ApplyManifestApplicationDecision::Applied(ApplyManifestResult { resource, outcome })
+        }
+        ApplyResourceApplicationDecision::Rejected(rejection) => {
+            ApplyManifestApplicationDecision::Rejected(rejection.into())
+        }
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn typed_resource_state_to_view<R>(
-    state: &R::ResourceState,
+    state: R::ResourceState,
 ) -> Result<ResourceView, InternalError>
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
+    let (uid, metadata, spec, status) = state.into_parts();
+
     Ok(ResourceView {
         kind: R::DESCRIPTOR.resource_type.to_string(),
         api_version: R::DESCRIPTOR.api_version.to_string(),
         account: ResourceViewAccount {
-            id: state.metadata().account.clone(),
+            id: metadata.account.clone(),
             name: None,
         },
-        metadata: ResourceViewMetadata {
-            uid: *state.uid(),
-            name: state.metadata().name.clone(),
-            description: state.metadata().description.clone(),
-            labels: state.metadata().labels.clone(),
-            annotations: state.metadata().annotations.clone(),
-            generation: state.metadata().generation,
-            created_at: state.metadata().created_at,
-            updated_at: state.metadata().updated_at,
-            deleted_at: state.metadata().deleted_at,
-        },
-        last_reconciled_at: state.status().resource_status().last_reconciled_at(),
-        spec: serde_json::to_value(state.spec()).int_err()?,
-        status: Some(serde_json::to_value(state.status()).int_err()?),
+        metadata: ResourceViewMetadata::from_owned(uid, metadata),
+        last_reconciled_at: status.resource_status().last_reconciled_at(),
+        spec: serde_json::to_value(spec).int_err()?,
+        status: Some(serde_json::to_value(status).int_err()?),
     })
 }
 
@@ -111,6 +183,36 @@ where
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceView {
+    let ResourceSnapshot {
+        uid,
+        kind,
+        api_version,
+        metadata,
+        spec,
+        status,
+        last_reconciled_at,
+        ..
+    } = snapshot;
+
+    ResourceView {
+        kind,
+        api_version,
+        account: ResourceViewAccount {
+            id: metadata.account.clone(),
+            name: None,
+        },
+        metadata: ResourceViewMetadata::from_owned(uid, metadata),
+        last_reconciled_at,
+        spec,
+        status,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceStatusSummaryView {
     let resource_status = status.resource_status();
     let ready = resource_status
@@ -128,5 +230,3 @@ fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceSta
         ready,
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

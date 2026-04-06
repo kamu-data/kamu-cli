@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::mutations::ResourceApplyOutcome;
 use crate::prelude::*;
-use crate::queries::{Resource, ResourceKind, ResourceManifestFormat, ResourceSelectorInput};
+use crate::queries::{ResourceKind, ResourceManifestFormat, ResourceSelectorInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,115 +39,6 @@ impl ResourcesMut {
         selector: ResourceSelectorInput,
     ) -> Result<ResourceDeleteResult> {
         super::helpers::delete_resource(ctx, selector, None).await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceApplyOperation {
-    Created,
-    Updated,
-    Unchanged,
-}
-
-impl From<kamu_resources::ApplyResourceOutcome> for ResourceApplyOperation {
-    fn from(value: kamu_resources::ApplyResourceOutcome) -> Self {
-        match value {
-            kamu_resources::ApplyResourceOutcome::Created => Self::Created,
-            kamu_resources::ApplyResourceOutcome::Updated => Self::Updated,
-            kamu_resources::ApplyResourceOutcome::Untouched => Self::Unchanged,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceApplyRejectionCategory {
-    ImmutableFieldChanged,
-    BusinessValidationFailed,
-    ReferencedObjectMissing,
-    LifecycleRuleConflict,
-}
-
-impl From<kamu_resources::ApplyResourceRejectionCategory> for ResourceApplyRejectionCategory {
-    fn from(value: kamu_resources::ApplyResourceRejectionCategory) -> Self {
-        match value {
-            kamu_resources::ApplyResourceRejectionCategory::ImmutableFieldChanged => {
-                Self::ImmutableFieldChanged
-            }
-            kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed => {
-                Self::BusinessValidationFailed
-            }
-            kamu_resources::ApplyResourceRejectionCategory::ReferencedObjectMissing => {
-                Self::ReferencedObjectMissing
-            }
-            kamu_resources::ApplyResourceRejectionCategory::LifecycleRuleConflict => {
-                Self::LifecycleRuleConflict
-            }
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApplySuccess {
-    pub operation: ResourceApplyOperation,
-    pub resource: Resource,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApplyRejection {
-    pub category: ResourceApplyRejectionCategory,
-    pub message: String,
-}
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceApplyOutcome {
-    Success(ResourceApplySuccess),
-    Rejection(ResourceApplyRejection),
-}
-
-impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {
-    fn from(value: kamu_resources::ApplyManifestPlanningDecision) -> Self {
-        match value {
-            kamu_resources::ApplyManifestPlanningDecision::Planned(plan) => {
-                Self::Success(ResourceApplySuccess {
-                    operation: plan.outcome.into(),
-                    resource: plan.resource.into(),
-                })
-            }
-            kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection) => {
-                Self::Rejection(rejection.into())
-            }
-        }
-    }
-}
-
-impl From<kamu_resources::ApplyManifestApplicationDecision> for ResourceApplyOutcome {
-    fn from(value: kamu_resources::ApplyManifestApplicationDecision) -> Self {
-        match value {
-            kamu_resources::ApplyManifestApplicationDecision::Applied(result) => {
-                Self::Success(ResourceApplySuccess {
-                    operation: result.outcome.into(),
-                    resource: result.resource.into(),
-                })
-            }
-            kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection) => {
-                Self::Rejection(rejection.into())
-            }
-        }
-    }
-}
-
-impl From<kamu_resources_facade::ApplyManifestRejection> for ResourceApplyRejection {
-    fn from(value: kamu_resources_facade::ApplyManifestRejection) -> Self {
-        Self {
-            category: value.category.into(),
-            message: value.message,
-        }
     }
 }
 

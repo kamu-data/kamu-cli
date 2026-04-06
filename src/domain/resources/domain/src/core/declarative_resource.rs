@@ -53,6 +53,10 @@ pub trait DeclarativeResourceState: Send + Sync {
 
     fn status(&self) -> &Self::Status;
     fn status_mut(&mut self) -> &mut Self::Status;
+
+    fn into_parts(self) -> (ResourceUID, ResourceMetadata, Self::Spec, Self::Status)
+    where
+        Self: Sized;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

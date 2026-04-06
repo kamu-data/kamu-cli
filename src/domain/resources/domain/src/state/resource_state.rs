@@ -87,6 +87,10 @@ where
     fn status_mut(&mut self) -> &mut Self::Status {
         &mut self.status
     }
+
+    fn into_parts(self) -> (ResourceUID, ResourceMetadata, Self::Spec, Self::Status) {
+        (self.uid, self.metadata, self.spec, self.status)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceName, ResourceUID};
+use crate::{ResourceMetadata, ResourceName, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +48,24 @@ pub struct ResourceViewMetadata {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceViewMetadata {
+    pub fn from_owned(uid: ResourceUID, metadata: ResourceMetadata) -> Self {
+        Self {
+            uid,
+            name: metadata.name,
+            description: metadata.description,
+            labels: metadata.labels,
+            annotations: metadata.annotations,
+            generation: metadata.generation,
+            created_at: metadata.created_at,
+            updated_at: metadata.updated_at,
+            deleted_at: metadata.deleted_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

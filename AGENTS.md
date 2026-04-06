@@ -71,11 +71,19 @@ impl InMemory<Repo>Harness {
 - Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
 - Respect exact long separator comment style where surrounding files use it.
 - Name lookup methods consistently: `get_xxx` returns the thing or a not-found error, while `find_xxx` returns `Option<T>` and treats absence as non-error.
+- Keep macros declarative. Put algorithmic logic into ordinary helper functions or services; macros should mainly wire types and delegate.
+- When a piece of logic becomes conceptually distinct, split it into its own module early instead of letting general-purpose helper files accumulate unrelated responsibilities.
+- Organize model files top-down for readers: highest-level result/union type first, then the structs/enums it references, with impl blocks placed immediately after the type they belong to.
+- Group repeated logical sections inside functions into named helpers when they represent a coherent concept.
+- Keep visibility tight by default. Narrow helpers to `pub(crate)` or private unless they must cross a real boundary such as downstream macro expansion.
+- Do not publicly re-export internal helper modules unless external consumers or macro expansion truly require it; prefer sibling-module calls for crate-internal collaboration.
 
 ## GraphQL
 
 - GraphQL schema is code-first in `kamu-adapter-graphql`; never edit `resources/schema.gql` by hand.
 - Add new API surface through grouped root objects in `src/adapter/graphql/src/root.rs`, with query and mutation modules following the existing crate structure.
+- Keep resolver/root files focused on query or mutation entrypoints. Extract GraphQL value types and conversions into `models.rs` when the surface grows.
+- For GraphQL enums that mirror domain enums, prefer `#[graphql(remote = ...)]` over hand-written mapping impls when names align. If names do not align, prefer unifying names unless compatibility requires otherwise.
 - For schema-only prototypes explicitly requested by the user, resolver bodies may be left as `todo!()`.
 - Regenerate the schema with the existing test: `cargo nextest run -E 'test(update_graphql_schema)`.
 
@@ -91,6 +99,10 @@ impl InMemory<Repo>Harness {
 
 ### Repositories
 - Keep repository layers simple when possible; prefer domain/service-level complex algorithms rather than repositories unless storage-specific behavior is the actual concern.
+
+### Domain and Views
+- Prefer placing value-construction logic on the value type itself. If code builds a view/domain value from other domain values and does not depend on infrastructure, add an inherent constructor or `From` impl on that value type instead of keeping the logic in service helpers.
+- When converting owned domain state into views, prefer move-based decomposition over cloning. If trait APIs only expose borrowed accessors, consider adding an owned decomposition method such as `into_parts(self)` on the domain trait.
 
 ### Error Handling
 - Prefer operation-specific error types and keep impossible variants out of operation-specific APIs when practical.

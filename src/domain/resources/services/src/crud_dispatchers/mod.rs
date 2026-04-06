@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod declare_resource_crud_dispatcher;
+mod resource_crud_dispatcher_diff_helpers;
 mod resource_crud_dispatcher_helpers;
 mod resource_crud_dispatcher_registry;
 

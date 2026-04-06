@@ -131,6 +131,17 @@ where
     fn status_mut(&mut self) -> &mut Self::Status {
         &mut self.inner.status
     }
+
+    fn into_parts(
+        self,
+    ) -> (
+        ResourceUID,
+        crate::ResourceMetadata,
+        Self::Spec,
+        Self::Status,
+    ) {
+        self.inner.into_parts()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,6 +17,26 @@ pub struct ApplyManifestPlan {
     pub outcome: ApplyResourceOutcome,
     pub reconciliation_required: bool,
     pub executable: bool,
+    pub changes: Vec<ApplyManifestChange>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ApplyManifestChange {
+    pub kind: ApplyManifestChangeKind,
+    pub path: String,
+    pub before: Option<serde_json::Value>,
+    pub after: Option<serde_json::Value>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyManifestChangeKind {
+    Generation,
+    Metadata,
+    Spec,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

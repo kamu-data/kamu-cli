@@ -23,6 +23,8 @@ macro_rules! declare_resource_crud_dispatcher {
         pub struct $dispatcher {
             apply_resource_use_case:
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
+            generic_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
             get_resource_by_uid_use_case:
                 std::sync::Arc<dyn kamu_resources::GetResourceByUidUseCase<$resource>>,
             list_resources_by_kind_use_case:
@@ -70,23 +72,12 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                Ok(match plan {
-                    kamu_resources::ApplyResourcePlanningDecision::Planned(plan) => {
-                        let resource = $crate::typed_resource_state_to_view::<$resource>(&plan.state)?;
-
-                        kamu_resources::ApplyManifestPlanningDecision::Planned(
-                            kamu_resources::ApplyManifestPlan {
-                                resource,
-                                outcome: plan.action.into(),
-                                reconciliation_required: plan.reconciliation_required,
-                                executable: plan.executable,
-                            },
-                        )
-                    }
-                    kamu_resources::ApplyResourcePlanningDecision::Rejected(rejection) => {
-                        kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection.into())
-                    }
-                })
+                $crate::map_apply_resource_planning_decision::<$resource>(
+                    plan,
+                    self.generic_resource_query_service.as_ref(),
+                )
+                .await
+                .map_err(Into::into)
             }
 
             async fn apply(
@@ -112,22 +103,8 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                Ok(match result {
-                    kamu_resources::ApplyResourceApplicationDecision::Applied(result) => {
-                        let resource =
-                            $crate::typed_resource_state_to_view::<$resource>(&result.state)?;
-
-                        kamu_resources::ApplyManifestApplicationDecision::Applied(
-                            kamu_resources::ApplyManifestResult {
-                                resource,
-                                outcome: result.outcome,
-                            },
-                        )
-                    }
-                    kamu_resources::ApplyResourceApplicationDecision::Rejected(rejection) => {
-                        kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection.into())
-                    }
-                })
+                $crate::map_apply_resource_application_decision::<$resource>(result)
+                    .map_err(Into::into)
             }
 
             async fn get(
@@ -140,7 +117,7 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::GetResourceCrudDispatcherError::from)?;
 
-                $crate::typed_resource_state_to_view::<$resource>(&state).map_err(Into::into)
+                $crate::typed_resource_state_to_view::<$resource>(state).map_err(Into::into)
             }
 
             async fn list(
