@@ -3735,10 +3735,23 @@ type Resource {
 	status: JSON
 }
 
+type ResourceApplyChange {
+	kind: ResourceApplyChangeKind!
+	path: String!
+	before: JSON
+	after: JSON
+}
+
+enum ResourceApplyChangeKind {
+	GENERATION
+	METADATA
+	SPEC
+}
+
 enum ResourceApplyOperation {
 	CREATED
 	UPDATED
-	UNCHANGED
+	UNTOUCHED
 }
 
 union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection
@@ -3758,6 +3771,7 @@ enum ResourceApplyRejectionCategory {
 type ResourceApplySuccess {
 	operation: ResourceApplyOperation!
 	resource: Resource!
+	changes: [ResourceApplyChange!]!
 }
 
 enum ResourceBuiltinKind {
