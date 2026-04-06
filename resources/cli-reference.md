@@ -293,6 +293,7 @@ Manage resource contexts
 * `add` — Register a new remote resource context
 * `list [ls]` — List configured resource contexts
 * `remove [rm]` — Remove a remote resource context
+* `test` — Test connectivity and authorization for a remote resource context
 * `use` — Switch the current resource context
 
 **Arguments:**
@@ -316,6 +317,10 @@ List configured contexts:
 
     kamu ctx ls
 
+Test a remote context:
+
+    kamu ctx test demo
+
 Switch to a context:
 
     kamu ctx prod
@@ -326,11 +331,11 @@ Switch back to the local workspace context:
 
 Register a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://example.com
+    kamu ctx add prod --url https://api.kamu.dev
 
 Register a user-scoped remote context:
 
-    kamu ctx add prod --url https://example.com --user
+    kamu ctx add prod --url https://api.kamu.dev --user
 
 
 
@@ -420,6 +425,34 @@ Remove a workspace-scoped context:
 Remove a user-scoped context:
 
     kamu ctx rm prod --user
+
+
+
+
+## `kamu ctx test`
+
+Test connectivity and authorization for a remote resource context
+
+**Usage:** `kamu ctx test [NAME]`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+Tests backend reachability and access token validity for a remote context.
+
+If no context name is provided, the effective current context is tested.
+Testing the local workspace context is not supported.
+
+**Examples:**
+
+Test a named context:
+
+    kamu ctx test demo
+
+Test the current context:
+
+    kamu ctx test
 
 
 

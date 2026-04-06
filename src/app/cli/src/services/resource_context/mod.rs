@@ -13,6 +13,7 @@ mod models;
 mod resource_context_registry_service;
 mod resource_context_resolver;
 mod resource_context_store;
+mod resource_context_test_service;
 
 pub use current_context_state_service::*;
 pub use dependencies::*;
@@ -20,3 +21,4 @@ pub use models::*;
 pub use resource_context_registry_service::*;
 pub use resource_context_resolver::*;
 pub use resource_context_store::*;
+pub use resource_context_test_service::*;

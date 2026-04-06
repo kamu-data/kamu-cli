@@ -169,6 +169,10 @@ List configured contexts:
 
     kamu ctx ls
 
+Test a remote context:
+
+    kamu ctx test demo
+
 Switch to a context:
 
     kamu ctx prod
@@ -179,11 +183,11 @@ Switch back to the local workspace context:
 
 Register a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://example.com
+    kamu ctx add prod --url https://api.kamu.dev
 
 Register a user-scoped remote context:
 
-    kamu ctx add prod --url https://example.com --user
+    kamu ctx add prod --url https://api.kamu.dev --user
 "#)]
 #[command(args_conflicts_with_subcommands = true)]
 pub struct Ctx {
@@ -202,6 +206,7 @@ pub enum CtxSubCommand {
     List(CtxList),
     #[command(visible_alias = "rm")]
     Remove(CtxRemove),
+    Test(CtxTest),
     Use(CtxUse),
 }
 
@@ -283,6 +288,30 @@ pub struct CtxRemove {
     /// Context name
     #[arg()]
     pub name: String,
+}
+
+/// Test connectivity and authorization for a remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Tests backend reachability and access token validity for a remote context.
+
+If no context name is provided, the effective current context is tested.
+Testing the local workspace context is not supported.
+
+**Examples:**
+
+Test a named context:
+
+    kamu ctx test demo
+
+Test the current context:
+
+    kamu ctx test
+"#)]
+pub struct CtxTest {
+    /// Context name
+    #[arg()]
+    pub name: Option<String>,
 }
 
 /// Switch the current resource context

@@ -13,8 +13,10 @@ use super::{CLIError, Command};
 use crate::WorkspaceService;
 use crate::resource_context::{
     CurrentContextStateService,
+    ResolvedResourceContext,
     ResourceContextResolver,
     ResourceContextStoreScope,
+    ResourceContextTestService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +26,7 @@ use crate::resource_context::{
 pub struct ContextUseCommand {
     current_context_state_service: Arc<CurrentContextStateService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
+    resource_context_test_service: Arc<ResourceContextTestService>,
     workspace_service: Arc<WorkspaceService>,
 
     #[dill::component(explicit)]
@@ -35,7 +38,8 @@ pub struct ContextUseCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ContextUseCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        self.resource_context_resolver
+        let resolved_context = self
+            .resource_context_resolver
             .resolve_context_name(&self.name)?;
 
         let scope = if self.workspace_service.is_in_workspace() {
@@ -53,6 +57,21 @@ impl Command for ContextUseCommand {
             console::style("Current context:").green().bold(),
             self.name,
         );
+
+        if let ResolvedResourceContext::RemoteWorkspace { name, backend_url } = resolved_context {
+            let test_result = self
+                .resource_context_test_service
+                .test_remote_context(&name, &backend_url)
+                .await?;
+
+            if let Some(warning_message) = test_result.warning_message() {
+                eprintln!(
+                    "{} {}",
+                    console::style("Warning:").yellow().bold(),
+                    warning_message,
+                );
+            }
+        }
 
         Ok(())
     }

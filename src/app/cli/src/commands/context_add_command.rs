@@ -17,6 +17,7 @@ use crate::resource_context::{
     ResourceContextRecord,
     ResourceContextRegistryService,
     ResourceContextStoreScope,
+    ResourceContextTestService,
 };
 use crate::{ContextListCommand, WorkspaceService};
 
@@ -25,14 +26,16 @@ use crate::{ContextListCommand, WorkspaceService};
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct ContextAddCommand {
+    login_service: Arc<crate::odf_server::LoginService>,
     resource_context_registry_service: Arc<ResourceContextRegistryService>,
+    resource_context_test_service: Arc<ResourceContextTestService>,
     workspace_service: Arc<WorkspaceService>,
 
     #[dill::component(explicit)]
     name: String,
 
     #[dill::component(explicit)]
-    backend_url: Url,
+    server_url: Url,
 
     #[dill::component(explicit)]
     scope: ResourceContextStoreScope,
@@ -55,6 +58,12 @@ impl Command for ContextAddCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
+        let backend_url = self
+            .login_service
+            .resolve_odf_server_backend_url(&self.server_url)
+            .await
+            .unwrap_or_else(|_| self.server_url.clone());
+
         let existed = self
             .resource_context_registry_service
             .get_context_in_scope(self.scope, &self.name)
@@ -63,7 +72,7 @@ impl Command for ContextAddCommand {
         self.resource_context_registry_service
             .upsert_context(
                 self.scope,
-                ResourceContextRecord::new(self.name.clone(), self.backend_url.clone()),
+                ResourceContextRecord::new(self.name.clone(), backend_url.clone()),
             )
             .map_err(CLIError::critical)?;
 
@@ -76,6 +85,19 @@ impl Command for ContextAddCommand {
             console::style("in").green().bold(),
             ContextListCommand::scope_label(self.scope).to_lowercase(),
         );
+
+        let test_result = self
+            .resource_context_test_service
+            .test_remote_context(&self.name, &backend_url)
+            .await?;
+
+        if let Some(warning_message) = test_result.warning_message() {
+            eprintln!(
+                "{} {}",
+                console::style("Warning:").yellow().bold(),
+                warning_message,
+            );
+        }
 
         Ok(())
     }

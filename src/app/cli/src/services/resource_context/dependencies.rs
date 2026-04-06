@@ -18,6 +18,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<resource_context::ResourceContextRegistryService>();
     catalog_builder.add::<resource_context::CurrentContextStateService>();
     catalog_builder.add::<resource_context::ResourceContextResolver>();
+    catalog_builder.add::<resource_context::ResourceContextTestService>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

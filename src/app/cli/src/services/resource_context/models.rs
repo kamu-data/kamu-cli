@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +79,100 @@ pub struct ResourceContextsState {
 pub enum ResolvedResourceContext {
     LocalWorkspace,
     RemoteWorkspace { name: String, backend_url: Url },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceContextTestAuthStatus {
+    NotChecked,
+    Missing,
+    Valid,
+    Expired,
+    Invalid,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum ResourceContextTestFailure {
+    #[error("request to '{url}' failed: {message}")]
+    RequestFailed { url: Url, message: String },
+
+    #[error("unexpected response from '{url}': {status_code} {status_text}")]
+    UnexpectedResponse {
+        url: Url,
+        status_code: u16,
+        status_text: String,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceContextTestResult {
+    pub name: String,
+    pub backend_url: Option<Url>,
+    pub reachable: bool,
+    pub auth_status: ResourceContextTestAuthStatus,
+    pub recommendation: Option<String>,
+    pub failure: Option<ResourceContextTestFailure>,
+}
+
+impl ResourceContextTestResult {
+    pub fn is_healthy(&self) -> bool {
+        self.reachable
+            && matches!(
+                self.auth_status,
+                ResourceContextTestAuthStatus::Valid | ResourceContextTestAuthStatus::NotChecked
+            )
+    }
+
+    pub fn summary(&self) -> String {
+        match (&self.reachable, &self.auth_status) {
+            (false, _) => format!(
+                "Context '{}' is unreachable: {}",
+                self.name,
+                self.failure
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| String::from("unknown error")),
+            ),
+            (true, ResourceContextTestAuthStatus::Valid) => format!(
+                "Context '{}' is reachable and access token is valid",
+                self.name
+            ),
+            (true, ResourceContextTestAuthStatus::Missing) => format!(
+                "Context '{}' is reachable, but no access token was found",
+                self.name
+            ),
+            (true, ResourceContextTestAuthStatus::Expired) => format!(
+                "Context '{}' is reachable, but the access token has expired",
+                self.name
+            ),
+            (true, ResourceContextTestAuthStatus::Invalid) => format!(
+                "Context '{}' is reachable, but the access token is invalid",
+                self.name
+            ),
+            (true, ResourceContextTestAuthStatus::NotChecked) => {
+                format!("Context '{}' is available", self.name)
+            }
+        }
+    }
+
+    pub fn warning_message(&self) -> Option<String> {
+        if self.is_healthy() {
+            return None;
+        }
+
+        let mut warning = self.summary();
+        if let Some(recommendation) = &self.recommendation {
+            warning.push_str(". ");
+            warning.push_str(recommendation);
+        }
+
+        Some(warning)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
