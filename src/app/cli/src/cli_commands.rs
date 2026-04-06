@@ -47,6 +47,8 @@ pub fn get_command(
             .cast(),
         ),
 
+        cli::Command::ApiResources(_) => Box::new(ApiResourcesCommand::builder().cast()),
+
         cli::Command::Complete(c) => Box::new(CompleteCommand::builder(c.input, c.current).cast()),
 
         cli::Command::Completions(c) => Box::new(CompletionsCommand::builder(c.shell).cast()),
@@ -559,6 +561,7 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Ctx(_)
+        | cli::Command::ApiResources(_)
         | cli::Command::New(_)
         | cli::Command::Sql(_)
         | cli::Command::Version(_)
@@ -573,6 +576,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Ctx(_)
+        | cli::Command::ApiResources(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
         | cli::Command::Version(_) => false,

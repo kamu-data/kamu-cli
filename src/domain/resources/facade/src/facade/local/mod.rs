@@ -7,18 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod gc_service;
-pub use gc_service::*;
+mod local_resource_facade_impl;
+mod resource_account_resolver_impl;
 
-mod workspace;
-pub use workspace::*;
-
-pub mod accounts;
-pub mod config;
-pub mod resource_context;
-pub mod resources;
-
-mod confirm_delete_service;
-pub use confirm_delete_service::*;
-
-pub mod odf_server;
+pub use local_resource_facade_impl::*;
+pub(crate) use resource_account_resolver_impl::*;

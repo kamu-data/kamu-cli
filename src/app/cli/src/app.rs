@@ -61,6 +61,7 @@ use crate::{
     move_initial_database_to_workspace,
     odf_server,
     resource_context,
+    resources,
     spawn_password_refreshing_job,
 };
 
@@ -562,7 +563,6 @@ pub fn configure_base_catalog(
     );
 
     odf_server::register_dependencies(&mut b, is_e2e_testing);
-    resource_context::register_dependencies(&mut b);
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
 
@@ -667,6 +667,9 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<ConfirmDeleteService>();
+
+    resource_context::register_dependencies(&mut b);
+    resources::register_dependencies(&mut b);
 
     b
 }

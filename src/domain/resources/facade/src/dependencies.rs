@@ -9,11 +9,13 @@
 
 use dill::CatalogBuilder;
 
+use crate::{LocalResourceFacadeImpl, ResourceAccountResolverImpl};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<crate::ResourceAccountResolverImpl>();
-    catalog_builder.add::<crate::ResourceFacadeImpl>();
+    catalog_builder.add::<ResourceAccountResolverImpl>();
+    catalog_builder.add::<LocalResourceFacadeImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

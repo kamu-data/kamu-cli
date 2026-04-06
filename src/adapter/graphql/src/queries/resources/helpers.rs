@@ -14,12 +14,32 @@ use crate::prelude::*;
 use crate::queries::{
     Resource,
     ResourceConnection,
+    ResourceKindDescriptor,
     ResourceKindInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
     ResourceSummary,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn list_supported_resource_kinds(
+    ctx: &Context<'_>,
+) -> Result<Vec<ResourceKindDescriptor>> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let items = resource_facade
+        .list_supported_kinds()
+        .await
+        .map_err(|error| match error {
+            kamu_resources_facade::ListSupportedResourceKindsError::Internal(error) => {
+                GqlError::from(error)
+            }
+        })?;
+
+    Ok(items.into_iter().map(Into::into).collect())
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

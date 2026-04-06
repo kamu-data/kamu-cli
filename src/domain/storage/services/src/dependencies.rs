@@ -15,6 +15,7 @@ use crate::*;
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     register_storage_resource_service_layer(catalog_builder);
+    register_storage_resource_crud_dispatcher(catalog_builder);
     catalog_builder.add::<StorageReconcilerImpl>();
 }
 

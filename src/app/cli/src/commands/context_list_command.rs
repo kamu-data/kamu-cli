@@ -22,7 +22,6 @@ use crate::resource_context::{
     ResourceContextRegistryService,
     ResourceContextResolver,
     ResourceContextStoreScope,
-    ScopedResourceContextRecord,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,24 +117,6 @@ impl ContextListCommand {
             .as_ref()
             .map(crate::resource_context::ResourceContextLastTestResult::label)
             .unwrap_or("Unknown")
-    }
-
-    pub(crate) fn describe_context(
-        scoped_context: Option<ScopedResourceContextRecord>,
-        resolved_context: ResolvedResourceContext,
-    ) -> (String, String, String) {
-        match resolved_context {
-            ResolvedResourceContext::LocalWorkspace => (
-                LOCAL_CONTEXT_NAME.to_string(),
-                "Local".to_string(),
-                Self::scope_label(ResourceContextStoreScope::Workspace).to_string(),
-            ),
-            ResolvedResourceContext::RemoteWorkspace { name, .. } => (
-                name,
-                "Remote".to_string(),
-                Self::scope_label(scoped_context.unwrap().scope).to_string(),
-            ),
-        }
     }
 }
 

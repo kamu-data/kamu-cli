@@ -7,19 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+mod resource_facade_factory;
 
-use crate::*;
+use dill::CatalogBuilder;
+pub use resource_facade_factory::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<resource_context::CLIResourceContextStore>();
-    catalog_builder.add::<resource_context::ResourceContextRegistryService>();
-    catalog_builder.add::<resource_context::CurrentContextStateService>();
-    catalog_builder.add::<resource_context::ResourceContextReporter>();
-    catalog_builder.add::<resource_context::ResourceContextResolver>();
-    catalog_builder.add::<resource_context::ResourceContextTestService>();
+    catalog_builder.add::<ResourceFacadeFactory>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

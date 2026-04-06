@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
+use kamu_storage::StorageResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<resource_context::CLIResourceContextStore>();
-    catalog_builder.add::<resource_context::ResourceContextRegistryService>();
-    catalog_builder.add::<resource_context::CurrentContextStateService>();
-    catalog_builder.add::<resource_context::ResourceContextReporter>();
-    catalog_builder.add::<resource_context::ResourceContextResolver>();
-    catalog_builder.add::<resource_context::ResourceContextTestService>();
+kamu_resources_services::declare_resource_crud_dispatcher!(
+    dispatcher = StorageResourceCrudDispatcher,
+    resource = StorageResource
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_storage_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
+    catalog_builder.add::<StorageResourceCrudDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

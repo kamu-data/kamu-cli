@@ -12,6 +12,7 @@ To regenerate this schema from existing code, use the following command:
 **Subcommands:**
 
 * `add` — Add a new dataset or modify an existing one
+* `api-resources` — List supported resource kinds in the active context
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `ctx` — Manage resource contexts
@@ -98,6 +99,27 @@ Add a dataset from manifest hosted externally (e.g. on GihHub):
     kamu add https://raw.githubusercontent.com/kamu-data/kamu-contrib/master/ca.bankofcanada/ca.bankofcanada.exchange-rates.daily.yaml
 
 To add dataset from a repository see `kamu pull` command.
+
+
+
+
+## `kamu api-resources`
+
+List supported resource kinds in the active context
+
+**Usage:** `kamu api-resources`
+
+Prints resource kinds supported by the active resource context.
+
+If the active context is `local`, the command lists kinds supported by the
+current workspace. If the active context points to a remote server, the command
+lists kinds supported by that remote GraphQL API.
+
+**Examples:**
+
+List supported resource kinds in the active context:
+
+    kamu api-resources
 
 
 

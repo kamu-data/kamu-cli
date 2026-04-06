@@ -96,6 +96,7 @@ pub enum PasswordHashingMode {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Add(Add),
+    ApiResources(ApiResources),
     Complete(Complete),
     Completions(Completions),
     Config(Config),
@@ -127,6 +128,25 @@ pub enum Command {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// List supported resource kinds in the active context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Prints resource kinds supported by the active resource context.
+
+If the active context is `local`, the command lists kinds supported by the
+current workspace. If the active context points to a remote server, the command
+lists kinds supported by that remote GraphQL API.
+
+**Examples:**
+
+List supported resource kinds in the active context:
+
+    kamu api-resources
+"#)]
+pub struct ApiResources {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Cli {
     pub fn tabular_output_format(&self) -> Option<OutputFormat> {
         match &self.command {
@@ -142,6 +162,7 @@ impl Cli {
             Command::Search(c) => c.output_format,
             Command::Sql(c) => c.output_format,
             Command::Tail(c) => c.output_format,
+            Command::ApiResources(_) => Some(OutputFormat::Table),
             _ => None,
         }
     }

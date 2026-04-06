@@ -8,7 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::*;
-use kamu_resources::{DeclarativeResource, ResourceApiVersion, ResourceType};
+use kamu_resources::{
+    DeclarativeResource,
+    ResourceApiVersion,
+    ResourceKindName,
+    ResourceKindShortNames,
+    ResourceType,
+};
 
 use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus};
 
@@ -20,12 +26,22 @@ pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, dyn SecretSetE
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SecretSetResource {
-    pub const RESOURCE_TYPE: &'static str = "secret_set";
+    pub const RESOURCE_TYPE: &'static str = "SecretSet";
+    pub const RESOURCE_NAME: &'static str = "secretsets";
+    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["ss"];
     pub const API_VERSION: &'static str = "v1alpha1";
 }
 
 impl ResourceType for SecretSetResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
+}
+
+impl ResourceKindName for SecretSetResource {
+    const RESOURCE_NAME: &'static str = Self::RESOURCE_NAME;
+}
+
+impl ResourceKindShortNames for SecretSetResource {
+    const RESOURCE_SHORT_NAMES: &'static [&'static str] = Self::RESOURCE_SHORT_NAMES;
 }
 
 impl ResourceApiVersion for SecretSetResource {

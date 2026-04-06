@@ -85,7 +85,7 @@ impl InMemory<Repo>Harness {
 - Keep resolver/root files focused on query or mutation entrypoints. Extract GraphQL value types and conversions into `models.rs` when the surface grows.
 - For GraphQL enums that mirror domain enums, prefer `#[graphql(remote = ...)]` over hand-written mapping impls when names align. If names do not align, prefer unifying names unless compatibility requires otherwise.
 - For schema-only prototypes explicitly requested by the user, resolver bodies may be left as `todo!()`.
-- Regenerate the schema with the existing test: `cargo nextest run -E 'test(update_graphql_schema)`.
+- Regenerate the schema with the existing test: `cargo nextest run -E 'test(update_graphql_schema)'`.
 
 
 ## Design Notes

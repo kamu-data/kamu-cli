@@ -7,18 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
+use dill::BuilderExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     GenericResourceQueryService,
     ResourceAPIVersionMismatchError,
+    ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
+    ResourceDispatcherMeta,
     ResourceManifest,
     ResourceMetadataInput,
     ResourceNameNotFoundError,
@@ -43,6 +47,7 @@ use crate::{
     ListAllResourcesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    ListSupportedResourceKindsError,
     ParseResourceManifestError,
     RenderResourceManifestError,
     RenderResourceManifestRequest,
@@ -50,6 +55,7 @@ use crate::{
     ResolvedAccount,
     ResourceAccountResolver,
     ResourceFacade,
+    ResourceKindDescriptor,
     ResourceKindMismatchError,
     ResourceManifestFormat,
 };
@@ -58,7 +64,7 @@ use crate::{
 
 #[dill::component(pub)]
 #[dill::interface(dyn ResourceFacade)]
-pub struct ResourceFacadeImpl {
+pub struct LocalResourceFacadeImpl {
     catalog: dill::Catalog,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
@@ -67,7 +73,13 @@ pub struct ResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceFacade for ResourceFacadeImpl {
+impl ResourceFacade for LocalResourceFacadeImpl {
+    async fn list_supported_kinds(
+        &self,
+    ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError> {
+        Ok(self.list_resource_kind_descriptors())
+    }
+
     async fn plan_apply_manifest(
         &self,
         request: ApplyManifestRequest,
@@ -308,8 +320,46 @@ impl ResourceFacade for ResourceFacadeImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceFacadeImpl {
+impl LocalResourceFacadeImpl {
     const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
+
+    fn list_resource_kind_descriptors(&self) -> Vec<ResourceKindDescriptor> {
+        let mut seen = HashSet::new();
+        let mut descriptors = Vec::new();
+
+        for builder in self
+            .catalog
+            .builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
+                |_: &ResourceDispatcherMeta| true,
+            )
+        {
+            let meta = builder
+                .metadata_get_first::<ResourceDispatcherMeta>()
+                .expect("Resource CRUD dispatcher metadata missing");
+            let descriptor = &meta.descriptor;
+
+            if seen.insert((descriptor.resource_type, descriptor.api_version)) {
+                descriptors.push(ResourceKindDescriptor {
+                    name: descriptor.resource_name.to_string(),
+                    short_names: descriptor
+                        .resource_short_names
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    kind: descriptor.resource_type.to_string(),
+                    api_version: descriptor.api_version.to_string(),
+                });
+            }
+        }
+
+        descriptors.sort_by(|a, b| {
+            a.kind
+                .cmp(&b.kind)
+                .then_with(|| a.api_version.cmp(&b.api_version))
+        });
+
+        descriptors
+    }
 
     async fn resolve_resource_uid<E>(
         &self,
@@ -488,3 +538,5 @@ impl ResourceFacadeImpl {
         Ok(snapshot)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

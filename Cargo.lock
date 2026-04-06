@@ -8698,6 +8698,7 @@ dependencies = [
  "database-common",
  "dill",
  "event-sourcing",
+ "http 1.4.0",
  "internal-error",
  "kamu-accounts",
  "kamu-auth-rebac",
@@ -8705,10 +8706,12 @@ dependencies = [
  "kamu-resources-services",
  "opendatafabric",
  "paste",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml_ng",
  "thiserror 2.0.18",
+ "url",
 ]
 
 [[package]]

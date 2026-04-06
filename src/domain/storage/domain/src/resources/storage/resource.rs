@@ -8,7 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::*;
-use kamu_resources::{DeclarativeResource, ResourceApiVersion, ResourceType};
+use kamu_resources::{
+    DeclarativeResource,
+    ResourceApiVersion,
+    ResourceKindName,
+    ResourceKindShortNames,
+    ResourceType,
+};
 
 use crate::{StorageEventStore, StorageSpec, StorageState, StorageStatus};
 
@@ -20,12 +26,22 @@ pub struct StorageResource(pub(crate) Aggregate<StorageState, dyn StorageEventSt
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl StorageResource {
-    pub const RESOURCE_TYPE: &'static str = "storage";
+    pub const RESOURCE_TYPE: &'static str = "Storage";
+    pub const RESOURCE_NAME: &'static str = "storages";
+    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st"];
     pub const API_VERSION: &'static str = "v1alpha1";
 }
 
 impl ResourceType for StorageResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
+}
+
+impl ResourceKindName for StorageResource {
+    const RESOURCE_NAME: &'static str = Self::RESOURCE_NAME;
+}
+
+impl ResourceKindShortNames for StorageResource {
+    const RESOURCE_SHORT_NAMES: &'static [&'static str] = Self::RESOURCE_SHORT_NAMES;
 }
 
 impl ResourceApiVersion for StorageResource {

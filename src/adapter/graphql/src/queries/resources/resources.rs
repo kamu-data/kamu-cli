@@ -13,6 +13,7 @@ use crate::prelude::*;
 use crate::queries::{
     Resource,
     ResourceConnection,
+    ResourceKindDescriptor,
     ResourceKindInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
@@ -29,6 +30,12 @@ pub struct Resources;
 #[Object]
 impl Resources {
     const DEFAULT_PER_PAGE: usize = 15;
+
+    /// Returns resource kinds supported by the current server
+    #[tracing::instrument(level = "info", name = Resources_supported_kinds, skip_all)]
+    async fn supported_kinds(&self, ctx: &Context<'_>) -> Result<Vec<ResourceKindDescriptor>> {
+        resource_helpers::list_supported_resource_kinds(ctx).await
+    }
 
     /// Returns a resource by selector, if found
     #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?selector))]

@@ -109,6 +109,27 @@ impl ResourceKind {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ResourceKindDescriptor {
+    pub name: String,
+    pub short_names: Vec<String>,
+    pub kind: ResourceKind,
+    pub api_version: String,
+}
+
+impl From<kamu_resources_facade::ResourceKindDescriptor> for ResourceKindDescriptor {
+    fn from(value: kamu_resources_facade::ResourceKindDescriptor) -> Self {
+        Self {
+            name: value.name,
+            short_names: value.short_names,
+            kind: ResourceKind::new(value.kind),
+            api_version: value.api_version,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources_facade::ResourceManifestFormat")]
 pub enum ResourceManifestFormat {

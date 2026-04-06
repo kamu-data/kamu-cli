@@ -36,6 +36,10 @@ use crate::ResolveManifestAccountError;
 
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
+    async fn list_supported_kinds(
+        &self,
+    ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError>;
+
     async fn plan_apply_manifest(
         &self,
         request: ApplyManifestRequest,
@@ -67,6 +71,16 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         request: DeleteResourceRequest,
     ) -> Result<ResourceUID, DeleteResourceError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceKindDescriptor {
+    pub name: String,
+    pub short_names: Vec<String>,
+    pub kind: String,
+    pub api_version: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -348,6 +362,14 @@ impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
             E::Internal(err) => Self::Internal(err),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ListSupportedResourceKindsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

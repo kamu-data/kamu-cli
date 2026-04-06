@@ -3822,6 +3822,13 @@ type ResourceKind {
 	builtin: ResourceBuiltinKind
 }
 
+type ResourceKindDescriptor {
+	name: String!
+	shortNames: [String!]!
+	kind: ResourceKind!
+	apiVersion: String!
+}
+
 input ResourceKindInput @oneOf {
 	builtin: ResourceBuiltinKind
 	custom: String
@@ -3881,6 +3888,10 @@ type ResourceSummary {
 }
 
 type Resources {
+	"""
+	Returns resource kinds supported by the current server
+	"""
+	supportedKinds: [ResourceKindDescriptor!]!
 	"""
 	Returns a resource by selector, if found
 	"""
