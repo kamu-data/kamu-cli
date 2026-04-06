@@ -142,8 +142,16 @@ lists kinds supported by that remote GraphQL API.
 List supported resource kinds in the active context:
 
     kamu api-resources
+
+List supported resource kinds in JSON:
+
+    kamu api-resources -o json
 "#)]
-pub struct ApiResources {}
+pub struct ApiResources {
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -151,6 +159,10 @@ impl Cli {
     pub fn tabular_output_format(&self) -> Option<OutputFormat> {
         match &self.command {
             Command::List(c) => c.output_format,
+            Command::Ctx(c) => match &c.subcommand {
+                Some(CtxSubCommand::List(sc)) => sc.output_format,
+                _ => None,
+            },
             Command::Repo(c) => match &c.subcommand {
                 RepoSubCommand::Alias(sc) => match &sc.subcommand {
                     RepoAliasSubCommand::List(ssc) => ssc.output_format,
@@ -162,7 +174,7 @@ impl Cli {
             Command::Search(c) => c.output_format,
             Command::Sql(c) => c.output_format,
             Command::Tail(c) => c.output_format,
-            Command::ApiResources(_) => Some(OutputFormat::Table),
+            Command::ApiResources(c) => c.output_format,
             _ => None,
         }
     }
@@ -282,8 +294,16 @@ When running inside a workspace, the implicit `local` context is also included.
 List contexts:
 
     kamu ctx ls
+
+List contexts in JSON:
+
+    kamu ctx ls -o json
 "#)]
-pub struct CtxList {}
+pub struct CtxList {
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+}
 
 /// Remove a remote resource context
 #[derive(Debug, clap::Args)]

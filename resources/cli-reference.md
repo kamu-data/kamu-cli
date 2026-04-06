@@ -107,7 +107,28 @@ To add dataset from a repository see `kamu pull` command.
 
 List supported resource kinds in the active context
 
-**Usage:** `kamu api-resources`
+**Usage:** `kamu api-resources [OPTIONS]`
+
+**Options:**
+
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
 
 Prints resource kinds supported by the active resource context.
 
@@ -120,6 +141,10 @@ lists kinds supported by that remote GraphQL API.
 List supported resource kinds in the active context:
 
     kamu api-resources
+
+List supported resource kinds in JSON:
+
+    kamu api-resources -o json
 
 
 
@@ -406,7 +431,28 @@ Add a user-scoped remote context:
 
 List configured resource contexts
 
-**Usage:** `kamu ctx list`
+**Usage:** `kamu ctx list [OPTIONS]`
+
+**Options:**
+
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
 
 Lists effective resource contexts configured in the workspace and user scopes.
 
@@ -417,6 +463,10 @@ When running inside a workspace, the implicit `local` context is also included.
 List contexts:
 
     kamu ctx ls
+
+List contexts in JSON:
+
+    kamu ctx ls -o json
 
 
 

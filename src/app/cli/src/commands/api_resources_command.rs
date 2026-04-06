@@ -72,10 +72,12 @@ impl ApiResourcesCommand {
 impl Command for ApiResourcesCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let resolved_context = self.resource_context_resolver.resolve(None)?;
-        self.resource_context_reporter.report_usage(
-            "Fetching supported resource kinds from context",
-            &resolved_context,
-        );
+        if self.output_config.format == OutputFormat::Table {
+            self.resource_context_reporter.report_usage(
+                "Fetching supported resource kinds from context",
+                &resolved_context,
+            );
+        }
 
         let mut writer = self
             .output_config
