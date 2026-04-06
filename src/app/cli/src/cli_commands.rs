@@ -47,7 +47,9 @@ pub fn get_command(
             .cast(),
         ),
 
-        cli::Command::ApiResources(_) => Box::new(ApiResourcesCommand::builder().cast()),
+        cli::Command::ApiResources(c) => {
+            Box::new(ApiResourcesCommand::builder(c.resource_context.context).cast())
+        }
 
         cli::Command::Complete(c) => Box::new(CompleteCommand::builder(c.input, c.current).cast()),
 

@@ -111,6 +111,8 @@ List supported resource kinds in the active context
 
 **Options:**
 
+* `--context <NAME>` — Override the current resource context for this invocation
+
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:
@@ -136,11 +138,17 @@ If the active context is `local`, the command lists kinds supported by the
 current workspace. If the active context points to a remote server, the command
 lists kinds supported by that remote GraphQL API.
 
+Use `--context` to override the current context for this invocation only.
+
 **Examples:**
 
 List supported resource kinds in the active context:
 
     kamu api-resources
+
+List supported resource kinds from a specific context:
+
+    kamu api-resources --context prod
 
 List supported resource kinds in JSON:
 
@@ -1905,7 +1913,6 @@ Outputs build information
 * `-o`, `--output-format <FMT>` — Format of the output
 
   Possible values: `shell`, `json`, `yaml`
-
 
 
 

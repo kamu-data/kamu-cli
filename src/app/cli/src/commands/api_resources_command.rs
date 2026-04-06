@@ -26,13 +26,18 @@ pub struct ApiResourcesCommand {
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
+    explicit_context_name: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ApiResourcesCommand {
     async fn record_batch(&self) -> Result<RecordBatch, CLIError> {
-        let resource_facade = self.resource_facade_factory.get_resource_facade(None)?;
+        let resource_facade = self
+            .resource_facade_factory
+            .get_resource_facade(self.explicit_context_name.as_deref())?;
 
         let supported_kinds = resource_facade
             .list_supported_kinds()
@@ -71,7 +76,9 @@ impl ApiResourcesCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ApiResourcesCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let resolved_context = self.resource_context_resolver.resolve(None)?;
+        let resolved_context = self
+            .resource_context_resolver
+            .resolve(self.explicit_context_name.as_deref())?;
         if self.output_config.format == OutputFormat::Table {
             self.resource_context_reporter.report_usage(
                 "Fetching supported resource kinds from context",

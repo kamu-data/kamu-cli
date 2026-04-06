@@ -137,20 +137,38 @@ If the active context is `local`, the command lists kinds supported by the
 current workspace. If the active context points to a remote server, the command
 lists kinds supported by that remote GraphQL API.
 
+Use `--context` to override the current context for this invocation only.
+
 **Examples:**
 
 List supported resource kinds in the active context:
 
     kamu api-resources
 
+List supported resource kinds from a specific context:
+
+    kamu api-resources --context prod
+
 List supported resource kinds in JSON:
 
     kamu api-resources -o json
 "#)]
 pub struct ApiResources {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, clap::Args)]
+pub struct ResourceContextArgs {
+    /// Override the current resource context for this invocation
+    #[arg(long, value_name = "NAME")]
+    pub context: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
