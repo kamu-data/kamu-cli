@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use time_source::SystemTimeSource;
 use url::Url;
 
 use crate::{CLIError, odf_server, resource_context};
@@ -17,7 +18,9 @@ use crate::{CLIError, odf_server, resource_context};
 
 pub struct ResourceContextTestService {
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    resource_context_registry_service: Arc<resource_context::ResourceContextRegistryService>,
     resource_context_resolver: Arc<resource_context::ResourceContextResolver>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,11 +29,15 @@ pub struct ResourceContextTestService {
 impl ResourceContextTestService {
     pub fn new(
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        resource_context_registry_service: Arc<resource_context::ResourceContextRegistryService>,
         resource_context_resolver: Arc<resource_context::ResourceContextResolver>,
+        time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             access_token_registry_service,
+            resource_context_registry_service,
             resource_context_resolver,
+            time_source,
         }
     }
 
@@ -140,6 +147,66 @@ impl ResourceContextTestService {
         }
     }
 
+    pub async fn test_context_and_persist(
+        &self,
+        explicit_context_name: Option<&str>,
+    ) -> Result<resource_context::ResourceContextTestResult, CLIError> {
+        let result = self.test_context(explicit_context_name).await?;
+
+        if let Some(name) = result.remote_name() {
+            self.persist_effective_result(name, &result)?;
+        }
+
+        Ok(result)
+    }
+
+    pub async fn test_remote_context_and_persist(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        name: &str,
+        backend_url: &Url,
+    ) -> Result<resource_context::ResourceContextTestResult, CLIError> {
+        let result = self.test_remote_context(name, backend_url).await?;
+        self.persist_result(scope, name, &result)?;
+
+        Ok(result)
+    }
+
+    pub async fn test_all_contexts_and_persist(
+        &self,
+    ) -> Result<Vec<resource_context::ResourceContextTestResult>, CLIError> {
+        let checked_at = self.time_source.now();
+        let mut results = Vec::new();
+
+        for scoped_context in self
+            .resource_context_registry_service
+            .list_effective_contexts_with_scope()
+        {
+            let result = self
+                .test_remote_context(
+                    &scoped_context.context.name,
+                    &scoped_context.context.backend_url,
+                )
+                .await?;
+
+            let last_test_result =
+                resource_context::ResourceContextLastTestResult::from_test_result(
+                    &result, checked_at,
+                );
+            self.resource_context_registry_service
+                .set_context_last_test_result(
+                    scoped_context.scope,
+                    &scoped_context.context.name,
+                    last_test_result,
+                )
+                .map_err(CLIError::critical)?;
+
+            results.push(result);
+        }
+
+        Ok(results)
+    }
+
     async fn validate_access_token(
         &self,
         backend_url: &Url,
@@ -222,6 +289,39 @@ impl ResourceContextTestService {
                 message: e.to_string(),
             }
         })
+    }
+
+    fn persist_effective_result(
+        &self,
+        name: &str,
+        test_result: &resource_context::ResourceContextTestResult,
+    ) -> Result<(), CLIError> {
+        let last_test_result = resource_context::ResourceContextLastTestResult::from_test_result(
+            test_result,
+            self.time_source.now(),
+        );
+        self.resource_context_registry_service
+            .set_effective_context_last_test_result(name, last_test_result)
+            .map_err(CLIError::critical)?;
+
+        Ok(())
+    }
+
+    fn persist_result(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        name: &str,
+        test_result: &resource_context::ResourceContextTestResult,
+    ) -> Result<(), CLIError> {
+        let last_test_result = resource_context::ResourceContextLastTestResult::from_test_result(
+            test_result,
+            self.time_source.now(),
+        );
+        self.resource_context_registry_service
+            .set_context_last_test_result(scope, name, last_test_result)
+            .map_err(CLIError::critical)?;
+
+        Ok(())
     }
 }
 

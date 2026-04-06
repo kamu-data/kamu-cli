@@ -173,6 +173,10 @@ Test a remote context:
 
     kamu ctx test demo
 
+Refresh cached status for all remote contexts:
+
+    kamu ctx test --all
+
 Switch to a context:
 
     kamu ctx prod
@@ -293,10 +297,10 @@ pub struct CtxRemove {
 /// Test connectivity and authorization for a remote resource context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Tests backend reachability and access token validity for a remote context.
+Tests backend reachability and access token validity for a context.
 
 If no context name is provided, the effective current context is tested.
-Testing the local workspace context is not supported.
+Use `--all` to refresh cached status for all configured remote contexts.
 
 **Examples:**
 
@@ -307,8 +311,16 @@ Test a named context:
 Test the current context:
 
     kamu ctx test
+
+Test all remote contexts:
+
+    kamu ctx test --all
 "#)]
 pub struct CtxTest {
+    /// Test all effective remote contexts
+    #[arg(long)]
+    pub all: bool,
+
     /// Context name
     #[arg()]
     pub name: Option<String>,

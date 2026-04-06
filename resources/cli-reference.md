@@ -321,6 +321,10 @@ Test a remote context:
 
     kamu ctx test demo
 
+Refresh cached status for all remote contexts:
+
+    kamu ctx test --all
+
 Switch to a context:
 
     kamu ctx prod
@@ -433,16 +437,20 @@ Remove a user-scoped context:
 
 Test connectivity and authorization for a remote resource context
 
-**Usage:** `kamu ctx test [NAME]`
+**Usage:** `kamu ctx test [OPTIONS] [NAME]`
 
 **Arguments:**
 
 * `<NAME>` — Context name
 
-Tests backend reachability and access token validity for a remote context.
+**Options:**
+
+* `--all` — Test all effective remote contexts
+
+Tests backend reachability and access token validity for a context.
 
 If no context name is provided, the effective current context is tested.
-Testing the local workspace context is not supported.
+Use `--all` to refresh cached status for all configured remote contexts.
 
 **Examples:**
 
@@ -453,6 +461,10 @@ Test a named context:
 Test the current context:
 
     kamu ctx test
+
+Test all remote contexts:
+
+    kamu ctx test --all
 
 
 

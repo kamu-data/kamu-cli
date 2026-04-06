@@ -146,6 +146,54 @@ impl ResourceContextRegistryService {
         self.store.write_context_registry(scope, &registry)
     }
 
+    pub fn set_context_last_test_result(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        name: &str,
+        last_test_result: resource_context::ResourceContextLastTestResult,
+    ) -> Result<bool, InternalError> {
+        let mut registry = self.lock_registry_for_scope(scope);
+
+        let position = if let Some(position) =
+            registry.iter().position(|existing| existing.name == name)
+        {
+            position
+        } else {
+            *registry = self.store.read_context_registry(scope)?;
+
+            let Some(position) = registry.iter().position(|existing| existing.name == name) else {
+                return Ok(false);
+            };
+
+            position
+        };
+
+        registry[position].last_test_result = Some(last_test_result);
+        self.store.write_context_registry(scope, &registry)?;
+
+        Ok(true)
+    }
+
+    pub fn set_effective_context_last_test_result(
+        &self,
+        name: &str,
+        last_test_result: resource_context::ResourceContextLastTestResult,
+    ) -> Result<bool, InternalError> {
+        if self.set_context_last_test_result(
+            resource_context::ResourceContextStoreScope::Workspace,
+            name,
+            last_test_result.clone(),
+        )? {
+            return Ok(true);
+        }
+
+        self.set_context_last_test_result(
+            resource_context::ResourceContextStoreScope::User,
+            name,
+            last_test_result,
+        )
+    }
+
     pub fn remove_context(
         &self,
         scope: resource_context::ResourceContextStoreScope,
@@ -174,6 +222,15 @@ impl ResourceContextRegistryService {
             resource_context::ResourceContextStoreScope::Workspace => &self.workspace_registry,
             resource_context::ResourceContextStoreScope::User => &self.user_registry,
         }
+    }
+
+    fn lock_registry_for_scope(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> std::sync::MutexGuard<'_, resource_context::ResourceContextRegistry> {
+        self.registry_for_scope(scope)
+            .lock()
+            .expect("Could not lock resource context registry")
     }
 }
 

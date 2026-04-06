@@ -10,27 +10,45 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use crate::resource_context::ResourceContextTestService;
+use crate::resource_context::{ResourceContextRegistryService, ResourceContextTestService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct ContextTestCommand {
+    resource_context_registry_service: Arc<ResourceContextRegistryService>,
     resource_context_test_service: Arc<ResourceContextTestService>,
 
     #[dill::component(explicit)]
     name: Option<String>,
+
+    #[dill::component(explicit)]
+    all: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl Command for ContextTestCommand {
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if self.all && self.name.is_some() {
+            return Err(CLIError::usage_error(
+                "Specify either a context name or `--all`, but not both",
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn run(&self) -> Result<(), CLIError> {
+        if self.all {
+            return self.run_all().await;
+        }
+
         let result = self
             .resource_context_test_service
-            .test_context(self.name.as_deref())
+            .test_context_and_persist(self.name.as_deref())
             .await?;
 
         if result.is_healthy() {
@@ -45,6 +63,52 @@ impl Command for ContextTestCommand {
         }
 
         Err(CLIError::usage_error(message))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ContextTestCommand {
+    async fn run_all(&self) -> Result<(), CLIError> {
+        let contexts = self
+            .resource_context_registry_service
+            .list_effective_contexts_with_scope();
+
+        if contexts.is_empty() {
+            eprintln!(
+                "{}",
+                console::style("No remote contexts configured")
+                    .yellow()
+                    .bold()
+            );
+            return Ok(());
+        }
+
+        let mut has_failures = false;
+        let results = self
+            .resource_context_test_service
+            .test_all_contexts_and_persist()
+            .await?;
+
+        for result in results {
+            if result.is_healthy() {
+                eprintln!("{}", console::style(result.summary()).green().bold());
+            } else {
+                has_failures = true;
+                eprintln!("{}", console::style(result.summary()).yellow().bold());
+                if let Some(recommendation) = result.recommendation {
+                    eprintln!("{recommendation}");
+                }
+            }
+        }
+
+        if has_failures {
+            Err(CLIError::usage_error(
+                "One or more contexts are unreachable or require re-authentication",
+            ))
+        } else {
+            Ok(())
+        }
     }
 }
 

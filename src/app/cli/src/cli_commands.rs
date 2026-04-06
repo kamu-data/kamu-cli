@@ -107,7 +107,7 @@ pub fn get_command(
                 .cast(),
             ),
             Some(cli::CtxSubCommand::Test(sc)) => {
-                Box::new(ContextTestCommand::builder(sc.name).cast())
+                Box::new(ContextTestCommand::builder(sc.name, sc.all).cast())
             }
             Some(cli::CtxSubCommand::Use(sc)) => {
                 Box::new(ContextUseCommand::builder(sc.name).cast())

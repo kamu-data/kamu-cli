@@ -88,7 +88,7 @@ impl Command for ContextAddCommand {
 
         let test_result = self
             .resource_context_test_service
-            .test_remote_context(&self.name, &backend_url)
+            .test_remote_context_and_persist(self.scope, &self.name, &backend_url)
             .await?;
 
         if let Some(warning_message) = test_result.warning_message() {

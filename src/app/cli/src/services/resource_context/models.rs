@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
@@ -30,6 +31,8 @@ pub enum ResourceContextStoreScope {
 pub struct ResourceContextRecord {
     pub name: String,
     pub backend_url: Url,
+    #[serde(default)]
+    pub last_test_result: Option<ResourceContextLastTestResult>,
 }
 
 impl ResourceContextRecord {
@@ -37,6 +40,7 @@ impl ResourceContextRecord {
         Self {
             name: name.into(),
             backend_url,
+            last_test_result: None,
         }
     }
 }
@@ -79,6 +83,78 @@ pub struct ResourceContextsState {
 pub enum ResolvedResourceContext {
     LocalWorkspace,
     RemoteWorkspace { name: String, backend_url: Url },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ResourceContextLastTestResult {
+    pub status: ResourceContextLastTestStatus,
+    pub checked_at: DateTime<Utc>,
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
+impl ResourceContextLastTestResult {
+    pub fn from_test_result(
+        test_result: &ResourceContextTestResult,
+        checked_at: DateTime<Utc>,
+    ) -> Self {
+        let (status, detail) = match (&test_result.reachable, &test_result.auth_status) {
+            (false, _) => (
+                ResourceContextLastTestStatus::Unreachable,
+                test_result.failure.as_ref().map(ToString::to_string),
+            ),
+            (
+                true,
+                ResourceContextTestAuthStatus::Valid | ResourceContextTestAuthStatus::NotChecked,
+            ) => (ResourceContextLastTestStatus::ReachableValid, None),
+            (true, ResourceContextTestAuthStatus::Missing) => {
+                (ResourceContextLastTestStatus::ReachableMissingToken, None)
+            }
+            (true, ResourceContextTestAuthStatus::Expired) => {
+                (ResourceContextLastTestStatus::ReachableExpiredToken, None)
+            }
+            (true, ResourceContextTestAuthStatus::Invalid) => {
+                (ResourceContextLastTestStatus::ReachableInvalidToken, None)
+            }
+        };
+
+        Self {
+            status,
+            checked_at,
+            detail,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        self.status.label()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub enum ResourceContextLastTestStatus {
+    ReachableValid,
+    ReachableMissingToken,
+    ReachableExpiredToken,
+    ReachableInvalidToken,
+    Unreachable,
+}
+
+impl ResourceContextLastTestStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::ReachableValid => "Valid",
+            Self::ReachableMissingToken => "Missing token",
+            Self::ReachableExpiredToken => "Expired token",
+            Self::ReachableInvalidToken => "Invalid token",
+            Self::Unreachable => "Unreachable",
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,6 +202,10 @@ impl ResourceContextTestResult {
                 self.auth_status,
                 ResourceContextTestAuthStatus::Valid | ResourceContextTestAuthStatus::NotChecked
             )
+    }
+
+    pub fn remote_name(&self) -> Option<&str> {
+        self.backend_url.as_ref().map(|_| self.name.as_str())
     }
 
     pub fn summary(&self) -> String {

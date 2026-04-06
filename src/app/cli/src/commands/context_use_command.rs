@@ -61,7 +61,7 @@ impl Command for ContextUseCommand {
         if let ResolvedResourceContext::RemoteWorkspace { name, backend_url } = resolved_context {
             let test_result = self
                 .resource_context_test_service
-                .test_remote_context(&name, &backend_url)
+                .test_remote_context_and_persist(scope, &name, &backend_url)
                 .await?;
 
             if let Some(warning_message) = test_result.warning_message() {

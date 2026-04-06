@@ -51,6 +51,7 @@ impl ContextListCommand {
         let mut col_name = Vec::new();
         let mut col_kind = Vec::new();
         let mut col_scope = Vec::new();
+        let mut col_status = Vec::new();
         let mut col_url = Vec::new();
 
         if self.workspace_service.is_in_workspace() {
@@ -61,10 +62,12 @@ impl ContextListCommand {
             col_name.push(LOCAL_CONTEXT_NAME.to_string());
             col_kind.push("Local".to_string());
             col_scope.push(Self::scope_label(ResourceContextStoreScope::Workspace).to_string());
+            col_status.push("Local".to_string());
             col_url.push("-".to_string());
         }
 
         for scoped_context in contexts {
+            let status = Self::status_label(&scoped_context.context).to_string();
             let resolved_context = ResolvedResourceContext::RemoteWorkspace {
                 name: scoped_context.context.name.clone(),
                 backend_url: scoped_context.context.backend_url.clone(),
@@ -77,6 +80,7 @@ impl ContextListCommand {
             col_name.push(scoped_context.context.name);
             col_kind.push("Remote".to_string());
             col_scope.push(Self::scope_label(scoped_context.scope).to_string());
+            col_status.push(status);
             col_url.push(scoped_context.context.backend_url.to_string());
         }
 
@@ -85,6 +89,7 @@ impl ContextListCommand {
             Arc::new(StringArray::from(col_name)),
             Arc::new(StringArray::from(col_kind)),
             Arc::new(StringArray::from(col_scope)),
+            Arc::new(StringArray::from(col_status)),
             Arc::new(StringArray::from(col_url)),
         ])
     }
@@ -105,6 +110,14 @@ impl ContextListCommand {
             ResourceContextStoreScope::Workspace => "Workspace",
             ResourceContextStoreScope::User => "User",
         }
+    }
+
+    fn status_label(context: &crate::resource_context::ResourceContextRecord) -> &str {
+        context
+            .last_test_result
+            .as_ref()
+            .map(crate::resource_context::ResourceContextLastTestResult::label)
+            .unwrap_or("Unknown")
     }
 
     pub(crate) fn describe_context(
@@ -154,6 +167,7 @@ impl OutputWriter for ContextListCommand {
                 ColumnFormat::new().with_style_spec("c"),
                 ColumnFormat::new().with_style_spec("c"),
                 ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("l"),
             ])
     }
 
@@ -163,6 +177,7 @@ impl OutputWriter for ContextListCommand {
             Field::new("Name", DataType::Utf8, false),
             Field::new("Kind", DataType::Utf8, false),
             Field::new("Scope", DataType::Utf8, false),
+            Field::new("Status", DataType::Utf8, false),
             Field::new("Url", DataType::Utf8, false),
         ]))
     }
