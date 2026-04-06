@@ -118,17 +118,6 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceValidateManifestResult {
-    pub valid: bool,
-    pub issues: Vec<ResourceValidationIssue>,
-    pub kind: Option<ResourceKind>,
-    pub api_version: Option<String>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceRenderManifestResult {
     pub manifest: String,
@@ -196,24 +185,6 @@ impl From<kamu_resources::ResourceView> for ResourceMetadata {
             last_reconciled_at: value.last_reconciled_at,
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceValidationIssue {
-    pub severity: ResourceValidationIssueSeverity,
-    pub code: Option<String>,
-    pub path: Option<String>,
-    pub message: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceValidationIssueSeverity {
-    Error,
-    Warning,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

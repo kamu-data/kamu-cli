@@ -17,7 +17,6 @@ use crate::queries::{
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
-    ResourceValidateManifestResult,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,18 +80,6 @@ impl Resources {
         .await
     }
 
-    /// Validates a resource manifest without applying it
-    #[tracing::instrument(level = "info", name = Resources_validate_manifest, skip_all)]
-    async fn validate_manifest(
-        &self,
-        ctx: &Context<'_>,
-        manifest: String,
-        format: ResourceManifestFormat,
-    ) -> Result<ResourceValidateManifestResult> {
-        let _ = (ctx, manifest, format);
-        todo!("Resources.validate_manifest is not implemented yet");
-    }
-
     /// Renders a canonical manifest representation from a stored resource
     #[tracing::instrument(level = "info", name = Resources_render_manifest, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -102,6 +89,11 @@ impl Resources {
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<ResourceRenderManifestResult> {
-        resource_helpers::render_resource_manifest(ctx, selector, format, None).await
+        resource_helpers::render_resource_manifest(
+            ctx, selector, format, None, /* current subject */
+        )
+        .await
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

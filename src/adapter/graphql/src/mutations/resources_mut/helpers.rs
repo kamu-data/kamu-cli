@@ -44,7 +44,6 @@ pub(crate) async fn apply_resource_manifest(
 
     Ok(result)
 }
-
 pub(crate) fn map_apply_resource_error(
     error: kamu_resources_facade::ApplyManifestError,
 ) -> GqlError {
