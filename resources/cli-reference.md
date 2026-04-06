@@ -403,7 +403,7 @@ List contexts:
 
 Remove a remote resource context
 
-**Usage:** `kamu ctx remove [OPTIONS] <NAME>`
+**Usage:** `kamu ctx remove [OPTIONS] [NAME]`
 
 **Arguments:**
 
@@ -412,11 +412,13 @@ Remove a remote resource context
 **Options:**
 
 * `--user` — Remove context from the user home folder rather than in the workspace
+* `--all` — Remove all remote contexts in the selected scope
 
 Removes a previously registered remote context from the selected scope.
 
 By default removal happens in the current workspace. Use `--user` to remove a
-user-scoped context instead.
+user-scoped context instead. Use `--all` to remove all remote contexts from
+the selected scope.
 
 The name `local` is reserved and cannot be removed.
 
@@ -429,6 +431,10 @@ Remove a workspace-scoped context:
 Remove a user-scoped context:
 
     kamu ctx rm prod --user
+
+Remove all workspace-scoped remote contexts:
+
+    kamu ctx rm --all
 
 
 

@@ -124,6 +124,13 @@ impl ResourceContextRegistryService {
         contexts
     }
 
+    pub fn list_contexts_in_scope(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Vec<resource_context::ResourceContextRecord> {
+        self.lock_registry_for_scope(scope).clone()
+    }
+
     pub fn upsert_context(
         &self,
         scope: resource_context::ResourceContextStoreScope,
@@ -212,6 +219,23 @@ impl ResourceContextRegistryService {
         self.store.write_context_registry(scope, &registry)?;
 
         Ok(true)
+    }
+
+    pub fn remove_all_contexts_in_scope(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Result<usize, InternalError> {
+        let mut registry = self.lock_registry_for_scope(scope);
+        let removed = registry.len();
+
+        if removed == 0 {
+            return Ok(0);
+        }
+
+        registry.clear();
+        self.store.write_context_registry(scope, &registry)?;
+
+        Ok(removed)
     }
 
     fn registry_for_scope(

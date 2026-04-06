@@ -98,6 +98,7 @@ pub fn get_command(
             Some(cli::CtxSubCommand::Remove(sc)) => Box::new(
                 ContextRemoveCommand::builder(
                     sc.name,
+                    sc.all,
                     if sc.user {
                         resource_context::ResourceContextStoreScope::User
                     } else {

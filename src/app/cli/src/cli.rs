@@ -270,7 +270,8 @@ pub struct CtxList {}
 Removes a previously registered remote context from the selected scope.
 
 By default removal happens in the current workspace. Use `--user` to remove a
-user-scoped context instead.
+user-scoped context instead. Use `--all` to remove all remote contexts from
+the selected scope.
 
 The name `local` is reserved and cannot be removed.
 
@@ -283,15 +284,23 @@ Remove a workspace-scoped context:
 Remove a user-scoped context:
 
     kamu ctx rm prod --user
+
+Remove all workspace-scoped remote contexts:
+
+    kamu ctx rm --all
 "#)]
 pub struct CtxRemove {
     /// Remove context from the user home folder rather than in the workspace
     #[arg(long)]
     pub user: bool,
 
+    /// Remove all remote contexts in the selected scope
+    #[arg(long)]
+    pub all: bool,
+
     /// Context name
     #[arg()]
-    pub name: String,
+    pub name: Option<String>,
 }
 
 /// Test connectivity and authorization for a remote resource context
