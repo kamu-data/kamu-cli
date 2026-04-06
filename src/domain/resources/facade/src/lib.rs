@@ -13,6 +13,7 @@ mod facade;
 pub use dependencies::*;
 pub use facade::*;
 pub use kamu_resources::{
+    ApplyManifestPlan,
     ApplyManifestResult,
     ResourceStatusSummaryView,
     ResourceSummaryView,

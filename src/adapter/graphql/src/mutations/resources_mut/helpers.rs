@@ -20,18 +20,29 @@ pub(crate) async fn apply_resource_manifest(
     ctx: &Context<'_>,
     manifest: String,
     format: ResourceManifestFormat,
+    dry_run: bool,
 ) -> Result<ResourceApplyResult> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-    let result = resource_facade
-        .apply_manifest(kamu_resources_facade::ApplyManifestRequest {
-            format: format.into(),
-            manifest,
-        })
-        .await
-        .map_err(map_apply_resource_error)?;
+    let request = kamu_resources_facade::ApplyManifestRequest {
+        format: format.into(),
+        manifest,
+    };
 
-    Ok(result.into())
+    let result = if dry_run {
+        resource_facade
+            .plan_apply_manifest(request)
+            .await
+            .map(ResourceApplyResult::from)
+    } else {
+        resource_facade
+            .apply_manifest(request)
+            .await
+            .map(ResourceApplyResult::from)
+    }
+    .map_err(map_apply_resource_error)?;
+
+    Ok(result)
 }
 
 pub(crate) fn map_apply_resource_error(

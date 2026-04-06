@@ -47,6 +47,36 @@ macro_rules! declare_resource_crud_dispatcher {
             <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
                 std::error::Error + Send + Sync + 'static,
         {
+            async fn plan_apply(
+                &self,
+                request: $crate::ResourceCrudDispatcherApplyRequest,
+            ) -> Result<kamu_resources::ApplyManifestPlan, $crate::ApplyResourceCrudDispatcherError> {
+                let kind =
+                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
+                let api_version =
+                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.api_version;
+                let spec = $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
+
+                let plan = self
+                    .apply_resource_use_case
+                    .plan(kamu_resources::ApplyResourceParams {
+                        uid: request.uid,
+                        metadata: request.metadata,
+                        spec,
+                    })
+                    .await
+                    .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
+
+                let resource = $crate::typed_resource_state_to_view::<$resource>(&plan.state)?;
+
+                Ok(kamu_resources::ApplyManifestPlan {
+                    resource,
+                    outcome: plan.action.into(),
+                    reconciliation_required: plan.reconciliation_required,
+                    executable: plan.executable,
+                })
+            }
+
             async fn apply(
                 &self,
                 request: $crate::ResourceCrudDispatcherApplyRequest,
@@ -59,7 +89,7 @@ macro_rules! declare_resource_crud_dispatcher {
 
                 let result = self
                     .apply_resource_use_case
-                    .execute(kamu_resources::ApplyResourceParams {
+                    .apply(kamu_resources::ApplyResourceParams {
                         uid: request.uid,
                         metadata: request.metadata,
                         spec,

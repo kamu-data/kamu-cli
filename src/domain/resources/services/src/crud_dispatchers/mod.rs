@@ -12,6 +12,7 @@ mod resource_crud_dispatcher_helpers;
 mod resource_crud_dispatcher_registry;
 
 pub use kamu_resources::{
+    ApplyManifestPlan,
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,

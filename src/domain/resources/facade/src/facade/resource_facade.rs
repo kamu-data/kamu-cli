@@ -11,6 +11,7 @@ use database_common::PaginationOpts;
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
+    ApplyManifestPlan,
     ApplyManifestResult,
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
@@ -35,6 +36,11 @@ use crate::ResolveManifestAccountError;
 
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
+    async fn plan_apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestPlan, ApplyManifestError>;
+
     async fn apply_manifest(
         &self,
         request: ApplyManifestRequest,

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_resources::{
+    ApplyManifestPlan,
     ApplyManifestResult,
     GenericResourceQueryService,
     ResourceAPIVersionMismatchError,
@@ -63,6 +64,41 @@ pub struct ResourceFacadeImpl {
 
 #[async_trait::async_trait]
 impl ResourceFacade for ResourceFacadeImpl {
+    async fn plan_apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestPlan, ApplyManifestError> {
+        let manifest = self.parse_manifest(request.format, &request.manifest)?;
+
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(manifest.metadata.account.as_ref())
+            .await?;
+
+        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
+            &self.catalog,
+            &manifest.kind,
+            &manifest.api_version,
+        )?;
+
+        let metadata = self.make_metadata_input(&manifest, &target_account)?;
+
+        let mut plan = dispatcher
+            .plan_apply(ResourceCrudDispatcherApplyRequest {
+                uid: manifest.metadata.uid,
+                metadata,
+                spec: manifest.spec,
+            })
+            .await?;
+
+        plan.resource = self
+            .resource_account_resolver
+            .hydrate_resource_view_account(plan.resource, Some(&target_account))
+            .await?;
+
+        Ok(plan)
+    }
+
     async fn apply_manifest(
         &self,
         request: ApplyManifestRequest,

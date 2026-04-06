@@ -13,6 +13,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::{
+    ApplyManifestPlan,
     ApplyManifestResult,
     ApplyResourceUseCaseError,
     DeleteResourcesError,
@@ -29,6 +30,11 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait ResourceCrudDispatcher: Send + Sync {
+    async fn plan_apply(
+        &self,
+        request: ResourceCrudDispatcherApplyRequest,
+    ) -> Result<ApplyManifestPlan, ApplyResourceCrudDispatcherError>;
+
     async fn apply(
         &self,
         request: ResourceCrudDispatcherApplyRequest,

@@ -26,11 +26,8 @@ impl ResourcesMut {
         format: ResourceManifestFormat,
         dry_run: Option<bool>,
     ) -> Result<ResourceApplyResult> {
-        if dry_run.unwrap_or(false) {
-            return Err(GqlError::gql("dryRun is not supported yet"));
-        }
-
-        super::helpers::apply_resource_manifest(ctx, manifest, format).await
+        super::helpers::apply_resource_manifest(ctx, manifest, format, dry_run.unwrap_or(false))
+            .await
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
@@ -73,6 +70,15 @@ pub struct ResourceApplyResult {
 
 impl From<kamu_resources::ApplyManifestResult> for ResourceApplyResult {
     fn from(value: kamu_resources::ApplyManifestResult) -> Self {
+        Self {
+            operation: value.outcome.into(),
+            resource: value.resource.into(),
+        }
+    }
+}
+
+impl From<kamu_resources::ApplyManifestPlan> for ResourceApplyResult {
+    fn from(value: kamu_resources::ApplyManifestPlan) -> Self {
         Self {
             operation: value.outcome.into(),
             resource: value.resource.into(),

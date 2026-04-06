@@ -24,10 +24,34 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
+pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
+    async fn plan(
+        &self,
+        params: ApplyResourceParams<R>,
+    ) -> Result<ApplyResourcePlan<R>, ApplyResourceUseCaseError<R>>;
+
+    async fn apply(
+        &self,
+        params: ApplyResourceParams<R>,
+    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub uid: Option<ResourceUID>,
     pub metadata: crate::ResourceMetadataInput,
     pub spec: R::Spec,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceAction {
+    Create,
+    Update,
+    Untouched,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,20 +65,20 @@ pub enum ApplyResourceOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ApplyResourceResult<R: DeclarativeResource> {
+pub struct ApplyResourcePlan<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,
-    pub outcome: ApplyResourceOutcome,
+    pub action: ApplyResourceAction,
+    pub reconciliation_required: bool,
+    pub executable: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
-    async fn execute(
-        &self,
-        params: ApplyResourceParams<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>>;
+pub struct ApplyResourceResult<R: DeclarativeResource> {
+    pub uid: ResourceUID,
+    pub state: R::ResourceState,
+    pub outcome: ApplyResourceOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +118,18 @@ where
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
             uid, expected, actual,
         ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ApplyResourceAction> for ApplyResourceOutcome {
+    fn from(value: ApplyResourceAction) -> Self {
+        match value {
+            ApplyResourceAction::Create => Self::Created,
+            ApplyResourceAction::Update => Self::Updated,
+            ApplyResourceAction::Untouched => Self::Untouched,
+        }
     }
 }
 
