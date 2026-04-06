@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
@@ -43,6 +43,9 @@ use crate::{
     ListResourcesError,
     ListResourcesRequest,
     ParseResourceManifestError,
+    RenderResourceManifestError,
+    RenderResourceManifestRequest,
+    RenderResourceManifestResult,
     ResolvedAccount,
     ResourceAccountResolver,
     ResourceFacade,
@@ -195,6 +198,28 @@ impl ResourceFacade for ResourceFacadeImpl {
             .map_err(Into::into)
     }
 
+    async fn render_manifest(
+        &self,
+        request: RenderResourceManifestRequest,
+    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
+        let view = self
+            .get(GetResourceRequest {
+                kind: request.kind,
+                api_version: request.api_version,
+                account: request.account,
+                resource_ref: request.resource_ref,
+            })
+            .await?;
+
+        let manifest = Self::resource_view_to_manifest(view);
+        let manifest = Self::serialize_manifest(&manifest, request.format)?;
+
+        Ok(RenderResourceManifestResult {
+            manifest,
+            format: request.format,
+        })
+    }
+
     async fn list(
         &self,
         request: ListResourcesRequest,
@@ -336,6 +361,48 @@ impl ResourceFacadeImpl {
             manifest.metadata.annotations.clone(),
         )
         .map_err(Into::into)
+    }
+
+    fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
+        let ResourceView {
+            kind,
+            api_version,
+            account,
+            metadata,
+            spec,
+            ..
+        } = view;
+
+        ResourceManifest {
+            api_version,
+            kind,
+            metadata: kamu_resources::ResourceManifestMetadata {
+                uid: Some(metadata.uid),
+                account: Some(kamu_resources::ResourceManifestAccount {
+                    id: Some(account.id),
+                    name: account.name.map(|name| name.to_string()),
+                }),
+                name: metadata.name,
+                description: metadata.description,
+                labels: metadata.labels.into_iter().collect(),
+                annotations: metadata.annotations.into_iter().collect(),
+            },
+            spec,
+        }
+    }
+
+    fn serialize_manifest(
+        manifest: &ResourceManifest,
+        format: ResourceManifestFormat,
+    ) -> Result<String, RenderResourceManifestError> {
+        match format {
+            ResourceManifestFormat::Json => serde_json::to_string_pretty(manifest)
+                .int_err()
+                .map_err(Into::into),
+            ResourceManifestFormat::Yaml => serde_yaml::to_string(manifest)
+                .int_err()
+                .map_err(Into::into),
+        }
     }
 
     async fn resolve_snapshot_for_kind(

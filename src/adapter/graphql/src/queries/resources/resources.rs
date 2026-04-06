@@ -102,7 +102,6 @@ impl Resources {
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<ResourceRenderManifestResult> {
-        let _ = (ctx, selector, format);
-        todo!("Resources.render_manifest is not implemented yet");
+        resource_helpers::render_resource_manifest(ctx, selector, format, None).await
     }
 }

@@ -48,6 +48,11 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
 
+    async fn render_manifest(
+        &self,
+        request: RenderResourceManifestRequest,
+    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
+
     async fn list(
         &self,
         request: ListResourcesRequest,
@@ -88,6 +93,17 @@ pub struct GetResourceRequest {
     pub api_version: Option<String>,
     pub account: Option<ResourceManifestAccount>,
     pub resource_ref: GetResourceRef,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct RenderResourceManifestRequest {
+    pub kind: String,
+    pub api_version: Option<String>,
+    pub account: Option<ResourceManifestAccount>,
+    pub resource_ref: GetResourceRef,
+    pub format: ResourceManifestFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,6 +239,54 @@ impl From<GetResourceCrudDispatcherError> for GetResourceError {
                 }
             }
             E::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct RenderResourceManifestResult {
+    pub manifest: String,
+    pub format: ResourceManifestFormat,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum RenderResourceManifestError {
+    #[error(transparent)]
+    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+
+    #[error(transparent)]
+    BadAccount(#[from] ResolveManifestAccountError),
+
+    #[error(transparent)]
+    UIDNotFound(#[from] ResourceUIDNotFoundError),
+
+    #[error(transparent)]
+    NameNotFound(#[from] ResourceNameNotFoundError),
+
+    #[error(transparent)]
+    ApiVersionMismatch(#[from] ResourceAPIVersionMismatchError),
+
+    #[error(transparent)]
+    KindMismatch(#[from] ResourceKindMismatchError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<GetResourceError> for RenderResourceManifestError {
+    fn from(err: GetResourceError) -> Self {
+        match err {
+            GetResourceError::UnsupportedDescriptor(err) => Self::UnsupportedDescriptor(err),
+            GetResourceError::BadAccount(err) => Self::BadAccount(err),
+            GetResourceError::UIDNotFound(err) => Self::UIDNotFound(err),
+            GetResourceError::NameNotFound(err) => Self::NameNotFound(err),
+            GetResourceError::ApiVersionMismatch(err) => Self::ApiVersionMismatch(err),
+            GetResourceError::KindMismatch(err) => Self::KindMismatch(err),
+            GetResourceError::Internal(err) => Self::Internal(err),
         }
     }
 }

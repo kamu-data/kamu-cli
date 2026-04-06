@@ -15,6 +15,8 @@ use crate::queries::{
     Resource,
     ResourceConnection,
     ResourceKindInput,
+    ResourceManifestFormat,
+    ResourceRenderManifestResult,
     ResourceSelectorInput,
     ResourceSummary,
 };
@@ -115,6 +117,55 @@ pub(crate) async fn list_all_resources_connection(
     let items = items.into_iter().map(ResourceSummary::from).collect();
 
     Ok(ResourceConnection::new(items, page, per_page, total_count))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn render_resource_manifest(
+    ctx: &Context<'_>,
+    selector: ResourceSelectorInput,
+    format: ResourceManifestFormat,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<ResourceRenderManifestResult> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let ResourceSelectorInput {
+        kind,
+        api_version,
+        resource_ref,
+    } = selector;
+
+    let rendered = resource_facade
+        .render_manifest(kamu_resources_facade::RenderResourceManifestRequest {
+            kind: kind.into_resource_type(),
+            api_version,
+            account,
+            resource_ref: resource_ref.into(),
+            format: format.into(),
+        })
+        .await
+        .map_err(map_render_resource_manifest_error)?;
+
+    Ok(ResourceRenderManifestResult {
+        manifest: rendered.manifest,
+        format: rendered.format.into(),
+    })
+}
+
+fn map_render_resource_manifest_error(
+    error: kamu_resources_facade::RenderResourceManifestError,
+) -> GqlError {
+    use kamu_resources_facade::RenderResourceManifestError as E;
+
+    match error {
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
+        E::NameNotFound(error) => GqlError::gql(error.to_string()),
+        E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
+        E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::Internal(error) => error.into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

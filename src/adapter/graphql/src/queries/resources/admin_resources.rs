@@ -110,8 +110,16 @@ impl AdminResources {
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<ResourceRenderManifestResult> {
-        let _ = (&self.of_account, ctx, selector, format);
-        todo!("AdminResources.render_manifest is not implemented yet");
+        resource_helpers::render_resource_manifest(
+            ctx,
+            selector,
+            format,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
     }
 }
 
