@@ -11,8 +11,8 @@ use database_common::PaginationOpts;
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
-    ApplyManifestPlan,
-    ApplyManifestResult,
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlanningDecision,
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
@@ -39,12 +39,12 @@ pub trait ResourceFacade: Send + Sync {
     async fn plan_apply_manifest(
         &self,
         request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestPlan, ApplyManifestError>;
+    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError>;
 
     async fn apply_manifest(
         &self,
         request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestResult, ApplyManifestError>;
+    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
 
@@ -164,7 +164,6 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
             E::NotFound(err) => Self::UIDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
-            E::Lifecycle(err) => Self::Internal(err.int_err()),
             E::InvalidSpec {
                 kind,
                 api_version,

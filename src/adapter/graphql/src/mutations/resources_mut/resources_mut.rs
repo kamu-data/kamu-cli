@@ -25,7 +25,7 @@ impl ResourcesMut {
         manifest: String,
         format: ResourceManifestFormat,
         dry_run: Option<bool>,
-    ) -> Result<ResourceApplyResult> {
+    ) -> Result<ResourceApplyOutcome> {
         super::helpers::apply_resource_manifest(ctx, manifest, format, dry_run.unwrap_or(false))
             .await
     }
@@ -62,26 +62,90 @@ impl From<kamu_resources::ApplyResourceOutcome> for ResourceApplyOperation {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApplyResult {
-    pub operation: ResourceApplyOperation,
-    pub resource: Resource,
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceApplyRejectionCategory {
+    ImmutableFieldChanged,
+    BusinessValidationFailed,
+    ReferencedObjectMissing,
+    LifecycleRuleConflict,
 }
 
-impl From<kamu_resources::ApplyManifestResult> for ResourceApplyResult {
-    fn from(value: kamu_resources::ApplyManifestResult) -> Self {
-        Self {
-            operation: value.outcome.into(),
-            resource: value.resource.into(),
+impl From<kamu_resources::ApplyResourceRejectionCategory> for ResourceApplyRejectionCategory {
+    fn from(value: kamu_resources::ApplyResourceRejectionCategory) -> Self {
+        match value {
+            kamu_resources::ApplyResourceRejectionCategory::ImmutableFieldChanged => {
+                Self::ImmutableFieldChanged
+            }
+            kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed => {
+                Self::BusinessValidationFailed
+            }
+            kamu_resources::ApplyResourceRejectionCategory::ReferencedObjectMissing => {
+                Self::ReferencedObjectMissing
+            }
+            kamu_resources::ApplyResourceRejectionCategory::LifecycleRuleConflict => {
+                Self::LifecycleRuleConflict
+            }
         }
     }
 }
 
-impl From<kamu_resources::ApplyManifestPlan> for ResourceApplyResult {
-    fn from(value: kamu_resources::ApplyManifestPlan) -> Self {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApplySuccess {
+    pub operation: ResourceApplyOperation,
+    pub resource: Resource,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApplyRejection {
+    pub category: ResourceApplyRejectionCategory,
+    pub message: String,
+}
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceApplyOutcome {
+    Success(ResourceApplySuccess),
+    Rejection(ResourceApplyRejection),
+}
+
+impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {
+    fn from(value: kamu_resources::ApplyManifestPlanningDecision) -> Self {
+        match value {
+            kamu_resources::ApplyManifestPlanningDecision::Planned(plan) => {
+                Self::Success(ResourceApplySuccess {
+                    operation: plan.outcome.into(),
+                    resource: plan.resource.into(),
+                })
+            }
+            kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection) => {
+                Self::Rejection(rejection.into())
+            }
+        }
+    }
+}
+
+impl From<kamu_resources::ApplyManifestApplicationDecision> for ResourceApplyOutcome {
+    fn from(value: kamu_resources::ApplyManifestApplicationDecision) -> Self {
+        match value {
+            kamu_resources::ApplyManifestApplicationDecision::Applied(result) => {
+                Self::Success(ResourceApplySuccess {
+                    operation: result.outcome.into(),
+                    resource: result.resource.into(),
+                })
+            }
+            kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection) => {
+                Self::Rejection(rejection.into())
+            }
+        }
+    }
+}
+
+impl From<kamu_resources_facade::ApplyManifestRejection> for ResourceApplyRejection {
+    fn from(value: kamu_resources_facade::ApplyManifestRejection) -> Self {
         Self {
-            operation: value.outcome.into(),
-            resource: value.resource.into(),
+            category: value.category.into(),
+            message: value.message,
         }
     }
 }

@@ -3741,7 +3741,21 @@ enum ResourceApplyOperation {
 	UNCHANGED
 }
 
-type ResourceApplyResult {
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection
+
+type ResourceApplyRejection {
+	category: ResourceApplyRejectionCategory!
+	message: String!
+}
+
+enum ResourceApplyRejectionCategory {
+	IMMUTABLE_FIELD_CHANGED
+	BUSINESS_VALIDATION_FAILED
+	REFERENCED_OBJECT_MISSING
+	LIFECYCLE_RULE_CONFLICT
+}
+
+type ResourceApplySuccess {
 	operation: ResourceApplyOperation!
 	resource: Resource!
 }
@@ -3888,7 +3902,7 @@ type Resources {
 }
 
 type ResourcesMut {
-	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyResult!
+	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
 }
 

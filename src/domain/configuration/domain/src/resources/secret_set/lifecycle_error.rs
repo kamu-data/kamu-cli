@@ -8,7 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ProjectionError;
-use kamu_resources::ResourceMetadataValidationError;
+use internal_error::ErrorIntoInternal;
+use kamu_resources::{
+    ApplyResourceLifecycleErrorHandling,
+    ApplyResourceRejection,
+    ApplyResourceRejectionCategory,
+    IntoApplyResourceRejection,
+    ResourceMetadataValidationError,
+};
 
 use crate::{SecretSetSpecValidationError, SecretSetState};
 
@@ -29,5 +36,29 @@ pub enum SecretSetLifecycleError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_resources::impl_invariant_violation_lifecycle_error!(SecretSetLifecycleError, SecretSetState);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl IntoApplyResourceRejection for SecretSetLifecycleError {
+    fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
+        match self {
+            Self::MetadataValidation(err) => {
+                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    message: err.to_string(),
+                })
+            }
+            Self::SpecValidation(err) => {
+                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    message: err.to_string(),
+                })
+            }
+            Self::InvariantViolation(err) => {
+                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

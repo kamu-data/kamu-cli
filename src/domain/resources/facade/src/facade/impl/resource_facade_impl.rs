@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_resources::{
-    ApplyManifestPlan,
-    ApplyManifestResult,
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlanningDecision,
     GenericResourceQueryService,
     ResourceAPIVersionMismatchError,
     ResourceCrudDispatcherApplyRequest,
@@ -67,7 +67,7 @@ impl ResourceFacade for ResourceFacadeImpl {
     async fn plan_apply_manifest(
         &self,
         request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestPlan, ApplyManifestError> {
+    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
         let manifest = self.parse_manifest(request.format, &request.manifest)?;
 
         let target_account = self
@@ -83,7 +83,7 @@ impl ResourceFacade for ResourceFacadeImpl {
 
         let metadata = self.make_metadata_input(&manifest, &target_account)?;
 
-        let mut plan = dispatcher
+        let plan = dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
                 uid: manifest.metadata.uid,
                 metadata,
@@ -91,18 +91,25 @@ impl ResourceFacade for ResourceFacadeImpl {
             })
             .await?;
 
-        plan.resource = self
-            .resource_account_resolver
-            .hydrate_resource_view_account(plan.resource, Some(&target_account))
-            .await?;
+        Ok(match plan {
+            ApplyManifestPlanningDecision::Planned(mut plan) => {
+                plan.resource = self
+                    .resource_account_resolver
+                    .hydrate_resource_view_account(plan.resource, Some(&target_account))
+                    .await?;
 
-        Ok(plan)
+                ApplyManifestPlanningDecision::Planned(plan)
+            }
+            ApplyManifestPlanningDecision::Rejected(rejection) => {
+                ApplyManifestPlanningDecision::Rejected(rejection)
+            }
+        })
     }
 
     async fn apply_manifest(
         &self,
         request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestResult, ApplyManifestError> {
+    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
         let manifest = self.parse_manifest(request.format, &request.manifest)?;
 
         let target_account = self
@@ -118,7 +125,7 @@ impl ResourceFacade for ResourceFacadeImpl {
 
         let metadata = self.make_metadata_input(&manifest, &target_account)?;
 
-        let mut result = dispatcher
+        let result = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
                 uid: manifest.metadata.uid,
                 metadata,
@@ -126,12 +133,19 @@ impl ResourceFacade for ResourceFacadeImpl {
             })
             .await?;
 
-        result.resource = self
-            .resource_account_resolver
-            .hydrate_resource_view_account(result.resource, Some(&target_account))
-            .await?;
+        Ok(match result {
+            ApplyManifestApplicationDecision::Applied(mut result) => {
+                result.resource = self
+                    .resource_account_resolver
+                    .hydrate_resource_view_account(result.resource, Some(&target_account))
+                    .await?;
 
-        Ok(result)
+                ApplyManifestApplicationDecision::Applied(result)
+            }
+            ApplyManifestApplicationDecision::Rejected(rejection) => {
+                ApplyManifestApplicationDecision::Rejected(rejection)
+            }
+        })
     }
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError> {

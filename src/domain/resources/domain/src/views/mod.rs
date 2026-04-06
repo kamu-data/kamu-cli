@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod apply_manifest_plan;
 mod apply_manifest_result;
 mod resource_summary_view;
 mod resource_view;
 
-pub use apply_manifest_plan::*;
 pub use apply_manifest_result::*;
 pub use resource_summary_view::*;
 pub use resource_view::*;

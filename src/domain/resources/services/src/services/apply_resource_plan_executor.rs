@@ -15,11 +15,13 @@ use time_source::SystemTimeSource;
 
 use crate::domain::{
     ApplyResourceAction,
+    ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceResult,
     ApplyResourceUseCaseError,
     DeclarativeResource,
     GenericResourceQueryService,
+    IntoApplyResourceRejection,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcilableEventSourcedResource,
@@ -36,7 +38,7 @@ use crate::domain::{
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
-use crate::{ApplyResourcePlanner, PlannedApplyResource};
+use crate::{ApplyResourcePlanner, PlannedApplyResource, PlannedApplyResourceDecision};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +61,8 @@ where
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceMetadataValidationError>
-        + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+        + From<<R::Spec as ResourceValidateSpec>::ValidationError>
+        + IntoApplyResourceRejection,
 {
     pub fn new(
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
@@ -82,18 +85,20 @@ where
     pub async fn execute(
         &self,
         plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         match plan.action {
             ApplyResourceAction::Create => self.execute_create(plan).await,
             ApplyResourceAction::Update => self.execute_update(plan).await,
-            ApplyResourceAction::Untouched => Ok(plan.into_apply_result()),
+            ApplyResourceAction::Untouched => Ok(ApplyResourceApplicationDecision::Applied(
+                self.make_apply_result(plan),
+            )),
         }
     }
 
     async fn execute_create(
         &self,
         mut plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         match self
             .resource_persistence_service
             .create(&mut plan.resource)
@@ -113,13 +118,15 @@ where
         )
         .await?;
 
-        Ok(plan.into_apply_result())
+        Ok(ApplyResourceApplicationDecision::Applied(
+            self.make_apply_result(plan),
+        ))
     }
 
     async fn execute_update(
         &self,
         mut plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         self.resource_persistence_service
             .save(&mut plan.resource)
             .await
@@ -132,13 +139,15 @@ where
         )
         .await?;
 
-        Ok(plan.into_apply_result())
+        Ok(ApplyResourceApplicationDecision::Applied(
+            self.make_apply_result(plan),
+        ))
     }
 
     async fn retry_apply_after_duplicate_create(
         &self,
         plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         let metadata = plan.resource.metadata();
 
         let metadata_input = ResourceMetadataInput {
@@ -191,19 +200,34 @@ where
             plan.planned_at,
         )?;
 
-        match replanned.action {
-            ApplyResourceAction::Create => Err(ApplyResourceUseCaseError::Internal(
-                "Resource duplicate create retry unexpectedly produced a create plan"
-                    .int_err()
-                    .with_context(format!(
-                        "account_id={}, kind='{}', name='{}'",
-                        plan.resource.metadata().account,
-                        R::DESCRIPTOR.resource_type,
-                        plan.resource.metadata().name
-                    )),
-            )),
-            ApplyResourceAction::Update => self.execute_update(replanned).await,
-            ApplyResourceAction::Untouched => Ok(replanned.into_apply_result()),
+        match replanned {
+            PlannedApplyResourceDecision::Planned(replanned) => match replanned.action {
+                ApplyResourceAction::Create => Err(ApplyResourceUseCaseError::Internal(
+                    "Resource duplicate create retry unexpectedly produced a create plan"
+                        .int_err()
+                        .with_context(format!(
+                            "account_id={}, kind='{}', name='{}'",
+                            plan.resource.metadata().account,
+                            R::DESCRIPTOR.resource_type,
+                            plan.resource.metadata().name
+                        )),
+                )),
+                ApplyResourceAction::Update => self.execute_update(replanned).await,
+                ApplyResourceAction::Untouched => Ok(ApplyResourceApplicationDecision::Applied(
+                    self.make_apply_result(replanned),
+                )),
+            },
+            PlannedApplyResourceDecision::Rejected(rejection) => {
+                Ok(ApplyResourceApplicationDecision::Rejected(rejection))
+            }
+        }
+    }
+
+    fn make_apply_result(&self, plan: PlannedApplyResource<R>) -> ApplyResourceResult<R> {
+        ApplyResourceResult {
+            uid: *plan.resource.uid(),
+            state: plan.resource.into(),
+            outcome: plan.action.into(),
         }
     }
 

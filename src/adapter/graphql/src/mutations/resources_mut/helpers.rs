@@ -9,7 +9,7 @@
 
 use async_graphql::Context;
 
-use crate::mutations::{ResourceApplyResult, ResourceDeleteResult};
+use crate::mutations::{ResourceApplyOutcome, ResourceDeleteResult};
 use crate::prelude::*;
 use crate::queries::helpers::map_resolve_manifest_account_error;
 use crate::queries::{ResourceKind, ResourceManifestFormat, ResourceSelectorInput};
@@ -21,7 +21,7 @@ pub(crate) async fn apply_resource_manifest(
     manifest: String,
     format: ResourceManifestFormat,
     dry_run: bool,
-) -> Result<ResourceApplyResult> {
+) -> Result<ResourceApplyOutcome> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
     let request = kamu_resources_facade::ApplyManifestRequest {
@@ -33,12 +33,12 @@ pub(crate) async fn apply_resource_manifest(
         resource_facade
             .plan_apply_manifest(request)
             .await
-            .map(ResourceApplyResult::from)
+            .map(ResourceApplyOutcome::from)
     } else {
         resource_facade
             .apply_manifest(request)
             .await
-            .map(ResourceApplyResult::from)
+            .map(ResourceApplyOutcome::from)
     }
     .map_err(map_apply_resource_error)?;
 

@@ -29,12 +29,12 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
     async fn plan(
         &self,
         params: ApplyResourceParams<R>,
-    ) -> Result<ApplyResourcePlan<R>, ApplyResourceUseCaseError<R>>;
+    ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>>;
 
     async fn apply(
         &self,
         params: ApplyResourceParams<R>,
-    ) -> Result<ApplyResourceResult<R>, ApplyResourceUseCaseError<R>>;
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,20 +47,16 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApplyResourceAction {
-    Create,
-    Update,
-    Untouched,
+pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
+    Planned(ApplyResourcePlan<R>),
+    Rejected(ApplyResourceRejection),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApplyResourceOutcome {
-    Created,
-    Updated,
-    Untouched,
+pub enum ApplyResourceApplicationDecision<R: DeclarativeResource> {
+    Applied(ApplyResourceResult<R>),
+    Rejected(ApplyResourceRejection),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,10 +71,69 @@ pub struct ApplyResourcePlan<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceAction {
+    Create,
+    Update,
+    Untouched,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ApplyResourceResult<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,
     pub outcome: ApplyResourceOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceOutcome {
+    Created,
+    Updated,
+    Untouched,
+}
+
+impl From<ApplyResourceAction> for ApplyResourceOutcome {
+    fn from(value: ApplyResourceAction) -> Self {
+        match value {
+            ApplyResourceAction::Create => Self::Created,
+            ApplyResourceAction::Update => Self::Updated,
+            ApplyResourceAction::Untouched => Self::Untouched,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ApplyResourceRejection {
+    pub category: ApplyResourceRejectionCategory,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceRejectionCategory {
+    ImmutableFieldChanged,
+    BusinessValidationFailed,
+    ReferencedObjectMissing,
+    LifecycleRuleConflict,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum ApplyResourceLifecycleErrorHandling {
+    Rejected(ApplyResourceRejection),
+    Technical(InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait IntoApplyResourceRejection {
+    fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,9 +154,6 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-
-    #[error(transparent)]
-    Lifecycle(R::LifecycleError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,18 +170,6 @@ where
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
             uid, expected, actual,
         ))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<ApplyResourceAction> for ApplyResourceOutcome {
-    fn from(value: ApplyResourceAction) -> Self {
-        match value {
-            ApplyResourceAction::Create => Self::Created,
-            ApplyResourceAction::Update => Self::Updated,
-            ApplyResourceAction::Untouched => Self::Untouched,
-        }
     }
 }
 

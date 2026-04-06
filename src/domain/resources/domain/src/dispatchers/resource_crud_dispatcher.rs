@@ -13,8 +13,9 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::{
-    ApplyManifestPlan,
-    ApplyManifestResult,
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlanningDecision,
+    ApplyManifestRejection,
     ApplyResourceUseCaseError,
     DeleteResourcesError,
     GetResourceByUidError,
@@ -33,12 +34,12 @@ pub trait ResourceCrudDispatcher: Send + Sync {
     async fn plan_apply(
         &self,
         request: ResourceCrudDispatcherApplyRequest,
-    ) -> Result<ApplyManifestPlan, ApplyResourceCrudDispatcherError>;
+    ) -> Result<ApplyManifestPlanningDecision, ApplyResourceCrudDispatcherError>;
 
     async fn apply(
         &self,
         request: ResourceCrudDispatcherApplyRequest,
-    ) -> Result<ApplyManifestResult, ApplyResourceCrudDispatcherError>;
+    ) -> Result<ApplyManifestApplicationDecision, ApplyResourceCrudDispatcherError>;
 
     async fn get(
         &self,
@@ -110,9 +111,6 @@ pub enum ApplyResourceCrudDispatcherError {
     ConcurrentModification(#[from] ConcurrentModificationError),
 
     #[error(transparent)]
-    Lifecycle(#[from] ResourceLifecycleValidationError),
-
-    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -157,25 +155,9 @@ pub enum UnsupportedResourceDescriptorError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct ResourceLifecycleValidationError(Box<dyn std::error::Error + Send + Sync + 'static>);
-
-impl ResourceLifecycleValidationError {
-    pub fn new<E>(err: E) -> Self
-    where
-        E: std::error::Error + Send + Sync + 'static,
-    {
-        Self(Box::new(err))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl<R> From<ApplyResourceUseCaseError<R>> for ApplyResourceCrudDispatcherError
 where
     R: crate::ReconcilableEventSourcedResource,
-    R::LifecycleError: std::error::Error + Send + Sync + 'static,
 {
     fn from(err: ApplyResourceUseCaseError<R>) -> Self {
         match err {
@@ -188,9 +170,17 @@ where
                 Self::ConcurrentModification(err)
             }
             ApplyResourceUseCaseError::Internal(err) => Self::Internal(err),
-            ApplyResourceUseCaseError::Lifecycle(err) => {
-                Self::Lifecycle(ResourceLifecycleValidationError::new(err))
-            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<crate::ApplyResourceRejection> for ApplyManifestRejection {
+    fn from(value: crate::ApplyResourceRejection) -> Self {
+        Self {
+            category: value.category,
+            message: value.message,
         }
     }
 }

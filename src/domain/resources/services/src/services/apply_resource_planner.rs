@@ -13,12 +13,15 @@ use time_source::SystemTimeSource;
 
 use crate::domain::{
     ApplyResourceAction,
+    ApplyResourceLifecycleErrorHandling,
     ApplyResourceParams,
     ApplyResourcePlan,
-    ApplyResourceResult,
+    ApplyResourcePlanningDecision,
+    ApplyResourceRejection,
     ApplyResourceUseCaseError,
     DeclarativeResource,
     GenericResourceQueryService,
+    IntoApplyResourceRejection,
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ReconcilableResource,
@@ -52,7 +55,8 @@ where
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceMetadataValidationError>
-        + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+        + From<<R::Spec as ResourceValidateSpec>::ValidationError>
+        + IntoApplyResourceRejection,
 {
     pub fn new(
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
@@ -71,15 +75,22 @@ where
     pub async fn plan(
         &self,
         params: ApplyResourceParams<R>,
-    ) -> Result<ApplyResourcePlan<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>> {
         let plan = self.plan_internal(params).await?;
-        Ok(plan.into_public_plan())
+        Ok(match plan {
+            PlannedApplyResourceDecision::Planned(plan) => {
+                ApplyResourcePlanningDecision::Planned(plan.into_public_plan())
+            }
+            PlannedApplyResourceDecision::Rejected(rejection) => {
+                ApplyResourcePlanningDecision::Rejected(rejection)
+            }
+        })
     }
 
     pub async fn plan_internal(
         &self,
         params: ApplyResourceParams<R>,
-    ) -> Result<PlannedApplyResource<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         let now = self.time_source.now();
 
         let maybe_existing_uid = self
@@ -109,7 +120,6 @@ where
     ) -> Result<Option<ResourceUID>, ApplyResourceUseCaseError<R>> {
         match uid {
             Some(uid) => Ok(Some(uid)),
-
             None => self
                 .generic_resource_query_service
                 .find_resource_uid_by_name(
@@ -136,7 +146,7 @@ where
         &self,
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
-    ) -> Result<PlannedApplyResource<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         let uid = self
             .generic_resource_query_service
             .allocate_uid()
@@ -144,16 +154,24 @@ where
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
         let resource =
-            <R as ReconcilableResource>::try_create(now, uid, params.metadata, params.spec)
-                .map_err(ApplyResourceUseCaseError::Lifecycle)?;
+            match <R as ReconcilableResource>::try_create(now, uid, params.metadata, params.spec) {
+                Ok(resource) => resource,
+                Err(err) => {
+                    return Ok(PlannedApplyResourceDecision::Rejected(
+                        Self::map_lifecycle_error(err)?,
+                    ));
+                }
+            };
 
-        Ok(PlannedApplyResource {
-            reconciliation_required: resource.needs_reconciliation(),
-            resource,
-            action: ApplyResourceAction::Create,
-            executable: true,
-            planned_at: now,
-        })
+        Ok(PlannedApplyResourceDecision::Planned(
+            PlannedApplyResource {
+                reconciliation_required: resource.needs_reconciliation(),
+                resource,
+                action: ApplyResourceAction::Create,
+                executable: true,
+                planned_at: now,
+            },
+        ))
     }
 
     pub(crate) fn plan_update_resource(
@@ -161,11 +179,21 @@ where
         mut resource: R,
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
-    ) -> Result<PlannedApplyResource<R>, ApplyResourceUseCaseError<R>> {
-        <R as ReconcilableResource>::try_update_metadata(&mut resource, now, params.metadata)
-            .map_err(ApplyResourceUseCaseError::Lifecycle)?;
-        <R as ReconcilableResource>::try_update_spec(&mut resource, now, params.spec)
-            .map_err(ApplyResourceUseCaseError::Lifecycle)?;
+    ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
+        if let Err(err) =
+            <R as ReconcilableResource>::try_update_metadata(&mut resource, now, params.metadata)
+        {
+            return Ok(PlannedApplyResourceDecision::Rejected(
+                Self::map_lifecycle_error(err)?,
+            ));
+        }
+        if let Err(err) =
+            <R as ReconcilableResource>::try_update_spec(&mut resource, now, params.spec)
+        {
+            return Ok(PlannedApplyResourceDecision::Rejected(
+                Self::map_lifecycle_error(err)?,
+            ));
+        }
 
         let action = if resource.aggregate().has_updates() {
             ApplyResourceAction::Update
@@ -173,14 +201,34 @@ where
             ApplyResourceAction::Untouched
         };
 
-        Ok(PlannedApplyResource {
-            reconciliation_required: resource.needs_reconciliation(),
-            resource,
-            action,
-            executable: true,
-            planned_at: now,
-        })
+        Ok(PlannedApplyResourceDecision::Planned(
+            PlannedApplyResource {
+                reconciliation_required: resource.needs_reconciliation(),
+                resource,
+                action,
+                executable: true,
+                planned_at: now,
+            },
+        ))
     }
+
+    fn map_lifecycle_error(
+        err: R::LifecycleError,
+    ) -> Result<ApplyResourceRejection, ApplyResourceUseCaseError<R>> {
+        match err.into_apply_resource_rejection() {
+            ApplyResourceLifecycleErrorHandling::Rejected(rejection) => Ok(rejection),
+            ApplyResourceLifecycleErrorHandling::Technical(err) => {
+                Err(ApplyResourceUseCaseError::Internal(err))
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum PlannedApplyResourceDecision<R: ReconcilableEventSourcedResource> {
+    Planned(PlannedApplyResource<R>),
+    Rejected(ApplyResourceRejection),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,21 +245,13 @@ impl<R> PlannedApplyResource<R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    pub fn into_public_plan(self) -> ApplyResourcePlan<R> {
+    fn into_public_plan(self) -> ApplyResourcePlan<R> {
         ApplyResourcePlan {
             uid: *self.resource.uid(),
             state: self.resource.into(),
             action: self.action,
             reconciliation_required: self.reconciliation_required,
             executable: self.executable,
-        }
-    }
-
-    pub fn into_apply_result(self) -> ApplyResourceResult<R> {
-        ApplyResourceResult {
-            uid: *self.resource.uid(),
-            state: self.resource.into(),
-            outcome: self.action.into(),
         }
     }
 }

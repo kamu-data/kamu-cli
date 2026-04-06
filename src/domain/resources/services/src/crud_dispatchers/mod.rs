@@ -12,7 +12,10 @@ mod resource_crud_dispatcher_helpers;
 mod resource_crud_dispatcher_registry;
 
 pub use kamu_resources::{
+    ApplyManifestApplicationDecision,
     ApplyManifestPlan,
+    ApplyManifestPlanningDecision,
+    ApplyManifestRejection,
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
@@ -21,7 +24,6 @@ pub use kamu_resources::{
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
-    ResourceLifecycleValidationError,
     UnsupportedResourceDescriptorError,
 };
 pub use resource_crud_dispatcher_helpers::*;

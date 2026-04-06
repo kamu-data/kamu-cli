@@ -31,12 +31,29 @@ macro_rules! declare_apply_resource_use_case {
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case {
+        impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case
+        where
+            $resource: kamu_resources::ReconcilableEventSourcedResource
+                + kamu_resources::ResourceDescriptorProvider,
+            <$resource as kamu_resources::DeclarativeResource>::Spec:
+                serde::Serialize + PartialEq + Clone + kamu_resources::ResourceValidateSpec,
+            <$resource as kamu_resources::DeclarativeResource>::Status:
+                serde::Serialize + kamu_resources::ResourceStatusLike,
+            <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
+                kamu_resources::IntoApplyResourceRejection
+                    + kamu_resources::InvariantViolationOf<
+                        <$resource as kamu_resources::DeclarativeResource>::ResourceState,
+                    >
+                    + From<kamu_resources::ResourceMetadataValidationError>
+                    + From<
+                        <<$resource as kamu_resources::DeclarativeResource>::Spec as kamu_resources::ResourceValidateSpec>::ValidationError,
+                    >,
+        {
             async fn plan(
                 &self,
                 params: kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<
-                kamu_resources::ApplyResourcePlan<$resource>,
+                kamu_resources::ApplyResourcePlanningDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
@@ -53,7 +70,7 @@ macro_rules! declare_apply_resource_use_case {
                 &self,
                 params: kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<
-                kamu_resources::ApplyResourceResult<$resource>,
+                kamu_resources::ApplyResourceApplicationDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
@@ -63,6 +80,15 @@ macro_rules! declare_apply_resource_use_case {
                     self.time_source.as_ref(),
                 );
                 let plan = planner.plan_internal(params).await?;
+
+                let plan = match plan {
+                    $crate::PlannedApplyResourceDecision::Planned(plan) => plan,
+                    $crate::PlannedApplyResourceDecision::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourceApplicationDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
 
                 let executor = $crate::ApplyResourcePlanExecutor::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),

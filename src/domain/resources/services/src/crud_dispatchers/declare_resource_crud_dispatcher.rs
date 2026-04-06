@@ -50,7 +50,10 @@ macro_rules! declare_resource_crud_dispatcher {
             async fn plan_apply(
                 &self,
                 request: $crate::ResourceCrudDispatcherApplyRequest,
-            ) -> Result<kamu_resources::ApplyManifestPlan, $crate::ApplyResourceCrudDispatcherError> {
+            ) -> Result<
+                kamu_resources::ApplyManifestPlanningDecision,
+                $crate::ApplyResourceCrudDispatcherError,
+            > {
                 let kind =
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
                 let api_version =
@@ -67,20 +70,32 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                let resource = $crate::typed_resource_state_to_view::<$resource>(&plan.state)?;
+                Ok(match plan {
+                    kamu_resources::ApplyResourcePlanningDecision::Planned(plan) => {
+                        let resource = $crate::typed_resource_state_to_view::<$resource>(&plan.state)?;
 
-                Ok(kamu_resources::ApplyManifestPlan {
-                    resource,
-                    outcome: plan.action.into(),
-                    reconciliation_required: plan.reconciliation_required,
-                    executable: plan.executable,
+                        kamu_resources::ApplyManifestPlanningDecision::Planned(
+                            kamu_resources::ApplyManifestPlan {
+                                resource,
+                                outcome: plan.action.into(),
+                                reconciliation_required: plan.reconciliation_required,
+                                executable: plan.executable,
+                            },
+                        )
+                    }
+                    kamu_resources::ApplyResourcePlanningDecision::Rejected(rejection) => {
+                        kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection.into())
+                    }
                 })
             }
 
             async fn apply(
                 &self,
                 request: $crate::ResourceCrudDispatcherApplyRequest,
-            ) -> Result<kamu_resources::ApplyManifestResult, $crate::ApplyResourceCrudDispatcherError> {
+            ) -> Result<
+                kamu_resources::ApplyManifestApplicationDecision,
+                $crate::ApplyResourceCrudDispatcherError,
+            > {
                 let kind =
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
                 let api_version =
@@ -97,11 +112,21 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                let resource = $crate::typed_resource_state_to_view::<$resource>(&result.state)?;
+                Ok(match result {
+                    kamu_resources::ApplyResourceApplicationDecision::Applied(result) => {
+                        let resource =
+                            $crate::typed_resource_state_to_view::<$resource>(&result.state)?;
 
-                Ok(kamu_resources::ApplyManifestResult {
-                    resource,
-                    outcome: result.outcome,
+                        kamu_resources::ApplyManifestApplicationDecision::Applied(
+                            kamu_resources::ApplyManifestResult {
+                                resource,
+                                outcome: result.outcome,
+                            },
+                        )
+                    }
+                    kamu_resources::ApplyResourceApplicationDecision::Rejected(rejection) => {
+                        kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection.into())
+                    }
                 })
             }
 
