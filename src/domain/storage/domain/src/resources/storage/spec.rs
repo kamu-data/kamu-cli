@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::ValueRef;
-use kamu_resources::ResourceValidateSpec;
+use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
 
 use crate::StorageProviderKind;
@@ -291,6 +291,14 @@ impl ResourceValidateSpec for StorageSpec {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceLinterSpec for StorageSpec {
+    fn lint_warnings(&self) -> Vec<ResourceWarning> {
+        Vec::new()
     }
 }
 

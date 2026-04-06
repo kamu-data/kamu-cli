@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use kamu_resources::ResourceValidateSpec;
+use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +29,11 @@ pub struct VariableSpec {
 impl VariableSetSpec {
     pub const MAX_VARIABLES: usize = 256;
     pub const MAX_VARIABLE_VALUE_LEN: usize = 16 * 1024;
+    pub const WARNING_VARIABLE_VALUE_LEN: usize = 1024;
+    pub const RESERVED_VARIABLE_PREFIX: &str = "KAMU_";
+
+    pub const WARNING_CODE_RESERVED_VARIABLE_PREFIX: &str = "reserved_variable_prefix";
+    pub const WARNING_CODE_LONG_VARIABLE_VALUE: &str = "long_variable_value";
 
     fn is_valid_variable_name(name: &str) -> bool {
         let mut chars = name.chars();
@@ -82,6 +87,42 @@ impl ResourceValidateSpec for VariableSetSpec {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceLinterSpec for VariableSetSpec {
+    fn lint_warnings(&self) -> Vec<ResourceWarning> {
+        let mut warnings = Vec::new();
+
+        for (name, variable) in &self.variables {
+            if name.starts_with(Self::RESERVED_VARIABLE_PREFIX) {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_RESERVED_VARIABLE_PREFIX,
+                    path: Some(format!("spec.variables.{name}")),
+                    message: format!(
+                        "Variable '{name}' uses reserved '{prefix}' prefix",
+                        prefix = Self::RESERVED_VARIABLE_PREFIX
+                    ),
+                });
+            }
+
+            if variable.value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_LONG_VARIABLE_VALUE,
+                    path: Some(format!("spec.variables.{name}.value")),
+                    message: format!(
+                        "Variable '{name}' value is unusually long: got {actual}, warning \
+                         threshold is {threshold}",
+                        actual = variable.value.len(),
+                        threshold = Self::WARNING_VARIABLE_VALUE_LEN
+                    ),
+                });
+            }
+        }
+
+        warnings
     }
 }
 

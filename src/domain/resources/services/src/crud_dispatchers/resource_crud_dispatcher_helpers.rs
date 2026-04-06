@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceConditionStatus,
     ResourceConditionType,
     ResourceDescriptorProvider,
+    ResourceLinterSpec,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceStatusSummaryView,
@@ -31,6 +32,7 @@ use kamu_resources::{
     ResourceView,
     ResourceViewAccount,
     ResourceViewMetadata,
+    ResourceWarning,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -41,10 +43,10 @@ pub fn decode_resource_spec<R>(
     kind: &str,
     api_version: &str,
     spec: serde_json::Value,
-) -> Result<R::Spec, ApplyResourceCrudDispatcherError>
+) -> Result<DecodedResourceSpec<R::Spec>, ApplyResourceCrudDispatcherError>
 where
     R: ReconcilableEventSourcedResource,
-    R::Spec: DeserializeOwned + ResourceValidateSpec,
+    R::Spec: DeserializeOwned + ResourceValidateSpec + ResourceLinterSpec,
     <R::Spec as ResourceValidateSpec>::ValidationError: std::fmt::Display,
 {
     let spec: R::Spec = serde_json::from_value(spec).map_err(|e| {
@@ -62,7 +64,17 @@ where
             message: e.to_string(),
         })?;
 
-    Ok(spec)
+    let warnings = spec.lint_warnings();
+
+    Ok(DecodedResourceSpec { spec, warnings })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct DecodedResourceSpec<T> {
+    pub spec: T,
+    pub warnings: Vec<ResourceWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +82,7 @@ where
 pub async fn map_apply_resource_planning_decision<R>(
     decision: ApplyResourcePlanningDecision<R>,
     generic_resource_query_service: &dyn GenericResourceQueryService,
+    warnings: Vec<ResourceWarning>,
 ) -> Result<ApplyManifestPlanningDecision, InternalError>
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
@@ -106,6 +119,7 @@ where
                 reconciliation_required,
                 executable,
                 changes,
+                warnings,
             })
         }
         ApplyResourcePlanningDecision::Rejected(rejection) => {
@@ -118,6 +132,7 @@ where
 
 pub fn map_apply_resource_application_decision<R>(
     decision: ApplyResourceApplicationDecision<R>,
+    warnings: Vec<ResourceWarning>,
 ) -> Result<ApplyManifestApplicationDecision, InternalError>
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
@@ -129,7 +144,11 @@ where
             let kamu_resources::ApplyResourceResult { state, outcome, .. } = result;
             let resource = typed_resource_state_to_view::<R>(state)?;
 
-            ApplyManifestApplicationDecision::Applied(ApplyManifestResult { resource, outcome })
+            ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
+                resource,
+                outcome,
+                warnings,
+            })
         }
         ApplyResourceApplicationDecision::Rejected(rejection) => {
             ApplyManifestApplicationDecision::Rejected(rejection.into())

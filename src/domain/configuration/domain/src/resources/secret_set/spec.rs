@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use kamu_resources::ResourceValidateSpec;
+use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +29,11 @@ pub struct SecretSpec {
 impl SecretSetSpec {
     pub const MAX_SECRETS: usize = 256;
     pub const MAX_SECRET_VALUE_LEN: usize = 16 * 1024;
+    pub const WARNING_SECRET_VALUE_LEN: usize = 1024;
+    pub const RESERVED_SECRET_PREFIX: &str = "KAMU_";
+
+    pub const WARNING_CODE_RESERVED_SECRET_PREFIX: &str = "reserved_secret_prefix";
+    pub const WARNING_CODE_LONG_SECRET_VALUE: &str = "long_secret_value";
 
     fn is_valid_secret_name(name: &str) -> bool {
         let mut chars = name.chars();
@@ -78,6 +83,42 @@ impl ResourceValidateSpec for SecretSetSpec {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceLinterSpec for SecretSetSpec {
+    fn lint_warnings(&self) -> Vec<ResourceWarning> {
+        let mut warnings = Vec::new();
+
+        for (name, secret) in &self.secrets {
+            if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX,
+                    path: Some(format!("spec.secrets.{name}")),
+                    message: format!(
+                        "Secret '{name}' uses reserved '{prefix}' prefix",
+                        prefix = Self::RESERVED_SECRET_PREFIX
+                    ),
+                });
+            }
+
+            if secret.value.len() > Self::WARNING_SECRET_VALUE_LEN {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_LONG_SECRET_VALUE,
+                    path: Some(format!("spec.secrets.{name}.value")),
+                    message: format!(
+                        "Secret '{name}' value is unusually long: got {actual}, warning threshold \
+                         is {threshold}",
+                        actual = secret.value.len(),
+                        threshold = Self::WARNING_SECRET_VALUE_LEN
+                    ),
+                });
+            }
+        }
+
+        warnings
     }
 }
 

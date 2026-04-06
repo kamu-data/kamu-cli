@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resource_linter_spec;
 mod resource_validate_metadata;
 mod resource_validate_spec;
 
+pub use resource_linter_spec::*;
 pub use resource_validate_metadata::*;
 pub use resource_validate_spec::*;

@@ -27,6 +27,7 @@ use kamu_resources::{
     ResourceUID,
     ResourceUIDNotFoundError,
     ResourceView,
+    ResourceWarning,
 };
 use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_dispatcher_by_kind};
 
@@ -85,6 +86,7 @@ impl ResourceFacade for ResourceFacadeImpl {
         )?;
 
         let metadata = self.make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
 
         let plan = dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
@@ -96,6 +98,7 @@ impl ResourceFacade for ResourceFacadeImpl {
 
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
+                plan.warnings.splice(0..0, metadata_warnings);
                 plan.resource = self
                     .resource_account_resolver
                     .hydrate_resource_view_account(plan.resource, Some(&target_account))
@@ -127,6 +130,7 @@ impl ResourceFacade for ResourceFacadeImpl {
         )?;
 
         let metadata = self.make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
 
         let result = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
@@ -138,6 +142,7 @@ impl ResourceFacade for ResourceFacadeImpl {
 
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
+                result.warnings.splice(0..0, metadata_warnings);
                 result.resource = self
                     .resource_account_resolver
                     .hydrate_resource_view_account(result.resource, Some(&target_account))
@@ -304,6 +309,8 @@ impl ResourceFacade for ResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceFacadeImpl {
+    const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
+
     async fn resolve_resource_uid<E>(
         &self,
         kind: &str,
@@ -361,6 +368,25 @@ impl ResourceFacadeImpl {
             manifest.metadata.annotations.clone(),
         )
         .map_err(Into::into)
+    }
+
+    fn collect_manifest_metadata_warnings(manifest: &ResourceManifest) -> Vec<ResourceWarning> {
+        let mut warnings = Vec::new();
+
+        if manifest
+            .metadata
+            .description
+            .as_ref()
+            .is_none_or(|description| description.trim().is_empty())
+        {
+            warnings.push(ResourceWarning {
+                code: Self::WARNING_CODE_MISSING_DESCRIPTION,
+                path: Some("metadata.description".to_string()),
+                message: "Resource has no description".to_string(),
+            });
+        }
+
+        warnings
     }
 
     fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ApplyResourceOutcome, ApplyResourceRejectionCategory, ResourceView};
+use crate::{ApplyResourceOutcome, ApplyResourceRejectionCategory, ResourceView, ResourceWarning};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,7 @@ pub struct ApplyManifestPlan {
     pub reconciliation_required: bool,
     pub executable: bool,
     pub changes: Vec<ApplyManifestChange>,
+    pub warnings: Vec<ResourceWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +46,7 @@ pub enum ApplyManifestChangeKind {
 pub struct ApplyManifestResult {
     pub resource: ResourceView,
     pub outcome: ApplyResourceOutcome,
+    pub warnings: Vec<ResourceWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

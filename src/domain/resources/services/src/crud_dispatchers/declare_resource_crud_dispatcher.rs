@@ -41,7 +41,8 @@ macro_rules! declare_resource_crud_dispatcher {
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::de::DeserializeOwned
                     + serde::Serialize
-                    + kamu_resources::ResourceValidateSpec,
+                    + kamu_resources::ResourceValidateSpec
+                    + kamu_resources::ResourceLinterSpec,
             <<$resource as kamu_resources::DeclarativeResource>::Spec as kamu_resources::ResourceValidateSpec>::ValidationError:
                 std::fmt::Display,
             <$resource as kamu_resources::DeclarativeResource>::Status:
@@ -60,14 +61,15 @@ macro_rules! declare_resource_crud_dispatcher {
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
                 let api_version =
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.api_version;
-                let spec = $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
+                let decoded_spec =
+                    $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
 
                 let plan = self
                     .apply_resource_use_case
                     .plan(kamu_resources::ApplyResourceParams {
                         uid: request.uid,
                         metadata: request.metadata,
-                        spec,
+                        spec: decoded_spec.spec,
                     })
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
@@ -75,6 +77,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 $crate::map_apply_resource_planning_decision::<$resource>(
                     plan,
                     self.generic_resource_query_service.as_ref(),
+                    decoded_spec.warnings,
                 )
                 .await
                 .map_err(Into::into)
@@ -91,19 +94,23 @@ macro_rules! declare_resource_crud_dispatcher {
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
                 let api_version =
                     <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.api_version;
-                let spec = $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
+                let decoded_spec =
+                    $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
 
                 let result = self
                     .apply_resource_use_case
                     .apply(kamu_resources::ApplyResourceParams {
                         uid: request.uid,
                         metadata: request.metadata,
-                        spec,
+                        spec: decoded_spec.spec,
                     })
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                $crate::map_apply_resource_application_decision::<$resource>(result)
+                $crate::map_apply_resource_application_decision::<$resource>(
+                    result,
+                    decoded_spec.warnings,
+                )
                     .map_err(Into::into)
             }
 

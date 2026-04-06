@@ -26,6 +26,7 @@ impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcom
                     operation: plan.outcome.into(),
                     resource: plan.resource.into(),
                     changes: plan.changes.into_iter().map(Into::into).collect(),
+                    warnings: plan.warnings.into_iter().map(Into::into).collect(),
                 })
             }
             kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection) => {
@@ -43,6 +44,7 @@ impl From<kamu_resources::ApplyManifestApplicationDecision> for ResourceApplyOut
                     operation: result.outcome.into(),
                     resource: result.resource.into(),
                     changes: Vec::new(),
+                    warnings: result.warnings.into_iter().map(Into::into).collect(),
                 })
             }
             kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection) => {
@@ -59,6 +61,7 @@ pub struct ResourceApplySuccess {
     pub operation: ResourceApplyOperation,
     pub resource: Resource,
     pub changes: Vec<ResourceApplyChange>,
+    pub warnings: Vec<ResourceApplyWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,6 +117,25 @@ impl From<kamu_resources_facade::ApplyManifestRejection> for ResourceApplyReject
     fn from(value: kamu_resources_facade::ApplyManifestRejection) -> Self {
         Self {
             category: value.category.into(),
+            message: value.message,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApplyWarning {
+    pub code: &'static str,
+    pub path: Option<String>,
+    pub message: String,
+}
+
+impl From<kamu_resources::ResourceWarning> for ResourceApplyWarning {
+    fn from(value: kamu_resources::ResourceWarning) -> Self {
+        Self {
+            code: value.code,
+            path: value.path,
             message: value.message,
         }
     }

@@ -23,4 +23,5 @@ pub use kamu_resources::{
     ResourceView,
     ResourceViewAccount,
     ResourceViewMetadata,
+    ResourceWarning,
 };
