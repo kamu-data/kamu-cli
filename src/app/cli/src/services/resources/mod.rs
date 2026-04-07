@@ -7,20 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod models;
+mod r#impl;
 mod resource_facade_factory;
+mod resource_manifest_discovery_service;
+mod resource_manifest_execution_service;
 mod resource_summary_service;
 
 use dill::CatalogBuilder;
-pub use models::*;
 pub use resource_facade_factory::*;
+pub use resource_manifest_discovery_service::*;
+pub use resource_manifest_execution_service::*;
 pub use resource_summary_service::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<ResourceFacadeFactory>();
-    catalog_builder.add::<ResourceSummaryService>();
+    catalog_builder.add::<r#impl::ResourceFacadeFactoryImpl>();
+    catalog_builder.add::<r#impl::ResourceManifestDiscoveryServiceImpl>();
+    catalog_builder.add::<r#impl::ResourceManifestExecutionServiceImpl>();
+    catalog_builder.add::<r#impl::ResourceSummaryServiceImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

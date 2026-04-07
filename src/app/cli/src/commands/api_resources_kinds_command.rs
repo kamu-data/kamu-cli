@@ -22,7 +22,7 @@ use crate::resources::ResourceFacadeFactory;
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct ApiResourcesKindsCommand {
-    resource_facade_factory: Arc<ResourceFacadeFactory>,
+    resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
     output_config: Arc<OutputConfig>,

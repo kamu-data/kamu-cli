@@ -14,7 +14,7 @@ use domain::{
     ResourcesSummary,
 };
 use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
 use url::Url;
 
@@ -62,8 +62,63 @@ impl RemoteGraphqlResourceFacadeImpl {
         self.graphql_client.execute(query).await
     }
 
-    fn unsupported_operation_error() -> InternalError {
-        InternalError::new("Remote resource facade operation is not implemented yet")
+    fn apply_manifest_query(
+        request: &ApplyManifestRequest,
+        dry_run: bool,
+    ) -> Result<String, ApplyManifestError> {
+        let manifest = serde_json::to_string(&request.manifest).int_err()?;
+        let format = request.format.to_string();
+
+        Ok(format!(
+            r#"
+            mutation {{
+              resources {{
+                applyManifest(manifest: {manifest}, format: {format}, dryRun: {dry_run}) {{
+                  __typename
+                  ... on ResourceApplySuccess {{
+                    operation
+                    resource {{
+                      apiVersion
+                      kind {{
+                        value
+                      }}
+                      metadata {{
+                        id
+                        accountId
+                        name
+                        description
+                        labels
+                        annotations
+                        generation
+                        createdAt
+                        updatedAt
+                        deletedAt
+                        lastReconciledAt
+                      }}
+                      spec
+                      status
+                    }}
+                    changes {{
+                      kind
+                      path
+                      before
+                      after
+                    }}
+                    warnings {{
+                      code
+                      path
+                      message
+                    }}
+                  }}
+                  ... on ResourceApplyRejection {{
+                    category
+                    message
+                  }}
+                }}
+              }}
+            }}
+            "#
+        ))
     }
 
     fn target_account_id(
@@ -209,49 +264,65 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         _request: GetResourceRequest,
     ) -> Result<kamu_resources::ResourceView, GetResourceError> {
-        Err(Self::unsupported_operation_error().into())
+        unimplemented!("Remote resource facade get operation is not implemented yet")
     }
 
     async fn render_manifest(
         &self,
         _request: RenderResourceManifestRequest,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        Err(Self::unsupported_operation_error().into())
+        unimplemented!("Remote resource facade render_manifest operation is not implemented yet")
     }
 
     async fn list(
         &self,
         _request: ListResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListResourcesError> {
-        Err(Self::unsupported_operation_error().into())
+        unimplemented!("Remote resource facade list operation is not implemented yet")
     }
 
     async fn list_all(
         &self,
         _request: ListAllResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListAllResourcesError> {
-        Err(Self::unsupported_operation_error().into())
+        unimplemented!("Remote resource facade list_all operation is not implemented yet")
     }
 
     async fn plan_apply_manifest(
         &self,
-        _request: ApplyManifestRequest,
+        request: ApplyManifestRequest,
     ) -> Result<domain::ApplyManifestPlanningDecision, ApplyManifestError> {
-        Err(Self::unsupported_operation_error().into())
+        let query = Self::apply_manifest_query(&request, true)?;
+        let response: fragments::ApplyManifestMutationDataFragment =
+            self.execute_graphql(&query).await?;
+
+        response
+            .resources
+            .apply_manifest
+            .into_planning_decision()
+            .map_err(Into::into)
     }
 
     async fn apply_manifest(
         &self,
-        _request: ApplyManifestRequest,
+        request: ApplyManifestRequest,
     ) -> Result<domain::ApplyManifestApplicationDecision, ApplyManifestError> {
-        Err(Self::unsupported_operation_error().into())
+        let query = Self::apply_manifest_query(&request, false)?;
+        let response: fragments::ApplyManifestMutationDataFragment =
+            self.execute_graphql(&query).await?;
+
+        response
+            .resources
+            .apply_manifest
+            .into_application_decision()
+            .map_err(Into::into)
     }
 
     async fn delete(
         &self,
         _request: DeleteResourceRequest,
     ) -> Result<kamu_resources::ResourceUID, DeleteResourceError> {
-        Err(Self::unsupported_operation_error().into())
+        unimplemented!("Remote resource facade delete operation is not implemented yet")
     }
 }
 

@@ -29,7 +29,7 @@ impl StorageResource {
     pub const RESOURCE_TYPE: &'static str = "Storage";
     pub const RESOURCE_NAME: &'static str = "storages";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st"];
-    pub const API_VERSION: &'static str = "v1alpha1";
+    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
 impl ResourceType for StorageResource {

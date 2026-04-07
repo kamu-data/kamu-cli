@@ -23,7 +23,7 @@ use crate::resources::{ResourceSummaryService, ResourceSummaryView};
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct ApiResourcesSummaryCommand {
-    resource_summary_service: Arc<ResourceSummaryService>,
+    resource_summary_service: Arc<dyn ResourceSummaryService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
     output_config: Arc<OutputConfig>,

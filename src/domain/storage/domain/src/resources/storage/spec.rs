@@ -16,6 +16,7 @@ use crate::StorageProviderKind;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageSpec {
     pub provider: StorageProviderSpec,
 }
@@ -23,6 +24,7 @@ pub struct StorageSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum StorageProviderSpec {
     LocalFs(StorageProviderSpecLocalFs),
     S3(StorageProviderSpecS3),
@@ -32,6 +34,7 @@ pub enum StorageProviderSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageProviderSpecLocalFs {
     pub workspace_path: String,
 }
@@ -39,6 +42,7 @@ pub struct StorageProviderSpecLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageProviderSpecS3 {
     pub bucket: ValueRef,
     pub region: ValueRef,
@@ -60,10 +64,13 @@ impl StorageProviderSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum S3CredentialsSpec {
     Anonymous,
     AccessKey {
+        #[serde(rename = "accessKey")]
         access_key: ValueRef,
+        #[serde(rename = "secretKey")]
         secret_key: ValueRef,
     },
 }
@@ -71,6 +78,7 @@ pub enum S3CredentialsSpec {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageProviderSpecIpfs {
     pub gateway: Option<ValueRef>,
     pub api_endpoint: Option<ValueRef>,
@@ -115,11 +123,15 @@ impl StorageSpec {
                     Ok(())
                 }
             }
-            ValueRef::VariableRef { variable_set, name } => {
+            ValueRef::VariableRef(variable_ref) => {
+                let variable_set = &variable_ref.variable_set;
+                let name = &variable_ref.name;
                 Self::validate_reference_name(variable_set)?;
                 Self::validate_reference_name(name)
             }
-            ValueRef::SecretRef { secret_set, name } => {
+            ValueRef::SecretRef(secret_ref) => {
+                let secret_set = &secret_ref.secret_set;
+                let name = &secret_ref.name;
                 Self::validate_reference_name(secret_set)?;
                 Self::validate_reference_name(name)
             }
@@ -216,6 +228,12 @@ pub enum StorageValidationError {
     #[error("s3 region literal must not be empty")]
     EmptyS3Region,
 
+    #[error("s3 prefix literal must not be empty")]
+    EmptyS3Prefix,
+
+    #[error("s3 endpoint literal must not be empty")]
+    EmptyS3Endpoint,
+
     #[error("s3 access key literal must not be empty")]
     EmptyS3AccessKey,
 
@@ -247,11 +265,11 @@ impl ResourceValidateSpec for StorageSpec {
                 Self::validate_value_ref(&spec.region, StorageValidationError::EmptyS3Region)?;
 
                 if let Some(prefix) = &spec.prefix {
-                    Self::validate_value_ref(prefix, StorageValidationError::EmptyS3Bucket)?;
+                    Self::validate_value_ref(prefix, StorageValidationError::EmptyS3Prefix)?;
                 }
 
                 if let Some(endpoint) = &spec.endpoint {
-                    Self::validate_value_ref(endpoint, StorageValidationError::EmptyS3Region)?;
+                    Self::validate_value_ref(endpoint, StorageValidationError::EmptyS3Endpoint)?;
                 }
 
                 match &spec.credentials {

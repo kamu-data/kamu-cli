@@ -29,7 +29,7 @@ impl VariableSetResource {
     pub const RESOURCE_TYPE: &'static str = "VariableSet";
     pub const RESOURCE_NAME: &'static str = "variablesets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
-    pub const API_VERSION: &'static str = "v1alpha1";
+    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
 impl ResourceType for VariableSetResource {

@@ -17,7 +17,11 @@ use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_datasets::DeleteDatasetError;
-use kamu_resources_facade::{ListSupportedResourceKindsError, ResourcesSummaryError};
+use kamu_resources_facade::{
+    ApplyManifestError,
+    ListSupportedResourceKindsError,
+    ResourcesSummaryError,
+};
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
@@ -248,6 +252,24 @@ impl From<ListSupportedResourceKindsError> for CLIError {
         match e {
             ListSupportedResourceKindsError::RemoteRequest(err) => Self::from(err),
             ListSupportedResourceKindsError::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<ApplyManifestError> for CLIError {
+    fn from(e: ApplyManifestError) -> Self {
+        use ApplyManifestError as E;
+        match e {
+            e @ (E::ParseManifest(_)
+            | E::UnsupportedDescriptor(_)
+            | E::BadAccount(_)
+            | E::InvalidMetadata(_)
+            | E::InvalidSpec(_)
+            | E::UIDNotFound(_)
+            | E::TypeMismatch(_)
+            | E::ConcurrentModification(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
         }
     }
 }

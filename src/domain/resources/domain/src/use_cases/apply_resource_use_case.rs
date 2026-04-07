@@ -88,11 +88,26 @@ pub struct ApplyResourceResult<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
 pub enum ApplyResourceOutcome {
+    #[strum(to_string = "Created")]
     Created,
+    #[strum(to_string = "Updated")]
     Updated,
+    #[strum(to_string = "Unchanged")]
     Untouched,
+}
+
+impl ApplyResourceOutcome {
+    pub fn label(self, dry_run: bool) -> String {
+        let label = self.to_string();
+
+        if dry_run {
+            format!("{label} (dry-run)")
+        } else {
+            label
+        }
+    }
 }
 
 impl From<ApplyResourceAction> for ApplyResourceOutcome {
@@ -121,6 +136,17 @@ pub enum ApplyResourceRejectionCategory {
     BusinessValidationFailed,
     ReferencedObjectMissing,
     LifecycleRuleConflict,
+}
+
+impl ApplyResourceRejectionCategory {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::ImmutableFieldChanged => "immutable field changed",
+            Self::BusinessValidationFailed => "business validation failed",
+            Self::ReferencedObjectMissing => "referenced object missing",
+            Self::LifecycleRuleConflict => "lifecycle rule conflict",
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

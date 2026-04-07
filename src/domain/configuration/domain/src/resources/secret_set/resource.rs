@@ -29,7 +29,7 @@ impl SecretSetResource {
     pub const RESOURCE_TYPE: &'static str = "SecretSet";
     pub const RESOURCE_NAME: &'static str = "secretsets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["ss"];
-    pub const API_VERSION: &'static str = "v1alpha1";
+    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
 impl ResourceType for SecretSetResource {

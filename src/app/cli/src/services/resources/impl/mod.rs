@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod apply;
-mod summary;
-mod supported_kinds;
+mod resource_facade_factory_impl;
+mod resource_manifest_discovery_service_impl;
+mod resource_manifest_execution_service_impl;
+mod resource_summary_service_impl;
 
-pub(crate) use apply::*;
-pub(crate) use summary::*;
-pub(crate) use supported_kinds::*;
+pub use resource_facade_factory_impl::*;
+pub use resource_manifest_discovery_service_impl::*;
+pub use resource_manifest_execution_service_impl::*;
+pub use resource_summary_service_impl::*;

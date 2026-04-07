@@ -47,7 +47,7 @@ pub struct ResourceAPIVersionMismatchError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error("Invalid spec for resource {kind}/{api_version}: {message}")]
+#[error("Invalid spec for resource {kind}::{api_version}: {message}")]
 pub struct ResourceInvalidSpecError {
     pub kind: String,
     pub api_version: String,

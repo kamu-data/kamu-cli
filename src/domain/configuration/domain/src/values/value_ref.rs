@@ -12,16 +12,37 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ValueRef {
     Literal(String),
-    VariableRef { variable_set: String, name: String },
-    SecretRef { secret_set: String, name: String },
+    VariableRef(VariableValueRef),
+    SecretRef(SecretValueRef),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ValueRef {
     pub fn is_reference(&self) -> bool {
         !matches!(self, Self::Literal(_))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VariableValueRef {
+    pub variable_set: String,
+    pub name: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SecretValueRef {
+    pub secret_set: String,
+    pub name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

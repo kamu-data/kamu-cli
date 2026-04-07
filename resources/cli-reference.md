@@ -12,6 +12,7 @@ To regenerate this schema from existing code, use the following command:
 **Subcommands:**
 
 * `add` — Add a new dataset or modify an existing one
+* `apply` — Create or update resources from manifest files
 * `api-resources` — List supported resource kinds in the active context
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
@@ -99,6 +100,57 @@ Add a dataset from manifest hosted externally (e.g. on GihHub):
     kamu add https://raw.githubusercontent.com/kamu-data/kamu-contrib/master/ca.bankofcanada/ca.bankofcanada.exchange-rates.daily.yaml
 
 To add dataset from a repository see `kamu pull` command.
+
+
+
+
+## `kamu apply`
+
+Create or update resources from manifest files
+
+**Usage:** `kamu apply [OPTIONS] --file <PATH>`
+
+**Options:**
+
+* `--context <NAME>` — Override the current resource context for this invocation
+* `-f`, `--file <PATH>` — Manifest file or directory path
+* `--dry-run` — Preview the accepted changes without applying them
+* `--format <FMT>` — Parse all selected files using the specified manifest format
+
+  Possible values: `json`, `yaml`
+
+* `-r`, `--recursive` — Recursively scan directories for manifests
+* `--continue-on-error` — Continue processing after per-manifest failures
+
+Applies one or more resource manifests to the active resource context.
+
+If the active context is `local`, manifests are applied to the current
+workspace. If the active context points to a remote server, manifests are
+applied through the remote GraphQL API.
+
+Use `--dry-run` to preview the accepted changes without applying them.
+
+**Examples:**
+
+Apply a single manifest:
+
+    kamu apply -f my-resource.yaml
+
+Preview changes without applying them:
+
+    kamu apply -f my-resource.yaml --dry-run
+
+Apply all manifests in a directory recursively:
+
+    kamu apply -f manifests/ --recursive
+
+Apply multiple files in the given order:
+
+    kamu apply -f a.yaml -f b.json
+
+Force JSON parsing regardless of file extension:
+
+    kamu apply -f generated.resource --format json
 
 
 

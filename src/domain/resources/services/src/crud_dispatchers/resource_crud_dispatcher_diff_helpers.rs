@@ -9,6 +9,7 @@
 
 use std::collections::BTreeSet;
 
+use chrono::SubsecRound;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
@@ -118,15 +119,15 @@ fn append_metadata_changes(
         changes,
         ApplyManifestChangeKind::Metadata,
         "metadata.createdAt",
-        before.map(|view| view.metadata.created_at),
-        Some(after.metadata.created_at),
+        before.map(|view| normalize_timestamp_precision(view.metadata.created_at)),
+        Some(normalize_timestamp_precision(after.metadata.created_at)),
     )?;
     push_metadata_change(
         changes,
         ApplyManifestChangeKind::Metadata,
         "metadata.updatedAt",
-        before.map(|view| view.metadata.updated_at),
-        Some(after.metadata.updated_at),
+        before.map(|view| normalize_timestamp_precision(view.metadata.updated_at)),
+        Some(normalize_timestamp_precision(after.metadata.updated_at)),
     )?;
     push_metadata_change(
         changes,
@@ -174,6 +175,14 @@ where
     value
         .map(|value| serde_json::to_value(value).int_err())
         .transpose()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn normalize_timestamp_precision(
+    value: chrono::DateTime<chrono::Utc>,
+) -> chrono::DateTime<chrono::Utc> {
+    value.trunc_subsecs(6)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

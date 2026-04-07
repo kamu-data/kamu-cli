@@ -96,6 +96,7 @@ pub enum PasswordHashingMode {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Add(Add),
+    Apply(Apply),
     ApiResources(ApiResources),
     Complete(Complete),
     Completions(Completions),
@@ -124,6 +125,74 @@ pub enum Command {
     Ui(Ui),
     Verify(Verify),
     Version(Version),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Create or update resources from manifest files
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Applies one or more resource manifests to the active resource context.
+
+If the active context is `local`, manifests are applied to the current
+workspace. If the active context points to a remote server, manifests are
+applied through the remote GraphQL API.
+
+Use `--dry-run` to preview the accepted changes without applying them.
+
+**Examples:**
+
+Apply a single manifest:
+
+    kamu apply -f my-resource.yaml
+
+Preview changes without applying them:
+
+    kamu apply -f my-resource.yaml --dry-run
+
+Apply all manifests in a directory recursively:
+
+    kamu apply -f manifests/ --recursive
+
+Apply multiple files in the given order:
+
+    kamu apply -f a.yaml -f b.json
+
+Force JSON parsing regardless of file extension:
+
+    kamu apply -f generated.resource --format json
+"#)]
+pub struct Apply {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Manifest file or directory path
+    #[arg(long, short = 'f', value_name = "PATH", required = true)]
+    pub file: Vec<PathBuf>,
+
+    /// Preview the accepted changes without applying them
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Parse all selected files using the specified manifest format
+    #[arg(long, value_name = "FMT", value_enum)]
+    pub format: Option<ApplyManifestInputFormat>,
+
+    /// Recursively scan directories for manifests
+    #[arg(long, short = 'r')]
+    pub recursive: bool,
+
+    /// Continue processing after per-manifest failures
+    #[arg(long)]
+    pub continue_on_error: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ApplyManifestInputFormat {
+    Json,
+    Yaml,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

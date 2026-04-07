@@ -94,7 +94,7 @@ pub struct ResourceCrudDispatcherDeleteRequest {
 
 #[derive(Debug, Error)]
 pub enum ApplyResourceCrudDispatcherError {
-    #[error("Invalid spec for resource {kind}/{api_version}: {message}")]
+    #[error("Invalid spec for resource {kind}::{api_version}: {message}")]
     InvalidSpec {
         kind: String,
         api_version: String,
@@ -146,10 +146,10 @@ pub enum DeleteResourcesCrudDispatcherError {
 
 #[derive(Debug, Error)]
 pub enum UnsupportedResourceDescriptorError {
-    #[error("Unsupported resource descriptor {kind}/{api_version}")]
+    #[error("Unsupported resource descriptor {kind}::{api_version}")]
     NotFound { kind: String, api_version: String },
 
-    #[error("Duplicate resource CRUD dispatcher registered for {kind}/{api_version}")]
+    #[error("Duplicate resource CRUD dispatcher registered for {kind}::{api_version}")]
     Duplicate { kind: String, api_version: String },
 }
 

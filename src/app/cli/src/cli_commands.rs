@@ -47,6 +47,18 @@ pub fn get_command(
             .cast(),
         ),
 
+        cli::Command::Apply(c) => Box::new(
+            ApplyCommand::builder(
+                c.resource_context.context,
+                c.file,
+                c.recursive,
+                c.dry_run,
+                c.continue_on_error,
+                c.format,
+            )
+            .cast(),
+        ),
+
         cli::Command::ApiResources(c) => match c.subcommand {
             Some(cli::ApiResourcesSubCommand::Kinds(_)) => {
                 Box::new(ApiResourcesKindsCommand::builder(c.resource_context.context).cast())
@@ -585,6 +597,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Ctx(_)
+        | cli::Command::Apply(_)
         | cli::Command::ApiResources(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
