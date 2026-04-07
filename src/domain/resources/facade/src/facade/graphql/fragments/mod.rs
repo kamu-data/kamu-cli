@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod client;
-mod error;
-pub mod middleware;
+mod summary;
+mod supported_kinds;
 
-pub use client::*;
-pub use error::*;
+pub(crate) use summary::*;
+pub(crate) use supported_kinds::*;

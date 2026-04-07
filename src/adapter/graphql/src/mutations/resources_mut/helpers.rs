@@ -61,6 +61,7 @@ pub(crate) fn map_apply_resource_error(
             tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
             GqlError::gql("Resource was modified concurrently")
         }
+        E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
 }
@@ -101,6 +102,7 @@ pub(crate) fn map_delete_resource_error(
         E::UIDNotFound(error) => GqlError::gql(error.to_string()),
         E::NameNotFound(error) => GqlError::gql(error.to_string()),
         E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
 }

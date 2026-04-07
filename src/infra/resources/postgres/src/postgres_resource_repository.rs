@@ -17,10 +17,12 @@ use kamu_resources::{
     ResourceDuplicateError,
     ResourceMetadata,
     ResourceName,
+    ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
     UpdateResourceError,
@@ -551,6 +553,67 @@ impl ResourceRepository for PostgresResourceRepository {
         .int_err()?;
 
         Ok(usize::try_from(count).unwrap())
+    }
+
+    async fn summarize_resources(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                resource_kind,
+                api_version,
+                COUNT(*) as "total_count!",
+                COUNT(*) FILTER (WHERE phase = 'Reconciling') as "reconciling_count!",
+                COUNT(*) FILTER (WHERE phase = 'Ready') as "ready_count!",
+                COUNT(*) FILTER (WHERE phase = 'Degraded') as "degraded_count!",
+                COUNT(*) FILTER (WHERE phase = 'Failed') as "failed_count!",
+                COUNT(*) FILTER (WHERE phase = 'Pending') as "pending_count!"
+            FROM (
+                SELECT
+                    resource_kind,
+                    api_version,
+                    CASE COALESCE(status ->> 'phase', 'Pending')
+                        WHEN 'Reconciling' THEN 'Reconciling'
+                        WHEN 'Ready' THEN 'Ready'
+                        WHEN 'Degraded' THEN 'Degraded'
+                        WHEN 'Failed' THEN 'Failed'
+                        ELSE 'Pending'
+                    END as phase
+                FROM resources
+                WHERE account_id = $1
+                  AND deleted_at IS NULL
+            ) as normalized_resources
+            GROUP BY resource_kind, api_version
+            ORDER BY resource_kind ASC, api_version ASC
+            "#,
+            account_id_stack.as_str(),
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceSummaryRow {
+                kind: row.resource_kind,
+                api_version: row.api_version,
+                total_count: u64::try_from(row.total_count).unwrap(),
+                phase_counts: ResourcePhaseCounts {
+                    pending: u64::try_from(row.pending_count).unwrap(),
+                    reconciling: u64::try_from(row.reconciling_count).unwrap(),
+                    ready: u64::try_from(row.ready_count).unwrap(),
+                    degraded: u64::try_from(row.degraded_count).unwrap(),
+                    failed: u64::try_from(row.failed_count).unwrap(),
+                },
+            })
+            .collect())
     }
 }
 

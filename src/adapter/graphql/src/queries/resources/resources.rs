@@ -18,6 +18,7 @@ use crate::queries::{
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
+    ResourcesSummary,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,13 @@ impl Resources {
     #[tracing::instrument(level = "info", name = Resources_supported_kinds, skip_all)]
     async fn supported_kinds(&self, ctx: &Context<'_>) -> Result<Vec<ResourceKindDescriptor>> {
         resource_helpers::list_supported_resource_kinds(ctx).await
+    }
+
+    /// Returns a summary-oriented dashboard for the current subject
+    #[tracing::instrument(level = "info", name = Resources_summary, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn summary(&self, ctx: &Context<'_>) -> Result<ResourcesSummary> {
+        resource_helpers::summary(ctx, None).await
     }
 
     /// Returns a resource by selector, if found

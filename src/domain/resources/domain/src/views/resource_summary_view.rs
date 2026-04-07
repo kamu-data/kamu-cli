@@ -14,6 +14,7 @@ use crate::{
     ResourceConditionStatus,
     ResourceConditionType,
     ResourceName,
+    ResourcePhase,
     ResourceSnapshot,
     ResourceStatus,
     ResourceUID,
@@ -38,7 +39,7 @@ pub struct ResourceSummaryView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceStatusSummaryView {
-    pub phase: Option<String>,
+    pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<u64>,
     pub ready: Option<bool>,
 }
@@ -77,7 +78,7 @@ impl From<ResourceStatus> for ResourceStatusSummaryView {
             });
 
         Self {
-            phase: Some(value.phase.to_string()),
+            phase: Some(value.phase),
             observed_generation: Some(value.observed_generation),
             ready,
         }

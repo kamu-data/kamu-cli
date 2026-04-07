@@ -16,6 +16,7 @@ use crate::queries::{
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
+    ResourcesSummary,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +98,19 @@ impl AdminResources {
             }),
             page,
             per_page,
+        )
+        .await
+    }
+
+    /// Returns a summary-oriented dashboard for the target account
+    #[tracing::instrument(level = "info", name = AdminResources_summary, skip_all)]
+    async fn summary(&self, ctx: &Context<'_>) -> Result<ResourcesSummary> {
+        resource_helpers::summary(
+            ctx,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
         )
         .await
     }

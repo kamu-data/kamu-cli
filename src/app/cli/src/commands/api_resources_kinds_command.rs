@@ -21,7 +21,7 @@ use crate::resources::ResourceFacadeFactory;
 
 #[dill::component]
 #[dill::interface(dyn Command)]
-pub struct ApiResourcesCommand {
+pub struct ApiResourcesKindsCommand {
     resource_facade_factory: Arc<ResourceFacadeFactory>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
@@ -33,16 +33,13 @@ pub struct ApiResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ApiResourcesCommand {
+impl ApiResourcesKindsCommand {
     async fn record_batch(&self) -> Result<RecordBatch, CLIError> {
         let resource_facade = self
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        let supported_kinds = resource_facade
-            .list_supported_kinds()
-            .await
-            .map_err(CLIError::critical)?;
+        let supported_kinds = resource_facade.list_supported_kinds().await?;
 
         let col_name: Vec<_> = supported_kinds
             .iter()
@@ -74,7 +71,7 @@ impl ApiResourcesCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-impl Command for ApiResourcesCommand {
+impl Command for ApiResourcesKindsCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let resolved_context = self
             .resource_context_resolver
@@ -99,7 +96,7 @@ impl Command for ApiResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl OutputWriter for ApiResourcesCommand {
+impl OutputWriter for ApiResourcesKindsCommand {
     fn records_format(&self) -> RecordsFormat {
         RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default())

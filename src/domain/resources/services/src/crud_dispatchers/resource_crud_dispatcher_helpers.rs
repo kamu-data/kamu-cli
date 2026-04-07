@@ -244,7 +244,7 @@ fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceSta
         });
 
     ResourceStatusSummaryView {
-        phase: Some(format!("{:?}", resource_status.phase)),
+        phase: Some(resource_status.phase),
         observed_generation: Some(resource_status.observed_generation),
         ready,
     }

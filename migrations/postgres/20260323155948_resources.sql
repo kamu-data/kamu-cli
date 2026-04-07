@@ -30,6 +30,15 @@ CREATE INDEX idx_resources_account_kind_name
 CREATE INDEX idx_resources_account_kind_updated_at
     ON resources (account_id, resource_kind, updated_at DESC);
 
+CREATE INDEX idx_resources_summary_projection
+    ON resources (
+        account_id,
+        resource_kind,
+        api_version,
+        ((status ->> 'phase'))
+    )
+    WHERE deleted_at IS NULL;
+
 /* ------------------------------ */
 
 CREATE SEQUENCE resource_event_id_seq AS BIGINT;

@@ -107,11 +107,69 @@ To add dataset from a repository see `kamu pull` command.
 
 List supported resource kinds in the active context
 
-**Usage:** `kamu api-resources [OPTIONS]`
+**Usage:** `kamu api-resources [OPTIONS] [COMMAND]`
+
+**Subcommands:**
+
+* `kinds` — 
+* `summary` — 
 
 **Options:**
 
 * `--context <NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Format to display the results in when using the default `kinds` action
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
+
+Resource API commands for the active context.
+
+If the active context is `local`, commands target the current workspace. If the
+active context points to a remote server, commands target that remote GraphQL
+API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+List supported resource kinds in the active context:
+
+    kamu api-resources
+
+List supported resource kinds explicitly:
+
+    kamu api-resources kinds
+
+Show summary from a specific context:
+
+    kamu api-resources summary --context prod
+
+Show summary in YAML:
+
+    kamu api-resources summary -o yaml
+
+
+
+
+## `kamu api-resources kinds`
+
+**Usage:** `kamu api-resources kinds [OPTIONS]`
+
+**Options:**
 
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
@@ -132,27 +190,17 @@ List supported resource kinds in the active context
     Parquet columnar storage. Only available when exporting to file(s)
 
 
-Prints resource kinds supported by the active resource context.
 
-If the active context is `local`, the command lists kinds supported by the
-current workspace. If the active context points to a remote server, the command
-lists kinds supported by that remote GraphQL API.
 
-Use `--context` to override the current context for this invocation only.
+## `kamu api-resources summary`
 
-**Examples:**
+**Usage:** `kamu api-resources summary [OPTIONS]`
 
-List supported resource kinds in the active context:
+**Options:**
 
-    kamu api-resources
+* `-o`, `--output-format <FMT>` — Format to display the results in
 
-List supported resource kinds from a specific context:
-
-    kamu api-resources --context prod
-
-List supported resource kinds in JSON:
-
-    kamu api-resources -o json
+  Possible values: `table`, `json`, `yaml`
 
 
 
@@ -1913,6 +1961,7 @@ Outputs build information
 * `-o`, `--output-format <FMT>` — Format of the output
 
   Possible values: `shell`, `json`, `yaml`
+
 
 
 

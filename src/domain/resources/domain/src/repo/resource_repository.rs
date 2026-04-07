@@ -17,6 +17,7 @@ use crate::{
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
 };
@@ -80,6 +81,11 @@ pub trait ResourceRepository: Send + Sync {
         account_id: odf::AccountID,
         kind: &str,
     ) -> Result<usize, InternalError>;
+
+    async fn summarize_resources(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

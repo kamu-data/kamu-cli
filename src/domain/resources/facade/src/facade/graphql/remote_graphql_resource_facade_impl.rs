@@ -7,16 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
-use internal_error::{InternalError, ResultIntoInternal};
-use serde::Deserialize;
+use domain::{
+    ResourceKindDescriptor,
+    ResourcePhaseCounts,
+    ResourceTypeCountSummary,
+    ResourcesSummary,
+};
+use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
+use internal_error::InternalError;
+use kamu_resources as domain;
 use url::Url;
 
-use super::remote_graphql_resource_facade_fragments as fragments;
+use super::fragments;
 use crate::{
-    ApplyManifestApplicationDecision,
     ApplyManifestError,
-    ApplyManifestPlanningDecision,
     ApplyManifestRequest,
     DeleteResourceError,
     DeleteResourceRequest,
@@ -31,16 +35,15 @@ use crate::{
     RenderResourceManifestRequest,
     RenderResourceManifestResult,
     ResourceFacade,
-    ResourceKindDescriptor,
+    ResourcesSummaryError,
+    ResourcesSummaryRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Note: intentionally not a dill component, used via factories
 pub struct RemoteGraphqlResourceFacadeImpl {
-    graphql_endpoint_url: Url,
-    http_client: reqwest::Client,
-    maybe_access_token: Option<String>,
+    graphql_client: GraphqlHttpClient,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,84 +51,32 @@ pub struct RemoteGraphqlResourceFacadeImpl {
 impl RemoteGraphqlResourceFacadeImpl {
     pub fn new(backend_url: &Url, maybe_access_token: Option<String>) -> Self {
         Self {
-            graphql_endpoint_url: Self::graphql_endpoint_url(backend_url),
-            http_client: reqwest::Client::new(),
-            maybe_access_token,
+            graphql_client: GraphqlHttpClient::from_backend_url(backend_url, maybe_access_token),
         }
     }
 
-    fn graphql_endpoint_url(backend_url: &Url) -> Url {
-        let mut graphql_endpoint_url = backend_url.clone();
-        let path = graphql_endpoint_url.path().trim_end_matches('/');
-        let path = if path.is_empty() {
-            "/graphql".to_string()
-        } else {
-            format!("{path}/graphql")
-        };
-        graphql_endpoint_url.set_path(&path);
-        graphql_endpoint_url.set_query(None);
-        graphql_endpoint_url.set_fragment(None);
-        graphql_endpoint_url
-    }
-
-    async fn execute_graphql<T>(&self, query: &str) -> Result<T, InternalError>
+    async fn execute_graphql<T>(&self, query: &str) -> Result<T, GraphqlHttpRequestError>
     where
         T: serde::de::DeserializeOwned,
     {
-        let body = serde_json::to_vec(&serde_json::json!({ "query": query })).int_err()?;
-
-        let mut request = self
-            .http_client
-            .post(self.graphql_endpoint_url.clone())
-            .header(ACCEPT, "application/json")
-            .header(CONTENT_TYPE, "application/json")
-            .body(body);
-
-        if let Some(access_token) = self.maybe_access_token.as_ref() {
-            request = request.header(AUTHORIZATION, format!("Bearer {access_token}"));
-        }
-
-        let response = request.send().await.int_err()?;
-        let status = response.status();
-        let response_body = response.text().await.int_err()?;
-
-        if !status.is_success() {
-            return Err(InternalError::new(format!(
-                "Remote GraphQL request to '{}' failed: {} {}",
-                self.graphql_endpoint_url,
-                status.as_u16(),
-                status.canonical_reason().unwrap_or("Unknown status")
-            )));
-        }
-
-        let response: GraphqlResponseFragment<T> = serde_json::from_str(&response_body)
-            .int_err()
-            .map_err(|e| {
-            e.with_context(format!(
-                "Failed to deserialize remote GraphQL response from '{}'",
-                self.graphql_endpoint_url
-            ))
-        })?;
-
-        if let Some(errors) = response.errors
-            && let Some(error) = errors.first()
-        {
-            return Err(InternalError::new(format!(
-                "Remote GraphQL request to '{}' failed: {}",
-                self.graphql_endpoint_url, error.message
-            )));
-        }
-
-        response.data.ok_or_else(|| {
-            InternalError::new(format!(
-                "Remote GraphQL request to '{}' returned no data",
-                self.graphql_endpoint_url
-            ))
-        })
+        self.graphql_client.execute(query).await
     }
 
     fn unsupported_operation_error() -> InternalError {
         InternalError::new("Remote resource facade operation is not implemented yet")
+    }
+
+    fn target_account_id(
+        account: Option<&domain::ResourceManifestAccount>,
+    ) -> Result<Option<odf::AccountID>, ResourcesSummaryError> {
+        match account {
+            None => Ok(None),
+            Some(account) => account.id.clone().map(Some).ok_or_else(|| {
+                ResourcesSummaryError::Internal(InternalError::new(
+                    "Remote admin resource summary requires target account id",
+                ))
+            }),
+        }
     }
 }
 
@@ -168,18 +119,90 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .collect())
     }
 
-    async fn plan_apply_manifest(
+    async fn summary(
         &self,
-        _request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
-        Err(Self::unsupported_operation_error().into())
-    }
+        request: ResourcesSummaryRequest,
+    ) -> Result<ResourcesSummary, ResourcesSummaryError> {
+        let maybe_target_account_id = Self::target_account_id(request.account.as_ref())?;
 
-    async fn apply_manifest(
-        &self,
-        _request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
-        Err(Self::unsupported_operation_error().into())
+        let response = if let Some(target_account_id) = maybe_target_account_id {
+            let query = format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      summary {{
+                        resourceCounts {{
+                          kind
+                          name
+                          apiVersion
+                          totalCount
+                          phaseCounts {{
+                            pending
+                            reconciling
+                            ready
+                            degraded
+                            failed
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+                "#
+            );
+
+            let response: fragments::AdminSummaryQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.admin.resources.summary
+        } else {
+            let response: fragments::SummaryQueryDataFragment = self
+                .execute_graphql(
+                    r#"
+                    query {
+                      resources {
+                        summary {
+                          resourceCounts {
+                            kind
+                            name
+                            apiVersion
+                            totalCount
+                            phaseCounts {
+                              pending
+                              reconciling
+                              ready
+                              degraded
+                              failed
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .await?;
+            response.resources.summary
+        };
+
+        Ok(ResourcesSummary {
+            resource_counts: response
+                .resource_counts
+                .into_iter()
+                .map(|item| ResourceTypeCountSummary {
+                    kind: item.kind,
+                    name: item.name,
+                    api_version: item.api_version,
+                    total_count: item.total_count,
+                    phase_counts: ResourcePhaseCounts {
+                        pending: item.phase_counts.pending,
+                        reconciling: item.phase_counts.reconciling,
+                        ready: item.phase_counts.ready,
+                        degraded: item.phase_counts.degraded,
+                        failed: item.phase_counts.failed,
+                    },
+                })
+                .collect(),
+        })
     }
 
     async fn get(
@@ -210,6 +233,20 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         Err(Self::unsupported_operation_error().into())
     }
 
+    async fn plan_apply_manifest(
+        &self,
+        _request: ApplyManifestRequest,
+    ) -> Result<domain::ApplyManifestPlanningDecision, ApplyManifestError> {
+        Err(Self::unsupported_operation_error().into())
+    }
+
+    async fn apply_manifest(
+        &self,
+        _request: ApplyManifestRequest,
+    ) -> Result<domain::ApplyManifestApplicationDecision, ApplyManifestError> {
+        Err(Self::unsupported_operation_error().into())
+    }
+
     async fn delete(
         &self,
         _request: DeleteResourceRequest,
@@ -219,15 +256,3 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-struct GraphqlResponseFragment<T> {
-    data: Option<T>,
-    #[serde(default)]
-    errors: Option<Vec<GraphqlErrorFragment>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GraphqlErrorFragment {
-    message: String,
-}

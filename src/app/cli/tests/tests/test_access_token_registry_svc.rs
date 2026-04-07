@@ -148,6 +148,34 @@ async fn test_find_token() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_loopback_backend_urls_are_treated_as_same_server() {
+    let svc = AccessTokenRegistryService::new(
+        Arc::new(DummyAccessTokenStore::new()),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
+
+    svc.save_access_token(
+        AccessTokenStoreScope::User,
+        Some(&Url::parse("http://localhost:12345").unwrap()),
+        &Url::parse("http://localhost:12345").unwrap(),
+        "random-token-user".to_string(),
+    )
+    .unwrap();
+
+    let report = svc
+        .find_by_backend_url(&Url::parse("http://127.0.0.1:12345").unwrap())
+        .unwrap();
+    assert_eq!(&report.access_token.access_token, "random-token-user");
+
+    let dataset_url = Url::parse("http://127.0.0.1:12345/foo").unwrap();
+    let maybe_token = svc.resolve_odf_dataset_access_token(&dataset_url);
+
+    assert_matches!(maybe_token, Some(token) if token.as_str() == "random-token-user");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_drop_token() {
     let svc = AccessTokenRegistryService::new(
         Arc::new(DummyAccessTokenStore::new()),

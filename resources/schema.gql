@@ -491,6 +491,10 @@ type AdminResources {
 	"""
 	listAll(page: Int, perPage: Int): ResourceConnection!
 	"""
+	Returns a summary-oriented dashboard for the target account
+	"""
+	summary: ResourcesSummary!
+	"""
 	Renders a canonical manifest representation from a stored resource in
 	the target account
 	"""
@@ -3853,6 +3857,14 @@ type ResourceMetadata {
 	lastReconciledAt: DateTime
 }
 
+type ResourcePhaseCounts {
+	pending: Int!
+	reconciling: Int!
+	ready: Int!
+	degraded: Int!
+	failed: Int!
+}
+
 input ResourceRefInput @oneOf {
 	byId: ResourceID
 	byName: ResourceByNameSelectorInput
@@ -3887,11 +3899,23 @@ type ResourceSummary {
 	status: ResourceStatusSummary
 }
 
+type ResourceTypeCountSummary {
+	kind: String!
+	name: String!
+	apiVersion: String!
+	totalCount: Int!
+	phaseCounts: ResourcePhaseCounts!
+}
+
 type Resources {
 	"""
 	Returns resource kinds supported by the current server
 	"""
 	supportedKinds: [ResourceKindDescriptor!]!
+	"""
+	Returns a summary-oriented dashboard for the current subject
+	"""
+	summary: ResourcesSummary!
 	"""
 	Returns a resource by selector, if found
 	"""
@@ -3913,6 +3937,10 @@ type Resources {
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
+}
+
+type ResourcesSummary {
+	resourceCounts: [ResourceTypeCountSummary!]!
 }
 
 type RestProtocolDesc {

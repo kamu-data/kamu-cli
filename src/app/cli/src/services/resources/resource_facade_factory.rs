@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use kamu_accounts::CurrentAccountSubject;
 use kamu_resources_facade::{RemoteGraphqlResourceFacadeImpl, ResourceFacade};
 
 use crate::CLIError;
@@ -23,7 +22,6 @@ pub struct ResourceFacadeFactory {
     local_resource_facade: Arc<dyn ResourceFacade>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     access_token_registry_service: Arc<AccessTokenRegistryService>,
-    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,13 +37,9 @@ impl ResourceFacadeFactory {
         {
             ResolvedResourceContext::LocalWorkspace => Ok(self.local_resource_facade.clone()),
             ResolvedResourceContext::RemoteWorkspace { backend_url, .. } => {
-                let maybe_access_token = match self.current_account_subject.as_ref() {
-                    CurrentAccountSubject::Logged(_) => self
-                        .access_token_registry_service
-                        .find_by_backend_url(&backend_url)
-                        .map(|report| report.access_token.access_token),
-                    CurrentAccountSubject::Anonymous(_) => None,
-                };
+                let maybe_access_token = self
+                    .access_token_registry_service
+                    .find_access_token_by_backend_url(&backend_url);
 
                 Ok(Arc::new(RemoteGraphqlResourceFacadeImpl::new(
                     &backend_url,

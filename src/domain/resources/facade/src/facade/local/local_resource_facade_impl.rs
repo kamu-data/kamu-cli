@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::BuilderExt;
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_resources::{
+use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     GenericResourceQueryService,
@@ -23,16 +22,21 @@ use kamu_resources::{
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
     ResourceDispatcherMeta,
+    ResourceKindDescriptor,
     ResourceManifest,
     ResourceMetadataInput,
     ResourceNameNotFoundError,
     ResourceSnapshot,
     ResourceSummaryView,
+    ResourceTypeCountSummary,
     ResourceUID,
     ResourceUIDNotFoundError,
     ResourceView,
     ResourceWarning,
+    ResourcesSummary,
 };
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_resources as domain;
 use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_dispatcher_by_kind};
 
 use crate::{
@@ -55,9 +59,10 @@ use crate::{
     ResolvedAccount,
     ResourceAccountResolver,
     ResourceFacade,
-    ResourceKindDescriptor,
     ResourceKindMismatchError,
     ResourceManifestFormat,
+    ResourcesSummaryError,
+    ResourcesSummaryRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,92 +85,52 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(self.list_resource_kind_descriptors())
     }
 
-    async fn plan_apply_manifest(
+    async fn summary(
         &self,
-        request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
-        let manifest = self.parse_manifest(request.format, &request.manifest)?;
-
+        request: ResourcesSummaryRequest,
+    ) -> Result<ResourcesSummary, ResourcesSummaryError> {
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(manifest.metadata.account.as_ref())
+            .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            &manifest.kind,
-            &manifest.api_version,
-        )?;
-
-        let metadata = self.make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
-
-        let plan = dispatcher
-            .plan_apply(ResourceCrudDispatcherApplyRequest {
-                uid: manifest.metadata.uid,
-                metadata,
-                spec: manifest.spec,
+        let resource_kind_descriptors = self.list_resource_kind_descriptors();
+        let descriptors_by_key: HashMap<_, _> = resource_kind_descriptors
+            .into_iter()
+            .map(|descriptor| {
+                (
+                    (descriptor.kind.clone(), descriptor.api_version.clone()),
+                    descriptor,
+                )
             })
-            .await?;
+            .collect();
 
-        Ok(match plan {
-            ApplyManifestPlanningDecision::Planned(mut plan) => {
-                plan.warnings.splice(0..0, metadata_warnings);
-                plan.resource = self
-                    .resource_account_resolver
-                    .hydrate_resource_view_account(plan.resource, Some(&target_account))
-                    .await?;
+        let resource_counts = self
+            .generic_resource_query_service
+            .summarize_resources(target_account.id.clone())
+            .await?
+            .into_iter()
+            .map(|row| {
+                let descriptor = descriptors_by_key
+                    .get(&(row.kind.clone(), row.api_version.clone()))
+                    .ok_or_else(|| {
+                        ResourcesSummaryError::Internal(InternalError::new(format!(
+                            "No resource descriptor registered for {}/{}",
+                            row.kind, row.api_version
+                        )))
+                    })?;
 
-                ApplyManifestPlanningDecision::Planned(plan)
-            }
-            ApplyManifestPlanningDecision::Rejected(rejection) => {
-                ApplyManifestPlanningDecision::Rejected(rejection)
-            }
-        })
-    }
-
-    async fn apply_manifest(
-        &self,
-        request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
-        let manifest = self.parse_manifest(request.format, &request.manifest)?;
-
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(manifest.metadata.account.as_ref())
-            .await?;
-
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            &manifest.kind,
-            &manifest.api_version,
-        )?;
-
-        let metadata = self.make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
-
-        let result = dispatcher
-            .apply(ResourceCrudDispatcherApplyRequest {
-                uid: manifest.metadata.uid,
-                metadata,
-                spec: manifest.spec,
+                Ok(ResourceTypeCountSummary {
+                    kind: row.kind,
+                    name: descriptor.name.clone(),
+                    api_version: row.api_version,
+                    total_count: row.total_count,
+                    phase_counts: row.phase_counts,
+                })
             })
-            .await?;
+            .collect::<Result<Vec<_>, ResourcesSummaryError>>()?;
 
-        Ok(match result {
-            ApplyManifestApplicationDecision::Applied(mut result) => {
-                result.warnings.splice(0..0, metadata_warnings);
-                result.resource = self
-                    .resource_account_resolver
-                    .hydrate_resource_view_account(result.resource, Some(&target_account))
-                    .await?;
-
-                ApplyManifestApplicationDecision::Applied(result)
-            }
-            ApplyManifestApplicationDecision::Rejected(rejection) => {
-                ApplyManifestApplicationDecision::Rejected(rejection)
-            }
-        })
+        Ok(ResourcesSummary { resource_counts })
     }
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError> {
@@ -275,6 +240,94 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
+    }
+
+    async fn plan_apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
+        let manifest = self.parse_manifest(request.format, &request.manifest)?;
+
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(manifest.metadata.account.as_ref())
+            .await?;
+
+        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
+            &self.catalog,
+            &manifest.kind,
+            &manifest.api_version,
+        )?;
+
+        let metadata = self.make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
+
+        let plan = dispatcher
+            .plan_apply(ResourceCrudDispatcherApplyRequest {
+                uid: manifest.metadata.uid,
+                metadata,
+                spec: manifest.spec,
+            })
+            .await?;
+
+        Ok(match plan {
+            ApplyManifestPlanningDecision::Planned(mut plan) => {
+                plan.warnings.splice(0..0, metadata_warnings);
+                plan.resource = self
+                    .resource_account_resolver
+                    .hydrate_resource_view_account(plan.resource, Some(&target_account))
+                    .await?;
+
+                ApplyManifestPlanningDecision::Planned(plan)
+            }
+            ApplyManifestPlanningDecision::Rejected(rejection) => {
+                ApplyManifestPlanningDecision::Rejected(rejection)
+            }
+        })
+    }
+
+    async fn apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
+        let manifest = self.parse_manifest(request.format, &request.manifest)?;
+
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(manifest.metadata.account.as_ref())
+            .await?;
+
+        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
+            &self.catalog,
+            &manifest.kind,
+            &manifest.api_version,
+        )?;
+
+        let metadata = self.make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
+
+        let result = dispatcher
+            .apply(ResourceCrudDispatcherApplyRequest {
+                uid: manifest.metadata.uid,
+                metadata,
+                spec: manifest.spec,
+            })
+            .await?;
+
+        Ok(match result {
+            ApplyManifestApplicationDecision::Applied(mut result) => {
+                result.warnings.splice(0..0, metadata_warnings);
+                result.resource = self
+                    .resource_account_resolver
+                    .hydrate_resource_view_account(result.resource, Some(&target_account))
+                    .await?;
+
+                ApplyManifestApplicationDecision::Applied(result)
+            }
+            ApplyManifestApplicationDecision::Rejected(rejection) => {
+                ApplyManifestApplicationDecision::Rejected(rejection)
+            }
+        })
     }
 
     async fn delete(

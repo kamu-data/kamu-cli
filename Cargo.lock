@@ -5444,7 +5444,14 @@ dependencies = [
  "async-graphql",
  "axum",
  "http 1.4.0",
+ "internal-error",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tower",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -8698,7 +8705,7 @@ dependencies = [
  "database-common",
  "dill",
  "event-sourcing",
- "http 1.4.0",
+ "graphql-http",
  "internal-error",
  "kamu-accounts",
  "kamu-auth-rebac",
@@ -8706,7 +8713,6 @@ dependencies = [
  "kamu-resources-services",
  "opendatafabric",
  "paste",
- "reqwest",
  "serde",
  "serde_json",
  "serde_yaml_ng",

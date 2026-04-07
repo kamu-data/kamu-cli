@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use event_sourcing::ConcurrentModificationError;
-use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_resources::{
+use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyResourceCrudDispatcherError,
@@ -18,6 +16,7 @@ use kamu_resources::{
     GetResourceCrudDispatcherError,
     ResourceAPIVersionMismatchError,
     ResourceInvalidSpecError,
+    ResourceKindDescriptor,
     ResourceManifestAccount,
     ResourceMetadataValidationError,
     ResourceName,
@@ -26,8 +25,13 @@ use kamu_resources::{
     ResourceUID,
     ResourceUIDNotFoundError,
     ResourceView,
+    ResourcesSummary,
     UnsupportedResourceDescriptorError,
 };
+use event_sourcing::ConcurrentModificationError;
+use graphql_http::GraphqlHttpRequestError;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_resources as domain;
 use thiserror::Error;
 
 use crate::ResolveManifestAccountError;
@@ -40,15 +44,10 @@ pub trait ResourceFacade: Send + Sync {
         &self,
     ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError>;
 
-    async fn plan_apply_manifest(
+    async fn summary(
         &self,
-        request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError>;
-
-    async fn apply_manifest(
-        &self,
-        request: ApplyManifestRequest,
-    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
+        request: ResourcesSummaryRequest,
+    ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
 
@@ -67,20 +66,20 @@ pub trait ResourceFacade: Send + Sync {
         request: ListAllResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
 
+    async fn plan_apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError>;
+
+    async fn apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
+
     async fn delete(
         &self,
         request: DeleteResourceRequest,
     ) -> Result<ResourceUID, DeleteResourceError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResourceKindDescriptor {
-    pub name: String,
-    pub short_names: Vec<String>,
-    pub kind: String,
-    pub api_version: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,6 +155,13 @@ pub struct DeleteResourceRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Default)]
+pub struct ResourcesSummaryRequest {
+    pub account: Option<ResourceManifestAccount>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 pub enum ApplyManifestError {
     #[error(transparent)]
@@ -181,6 +187,9 @@ pub enum ApplyManifestError {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -228,6 +237,9 @@ pub enum GetResourceError {
 
     #[error(transparent)]
     KindMismatch(#[from] ResourceKindMismatchError),
+
+    #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -288,6 +300,9 @@ pub enum RenderResourceManifestError {
     KindMismatch(#[from] ResourceKindMismatchError),
 
     #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -300,6 +315,7 @@ impl From<GetResourceError> for RenderResourceManifestError {
             GetResourceError::NameNotFound(err) => Self::NameNotFound(err),
             GetResourceError::ApiVersionMismatch(err) => Self::ApiVersionMismatch(err),
             GetResourceError::KindMismatch(err) => Self::KindMismatch(err),
+            GetResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             GetResourceError::Internal(err) => Self::Internal(err),
         }
     }
@@ -316,6 +332,9 @@ pub enum ListResourcesError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -325,6 +344,23 @@ pub enum ListResourcesError {
 pub enum ListAllResourcesError {
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
+
+    #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ResourcesSummaryError {
+    #[error(transparent)]
+    BadAccount(#[from] ResolveManifestAccountError),
+
+    #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -350,6 +386,9 @@ pub enum DeleteResourceError {
     KindMismatch(#[from] ResourceKindMismatchError),
 
     #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -368,6 +407,9 @@ impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
 
 #[derive(Debug, Error)]
 pub enum ListSupportedResourceKindsError {
+    #[error(transparent)]
+    RemoteRequest(#[from] GraphqlHttpRequestError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

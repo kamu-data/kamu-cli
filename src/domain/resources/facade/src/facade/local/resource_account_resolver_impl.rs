@@ -12,9 +12,9 @@ use std::sync::Arc;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_resources::ResourceManifestAccount;
+use kamu_resources::{ResourceManifestAccount, ResourceView};
 
-use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver, ResourceView};
+use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

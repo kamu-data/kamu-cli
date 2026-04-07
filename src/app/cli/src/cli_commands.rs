@@ -47,9 +47,16 @@ pub fn get_command(
             .cast(),
         ),
 
-        cli::Command::ApiResources(c) => {
-            Box::new(ApiResourcesCommand::builder(c.resource_context.context).cast())
-        }
+        cli::Command::ApiResources(c) => match c.subcommand {
+            Some(cli::ApiResourcesSubCommand::Kinds(_)) => {
+                Box::new(ApiResourcesKindsCommand::builder(c.resource_context.context).cast())
+            }
+            Some(cli::ApiResourcesSubCommand::Summary(sc)) => Box::new(
+                ApiResourcesSummaryCommand::builder(c.resource_context.context, sc.output_format)
+                    .cast(),
+            ),
+            None => Box::new(ApiResourcesKindsCommand::builder(c.resource_context.context).cast()),
+        },
 
         cli::Command::Complete(c) => Box::new(CompleteCommand::builder(c.input, c.current).cast()),
 

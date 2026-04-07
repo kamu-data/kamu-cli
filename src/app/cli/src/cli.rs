@@ -131,11 +131,11 @@ pub enum Command {
 /// List supported resource kinds in the active context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Prints resource kinds supported by the active resource context.
+Resource API commands for the active context.
 
-If the active context is `local`, the command lists kinds supported by the
-current workspace. If the active context points to a remote server, the command
-lists kinds supported by that remote GraphQL API.
+If the active context is `local`, commands target the current workspace. If the
+active context points to a remote server, commands target that remote GraphQL
+API.
 
 Use `--context` to override the current context for this invocation only.
 
@@ -145,21 +145,63 @@ List supported resource kinds in the active context:
 
     kamu api-resources
 
-List supported resource kinds from a specific context:
+List supported resource kinds explicitly:
 
-    kamu api-resources --context prod
+    kamu api-resources kinds
 
-List supported resource kinds in JSON:
+Show summary from a specific context:
 
-    kamu api-resources -o json
+    kamu api-resources summary --context prod
+
+Show summary in YAML:
+
+    kamu api-resources summary -o yaml
 "#)]
 pub struct ApiResources {
     #[command(flatten)]
     pub resource_context: ResourceContextArgs,
 
+    /// Format to display the results in when using the default `kinds` action
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+
+    #[command(subcommand)]
+    pub subcommand: Option<ApiResourcesSubCommand>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, clap::Subcommand)]
+pub enum ApiResourcesSubCommand {
+    Kinds(ApiResourcesKinds),
+    Summary(ApiResourcesSummary),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, clap::Args)]
+pub struct ApiResourcesKinds {
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ApiResourcesSummaryOutputFormat {
+    Table,
+    Json,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, clap::Args)]
+pub struct ApiResourcesSummary {
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<ApiResourcesSummaryOutputFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,7 +234,11 @@ impl Cli {
             Command::Search(c) => c.output_format,
             Command::Sql(c) => c.output_format,
             Command::Tail(c) => c.output_format,
-            Command::ApiResources(c) => c.output_format,
+            Command::ApiResources(c) => match &c.subcommand {
+                Some(ApiResourcesSubCommand::Kinds(sc)) => sc.output_format.or(c.output_format),
+                Some(ApiResourcesSubCommand::Summary(_)) => None,
+                None => c.output_format,
+            },
             _ => None,
         }
     }

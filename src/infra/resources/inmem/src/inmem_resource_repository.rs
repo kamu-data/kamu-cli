@@ -18,10 +18,12 @@ use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
     ResourceName,
+    ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
     UpdateResourceError,
@@ -317,6 +319,52 @@ impl ResourceRepository for InMemoryResourceRepository {
                     && snapshot.metadata.deleted_at.is_none()
             })
             .count())
+    }
+
+    async fn summarize_resources(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        let mut rows_by_key = HashMap::<(String, String), ResourceSummaryRow>::new();
+
+        for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
+            snapshot.metadata.account == account_id && snapshot.metadata.deleted_at.is_none()
+        }) {
+            let row = rows_by_key
+                .entry((snapshot.kind.clone(), snapshot.api_version.clone()))
+                .or_insert_with(|| ResourceSummaryRow {
+                    kind: snapshot.kind.clone(),
+                    api_version: snapshot.api_version.clone(),
+                    total_count: 0,
+                    phase_counts: ResourcePhaseCounts::default(),
+                });
+
+            row.total_count += 1;
+
+            match snapshot
+                .status
+                .as_ref()
+                .and_then(|status| status.get("phase"))
+                .and_then(|phase| phase.as_str())
+            {
+                Some("Reconciling") => row.phase_counts.increment_reconciling(),
+                Some("Ready") => row.phase_counts.increment_ready(),
+                Some("Degraded") => row.phase_counts.increment_degraded(),
+                Some("Failed") => row.phase_counts.increment_failed(),
+                _ => row.phase_counts.increment_pending(),
+            }
+        }
+
+        let mut rows = rows_by_key.into_values().collect::<Vec<_>>();
+        rows.sort_by(|lhs, rhs| {
+            lhs.kind
+                .cmp(&rhs.kind)
+                .then_with(|| lhs.api_version.cmp(&rhs.api_version))
+        });
+
+        Ok(rows)
     }
 }
 

@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::IpAddr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
@@ -64,16 +66,23 @@ impl AccessTokenRegistryService {
         &self,
         odf_server_url: &Url,
     ) -> Option<AccessTokenFindReport> {
+        if matches!(
+            self.current_account_subject.as_ref(),
+            CurrentAccountSubject::Anonymous(_)
+        ) {
+            return None;
+        }
+
         for registry_ptr in [&self.workspace_registry, &self.user_registry] {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
             let server_record_maybe = registry.iter().find(|c| {
-                if &c.backend_url == odf_server_url {
+                if Self::same_server_url(&c.backend_url, odf_server_url) {
                     true
                 } else {
                     match &c.frontend_url {
-                        Some(frontend_url) => frontend_url == odf_server_url,
+                        Some(frontend_url) => Self::same_server_url(frontend_url, odf_server_url),
                         _ => false,
                     }
                 }
@@ -95,13 +104,20 @@ impl AccessTokenRegistryService {
         &self,
         odf_server_frontend_url: &Url,
     ) -> Option<AccessTokenFindReport> {
+        if matches!(
+            self.current_account_subject.as_ref(),
+            CurrentAccountSubject::Anonymous(_)
+        ) {
+            return None;
+        }
+
         for registry_ptr in [&self.workspace_registry, &self.user_registry] {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
 
             let server_record_maybe = registry.iter().find(|c| match &c.frontend_url {
-                Some(frontend_url) => frontend_url == odf_server_frontend_url,
+                Some(frontend_url) => Self::same_server_url(frontend_url, odf_server_frontend_url),
                 _ => false,
             });
             if let Some(server_record) = server_record_maybe {
@@ -121,6 +137,13 @@ impl AccessTokenRegistryService {
         &self,
         odf_server_backend_url: &Url,
     ) -> Option<AccessTokenFindReport> {
+        if matches!(
+            self.current_account_subject.as_ref(),
+            CurrentAccountSubject::Anonymous(_)
+        ) {
+            return None;
+        }
+
         for registry_ptr in [&self.workspace_registry, &self.user_registry] {
             let registry = registry_ptr
                 .lock()
@@ -128,7 +151,7 @@ impl AccessTokenRegistryService {
 
             if let Some(token_map) = registry
                 .iter()
-                .find(|c| &c.backend_url == odf_server_backend_url)
+                .find(|c| Self::same_server_url(&c.backend_url, odf_server_backend_url))
             {
                 return token_map.token_for_account(self.account_name()).map(|ac| {
                     AccessTokenFindReport {
@@ -140,6 +163,11 @@ impl AccessTokenRegistryService {
             }
         }
         None
+    }
+
+    pub fn find_access_token_by_backend_url(&self, odf_server_backend_url: &Url) -> Option<String> {
+        self.find_by_backend_url(odf_server_backend_url)
+            .map(|report| report.access_token.access_token)
     }
 
     pub fn save_access_token(
@@ -163,11 +191,13 @@ impl AccessTokenRegistryService {
         let access_token = AccessToken::new(account_name.clone(), access_token);
 
         if let Some(server_record) = registry.iter_mut().find(|c| {
-            if &c.backend_url == odf_server_backend_url {
+            if Self::same_server_url(&c.backend_url, odf_server_backend_url) {
                 true
             } else {
                 match (&c.frontend_url, odf_server_frontend_url) {
-                    (Some(frontend_a), Some(frontend_b)) => frontend_a == frontend_b,
+                    (Some(frontend_a), Some(frontend_b)) => {
+                        Self::same_server_url(frontend_a, frontend_b)
+                    }
                     _ => false,
                 }
             }
@@ -236,10 +266,10 @@ impl AccessTokenRegistryService {
             .expect("Could not lock access tokens registry");
 
         if let Some(token_map) = registry.iter_mut().find(|c| {
-            &c.backend_url == odf_server_url
+            Self::same_server_url(&c.backend_url, odf_server_url)
                 || c.frontend_url
                     .as_ref()
-                    .is_some_and(|frontend_url| frontend_url == odf_server_url)
+                    .is_some_and(|frontend_url| Self::same_server_url(frontend_url, odf_server_url))
         }) && token_map.drop_account_token(account_name).is_some()
         {
             self.storage
@@ -248,6 +278,31 @@ impl AccessTokenRegistryService {
         }
 
         Ok(false)
+    }
+
+    fn same_server_url(left: &Url, right: &Url) -> bool {
+        left.scheme() == right.scheme()
+            && left.port_or_known_default() == right.port_or_known_default()
+            && left.path() == right.path()
+            && left.query() == right.query()
+            && left.fragment() == right.fragment()
+            && Self::same_server_host(left, right)
+    }
+
+    fn same_server_host(left: &Url, right: &Url) -> bool {
+        match (left.host_str(), right.host_str()) {
+            (Some(left_host), Some(right_host)) if left_host == right_host => true,
+            (Some(left_host), Some(right_host)) => {
+                Self::is_loopback_host(left_host) && Self::is_loopback_host(right_host)
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    fn is_loopback_host(host: &str) -> bool {
+        host.eq_ignore_ascii_case("localhost")
+            || IpAddr::from_str(host).is_ok_and(|ip_addr| ip_addr.is_loopback())
     }
 }
 

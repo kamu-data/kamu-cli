@@ -20,6 +20,7 @@ use crate::queries::{
     ResourceRenderManifestResult,
     ResourceSelectorInput,
     ResourceSummary,
+    ResourcesSummary,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,12 +34,39 @@ pub(crate) async fn list_supported_resource_kinds(
         .list_supported_kinds()
         .await
         .map_err(|error| match error {
+            kamu_resources_facade::ListSupportedResourceKindsError::RemoteRequest(error) => {
+                GqlError::from(error.int_err())
+            }
             kamu_resources_facade::ListSupportedResourceKindsError::Internal(error) => {
                 GqlError::from(error)
             }
         })?;
 
     Ok(items.into_iter().map(Into::into).collect())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn summary(
+    ctx: &Context<'_>,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<ResourcesSummary> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let summary = resource_facade
+        .summary(kamu_resources_facade::ResourcesSummaryRequest { account })
+        .await
+        .map_err(|error| match error {
+            kamu_resources_facade::ResourcesSummaryError::BadAccount(error) => {
+                map_resolve_manifest_account_error(error)
+            }
+            kamu_resources_facade::ResourcesSummaryError::RemoteRequest(error) => {
+                error.int_err().into()
+            }
+            kamu_resources_facade::ResourcesSummaryError::Internal(error) => error.into(),
+        })?;
+
+    Ok(ResourcesSummary::from_domain(summary))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +112,9 @@ pub(crate) async fn get_resource(
         }
         Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
             Err(map_resolve_manifest_account_error(error))
+        }
+        Err(kamu_resources_facade::GetResourceError::RemoteRequest(error)) => {
+            Err(error.int_err().into())
         }
         Err(kamu_resources_facade::GetResourceError::Internal(error)) => Err(error.into()),
     }
@@ -184,6 +215,7 @@ fn map_render_resource_manifest_error(
         E::NameNotFound(error) => GqlError::gql(error.to_string()),
         E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
         E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
 }
@@ -196,6 +228,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
     match error {
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
 }
@@ -205,6 +238,7 @@ fn map_list_all_resources_error(error: kamu_resources_facade::ListAllResourcesEr
 
     match error {
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
 }

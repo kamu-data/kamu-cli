@@ -11,11 +11,13 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use graphql_http::GraphqlHttpRequestError;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_datasets::DeleteDatasetError;
+use kamu_resources_facade::{ListSupportedResourceKindsError, ResourcesSummaryError};
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
@@ -216,6 +218,37 @@ impl From<odf::IterBlocksError> for CLIError {
 impl From<InternalError> for CLIError {
     fn from(e: InternalError) -> Self {
         Self::critical(e)
+    }
+}
+
+impl From<GraphqlHttpRequestError> for CLIError {
+    fn from(e: GraphqlHttpRequestError) -> Self {
+        match e {
+            GraphqlHttpRequestError::Transport { .. }
+            | GraphqlHttpRequestError::HttpStatus { .. }
+            | GraphqlHttpRequestError::Graphql { .. } => Self::failure(e),
+            GraphqlHttpRequestError::Internal(e) => Self::critical(e),
+        }
+    }
+}
+
+impl From<ResourcesSummaryError> for CLIError {
+    fn from(e: ResourcesSummaryError) -> Self {
+        use ResourcesSummaryError as E;
+        match e {
+            e @ E::BadAccount(_) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<ListSupportedResourceKindsError> for CLIError {
+    fn from(e: ListSupportedResourceKindsError) -> Self {
+        match e {
+            ListSupportedResourceKindsError::RemoteRequest(err) => Self::from(err),
+            ListSupportedResourceKindsError::Internal(err) => Self::critical(err),
+        }
     }
 }
 

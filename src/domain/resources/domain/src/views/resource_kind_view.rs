@@ -7,20 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod models;
-mod resource_facade_factory;
-mod resource_summary_service;
-
-use dill::CatalogBuilder;
-pub use models::*;
-pub use resource_facade_factory::*;
-pub use resource_summary_service::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<ResourceFacadeFactory>();
-    catalog_builder.add::<ResourceSummaryService>();
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceKindDescriptor {
+    pub name: String,
+    pub short_names: Vec<String>,
+    pub kind: String,
+    pub api_version: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

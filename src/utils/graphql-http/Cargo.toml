@@ -29,7 +29,16 @@ default = []
 async-graphql = { version = "7", default-features = false }
 axum = { version = "0.8", default-features = false }
 http = { version = "1", default-features = false }
+internal-error = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls-webpki-roots",
+] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", default-features = false }
+tracing = { version = "0.1", default-features = false }
 tower = { version = "0.5", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+url = { version = "2", default-features = false }
 
 
 [dev-dependencies]

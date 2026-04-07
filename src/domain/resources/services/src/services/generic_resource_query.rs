@@ -19,6 +19,7 @@ use crate::domain::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSummaryRow,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,6 +108,15 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         }
 
         Ok(resource_snapshots)
+    }
+
+    async fn summarize_resources(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
+        self.resource_repository
+            .summarize_resources(account_id)
+            .await
     }
 }
 

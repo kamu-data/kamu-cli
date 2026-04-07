@@ -12,16 +12,3 @@ mod facade;
 
 pub use dependencies::*;
 pub use facade::*;
-pub use kamu_resources::{
-    ApplyManifestApplicationDecision,
-    ApplyManifestPlan,
-    ApplyManifestPlanningDecision,
-    ApplyManifestRejection,
-    ApplyManifestResult,
-    ResourceStatusSummaryView,
-    ResourceSummaryView,
-    ResourceView,
-    ResourceViewAccount,
-    ResourceViewMetadata,
-    ResourceWarning,
-};

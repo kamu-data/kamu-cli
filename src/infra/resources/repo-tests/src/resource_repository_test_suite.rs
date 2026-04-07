@@ -17,9 +17,11 @@ use futures::TryStreamExt;
 use kamu_resources::{
     CreateResourceError,
     ResourceMetadata,
+    ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSummaryRow,
     ResourceUID,
     UpdateResourceError,
 };
@@ -431,6 +433,102 @@ pub async fn test_count_resources(catalog: &Catalog) {
 
     let count_other = repo.count_resources(account_id, "OtherKind").await.unwrap();
     assert_eq!(0, count_other);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_summarize_resources(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    let mut pending = make_test_snapshot(account_id.clone(), "KindA", "pending");
+    pending.uid = repo.new_resource_uid().await.unwrap();
+    pending.status = None;
+    repo.create_resource(&pending).await.unwrap();
+
+    let mut ready = make_test_snapshot(account_id.clone(), "KindA", "ready");
+    ready.uid = repo.new_resource_uid().await.unwrap();
+    ready.status = Some(serde_json::json!({ "phase": "Ready" }));
+    repo.create_resource(&ready).await.unwrap();
+
+    let mut degraded_v2 = make_test_snapshot(account_id.clone(), "KindA", "degraded-v2");
+    degraded_v2.uid = repo.new_resource_uid().await.unwrap();
+    degraded_v2.api_version = "v2".to_string();
+    degraded_v2.status = Some(serde_json::json!({ "phase": "Degraded" }));
+    repo.create_resource(&degraded_v2).await.unwrap();
+
+    let mut failed = make_test_snapshot(account_id.clone(), "KindB", "failed");
+    failed.uid = repo.new_resource_uid().await.unwrap();
+    failed.status = Some(serde_json::json!({ "phase": "Failed" }));
+    repo.create_resource(&failed).await.unwrap();
+
+    let mut unknown_phase = make_test_snapshot(account_id.clone(), "KindB", "unknown");
+    unknown_phase.uid = repo.new_resource_uid().await.unwrap();
+    unknown_phase.status = Some(serde_json::json!({ "phase": "UnknownFuturePhase" }));
+    repo.create_resource(&unknown_phase).await.unwrap();
+
+    let mut deleted = make_test_snapshot(account_id.clone(), "KindB", "deleted");
+    deleted.uid = repo.new_resource_uid().await.unwrap();
+    deleted.status = Some(serde_json::json!({ "phase": "Reconciling" }));
+    repo.create_resource(&deleted).await.unwrap();
+    let deleted = ResourceSnapshot {
+        metadata: ResourceMetadata {
+            deleted_at: Some(Utc::now()),
+            ..deleted.metadata
+        },
+        ..deleted
+    };
+    repo.update_resource(&deleted, None).await.unwrap();
+
+    let mut other_account = make_test_snapshot(other_account_id, "KindA", "other-account");
+    other_account.uid = repo.new_resource_uid().await.unwrap();
+    other_account.status = Some(serde_json::json!({ "phase": "Reconciling" }));
+    repo.create_resource(&other_account).await.unwrap();
+
+    let summary = repo.summarize_resources(account_id).await.unwrap();
+
+    assert_eq!(
+        summary,
+        vec![
+            ResourceSummaryRow {
+                kind: "KindA".to_string(),
+                api_version: "v1".to_string(),
+                total_count: 2,
+                phase_counts: ResourcePhaseCounts {
+                    pending: 1,
+                    reconciling: 0,
+                    ready: 1,
+                    degraded: 0,
+                    failed: 0,
+                },
+            },
+            ResourceSummaryRow {
+                kind: "KindA".to_string(),
+                api_version: "v2".to_string(),
+                total_count: 1,
+                phase_counts: ResourcePhaseCounts {
+                    pending: 0,
+                    reconciling: 0,
+                    ready: 0,
+                    degraded: 1,
+                    failed: 0,
+                },
+            },
+            ResourceSummaryRow {
+                kind: "KindB".to_string(),
+                api_version: "v1".to_string(),
+                total_count: 2,
+                phase_counts: ResourcePhaseCounts {
+                    pending: 1,
+                    reconciling: 0,
+                    ready: 0,
+                    degraded: 0,
+                    failed: 1,
+                },
+            },
+        ]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -117,8 +117,8 @@ pub struct ResourceKindDescriptor {
     pub api_version: String,
 }
 
-impl From<kamu_resources_facade::ResourceKindDescriptor> for ResourceKindDescriptor {
-    fn from(value: kamu_resources_facade::ResourceKindDescriptor) -> Self {
+impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
+    fn from(value: kamu_resources::ResourceKindDescriptor) -> Self {
         Self {
             name: value.name,
             short_names: value.short_names,
@@ -251,9 +251,70 @@ pub struct ResourceStatusSummary {
 impl From<kamu_resources::ResourceStatusSummaryView> for ResourceStatusSummary {
     fn from(value: kamu_resources::ResourceStatusSummaryView) -> Self {
         Self {
-            phase: value.phase,
+            phase: value.phase.map(|phase| phase.to_string()),
             observed_generation: value.observed_generation,
             ready: value.ready,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourcesSummary {
+    pub resource_counts: Vec<ResourceTypeCountSummary>,
+}
+
+impl ResourcesSummary {
+    pub fn from_domain(value: kamu_resources::ResourcesSummary) -> Self {
+        Self {
+            resource_counts: value.resource_counts.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceTypeCountSummary {
+    pub kind: String,
+    pub name: String,
+    pub api_version: String,
+    pub total_count: u64,
+    pub phase_counts: ResourcePhaseCounts,
+}
+
+impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary {
+    fn from(value: kamu_resources::ResourceTypeCountSummary) -> Self {
+        Self {
+            kind: value.kind,
+            name: value.name,
+            api_version: value.api_version,
+            total_count: value.total_count,
+            phase_counts: value.phase_counts.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourcePhaseCounts {
+    pub pending: u64,
+    pub reconciling: u64,
+    pub ready: u64,
+    pub degraded: u64,
+    pub failed: u64,
+}
+
+impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
+    fn from(value: kamu_resources::ResourcePhaseCounts) -> Self {
+        Self {
+            pending: value.pending,
+            reconciling: value.reconciling,
+            ready: value.ready,
+            degraded: value.degraded,
+            failed: value.failed,
         }
     }
 }

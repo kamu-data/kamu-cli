@@ -70,6 +70,21 @@ impl InternalError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn root_source_message(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut current = error.source();
+    let mut last = None;
+
+    while let Some(source) = current {
+        last = Some(source);
+        current = source.source();
+    }
+
+    last.map(ToString::to_string)
+        .unwrap_or_else(|| error.to_string())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait ErrorIntoInternal {
     fn int_err(self) -> InternalError;
 }

@@ -113,8 +113,8 @@ pub struct ResourceApplyRejection {
     pub message: String,
 }
 
-impl From<kamu_resources_facade::ApplyManifestRejection> for ResourceApplyRejection {
-    fn from(value: kamu_resources_facade::ApplyManifestRejection) -> Self {
+impl From<kamu_resources::ApplyManifestRejection> for ResourceApplyRejection {
+    fn from(value: kamu_resources::ApplyManifestRejection) -> Self {
         Self {
             category: value.category.into(),
             message: value.message,
