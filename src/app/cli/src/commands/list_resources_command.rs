@@ -76,12 +76,17 @@ impl ListResourcesCommand {
     }
 
     fn generic_resource_columns(&self) -> Vec<ResourceGenericColumn> {
-        let mut columns = vec![
-            ResourceGenericColumn::Name,
+        let mut columns = vec![ResourceGenericColumn::Name];
+
+        if self.detail_level > 0 {
+            columns.push(ResourceGenericColumn::Uid);
+        }
+
+        columns.extend([
             ResourceGenericColumn::Phase,
             ResourceGenericColumn::Readiness,
             ResourceGenericColumn::Updated,
-        ];
+        ]);
 
         if self.detail_level > 0 {
             columns.extend([
@@ -118,6 +123,7 @@ impl ListResourcesCommand {
         for column in self.generic_resource_columns() {
             fields.push(match column {
                 ResourceGenericColumn::Name => Field::new("Name", DataType::Utf8, false),
+                ResourceGenericColumn::Uid => Field::new("UID", DataType::Utf8, false),
                 ResourceGenericColumn::Phase => Field::new("Phase", DataType::Utf8, true),
                 ResourceGenericColumn::Readiness => {
                     Field::new("Readiness", DataType::Boolean, true)
@@ -164,9 +170,9 @@ impl ListResourcesCommand {
 
         for column in self.generic_resource_columns() {
             column_formats.push(match column {
-                ResourceGenericColumn::Name | ResourceGenericColumn::Description => {
-                    ColumnFormat::new().with_style_spec("l")
-                }
+                ResourceGenericColumn::Name
+                | ResourceGenericColumn::Uid
+                | ResourceGenericColumn::Description => ColumnFormat::new().with_style_spec("l"),
                 ResourceGenericColumn::Phase | ResourceGenericColumn::Readiness => {
                     ColumnFormat::new().with_style_spec("c")
                 }
@@ -305,6 +311,12 @@ impl ListResourcesCommand {
                     resources
                         .iter()
                         .map(|resource| resource.name.clone())
+                        .collect::<Vec<_>>(),
+                )),
+                ResourceGenericColumn::Uid => Arc::new(StringArray::from(
+                    resources
+                        .iter()
+                        .map(|resource| resource.uid.to_string())
                         .collect::<Vec<_>>(),
                 )),
                 ResourceGenericColumn::Phase => Arc::new(StringArray::from(
@@ -454,6 +466,7 @@ impl Command for ListResourcesCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResourceGenericColumn {
     Name,
+    Uid,
     Phase,
     Readiness,
     Updated,
