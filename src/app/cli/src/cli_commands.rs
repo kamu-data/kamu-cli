@@ -165,6 +165,17 @@ pub fn get_command(
             .cast(),
         ),
 
+        cli::Command::Get(c) => Box::new(
+            GetResourceCommand::builder(
+                c.resource_context.context,
+                c.resource,
+                c.name_or_id,
+                c.output_format,
+                c.ignore_not_found,
+            )
+            .cast(),
+        ),
+
         cli::Command::Ingest(c) => Box::new(
             IngestCommand::builder(
                 validate_dataset_ref(cli_catalog, c.dataset)?,

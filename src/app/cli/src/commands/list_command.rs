@@ -11,13 +11,16 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
-use kamu_resources::ResourceKindDescriptor;
 
 use super::{CLIError, Command, ListDatasetsCommand, ListResourcesCommand};
 use crate::accounts;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
-use crate::resources::ResourceFacadeFactory;
+use crate::resources::{
+    ResourceFacadeFactory,
+    ResourceKindLookupErrorOptions,
+    ResourceKindLookupService,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,6 +37,7 @@ pub struct ListCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+    resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
 
@@ -81,50 +85,6 @@ impl ListCommand {
         )
     }
 
-    fn supported_resource_targets(supported_kinds: &[ResourceKindDescriptor]) -> Vec<String> {
-        let mut targets = vec![DATASETS_TARGET.to_string()];
-        for descriptor in supported_kinds {
-            targets.push(descriptor.name.clone());
-            targets.extend(descriptor.short_names.iter().cloned());
-        }
-        targets.sort();
-        targets.dedup();
-        targets
-    }
-
-    fn resolve_resource_kind_descriptor(
-        target: &str,
-        supported_kinds: &[ResourceKindDescriptor],
-    ) -> Result<ResourceKindDescriptor, CLIError> {
-        let matches = supported_kinds
-            .iter()
-            .filter(|descriptor| {
-                descriptor.name.eq_ignore_ascii_case(target)
-                    || descriptor
-                        .short_names
-                        .iter()
-                        .any(|short_name| short_name.eq_ignore_ascii_case(target))
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        match matches.as_slice() {
-            [] => Err(CLIError::usage_error(format!(
-                "Unsupported list target '{target}'. Supported targets: {}",
-                Self::supported_resource_targets(supported_kinds).join(", ")
-            ))),
-            [descriptor] => Ok(descriptor.clone()),
-            _ => Err(CLIError::usage_error(format!(
-                "Ambiguous list target '{target}'. Matching resource kinds: {}",
-                matches
-                    .iter()
-                    .map(|descriptor| descriptor.kind.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ))),
-        }
-    }
-
     async fn resolve_list_resources_command(&self) -> Result<ListResourcesCommand, CLIError> {
         let resolved_context = self
             .resource_context_resolver
@@ -134,12 +94,15 @@ impl ListCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        let supported_kinds = resource_facade.list_supported_kinds().await?;
-
-        let kind_descriptor = Self::resolve_resource_kind_descriptor(
-            self.target.as_deref().unwrap(),
-            &supported_kinds,
-        )?;
+        let kind_descriptor = self
+            .resource_kind_lookup_service
+            .resolve_kind_descriptor(
+                self.explicit_context_name.as_deref(),
+                self.target.as_deref().unwrap(),
+                ResourceKindLookupErrorOptions::new("Unsupported list target")
+                    .with_additional_targets([DATASETS_TARGET]),
+            )
+            .await?;
 
         Ok(ListResourcesCommand::new(
             resource_facade,

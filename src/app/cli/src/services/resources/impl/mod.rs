@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod resource_facade_factory_impl;
+mod resource_kind_lookup_service_impl;
 mod resource_manifest_discovery_service_impl;
 mod resource_manifest_execution_service_impl;
 mod resource_summary_service_impl;
 
 pub use resource_facade_factory_impl::*;
+pub use resource_kind_lookup_service_impl::*;
 pub use resource_manifest_discovery_service_impl::*;
 pub use resource_manifest_execution_service_impl::*;
 pub use resource_summary_service_impl::*;

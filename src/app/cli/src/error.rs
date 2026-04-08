@@ -21,6 +21,7 @@ use kamu_resources_facade::{
     ApplyManifestError,
     ListResourcesError,
     ListSupportedResourceKindsError,
+    RenderResourceManifestError,
     ResourcesSummaryError,
 };
 use odf::utils::data::format::WriterError;
@@ -263,6 +264,23 @@ impl From<ListResourcesError> for CLIError {
 
         match e {
             e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<RenderResourceManifestError> for CLIError {
+    fn from(e: RenderResourceManifestError) -> Self {
+        use RenderResourceManifestError as E;
+
+        match e {
+            e @ (E::UnsupportedDescriptor(_)
+            | E::BadAccount(_)
+            | E::UIDNotFound(_)
+            | E::NameNotFound(_)
+            | E::ApiVersionMismatch(_)
+            | E::KindMismatch(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

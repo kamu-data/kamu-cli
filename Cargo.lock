@@ -7858,6 +7858,7 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "utoipa-axum",
+ "uuid",
  "vergen-gitcl",
  "webbrowser",
  "whoami",

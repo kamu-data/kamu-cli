@@ -30,6 +30,7 @@ use crate::{
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
+    GetResourceRef,
     GetResourceRequest,
     ListAllResourcesError,
     ListAllResourcesRequest,
@@ -273,6 +274,127 @@ impl RemoteGraphqlResourceFacadeImpl {
             )
         })
     }
+
+    fn render_manifest_query(
+        request: &RenderResourceManifestRequest,
+        target_account_id: Option<&odf::AccountID>,
+    ) -> Result<String, RenderResourceManifestError> {
+        let kind = serde_json::to_string(&request.kind).int_err()?;
+        let selector_ref = Self::render_resource_ref_input(&request.resource_ref)?;
+        let format = request.format.to_string();
+        let maybe_api_version = match &request.api_version {
+            Some(api_version) => {
+                format!(
+                    "apiVersion: {},",
+                    serde_json::to_string(api_version).int_err()?
+                )
+            }
+            None => String::new(),
+        };
+
+        Ok(if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      renderManifest(
+                        selector: {{
+                          kind: {{ custom: {kind} }},
+                          {maybe_api_version}
+                          ref: {selector_ref}
+                        }}
+                        format: {format}
+                      ) {{
+                        manifest
+                        format
+                      }}
+                    }}
+                  }}
+                }}
+                "#
+            )
+        } else {
+            format!(
+                r#"
+                query {{
+                  resources {{
+                    renderManifest(
+                      selector: {{
+                        kind: {{ custom: {kind} }},
+                        {maybe_api_version}
+                        ref: {selector_ref}
+                      }}
+                      format: {format}
+                    ) {{
+                      manifest
+                      format
+                    }}
+                  }}
+                }}
+                "#
+            )
+        })
+    }
+
+    fn render_resource_ref_input(
+        resource_ref: &GetResourceRef,
+    ) -> Result<String, RenderResourceManifestError> {
+        match resource_ref {
+            GetResourceRef::ById(uid) => Ok(format!(
+                "{{ byId: {} }}",
+                serde_json::to_string(&uid).int_err()?
+            )),
+            GetResourceRef::ByName(name) => Ok(format!(
+                "{{ byName: {{ name: {} }} }}",
+                serde_json::to_string(&name).int_err()?
+            )),
+        }
+    }
+
+    fn map_render_manifest_graphql_error(
+        request: &RenderResourceManifestRequest,
+        message: &str,
+    ) -> Option<RenderResourceManifestError> {
+        match &request.resource_ref {
+            GetResourceRef::ById(uid) => {
+                let error = domain::ResourceUIDNotFoundError(*uid);
+                message
+                    .contains(&error.to_string())
+                    .then_some(RenderResourceManifestError::UIDNotFound(error))
+            }
+            GetResourceRef::ByName(name) => {
+                let error = domain::ResourceNameNotFoundError {
+                    kind: request.kind.clone(),
+                    name: name.clone(),
+                };
+                message
+                    .contains(&error.to_string())
+                    .then_some(RenderResourceManifestError::NameNotFound(error))
+            }
+        }
+    }
+
+    fn map_render_manifest_remote_error(
+        request: &RenderResourceManifestRequest,
+        error: GraphqlHttpRequestError,
+    ) -> RenderResourceManifestError {
+        match error {
+            GraphqlHttpRequestError::Graphql {
+                endpoint_url,
+                message,
+            } => Self::map_render_manifest_graphql_error(request, &message).unwrap_or_else(|| {
+                RenderResourceManifestError::RemoteRequest(GraphqlHttpRequestError::Graphql {
+                    endpoint_url,
+                    message,
+                })
+            }),
+            GraphqlHttpRequestError::Internal(error) => {
+                RenderResourceManifestError::Internal(error)
+            }
+            other => RenderResourceManifestError::RemoteRequest(other),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -436,9 +558,31 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn render_manifest(
         &self,
-        _request: RenderResourceManifestRequest,
+        request: RenderResourceManifestRequest,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        unimplemented!("Remote resource facade render_manifest operation is not implemented yet")
+        let maybe_target_account_id =
+            Self::target_account_id::<RenderResourceManifestError>(request.account.as_ref())?;
+
+        let query = Self::render_manifest_query(&request, maybe_target_account_id.as_ref())?;
+
+        let rendered = if maybe_target_account_id.is_some() {
+            let response: fragments::AdminRenderManifestQueryDataFragment = self
+                .execute_graphql(&query)
+                .await
+                .map_err(|error| Self::map_render_manifest_remote_error(&request, error))?;
+            response.admin.resources.render_manifest
+        } else {
+            let response: fragments::RenderManifestQueryDataFragment = self
+                .execute_graphql(&query)
+                .await
+                .map_err(|error| Self::map_render_manifest_remote_error(&request, error))?;
+            response.resources.render_manifest
+        };
+
+        Ok(RenderResourceManifestResult {
+            manifest: rendered.manifest,
+            format: rendered.format.into(),
+        })
     }
 
     async fn list(

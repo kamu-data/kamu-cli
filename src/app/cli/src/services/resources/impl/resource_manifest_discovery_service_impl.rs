@@ -9,9 +9,9 @@
 
 use std::path::{Path, PathBuf};
 
-use kamu_resources_facade::ResourceManifestFormat;
+use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
 
-use crate::cli::ApplyManifestInputFormat;
+use crate::cli::ResourceManifestFormat;
 use crate::resources::{
     DiscoverResourceManifestError,
     DiscoverResourceManifestsResult,
@@ -32,7 +32,7 @@ impl ResourceManifestDiscoveryService for ResourceManifestDiscoveryServiceImpl {
         &self,
         inputs: Vec<PathBuf>,
         recursive: bool,
-        format: Option<ApplyManifestInputFormat>,
+        format: Option<ResourceManifestFormat>,
     ) -> DiscoverResourceManifestsResult {
         let mut result = DiscoverResourceManifestsResult::default();
 
@@ -54,7 +54,7 @@ impl ResourceManifestDiscoveryServiceImpl {
         &self,
         input: &Path,
         recursive: bool,
-        format: Option<ApplyManifestInputFormat>,
+        format: Option<ResourceManifestFormat>,
     ) -> Result<Vec<DiscoveredResourceManifest>, DiscoverResourceManifestError> {
         let metadata =
             std::fs::metadata(input).map_err(DiscoverResourceManifestError::InspectPath)?;
@@ -84,7 +84,7 @@ impl ResourceManifestDiscoveryServiceImpl {
     fn collect_directory_manifests(
         dir: &Path,
         recursive: bool,
-        format: Option<ApplyManifestInputFormat>,
+        format: Option<ResourceManifestFormat>,
     ) -> Result<Vec<PathBuf>, DiscoverResourceManifestError> {
         let mut children = Vec::new();
         let entries =
@@ -120,18 +120,18 @@ impl ResourceManifestDiscoveryServiceImpl {
 
     fn resolve_manifest_format(
         path: &Path,
-        format: Option<ApplyManifestInputFormat>,
-    ) -> Result<ResourceManifestFormat, DiscoverResourceManifestError> {
+        format: Option<ResourceManifestFormat>,
+    ) -> Result<FacadeResourceManifestFormat, DiscoverResourceManifestError> {
         if let Some(format) = format {
             return Ok(match format {
-                ApplyManifestInputFormat::Json => ResourceManifestFormat::Json,
-                ApplyManifestInputFormat::Yaml => ResourceManifestFormat::Yaml,
+                ResourceManifestFormat::Json => FacadeResourceManifestFormat::Json,
+                ResourceManifestFormat::Yaml => FacadeResourceManifestFormat::Yaml,
             });
         }
 
         match Self::manifest_extension(path).as_deref() {
-            Some("json") => Ok(ResourceManifestFormat::Json),
-            Some("yaml" | "yml") => Ok(ResourceManifestFormat::Yaml),
+            Some("json") => Ok(FacadeResourceManifestFormat::Json),
+            Some("yaml" | "yml") => Ok(FacadeResourceManifestFormat::Yaml),
             _ => Err(DiscoverResourceManifestError::UnsupportedExtension),
         }
     }

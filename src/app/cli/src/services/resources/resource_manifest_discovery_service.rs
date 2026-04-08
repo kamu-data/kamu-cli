@@ -9,9 +9,9 @@
 
 use std::path::PathBuf;
 
-use kamu_resources_facade::ResourceManifestFormat;
+use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
 
-use crate::cli::ApplyManifestInputFormat;
+use crate::cli::ResourceManifestFormat;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub trait ResourceManifestDiscoveryService: Send + Sync {
         &self,
         inputs: Vec<PathBuf>,
         recursive: bool,
-        format: Option<ApplyManifestInputFormat>,
+        format: Option<ResourceManifestFormat>,
     ) -> DiscoverResourceManifestsResult;
 }
 
@@ -37,7 +37,7 @@ pub struct DiscoverResourceManifestsResult {
 #[derive(Debug, Clone)]
 pub struct DiscoveredResourceManifest {
     pub source: PathBuf,
-    pub format: ResourceManifestFormat,
+    pub format: FacadeResourceManifestFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

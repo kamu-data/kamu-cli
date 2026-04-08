@@ -104,6 +104,7 @@ pub enum Command {
     Ctx(Ctx),
     Delete(Delete),
     Export(Export),
+    Get(Get),
     Ingest(Ingest),
     Init(Init),
     Inspect(Inspect),
@@ -176,7 +177,7 @@ pub struct Apply {
 
     /// Parse all selected files using the specified manifest format
     #[arg(long, value_name = "FMT", value_enum)]
-    pub format: Option<ApplyManifestInputFormat>,
+    pub format: Option<ResourceManifestFormat>,
 
     /// Recursively scan directories for manifests
     #[arg(long, short = 'r')]
@@ -190,7 +191,7 @@ pub struct Apply {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum ApplyManifestInputFormat {
+pub enum ResourceManifestFormat {
     Json,
     Yaml,
 }
@@ -824,6 +825,58 @@ pub struct Export {
     /// of records may be slightly different.
     #[arg(long)]
     pub records_per_file: Option<usize>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Returns canonical manifest representation of a resource
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Returns the canonical current state of a single resource as YAML or JSON.
+
+Only real resource kinds supported by the active context are accepted.
+Datasets are intentionally not supported by this command.
+
+**Examples:**
+
+Get a variable set manifest in YAML:
+
+    kamu get variablesets my-vars
+
+Get the same resource in JSON:
+
+    kamu get vs my-vars -o json
+
+Get a resource by UUID:
+
+    kamu get variablesets 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+Read a resource from a remote context:
+
+    kamu get storages warehouse --context prod
+
+Ignore a missing resource:
+
+    kamu get secretsets missing --ignore-not-found
+"#)]
+pub struct Get {
+    /// Resource kind selector such as `variablesets`, `vs`, `secretsets`, or
+    /// `ss`
+    pub resource: String,
+
+    /// Exact resource name or UUID-v4 resource ID
+    pub name_or_id: String,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Serialization format of the returned object
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = ResourceManifestFormat::Yaml)]
+    pub output_format: ResourceManifestFormat,
+
+    /// Exit successfully when the resource does not exist
+    #[arg(long)]
+    pub ignore_not_found: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

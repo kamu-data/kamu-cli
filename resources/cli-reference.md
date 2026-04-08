@@ -19,6 +19,7 @@ To regenerate this schema from existing code, use the following command:
 * `ctx` — Manage resource contexts
 * `delete [rm]` — Delete a dataset
 * `export` — Exports a dataset
+* `get` — Returns canonical manifest representation of a resource
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
@@ -112,7 +113,7 @@ Create or update resources from manifest files
 
 **Options:**
 
-* `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
 * `-f`, `--file <PATH>` — Manifest file or directory path
 * `--dry-run` — Preview the accepted changes without applying them
 * `--format <FMT>` — Parse all selected files using the specified manifest format
@@ -168,7 +169,7 @@ List supported resource kinds in the active context
 
 **Options:**
 
-* `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in when using the default `kinds` action
 
   Possible values:
@@ -747,6 +748,58 @@ In all other cases a path is considered as a directory. Examples:
 
 
 
+## `kamu get`
+
+Returns canonical manifest representation of a resource
+
+**Usage:** `kamu get [OPTIONS] <RESOURCE> <NAME_OR_ID>`
+
+**Arguments:**
+
+* `<RESOURCE>` — Resource kind selector such as `variablesets`, `vs`, `secretsets`, or `ss`
+* `<NAME_OR_ID>` — Exact resource name or UUID-v4 resource ID
+
+**Options:**
+
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Serialization format of the returned object
+
+  Default value: `yaml`
+
+  Possible values: `json`, `yaml`
+
+* `--ignore-not-found` — Exit successfully when the resource does not exist
+
+Returns the canonical current state of a single resource as YAML or JSON.
+
+Only real resource kinds supported by the active context are accepted.
+Datasets are intentionally not supported by this command.
+
+**Examples:**
+
+Get a variable set manifest in YAML:
+
+    kamu get variablesets my-vars
+
+Get the same resource in JSON:
+
+    kamu get vs my-vars -o json
+
+Get a resource by UUID:
+
+    kamu get variablesets 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+Read a resource from a remote context:
+
+    kamu get storages warehouse --context prod
+
+Ignore a missing resource:
+
+    kamu get secretsets missing --ignore-not-found
+
+
+
+
 ## `kamu ingest`
 
 Adds data to the root dataset according to its push source configuration
@@ -922,7 +975,7 @@ List all datasets in the workspace
 
 **Options:**
 
-* `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:

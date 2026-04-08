@@ -62,7 +62,7 @@ pub struct ApplyCommand {
     continue_on_error: bool,
 
     #[dill::component(explicit)]
-    format: Option<crate::cli::ApplyManifestInputFormat>,
+    format: Option<crate::cli::ResourceManifestFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

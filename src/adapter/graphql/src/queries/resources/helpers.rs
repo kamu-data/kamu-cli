@@ -30,6 +30,9 @@ pub(crate) async fn list_supported_resource_kinds(
 ) -> Result<Vec<ResourceKindDescriptor>> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
+    // TODO: Memoize supported resource kinds on the server side. This is
+    // effectively static metadata and only changes when the deployed build
+    // changes its registered resource kinds.
     let items = resource_facade
         .list_supported_kinds()
         .await

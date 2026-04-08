@@ -34,7 +34,7 @@ pub struct StorageResource(pub(crate) Aggregate<StorageState, dyn StorageEventSt
 impl StorageResource {
     pub const RESOURCE_TYPE: &'static str = "Storage";
     pub const RESOURCE_NAME: &'static str = "storages";
-    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st"];
+    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st", "storage"];
     pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 
     fn provider_detail(spec: &StorageSpec) -> String {
