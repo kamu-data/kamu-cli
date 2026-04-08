@@ -21,6 +21,7 @@ use crate::{StorageFailureDetails, StorageReconcileSuccess, StorageSpec};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageStatus {
     #[serde(flatten)]
     pub resource_status: ResourceStatus,
@@ -94,6 +95,7 @@ pub enum StorageProviderKind {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageReferenceStatus {
     pub total_references: usize,
     pub resolved_references: usize,

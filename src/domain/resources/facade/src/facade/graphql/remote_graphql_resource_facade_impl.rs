@@ -12,10 +12,12 @@ use domain::{
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnValueView,
+    ResourceNameNotFoundError,
     ResourcePhaseCounts,
     ResourceStatusSummaryView,
     ResourceSummaryView,
     ResourceTypeCountSummary,
+    ResourceUIDNotFoundError,
     ResourcesSummary,
 };
 use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
@@ -275,22 +277,116 @@ impl RemoteGraphqlResourceFacadeImpl {
         })
     }
 
+    fn selector_input(
+        kind: &str,
+        api_version: Option<&str>,
+        resource_ref: &GetResourceRef,
+    ) -> Result<String, InternalError> {
+        let kind = serde_json::to_string(kind).int_err()?;
+        let selector_ref = Self::resource_ref_input(resource_ref)?;
+        let maybe_api_version = match api_version {
+            Some(api_version) => format!(
+                "apiVersion: {},",
+                serde_json::to_string(api_version).int_err()?
+            ),
+            None => String::new(),
+        };
+
+        Ok(format!(
+            r#"{{
+                kind: {{ custom: {kind} }},
+                {maybe_api_version}
+                ref: {selector_ref}
+            }}"#
+        ))
+    }
+
+    fn get_resource_query(
+        request: &GetResourceRequest,
+        target_account_id: Option<&odf::AccountID>,
+    ) -> Result<String, GetResourceError> {
+        let selector = Self::selector_input(
+            &request.kind,
+            request.api_version.as_deref(),
+            &request.resource_ref,
+        )?;
+
+        Ok(if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      resource(selector: {selector}) {{
+                        apiVersion
+                        kind {{
+                          value
+                        }}
+                        metadata {{
+                          id
+                          accountId
+                          name
+                          description
+                          labels
+                          annotations
+                          generation
+                          createdAt
+                          updatedAt
+                          deletedAt
+                          lastReconciledAt
+                        }}
+                        spec
+                        status
+                      }}
+                    }}
+                  }}
+                }}
+                "#
+            )
+        } else {
+            format!(
+                r#"
+                query {{
+                  resources {{
+                    resource(selector: {selector}) {{
+                      apiVersion
+                      kind {{
+                        value
+                      }}
+                      metadata {{
+                        id
+                        accountId
+                        name
+                        description
+                        labels
+                        annotations
+                        generation
+                        createdAt
+                        updatedAt
+                        deletedAt
+                        lastReconciledAt
+                      }}
+                      spec
+                      status
+                    }}
+                  }}
+                }}
+                "#
+            )
+        })
+    }
+
     fn render_manifest_query(
         request: &RenderResourceManifestRequest,
         target_account_id: Option<&odf::AccountID>,
     ) -> Result<String, RenderResourceManifestError> {
-        let kind = serde_json::to_string(&request.kind).int_err()?;
-        let selector_ref = Self::render_resource_ref_input(&request.resource_ref)?;
+        let selector = Self::selector_input(
+            &request.kind,
+            request.api_version.as_deref(),
+            &request.resource_ref,
+        )
+        .map_err(RenderResourceManifestError::Internal)?;
         let format = request.format.to_string();
-        let maybe_api_version = match &request.api_version {
-            Some(api_version) => {
-                format!(
-                    "apiVersion: {},",
-                    serde_json::to_string(api_version).int_err()?
-                )
-            }
-            None => String::new(),
-        };
 
         Ok(if let Some(target_account_id) = target_account_id {
             format!(
@@ -299,11 +395,7 @@ impl RemoteGraphqlResourceFacadeImpl {
                   admin {{
                     resources(accountId: "{target_account_id}") {{
                       renderManifest(
-                        selector: {{
-                          kind: {{ custom: {kind} }},
-                          {maybe_api_version}
-                          ref: {selector_ref}
-                        }}
+                        selector: {selector}
                         format: {format}
                       ) {{
                         manifest
@@ -320,11 +412,7 @@ impl RemoteGraphqlResourceFacadeImpl {
                 query {{
                   resources {{
                     renderManifest(
-                      selector: {{
-                        kind: {{ custom: {kind} }},
-                        {maybe_api_version}
-                        ref: {selector_ref}
-                      }}
+                      selector: {selector}
                       format: {format}
                     ) {{
                       manifest
@@ -337,9 +425,7 @@ impl RemoteGraphqlResourceFacadeImpl {
         })
     }
 
-    fn render_resource_ref_input(
-        resource_ref: &GetResourceRef,
-    ) -> Result<String, RenderResourceManifestError> {
+    fn resource_ref_input(resource_ref: &GetResourceRef) -> Result<String, InternalError> {
         match resource_ref {
             GetResourceRef::ById(uid) => Ok(format!(
                 "{{ byId: {} }}",
@@ -393,6 +479,20 @@ impl RemoteGraphqlResourceFacadeImpl {
                 RenderResourceManifestError::Internal(error)
             }
             other => RenderResourceManifestError::RemoteRequest(other),
+        }
+    }
+
+    fn not_found_error(request: &GetResourceRequest) -> GetResourceError {
+        match &request.resource_ref {
+            GetResourceRef::ById(uid) => {
+                GetResourceError::UIDNotFound(ResourceUIDNotFoundError(*uid))
+            }
+            GetResourceRef::ByName(name) => {
+                GetResourceError::NameNotFound(ResourceNameNotFoundError {
+                    kind: request.kind.clone(),
+                    name: name.clone(),
+                })
+            }
         }
     }
 }
@@ -551,9 +651,28 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn get(
         &self,
-        _request: GetResourceRequest,
+        request: GetResourceRequest,
     ) -> Result<kamu_resources::ResourceView, GetResourceError> {
-        unimplemented!("Remote resource facade get operation is not implemented yet")
+        let maybe_target_account_id =
+            Self::target_account_id::<GetResourceError>(request.account.as_ref())?;
+
+        let query = Self::get_resource_query(&request, maybe_target_account_id.as_ref())?;
+
+        let maybe_resource = if maybe_target_account_id.is_some() {
+            let response: fragments::AdminGetResourceQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.admin.resources.resource
+        } else {
+            let response: fragments::GetResourceQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.resources.resource
+        };
+
+        let Some(resource) = maybe_resource else {
+            return Err(Self::not_found_error(&request));
+        };
+
+        resource.try_into().map_err(GetResourceError::Internal)
     }
 
     async fn render_manifest(

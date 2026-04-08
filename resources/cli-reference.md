@@ -768,12 +768,16 @@ Returns canonical manifest representation of a resource
 
   Possible values: `json`, `yaml`
 
+* `--canonical` — Return an apply-compatible canonical manifest instead of the full resource view
 * `--ignore-not-found` — Exit successfully when the resource does not exist
 
-Returns the canonical current state of a single resource as YAML or JSON.
+Returns the current state of a single resource as YAML or JSON.
 
 Only real resource kinds supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
+
+By default this command returns the full resource view, including status.
+Use `--canonical` to return the apply-compatible canonical manifest instead.
 
 **Examples:**
 
@@ -784,6 +788,10 @@ Get a variable set manifest in YAML:
 Get the same resource in JSON:
 
     kamu get vs my-vars -o json
+
+Get the canonical apply-compatible manifest:
+
+    kamu get vs my-vars --canonical
 
 Get a resource by UUID:
 

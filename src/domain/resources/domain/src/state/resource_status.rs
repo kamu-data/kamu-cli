@@ -15,6 +15,7 @@ use crate::{ResourceCondition, ResourcePhase};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceStatus {
     pub phase: ResourcePhase,
     pub observed_generation: u64,
@@ -29,12 +30,14 @@ impl ResourceStatus {
             return None;
         };
 
+        let observed_generation = status_map
+            .get("observedGeneration")
+            .or_else(|| status_map.get("observed_generation"))?
+            .clone();
+
         let mut status_json = serde_json::Map::with_capacity(3);
         status_json.insert("phase".to_string(), status_map.get("phase")?.clone());
-        status_json.insert(
-            "observed_generation".to_string(),
-            status_map.get("observed_generation")?.clone(),
-        );
+        status_json.insert("observedGeneration".to_string(), observed_generation);
         status_json.insert(
             "conditions".to_string(),
             status_map.get("conditions")?.clone(),

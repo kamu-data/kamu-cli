@@ -20,6 +20,7 @@ use crate::{VariableSetFailureDetails, VariableSetReconcileSuccess, VariableSetS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VariableSetStatus {
     #[serde(flatten)]
     pub resource_status: ResourceStatus,
@@ -84,6 +85,7 @@ impl
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct VariableSetStats {
     pub total_variables: usize,
     pub valid_variables: usize,

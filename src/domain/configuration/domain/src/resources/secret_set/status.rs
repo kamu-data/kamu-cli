@@ -20,6 +20,7 @@ use crate::{SecretSetFailureDetails, SecretSetReconcileSuccess, SecretSetSpec};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SecretSetStatus {
     #[serde(flatten)]
     pub resource_status: ResourceStatus,
@@ -77,6 +78,7 @@ impl ReconcilableStatusProjector<SecretSetSpec, SecretSetReconcileSuccess, Secre
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct SecretSetStats {
     pub total_secrets: usize,
     pub valid_secrets: usize,

@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceCondition {
+    #[serde(rename = "type")]
     pub type_: ResourceConditionType,
     pub status: ResourceConditionStatus,
     pub reason: String,

@@ -832,10 +832,13 @@ pub struct Export {
 /// Returns canonical manifest representation of a resource
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Returns the canonical current state of a single resource as YAML or JSON.
+Returns the current state of a single resource as YAML or JSON.
 
 Only real resource kinds supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
+
+By default this command returns the full resource view, including status.
+Use `--canonical` to return the apply-compatible canonical manifest instead.
 
 **Examples:**
 
@@ -846,6 +849,10 @@ Get a variable set manifest in YAML:
 Get the same resource in JSON:
 
     kamu get vs my-vars -o json
+
+Get the canonical apply-compatible manifest:
+
+    kamu get vs my-vars --canonical
 
 Get a resource by UUID:
 
@@ -873,6 +880,11 @@ pub struct Get {
     /// Serialization format of the returned object
     #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = ResourceManifestFormat::Yaml)]
     pub output_format: ResourceManifestFormat,
+
+    /// Return an apply-compatible canonical manifest instead of the full
+    /// resource view
+    #[arg(long)]
+    pub canonical: bool,
 
     /// Exit successfully when the resource does not exist
     #[arg(long)]

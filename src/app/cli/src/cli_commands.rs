@@ -171,6 +171,7 @@ pub fn get_command(
                 c.resource,
                 c.name_or_id,
                 c.output_format,
+                c.canonical,
                 c.ignore_not_found,
             )
             .cast(),
