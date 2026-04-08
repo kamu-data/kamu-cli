@@ -9,12 +9,14 @@
 
 mod apply_manifest_views;
 mod resource_kind_view;
+mod resource_list_view;
 mod resource_summary_view;
 mod resource_view;
 mod resources_summary_view;
 
 pub use apply_manifest_views::*;
 pub use resource_kind_view::*;
+pub use resource_list_view::*;
 pub use resource_summary_view::*;
 pub use resource_view::*;
 pub use resources_summary_view::*;

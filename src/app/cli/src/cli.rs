@@ -278,7 +278,7 @@ pub struct ApiResourcesSummary {
 #[derive(Debug, clap::Args)]
 pub struct ResourceContextArgs {
     /// Override the current resource context for this invocation
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, short = 'c', value_name = "NAME")]
     pub context: Option<String>,
 }
 
@@ -1023,6 +1023,18 @@ To see a human-friendly list of datasets in your workspace:
 
     kamu list
 
+To list datasets explicitly:
+
+    kamu list datasets
+
+To list variable sets:
+
+    kamu list variablesets
+
+To list storages from a specific context:
+
+    kamu list storages --context prod
+
 To see more details:
 
     kamu list -w
@@ -1032,6 +1044,13 @@ To get a machine-readable list of datasets:
     kamu list -o csv
 "#)]
 pub struct List {
+    /// Target to list: `datasets` or a resource selector such as
+    /// `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+    pub target: Option<String>,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,

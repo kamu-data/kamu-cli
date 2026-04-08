@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::ResourceListColumnDescriptor;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -16,6 +18,7 @@ pub struct ResourceKindDescriptor {
     pub short_names: Vec<String>,
     pub kind: String,
     pub api_version: String,
+    pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

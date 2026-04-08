@@ -134,11 +134,16 @@ interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
+interface "ResourceFacadeFactory" <<i>>
 interface "ResourceLifecycleEventDispatcher" <<i>>
 interface "ResourceLoader" <<i>>
+interface "ResourceManifestDiscoveryService" <<i>>
+interface "ResourceManifestExecutionService" <<i>>
 interface "ResourcePersistenceService" <<i>>
+interface "ResourcePresentationDispatcher" <<i>>
 interface "ResourceRawEventStore" <<i>>
 interface "ResourceRepository" <<i>>
+interface "ResourceSummaryService" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
 interface "SearchService" <<i>>
@@ -345,10 +350,12 @@ class "ResourceContextRegistryService"
 class "ResourceContextReporter"
 class "ResourceContextResolver"
 class "ResourceContextTestService"
-class "ResourceFacadeFactory"
+class "ResourceFacadeFactoryImpl"
 class "ResourceLifecycleMessageConsumer"
 class "ResourceLoaderImpl"
-class "ResourceSummaryService"
+class "ResourceManifestDiscoveryServiceImpl"
+class "ResourceManifestExecutionServiceImpl"
+class "ResourceSummaryServiceImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
 class "SearchIndexerConfig" <<singleton>>
@@ -364,6 +371,7 @@ class "SecretSetResourceAggregateLoaderImpl"
 class "SecretSetResourceCrudDispatcher"
 class "SecretSetResourceLifecycleDispatcher"
 class "SecretSetResourcePersistenceServiceImpl"
+class "SecretSetResourcePresentationDispatcher"
 class "SecretSetTypedResourceQueryServiceImpl"
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
@@ -422,6 +430,7 @@ class "StorageResourceAggregateLoaderImpl"
 class "StorageResourceCrudDispatcher"
 class "StorageResourceLifecycleDispatcher"
 class "StorageResourcePersistenceServiceImpl"
+class "StorageResourcePresentationDispatcher"
 class "StorageTypedResourceQueryServiceImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
@@ -448,6 +457,7 @@ class "VariableSetResourceAggregateLoaderImpl"
 class "VariableSetResourceCrudDispatcher"
 class "VariableSetResourceLifecycleDispatcher"
 class "VariableSetResourcePersistenceServiceImpl"
+class "VariableSetResourcePresentationDispatcher"
 class "VariableSetTypedResourceQueryServiceImpl"
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
@@ -777,13 +787,17 @@ class "WsSmartTransferProtocolClient"
 "ResourceContextTestService"  --> "AccessTokenRegistryService"
 "ResourceContextTestService"  --> "ResourceContextRegistryService"
 "ResourceContextTestService"  --> "ResourceContextResolver"
-"ResourceFacadeFactory"  --> "ResourceFacade"
-"ResourceFacadeFactory"  --> "AccessTokenRegistryService"
-"ResourceFacadeFactory"  --> "ResourceContextResolver"
-"ResourceSummaryService"  --> "ResourceFacade"
-"ResourceSummaryService"  --> "CurrentAccountSubject"
-"ResourceSummaryService"  --> "AccessTokenRegistryService"
-"ResourceSummaryService"  --> "ResourceContextResolver"
+"ResourceFacadeFactory" <|-- "ResourceFacadeFactoryImpl"
+"ResourceFacadeFactoryImpl"  --> "ResourceFacade"
+"ResourceFacadeFactoryImpl"  --> "AccessTokenRegistryService"
+"ResourceFacadeFactoryImpl"  --> "ResourceContextResolver"
+"ResourceManifestDiscoveryService" <|-- "ResourceManifestDiscoveryServiceImpl"
+"ResourceManifestExecutionService" <|-- "ResourceManifestExecutionServiceImpl"
+"ResourceSummaryService" <|-- "ResourceSummaryServiceImpl"
+"ResourceSummaryServiceImpl"  --> "ResourceFacade"
+"ResourceSummaryServiceImpl"  --> "CurrentAccountSubject"
+"ResourceSummaryServiceImpl"  --> "AccessTokenRegistryService"
+"ResourceSummaryServiceImpl"  --> "ResourceContextResolver"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"
@@ -801,12 +815,14 @@ class "WsSmartTransferProtocolClient"
 "SecretSetResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
 "SecretSetResourceCrudDispatcher"  --> "GetResourceByUidUseCase"
 "SecretSetResourceCrudDispatcher"  --> "ListResourcesByKindUseCase"
+"ResourcePresentationDispatcher" <|-- "SecretSetResourcePresentationDispatcher"
 "ResourceCrudDispatcher" <|-- "VariableSetResourceCrudDispatcher"
 "VariableSetResourceCrudDispatcher"  --> "GenericResourceQueryService"
 "VariableSetResourceCrudDispatcher"  --> "ApplyResourceUseCase"
 "VariableSetResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
 "VariableSetResourceCrudDispatcher"  --> "GetResourceByUidUseCase"
 "VariableSetResourceCrudDispatcher"  --> "ListResourcesByKindUseCase"
+"ResourcePresentationDispatcher" <|-- "VariableSetResourcePresentationDispatcher"
 "ApplyResourceUseCase" <|-- "SecretSetApplyResourceUseCaseImpl"
 "SecretSetApplyResourceUseCaseImpl"  --> "GenericResourceQueryService"
 "SecretSetApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"
@@ -1105,6 +1121,7 @@ class "WsSmartTransferProtocolClient"
 "StorageResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
 "StorageResourceCrudDispatcher"  --> "GetResourceByUidUseCase"
 "StorageResourceCrudDispatcher"  --> "ListResourcesByKindUseCase"
+"ResourcePresentationDispatcher" <|-- "StorageResourcePresentationDispatcher"
 "ApplyResourceUseCase" <|-- "StorageApplyResourceUseCaseImpl"
 "StorageApplyResourceUseCaseImpl"  --> "GenericResourceQueryService"
 "StorageApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"

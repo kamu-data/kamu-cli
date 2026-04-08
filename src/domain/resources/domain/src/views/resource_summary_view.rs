@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ResourceConditionStatus,
     ResourceConditionType,
+    ResourceListColumnValueView,
     ResourceName,
     ResourcePhase,
     ResourceSnapshot,
@@ -33,6 +34,7 @@ pub struct ResourceSummaryView {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummaryView>,
+    pub list_values: Vec<ResourceListColumnValueView>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +62,7 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
             created_at: value.metadata.created_at,
             updated_at: value.metadata.updated_at,
             status,
+            list_values: Vec::new(),
         }
     }
 }

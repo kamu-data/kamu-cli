@@ -15,18 +15,6 @@ pub trait ResourceType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceKindName {
-    const RESOURCE_NAME: &'static str;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceKindShortNames {
-    const RESOURCE_SHORT_NAMES: &'static [&'static str];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub trait ResourceApiVersion {
     const API_VERSION: &'static str;
 }
@@ -36,22 +24,13 @@ pub trait ResourceApiVersion {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceDescriptor {
     pub resource_type: &'static str,
-    pub resource_name: &'static str,
-    pub resource_short_names: &'static [&'static str],
     pub api_version: &'static str,
 }
 
 impl ResourceDescriptor {
-    pub const fn new(
-        resource_type: &'static str,
-        resource_name: &'static str,
-        resource_short_names: &'static [&'static str],
-        api_version: &'static str,
-    ) -> Self {
+    pub const fn new(resource_type: &'static str, api_version: &'static str) -> Self {
         Self {
             resource_type,
-            resource_name,
-            resource_short_names,
             api_version,
         }
     }
@@ -63,20 +42,11 @@ impl ResourceDescriptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceDescriptorProvider:
-    ResourceType + ResourceKindName + ResourceKindShortNames + ResourceApiVersion
-{
-    const DESCRIPTOR: ResourceDescriptor = ResourceDescriptor::new(
-        Self::RESOURCE_TYPE,
-        Self::RESOURCE_NAME,
-        Self::RESOURCE_SHORT_NAMES,
-        Self::API_VERSION,
-    );
+pub trait ResourceDescriptorProvider: ResourceType + ResourceApiVersion {
+    const DESCRIPTOR: ResourceDescriptor =
+        ResourceDescriptor::new(Self::RESOURCE_TYPE, Self::API_VERSION);
 }
 
-impl<T> ResourceDescriptorProvider for T where
-    T: ResourceType + ResourceKindName + ResourceKindShortNames + ResourceApiVersion
-{
-}
+impl<T> ResourceDescriptorProvider for T where T: ResourceType + ResourceApiVersion {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

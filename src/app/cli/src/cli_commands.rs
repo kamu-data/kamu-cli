@@ -215,6 +215,8 @@ pub fn get_command(
                     c.target_account,
                     c.all_accounts,
                 ),
+                c.target,
+                c.resource_context.context,
                 cli_catalog.get_one()?,
                 c.wide,
             )

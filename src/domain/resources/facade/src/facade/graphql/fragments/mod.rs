@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod apply;
+mod list;
 mod summary;
 mod supported_kinds;
 
 pub(crate) use apply::*;
+pub(crate) use list::*;
 pub(crate) use summary::*;
 pub(crate) use supported_kinds::*;

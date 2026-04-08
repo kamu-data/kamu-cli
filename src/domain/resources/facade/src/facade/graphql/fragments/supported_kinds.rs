@@ -32,11 +32,21 @@ pub(crate) struct ResourceKindDescriptorFragment {
     pub short_names: Vec<String>,
     pub kind: ResourceKindFragment,
     pub api_version: String,
+    pub list_columns: Vec<ResourceListColumnDescriptorFragment>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ResourceKindFragment {
     pub value: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResourceListColumnDescriptorFragment {
+    pub key: String,
+    pub header: String,
+    pub data_type: String,
+    pub visibility: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

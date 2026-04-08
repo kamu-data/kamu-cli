@@ -10,22 +10,20 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use dill::BuilderExt;
 use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     GenericResourceQueryService,
     ResourceAPIVersionMismatchError,
-    ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
-    ResourceDispatcherMeta,
     ResourceKindDescriptor,
     ResourceManifest,
     ResourceMetadataInput,
     ResourceNameNotFoundError,
+    ResourcePresentationDispatcher,
     ResourceSnapshot,
     ResourceSummaryView,
     ResourceTypeCountSummary,
@@ -382,25 +380,31 @@ impl LocalResourceFacadeImpl {
 
         for builder in self
             .catalog
-            .builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
-                |_: &ResourceDispatcherMeta| true,
-            )
+            .builders_for::<dyn ResourcePresentationDispatcher>()
         {
-            let meta = builder
-                .metadata_get_first::<ResourceDispatcherMeta>()
-                .expect("Resource CRUD dispatcher metadata missing");
-            let descriptor = &meta.descriptor;
+            let dispatcher = builder
+                .get(&self.catalog)
+                .expect("Resource presentation dispatcher construction failed");
+
+            let descriptor = dispatcher.descriptor();
+            let presentation = dispatcher.presentation();
 
             if seen.insert((descriptor.resource_type, descriptor.api_version)) {
                 descriptors.push(ResourceKindDescriptor {
-                    name: descriptor.resource_name.to_string(),
-                    short_names: descriptor
+                    name: presentation.resource_name.to_string(),
+                    short_names: presentation
                         .resource_short_names
                         .iter()
                         .map(ToString::to_string)
                         .collect(),
                     kind: descriptor.resource_type.to_string(),
                     api_version: descriptor.api_version.to_string(),
+                    list_columns: presentation
+                        .list_columns
+                        .iter()
+                        .copied()
+                        .map(Into::into)
+                        .collect(),
                 });
             }
         }

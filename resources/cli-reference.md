@@ -914,10 +914,15 @@ Show physical schema of the underlying Parquet files:
 
 List all datasets in the workspace
 
-**Usage:** `kamu list [OPTIONS]`
+**Usage:** `kamu list [OPTIONS] [TARGET]`
+
+**Arguments:**
+
+* `<TARGET>` — Target to list: `datasets` or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
 
 **Options:**
 
+* `--context <NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:
@@ -943,6 +948,18 @@ List all datasets in the workspace
 To see a human-friendly list of datasets in your workspace:
 
     kamu list
+
+To list datasets explicitly:
+
+    kamu list datasets
+
+To list variable sets:
+
+    kamu list variablesets
+
+To list storages from a specific context:
+
+    kamu list storages --context prod
 
 To see more details:
 

@@ -9,7 +9,12 @@
 
 use domain::{
     ResourceKindDescriptor,
+    ResourceListColumnDescriptor,
+    ResourceListColumnValue,
+    ResourceListColumnValueView,
     ResourcePhaseCounts,
+    ResourceStatusSummaryView,
+    ResourceSummaryView,
     ResourceTypeCountSummary,
     ResourcesSummary,
 };
@@ -49,6 +54,34 @@ pub struct RemoteGraphqlResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl RemoteGraphqlResourceFacadeImpl {
+    const LIST_PAGE_SIZE: usize = 100;
+
+    const LIST_BY_KIND_FIELDS: &'static str = r#"
+        nodes {
+          id
+          apiVersion
+          kind {
+            value
+          }
+          name
+          description
+          generation
+          createdAt
+          updatedAt
+          status {
+            phase
+            observedGeneration
+            ready
+          }
+          listValues {
+            key
+            stringValue
+            uint64Value
+            boolValue
+          }
+        }
+    "#;
+
     pub fn new(backend_url: &Url, maybe_access_token: Option<String>) -> Self {
         Self {
             graphql_client: GraphqlHttpClient::from_backend_url(backend_url, maybe_access_token),
@@ -121,17 +154,124 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
-    fn target_account_id(
+    fn target_account_id<E>(
         account: Option<&domain::ResourceManifestAccount>,
-    ) -> Result<Option<odf::AccountID>, ResourcesSummaryError> {
+    ) -> Result<Option<odf::AccountID>, E>
+    where
+        E: From<InternalError>,
+    {
         match account {
             None => Ok(None),
             Some(account) => account.id.clone().map(Some).ok_or_else(|| {
-                ResourcesSummaryError::Internal(InternalError::new(
-                    "Remote admin resource summary requires target account id",
-                ))
+                InternalError::new("Remote admin resource requests require target account id")
+                    .into()
             }),
         }
+    }
+
+    fn parse_enum<T>(value: &str, field_name: &str) -> Result<T, InternalError>
+    where
+        T: std::str::FromStr,
+    {
+        value.parse().map_err(|_| {
+            InternalError::new(format!(
+                "Unsupported {field_name} '{value}' in remote resource list",
+            ))
+        })
+    }
+
+    fn resource_summary_from_fragment(
+        fragment: fragments::ResourceSummaryFragment,
+    ) -> Result<ResourceSummaryView, ListResourcesError> {
+        let status = match fragment.status {
+            Some(status) => Some(ResourceStatusSummaryView {
+                phase: status
+                    .phase
+                    .as_deref()
+                    .map(|phase| Self::parse_enum(phase, "resource phase"))
+                    .transpose()?,
+                observed_generation: status.observed_generation,
+                ready: status.ready,
+            }),
+            None => None,
+        };
+
+        let list_values = fragment
+            .list_values
+            .into_iter()
+            .map(|value| {
+                let key = value.key;
+                let value = match (value.string_value, value.uint64_value, value.bool_value) {
+                    (Some(value), None, None) => ResourceListColumnValue::String(value),
+                    (None, Some(value), None) => ResourceListColumnValue::UInt64(value),
+                    (None, None, Some(value)) => ResourceListColumnValue::Bool(value),
+                    (None, None, None) => {
+                        return Err(ListResourcesError::Internal(InternalError::new(format!(
+                            "Missing list value payload for key '{key}'",
+                        ))));
+                    }
+                    _ => {
+                        return Err(ListResourcesError::Internal(InternalError::new(format!(
+                            "Ambiguous list value payload for key '{key}'",
+                        ))));
+                    }
+                };
+
+                Ok(ResourceListColumnValueView { key, value })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ResourceSummaryView {
+            kind: fragment.kind.value,
+            api_version: fragment.api_version,
+            uid: fragment.id,
+            name: fragment.name,
+            description: fragment.description,
+            generation: fragment.generation,
+            created_at: fragment.created_at,
+            updated_at: fragment.updated_at,
+            status,
+            list_values,
+        })
+    }
+
+    fn list_resources_query(
+        kind: &str,
+        page: usize,
+        per_page: usize,
+        target_account_id: Option<&odf::AccountID>,
+    ) -> Result<String, ListResourcesError> {
+        let kind = serde_json::to_string(kind).int_err()?;
+
+        Ok(if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      listByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
+                        {fields}
+                      }}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::LIST_BY_KIND_FIELDS,
+            )
+        } else {
+            format!(
+                r#"
+                query {{
+                  resources {{
+                    listByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
+                      {fields}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::LIST_BY_KIND_FIELDS,
+            )
+        })
     }
 }
 
@@ -154,6 +294,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
                         value
                       }
                       apiVersion
+                      listColumns {
+                        key
+                        header
+                        dataType
+                        visibility
+                      }
                     }
                   }
                 }
@@ -165,20 +311,41 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .resources
             .supported_kinds
             .into_iter()
-            .map(|item| ResourceKindDescriptor {
-                name: item.name,
-                short_names: item.short_names,
-                kind: item.kind.value,
-                api_version: item.api_version,
+            .map(|item| {
+                Ok(ResourceKindDescriptor {
+                    name: item.name,
+                    short_names: item.short_names,
+                    kind: item.kind.value,
+                    api_version: item.api_version,
+                    list_columns: item
+                        .list_columns
+                        .into_iter()
+                        .map(|column| {
+                            Ok(ResourceListColumnDescriptor {
+                                key: column.key,
+                                header: column.header,
+                                data_type: Self::parse_enum(
+                                    &column.data_type,
+                                    "list column data type",
+                                )?,
+                                visibility: Self::parse_enum(
+                                    &column.visibility,
+                                    "list column visibility",
+                                )?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, InternalError>>()?,
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>, InternalError>>()?)
     }
 
     async fn summary(
         &self,
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError> {
-        let maybe_target_account_id = Self::target_account_id(request.account.as_ref())?;
+        let maybe_target_account_id =
+            Self::target_account_id::<ResourcesSummaryError>(request.account.as_ref())?;
 
         let response = if let Some(target_account_id) = maybe_target_account_id {
             let query = format!(
@@ -276,9 +443,43 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn list(
         &self,
-        _request: ListResourcesRequest,
+        request: ListResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListResourcesError> {
-        unimplemented!("Remote resource facade list operation is not implemented yet")
+        let maybe_target_account_id =
+            Self::target_account_id::<ListResourcesError>(request.account.as_ref())?;
+
+        let page = request
+            .pagination
+            .offset
+            .checked_div(request.pagination.limit)
+            .unwrap_or(0);
+        let per_page = if request.pagination.limit == 0 {
+            Self::LIST_PAGE_SIZE
+        } else {
+            request.pagination.limit
+        };
+
+        let query = Self::list_resources_query(
+            &request.kind,
+            page,
+            per_page,
+            maybe_target_account_id.as_ref(),
+        )?;
+
+        let nodes = if maybe_target_account_id.is_some() {
+            let response: fragments::AdminListByKindQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.admin.resources.list_by_kind.nodes
+        } else {
+            let response: fragments::ListByKindQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.resources.list_by_kind.nodes
+        };
+
+        nodes
+            .into_iter()
+            .map(Self::resource_summary_from_fragment)
+            .collect()
     }
 
     async fn list_all(

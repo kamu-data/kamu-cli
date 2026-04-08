@@ -17,7 +17,7 @@ use kamu_accounts::{CurrentAccountSubject, make_search_security_context};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::DatasetSearchService;
 
-use super::{CLIError, Command};
+use super::{CLIError, Command, common};
 use crate::output::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,22 +46,6 @@ pub struct SearchCommand {
 }
 
 impl SearchCommand {
-    fn humanize_data_size(size: u64) -> String {
-        if size == 0 {
-            return "-".to_owned();
-        }
-        use humansize::{BINARY, format_size};
-        format_size(size, BINARY)
-    }
-
-    fn humanize_quantity(num: u64) -> String {
-        use num_format::{Locale, ToFormattedString};
-        if num == 0 {
-            return "-".to_owned();
-        }
-        num.to_formatted_string(&Locale::en)
-    }
-
     async fn search_local(&self) -> Result<(), CLIError> {
         let prompt = self.query.clone().unwrap_or_default();
         if prompt.is_empty() {
@@ -157,13 +141,13 @@ impl SearchCommand {
                 ColumnFormat::new().with_style_spec("l"), // Description
                 ColumnFormat::new()
                     .with_style_spec("r")
-                    .with_value_fmt_t(Self::humanize_quantity), // Blocks
+                    .with_value_fmt_t(common::humanize_quantity), // Blocks
                 ColumnFormat::new()
                     .with_style_spec("r")
-                    .with_value_fmt_t(Self::humanize_quantity), // Records
+                    .with_value_fmt_t(common::humanize_quantity), // Records
                 ColumnFormat::new()
                     .with_style_spec("r")
-                    .with_value_fmt_t(Self::humanize_data_size), // Size
+                    .with_value_fmt_t(common::humanize_data_size), // Size
             ]);
 
         let mut alias = Vec::new();

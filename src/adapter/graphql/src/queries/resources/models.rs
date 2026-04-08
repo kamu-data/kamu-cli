@@ -115,6 +115,7 @@ pub struct ResourceKindDescriptor {
     pub short_names: Vec<String>,
     pub kind: ResourceKind,
     pub api_version: String,
+    pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
 impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
@@ -124,6 +125,7 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
             short_names: value.short_names,
             kind: ResourceKind::new(value.kind),
             api_version: value.api_version,
+            list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -221,6 +223,7 @@ pub struct ResourceSummary {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummary>,
+    pub list_values: Vec<ResourceListColumnValueView>,
 }
 
 impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
@@ -235,6 +238,55 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
             created_at: value.created_at,
             updated_at: value.updated_at,
             status: value.status.map(Into::into),
+            list_values: value.list_values.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ResourceListColumnDescriptor {
+    pub key: String,
+    pub header: String,
+    pub data_type: String,
+    pub visibility: String,
+}
+
+impl From<kamu_resources::ResourceListColumnDescriptor> for ResourceListColumnDescriptor {
+    fn from(value: kamu_resources::ResourceListColumnDescriptor) -> Self {
+        Self {
+            key: value.key,
+            header: value.header,
+            data_type: value.data_type.to_string(),
+            visibility: value.visibility.to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ResourceListColumnValueView {
+    pub key: String,
+    pub string_value: Option<String>,
+    pub uint64_value: Option<u64>,
+    pub bool_value: Option<bool>,
+}
+
+impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnValueView {
+    fn from(value: kamu_resources::ResourceListColumnValueView) -> Self {
+        let (string_value, uint64_value, bool_value) = match value.value {
+            kamu_resources::ResourceListColumnValue::String(value) => (Some(value), None, None),
+            kamu_resources::ResourceListColumnValue::UInt64(value) => (None, Some(value), None),
+            kamu_resources::ResourceListColumnValue::Bool(value) => (None, None, Some(value)),
+        };
+
+        Self {
+            key: value.key,
+            string_value,
+            uint64_value,
+            bool_value,
         }
     }
 }

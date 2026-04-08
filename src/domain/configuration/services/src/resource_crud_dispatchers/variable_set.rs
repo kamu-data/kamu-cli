@@ -16,10 +16,16 @@ kamu_resources_services::declare_resource_crud_dispatcher!(
     resource = VariableSetResource
 );
 
+kamu_resources_services::declare_resource_presentation_dispatcher!(
+    dispatcher = VariableSetResourcePresentationDispatcher,
+    resource = VariableSetResource
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<VariableSetResourceCrudDispatcher>();
+    catalog_builder.add::<VariableSetResourcePresentationDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

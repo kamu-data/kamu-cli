@@ -3831,11 +3831,26 @@ type ResourceKindDescriptor {
 	shortNames: [String!]!
 	kind: ResourceKind!
 	apiVersion: String!
+	listColumns: [ResourceListColumnDescriptor!]!
 }
 
 input ResourceKindInput @oneOf {
 	builtin: ResourceBuiltinKind
 	custom: String
+}
+
+type ResourceListColumnDescriptor {
+	key: String!
+	header: String!
+	dataType: String!
+	visibility: String!
+}
+
+type ResourceListColumnValueView {
+	key: String!
+	stringValue: String
+	uint64Value: Int
+	boolValue: Boolean
 }
 
 enum ResourceManifestFormat {
@@ -3897,6 +3912,7 @@ type ResourceSummary {
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	status: ResourceStatusSummary
+	listValues: [ResourceListColumnValueView!]!
 }
 
 type ResourceTypeCountSummary {

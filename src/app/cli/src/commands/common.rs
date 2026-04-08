@@ -10,6 +10,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
+use chrono_humanize::HumanTime;
 use kamu::domain::PullImageListener;
 
 use crate::OutputConfig;
@@ -54,6 +56,30 @@ impl PullImageListener for PullImageProgress {
     fn success(&self) {
         self.progress_bar.lock().unwrap().take();
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn humanize_relative_date(timestamp: DateTime<Utc>) -> String {
+    format!("{}", HumanTime::from(timestamp - Utc::now()))
+}
+
+pub(crate) fn humanize_data_size(size: u64) -> String {
+    if size == 0 {
+        return "-".to_owned();
+    }
+
+    use humansize::{BINARY, format_size};
+    format_size(size, BINARY)
+}
+
+pub(crate) fn humanize_quantity(num: u64) -> String {
+    if num == 0 {
+        return "-".to_owned();
+    }
+
+    use num_format::{Locale, ToFormattedString};
+    num.to_formatted_string(&Locale::en)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

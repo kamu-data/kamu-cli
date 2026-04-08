@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +26,16 @@ pub enum ValueRef {
 impl ValueRef {
     pub fn is_reference(&self) -> bool {
         !matches!(self, Self::Literal(_))
+    }
+}
+
+impl fmt::Display for ValueRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Literal(value) => f.write_str(value),
+            Self::VariableRef(value) => write!(f, "var:{}/{}", value.variable_set, value.name),
+            Self::SecretRef(value) => write!(f, "secret:{}/{}", value.secret_set, value.name),
+        }
     }
 }
 

@@ -10,9 +10,15 @@
 use event_sourcing::*;
 use kamu_resources::{
     DeclarativeResource,
+    DeclarativeResourceState,
     ResourceApiVersion,
-    ResourceKindName,
-    ResourceKindShortNames,
+    ResourceListColumnDataType,
+    ResourceListColumnDefinition,
+    ResourceListColumnValue,
+    ResourceListColumnValueView,
+    ResourceListColumnVisibility,
+    ResourcePresentation,
+    ResourcePresentationDefinition,
     ResourceType,
 };
 
@@ -32,16 +38,10 @@ impl VariableSetResource {
     pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceType for VariableSetResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
-}
-
-impl ResourceKindName for VariableSetResource {
-    const RESOURCE_NAME: &'static str = Self::RESOURCE_NAME;
-}
-
-impl ResourceKindShortNames for VariableSetResource {
-    const RESOURCE_SHORT_NAMES: &'static [&'static str] = Self::RESOURCE_SHORT_NAMES;
 }
 
 impl ResourceApiVersion for VariableSetResource {
@@ -54,6 +54,30 @@ impl DeclarativeResource for VariableSetResource {
     type Spec = VariableSetSpec;
     type Status = VariableSetStatus;
     type ResourceState = VariableSetState;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourcePresentation for VariableSetResource {
+    const PRESENTATION: ResourcePresentationDefinition = ResourcePresentationDefinition::new(
+        Self::RESOURCE_NAME,
+        Self::RESOURCE_SHORT_NAMES,
+        &[ResourceListColumnDefinition {
+            key: "variables",
+            header: "Variables",
+            data_type: ResourceListColumnDataType::UInt64,
+            visibility: ResourceListColumnVisibility::Default,
+        }],
+    );
+
+    fn list_column_values(state: &Self::ResourceState) -> Vec<ResourceListColumnValueView> {
+        vec![ResourceListColumnValueView {
+            key: "variables".to_string(),
+            value: ResourceListColumnValue::UInt64(
+                u64::try_from(state.status().stats.total_variables).unwrap(),
+            ),
+        }]
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

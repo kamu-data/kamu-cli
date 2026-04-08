@@ -14,6 +14,7 @@ use kamu_resources::{
     ResourceStatusLike,
 };
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
 use crate::{StorageFailureDetails, StorageReconcileSuccess, StorageSpec};
 
@@ -81,7 +82,9 @@ impl ReconcilableStatusProjector<StorageSpec, StorageReconcileSuccess, StorageFa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "camelCase")]
 pub enum StorageProviderKind {
     LocalFs,
     S3,

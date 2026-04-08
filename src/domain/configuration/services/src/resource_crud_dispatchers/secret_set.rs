@@ -16,10 +16,16 @@ kamu_resources_services::declare_resource_crud_dispatcher!(
     resource = SecretSetResource
 );
 
+kamu_resources_services::declare_resource_presentation_dispatcher!(
+    dispatcher = SecretSetResourcePresentationDispatcher,
+    resource = SecretSetResource
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_secret_set_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<SecretSetResourceCrudDispatcher>();
+    catalog_builder.add::<SecretSetResourcePresentationDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

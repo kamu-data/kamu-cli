@@ -10,9 +10,15 @@
 use event_sourcing::*;
 use kamu_resources::{
     DeclarativeResource,
+    DeclarativeResourceState,
     ResourceApiVersion,
-    ResourceKindName,
-    ResourceKindShortNames,
+    ResourceListColumnDataType,
+    ResourceListColumnDefinition,
+    ResourceListColumnValue,
+    ResourceListColumnValueView,
+    ResourceListColumnVisibility,
+    ResourcePresentation,
+    ResourcePresentationDefinition,
     ResourceType,
 };
 
@@ -32,16 +38,10 @@ impl SecretSetResource {
     pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceType for SecretSetResource {
     const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
-}
-
-impl ResourceKindName for SecretSetResource {
-    const RESOURCE_NAME: &'static str = Self::RESOURCE_NAME;
-}
-
-impl ResourceKindShortNames for SecretSetResource {
-    const RESOURCE_SHORT_NAMES: &'static [&'static str] = Self::RESOURCE_SHORT_NAMES;
 }
 
 impl ResourceApiVersion for SecretSetResource {
@@ -54,6 +54,30 @@ impl DeclarativeResource for SecretSetResource {
     type Spec = SecretSetSpec;
     type Status = SecretSetStatus;
     type ResourceState = SecretSetState;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourcePresentation for SecretSetResource {
+    const PRESENTATION: ResourcePresentationDefinition = ResourcePresentationDefinition::new(
+        Self::RESOURCE_NAME,
+        Self::RESOURCE_SHORT_NAMES,
+        &[ResourceListColumnDefinition {
+            key: "secrets",
+            header: "Secrets",
+            data_type: ResourceListColumnDataType::UInt64,
+            visibility: ResourceListColumnVisibility::Default,
+        }],
+    );
+
+    fn list_column_values(state: &Self::ResourceState) -> Vec<ResourceListColumnValueView> {
+        vec![ResourceListColumnValueView {
+            key: "secrets".to_string(),
+            value: ResourceListColumnValue::UInt64(
+                u64::try_from(state.status().stats.total_secrets).unwrap(),
+            ),
+        }]
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

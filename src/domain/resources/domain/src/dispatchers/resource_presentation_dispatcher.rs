@@ -7,25 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_storage::StorageResource;
+use std::sync::Arc;
+
+use dill::Catalog;
+use internal_error::InternalError;
+
+use crate::{
+    ResourceDescriptor,
+    ResourcePresentationDefinition,
+    ResourceSnapshot,
+    get_resource_dispatcher_from_catalog,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_resources_services::declare_resource_crud_dispatcher!(
-    dispatcher = StorageResourceCrudDispatcher,
-    resource = StorageResource
-);
+pub trait ResourcePresentationDispatcher: Send + Sync {
+    fn descriptor(&self) -> ResourceDescriptor;
 
-kamu_resources_services::declare_resource_presentation_dispatcher!(
-    dispatcher = StorageResourcePresentationDispatcher,
-    resource = StorageResource
-);
+    fn presentation(&self) -> ResourcePresentationDefinition;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_storage_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
-    catalog_builder.add::<StorageResourceCrudDispatcher>();
-    catalog_builder.add::<StorageResourcePresentationDispatcher>();
+pub fn get_resource_presentation_dispatcher_from_catalog(
+    target_catalog: &Catalog,
+    resource: &ResourceSnapshot,
+) -> Result<Arc<dyn ResourcePresentationDispatcher>, InternalError> {
+    get_resource_dispatcher_from_catalog(
+        target_catalog,
+        resource,
+        "resource presentation dispatcher",
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

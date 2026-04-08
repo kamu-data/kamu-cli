@@ -24,6 +24,7 @@ use kamu_resources::{
     ResourceConditionType,
     ResourceDescriptorProvider,
     ResourceLinterSpec,
+    ResourcePresentation,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceStatusSummaryView,
@@ -186,7 +187,7 @@ where
 
 pub fn typed_resource_state_to_summary_view<R>(state: &R::ResourceState) -> ResourceSummaryView
 where
-    R: ResourceDescriptorProvider + DeclarativeResource,
+    R: ResourceDescriptorProvider + DeclarativeResource + ResourcePresentation,
     R::Status: ResourceStatusLike,
 {
     ResourceSummaryView {
@@ -199,6 +200,7 @@ where
         created_at: state.metadata().created_at,
         updated_at: state.metadata().updated_at,
         status: Some(resource_status_summary_view(state.status())),
+        list_values: R::list_column_values(state),
     }
 }
 
