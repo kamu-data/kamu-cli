@@ -41,6 +41,34 @@ impl PaginationOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn collect_all_pages<T, E, F, Fut>(
+    page_size: usize,
+    mut fetch_page: F,
+) -> Result<Vec<T>, E>
+where
+    F: FnMut(PaginationOpts) -> Fut,
+    Fut: Future<Output = Result<Vec<T>, E>>,
+{
+    let mut page = 0;
+    let mut items = Vec::new();
+
+    loop {
+        let page_items = fetch_page(PaginationOpts::from_page(page, page_size)).await?;
+        let fetched = page_items.len();
+        items.extend(page_items);
+
+        if fetched < page_size {
+            break;
+        }
+
+        page += 1;
+    }
+
+    Ok(items)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct EntityPageListing<Entity> {
     pub list: Vec<Entity>,

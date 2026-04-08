@@ -1078,7 +1078,7 @@ pub struct InspectSchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// List all datasets in the workspace
+/// List datasets or resources
 #[derive(Debug, clap::Args)]
 #[command(visible_alias = "ls")]
 #[command(after_help = r#"
@@ -1092,6 +1092,10 @@ To list datasets explicitly:
 
     kamu list datasets
 
+To list all resources across all kinds:
+
+    kamu list all
+
 To list variable sets:
 
     kamu list variablesets
@@ -1104,12 +1108,16 @@ To see more details:
 
     kamu list -w
 
+To get a machine-readable list of all resources:
+
+    kamu list all -o csv
+
 To get a machine-readable list of datasets:
 
     kamu list -o csv
 "#)]
 pub struct List {
-    /// Target to list: `datasets` or a resource selector such as
+    /// Target to list: `datasets`, `all`, or a resource selector such as
     /// `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
     pub target: Option<String>,
 

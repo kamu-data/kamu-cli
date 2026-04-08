@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
 
-use super::{CLIError, Command, ListDatasetsCommand, ListResourcesCommand};
+use super::{CLIError, Command, ListDatasetsCommand, ListResourcesCommand, ListResourcesScope};
 use crate::accounts;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
@@ -25,6 +25,7 @@ use crate::resources::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DATASETS_TARGET: &str = "datasets";
+const ALL_TARGET: &str = "all";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,7 +68,8 @@ impl ListCommand {
         match self.target.as_deref() {
             None => ListMode::Datasets,
             Some(target) if target.eq_ignore_ascii_case(DATASETS_TARGET) => ListMode::Datasets,
-            Some(_) => ListMode::Resources,
+            Some(target) if target.eq_ignore_ascii_case(ALL_TARGET) => ListMode::ResourcesAll,
+            Some(_) => ListMode::ResourcesByKind,
         }
     }
 
@@ -94,22 +96,27 @@ impl ListCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        let kind_descriptor = self
-            .resource_kind_lookup_service
-            .resolve_kind_descriptor(
-                self.explicit_context_name.as_deref(),
-                self.target.as_deref().unwrap(),
-                ResourceKindLookupErrorOptions::new("Unsupported list target")
-                    .with_additional_targets([DATASETS_TARGET]),
-            )
-            .await?;
+        let scope = match self.mode() {
+            ListMode::ResourcesAll => ListResourcesScope::All,
+            ListMode::ResourcesByKind => ListResourcesScope::ByKind(
+                self.resource_kind_lookup_service
+                    .resolve_kind_descriptor(
+                        self.explicit_context_name.as_deref(),
+                        self.target.as_deref().unwrap(),
+                        ResourceKindLookupErrorOptions::new("Unsupported list target")
+                            .with_additional_targets([DATASETS_TARGET, ALL_TARGET]),
+                    )
+                    .await?,
+            ),
+            ListMode::Datasets => unreachable!(),
+        };
 
         Ok(ListResourcesCommand::new(
             resource_facade,
             self.resource_context_reporter.clone(),
             resolved_context,
             self.related_account.clone(),
-            kind_descriptor,
+            scope,
             self.output_config.clone(),
             self.detail_level,
         ))
@@ -131,7 +138,7 @@ impl Command for ListCommand {
 
                 self.make_list_datasets_command().validate_args().await
             }
-            ListMode::Resources => {
+            ListMode::ResourcesAll | ListMode::ResourcesByKind => {
                 if self.related_account.is_explicit() {
                     return Err(CLIError::usage_error(
                         "Listing resources does not support --target-account or --all-accounts",
@@ -146,7 +153,9 @@ impl Command for ListCommand {
     async fn run(&self) -> Result<(), CLIError> {
         match self.mode() {
             ListMode::Datasets => self.make_list_datasets_command().run().await,
-            ListMode::Resources => self.resolve_list_resources_command().await?.run().await,
+            ListMode::ResourcesAll | ListMode::ResourcesByKind => {
+                self.resolve_list_resources_command().await?.run().await
+            }
         }
     }
 }
@@ -156,7 +165,8 @@ impl Command for ListCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ListMode {
     Datasets,
-    Resources,
+    ResourcesAll,
+    ResourcesByKind,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

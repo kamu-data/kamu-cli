@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
+use database_common::collect_all_pages;
 use datafusion::arrow::array::{
     ArrayRef,
     BooleanArray,
@@ -47,7 +47,7 @@ pub struct ListResourcesCommand {
     resource_context_reporter: Arc<ResourceContextReporter>,
     resolved_context: ResolvedResourceContext,
     related_account: accounts::RelatedAccountIndication,
-    kind_descriptor: ResourceKindDescriptor,
+    scope: ListResourcesScope,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
@@ -60,7 +60,7 @@ impl ListResourcesCommand {
         resource_context_reporter: Arc<ResourceContextReporter>,
         resolved_context: ResolvedResourceContext,
         related_account: accounts::RelatedAccountIndication,
-        kind_descriptor: ResourceKindDescriptor,
+        scope: ListResourcesScope,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
@@ -69,7 +69,7 @@ impl ListResourcesCommand {
             resource_context_reporter,
             resolved_context,
             related_account,
-            kind_descriptor,
+            scope,
             output_config,
             detail_level,
         }
@@ -77,6 +77,10 @@ impl ListResourcesCommand {
 
     fn generic_resource_columns(&self) -> Vec<ResourceGenericColumn> {
         let mut columns = vec![ResourceGenericColumn::Name];
+
+        if self.is_all_scope() {
+            columns.push(ResourceGenericColumn::Kind);
+        }
 
         if self.detail_level > 0 {
             columns.push(ResourceGenericColumn::Uid);
@@ -100,20 +104,24 @@ impl ListResourcesCommand {
         columns
     }
 
-    fn selected_resource_columns(
-        &self,
-        kind_descriptor: &ResourceKindDescriptor,
-    ) -> Vec<ResourceListColumnDescriptor> {
-        kind_descriptor
-            .list_columns
-            .iter()
-            .filter(|column| {
-                column.visibility == ResourceListColumnVisibility::Default
-                    || (self.detail_level > 0
-                        && column.visibility == ResourceListColumnVisibility::WideOnly)
-            })
-            .cloned()
-            .collect()
+    fn selected_resource_columns(&self) -> Vec<ResourceListColumnDescriptor> {
+        match &self.scope {
+            ListResourcesScope::All => Vec::new(),
+            ListResourcesScope::ByKind(kind_descriptor) => kind_descriptor
+                .list_columns
+                .iter()
+                .filter(|column| {
+                    column.visibility == ResourceListColumnVisibility::Default
+                        || (self.detail_level > 0
+                            && column.visibility == ResourceListColumnVisibility::WideOnly)
+                })
+                .cloned()
+                .collect(),
+        }
+    }
+
+    fn is_all_scope(&self) -> bool {
+        matches!(self.scope, ListResourcesScope::All)
     }
 
     fn resource_schema(&self, extra_columns: &[ResourceListColumnDescriptor]) -> Arc<Schema> {
@@ -123,6 +131,7 @@ impl ListResourcesCommand {
         for column in self.generic_resource_columns() {
             fields.push(match column {
                 ResourceGenericColumn::Name => Field::new("Name", DataType::Utf8, false),
+                ResourceGenericColumn::Kind => Field::new("Kind", DataType::Utf8, false),
                 ResourceGenericColumn::Uid => Field::new("UID", DataType::Utf8, false),
                 ResourceGenericColumn::Phase => Field::new("Phase", DataType::Utf8, true),
                 ResourceGenericColumn::Readiness => {
@@ -171,6 +180,7 @@ impl ListResourcesCommand {
         for column in self.generic_resource_columns() {
             column_formats.push(match column {
                 ResourceGenericColumn::Name
+                | ResourceGenericColumn::Kind
                 | ResourceGenericColumn::Uid
                 | ResourceGenericColumn::Description => ColumnFormat::new().with_style_spec("l"),
                 ResourceGenericColumn::Phase | ResourceGenericColumn::Readiness => {
@@ -255,38 +265,54 @@ impl ListResourcesCommand {
         }
     }
 
-    async fn list_all_resources(&self, kind: &str) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        let mut page = 0;
-        let mut items = Vec::new();
-
-        loop {
-            let page_items = self
-                .resource_facade
+    async fn list_resources_by_kind(
+        &self,
+        kind: &str,
+    ) -> Result<Vec<ResourceSummaryView>, CLIError> {
+        collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+            self.resource_facade
                 .list(kamu_resources_facade::ListResourcesRequest {
                     kind: kind.to_string(),
                     account: None,
-                    pagination: PaginationOpts::from_page(page, RESOURCE_PAGE_SIZE),
+                    pagination,
                 })
-                .await?;
+                .await
+                .map_err(Into::into)
+        })
+        .await
+    }
 
-            let fetched = page_items.len();
-            items.extend(page_items);
-
-            if fetched < RESOURCE_PAGE_SIZE {
-                break;
-            }
-            page += 1;
-        }
-
-        Ok(items)
+    async fn list_all_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
+        collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+            self.resource_facade
+                .list_all(kamu_resources_facade::ListAllResourcesRequest {
+                    account: None,
+                    pagination,
+                })
+                .await
+                .map_err(Into::into)
+        })
+        .await
     }
 
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        let mut resources = self.list_all_resources(&self.kind_descriptor.kind).await?;
-
-        resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-
-        Ok(resources)
+        match &self.scope {
+            ListResourcesScope::ByKind(kind_descriptor) => {
+                let mut resources = self.list_resources_by_kind(&kind_descriptor.kind).await?;
+                resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+                Ok(resources)
+            }
+            ListResourcesScope::All => {
+                let mut resources = self.list_all_resources().await?;
+                resources.sort_by(|lhs, rhs| {
+                    lhs.name
+                        .cmp(&rhs.name)
+                        .then_with(|| lhs.kind.cmp(&rhs.kind))
+                        .then_with(|| lhs.uid.to_string().cmp(&rhs.uid.to_string()))
+                });
+                Ok(resources)
+            }
+        }
     }
 
     fn make_writer(
@@ -311,6 +337,12 @@ impl ListResourcesCommand {
                     resources
                         .iter()
                         .map(|resource| resource.name.clone())
+                        .collect::<Vec<_>>(),
+                )),
+                ResourceGenericColumn::Kind => Arc::new(StringArray::from(
+                    resources
+                        .iter()
+                        .map(|resource| resource.kind.clone())
                         .collect::<Vec<_>>(),
                 )),
                 ResourceGenericColumn::Uid => Arc::new(StringArray::from(
@@ -445,7 +477,7 @@ impl Command for ListResourcesCommand {
 
     async fn run(&self) -> Result<(), CLIError> {
         let resources = self.load_resources().await?;
-        let extra_columns = self.selected_resource_columns(&self.kind_descriptor);
+        let extra_columns = self.selected_resource_columns();
         let (schema, mut writer) = self.make_writer(&extra_columns);
 
         if self.output_config.format == OutputFormat::Table {
@@ -463,9 +495,18 @@ impl Command for ListResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub enum ListResourcesScope {
+    ByKind(ResourceKindDescriptor),
+    All,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResourceGenericColumn {
     Name,
+    Kind,
     Uid,
     Phase,
     Readiness,

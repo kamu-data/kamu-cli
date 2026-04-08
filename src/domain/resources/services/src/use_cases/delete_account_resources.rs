@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
+use database_common::collect_all_pages;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     DeleteAccountResourcesUseCase,
@@ -52,30 +52,12 @@ impl DeleteAccountResourcesUsecaseImpl {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut all_snapshots = Vec::new();
-        let mut offset = 0;
-
-        loop {
-            let page = self
-                .generic_resource_query_service
-                .list_all_snapshots(
-                    account_id.clone(),
-                    PaginationOpts {
-                        limit: PAGE_SIZE,
-                        offset,
-                    },
-                )
-                .await?;
-
-            if page.is_empty() {
-                break;
-            }
-
-            offset += page.len();
-            all_snapshots.extend(page);
-        }
-
-        Ok(all_snapshots)
+        collect_all_pages(PAGE_SIZE, |pagination| async move {
+            self.generic_resource_query_service
+                .list_all_snapshots(account_id.clone(), pagination)
+                .await
+        })
+        .await
     }
 
     fn group_resource_uids_by_descriptor(

@@ -42,6 +42,34 @@ pub(crate) struct AdminListByKindFieldFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ListAllQueryDataFragment {
+    pub resources: ListAllResourcesFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ListAllResourcesFragment {
+    pub list_all: ResourceConnectionFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminListAllQueryDataFragment {
+    pub admin: AdminListAllFieldFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminListAllFieldFragment {
+    pub resources: ListAllResourcesFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceConnectionFragment {
     pub nodes: Vec<ResourceSummaryFragment>,
 }

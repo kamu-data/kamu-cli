@@ -20,6 +20,7 @@ use kamu_datasets::DeleteDatasetError;
 use kamu_resources_facade::{
     ApplyManifestError,
     GetResourceError,
+    ListAllResourcesError,
     ListResourcesError,
     ListSupportedResourceKindsError,
     RenderResourceManifestError,
@@ -265,6 +266,18 @@ impl From<ListResourcesError> for CLIError {
 
         match e {
             e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<ListAllResourcesError> for CLIError {
+    fn from(e: ListAllResourcesError) -> Self {
+        use ListAllResourcesError as E;
+
+        match e {
+            e @ E::BadAccount(_) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

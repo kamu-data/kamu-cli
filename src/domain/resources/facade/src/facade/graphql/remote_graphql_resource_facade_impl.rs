@@ -59,7 +59,7 @@ pub struct RemoteGraphqlResourceFacadeImpl {
 impl RemoteGraphqlResourceFacadeImpl {
     const LIST_PAGE_SIZE: usize = 100;
 
-    const LIST_BY_KIND_FIELDS: &'static str = r#"
+    const LIST_FIELDS: &'static str = r#"
         nodes {
           id
           apiVersion
@@ -183,9 +183,12 @@ impl RemoteGraphqlResourceFacadeImpl {
         })
     }
 
-    fn resource_summary_from_fragment(
+    fn resource_summary_from_fragment<E>(
         fragment: fragments::ResourceSummaryFragment,
-    ) -> Result<ResourceSummaryView, ListResourcesError> {
+    ) -> Result<ResourceSummaryView, E>
+    where
+        E: From<InternalError>,
+    {
         let status = match fragment.status {
             Some(status) => Some(ResourceStatusSummaryView {
                 phase: status
@@ -209,12 +212,12 @@ impl RemoteGraphqlResourceFacadeImpl {
                     (None, Some(value), None) => ResourceListColumnValue::UInt64(value),
                     (None, None, Some(value)) => ResourceListColumnValue::Bool(value),
                     (None, None, None) => {
-                        return Err(ListResourcesError::Internal(InternalError::new(format!(
+                        return Err(E::from(InternalError::new(format!(
                             "Missing list value payload for key '{key}'",
                         ))));
                     }
                     _ => {
-                        return Err(ListResourcesError::Internal(InternalError::new(format!(
+                        return Err(E::from(InternalError::new(format!(
                             "Ambiguous list value payload for key '{key}'",
                         ))));
                     }
@@ -243,7 +246,7 @@ impl RemoteGraphqlResourceFacadeImpl {
         page: usize,
         per_page: usize,
         target_account_id: Option<&odf::AccountID>,
-    ) -> Result<String, ListResourcesError> {
+    ) -> Result<String, InternalError> {
         let kind = serde_json::to_string(kind).int_err()?;
 
         Ok(if let Some(target_account_id) = target_account_id {
@@ -259,7 +262,7 @@ impl RemoteGraphqlResourceFacadeImpl {
                   }}
                 }}
                 "#,
-                fields = Self::LIST_BY_KIND_FIELDS,
+                fields = Self::LIST_FIELDS,
             )
         } else {
             format!(
@@ -272,9 +275,107 @@ impl RemoteGraphqlResourceFacadeImpl {
                   }}
                 }}
                 "#,
-                fields = Self::LIST_BY_KIND_FIELDS,
+                fields = Self::LIST_FIELDS,
             )
         })
+    }
+
+    fn list_all_resources_query(
+        page: usize,
+        per_page: usize,
+        target_account_id: Option<&odf::AccountID>,
+    ) -> String {
+        if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      listAll(page: {page}, perPage: {per_page}) {{
+                        {fields}
+                      }}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::LIST_FIELDS,
+            )
+        } else {
+            format!(
+                r#"
+                query {{
+                  resources {{
+                    listAll(page: {page}, perPage: {per_page}) {{
+                      {fields}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::LIST_FIELDS,
+            )
+        }
+    }
+
+    fn graphql_page_params(offset: usize, limit: usize) -> (usize, usize) {
+        let page = offset.checked_div(limit).unwrap_or(0);
+        let per_page = if limit == 0 {
+            Self::LIST_PAGE_SIZE
+        } else {
+            limit
+        };
+
+        (page, per_page)
+    }
+
+    async fn list_resource_summaries<E>(
+        &self,
+        query_kind: RemoteListQuery<'_>,
+        maybe_target_account_id: Option<&odf::AccountID>,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<ResourceSummaryView>, E>
+    where
+        E: From<GraphqlHttpRequestError> + From<InternalError>,
+    {
+        let (page, per_page) = Self::graphql_page_params(offset, limit);
+
+        let query = match query_kind {
+            RemoteListQuery::ByKind(kind) => {
+                Self::list_resources_query(kind, page, per_page, maybe_target_account_id)
+                    .map_err(E::from)?
+            }
+            RemoteListQuery::All => {
+                Self::list_all_resources_query(page, per_page, maybe_target_account_id)
+            }
+        };
+
+        let nodes = match query_kind {
+            RemoteListQuery::ByKind(_) if maybe_target_account_id.is_some() => {
+                let response: fragments::AdminListByKindQueryDataFragment =
+                    self.execute_graphql(&query).await?;
+                response.admin.resources.list_by_kind.nodes
+            }
+            RemoteListQuery::ByKind(_) => {
+                let response: fragments::ListByKindQueryDataFragment =
+                    self.execute_graphql(&query).await?;
+                response.resources.list_by_kind.nodes
+            }
+            RemoteListQuery::All if maybe_target_account_id.is_some() => {
+                let response: fragments::AdminListAllQueryDataFragment =
+                    self.execute_graphql(&query).await?;
+                response.admin.resources.list_all.nodes
+            }
+            RemoteListQuery::All => {
+                let response: fragments::ListAllQueryDataFragment =
+                    self.execute_graphql(&query).await?;
+                response.resources.list_all.nodes
+            }
+        };
+
+        nodes
+            .into_iter()
+            .map(Self::resource_summary_from_fragment::<E>)
+            .collect()
     }
 
     fn selector_input(
@@ -711,45 +812,29 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let maybe_target_account_id =
             Self::target_account_id::<ListResourcesError>(request.account.as_ref())?;
 
-        let page = request
-            .pagination
-            .offset
-            .checked_div(request.pagination.limit)
-            .unwrap_or(0);
-        let per_page = if request.pagination.limit == 0 {
-            Self::LIST_PAGE_SIZE
-        } else {
-            request.pagination.limit
-        };
-
-        let query = Self::list_resources_query(
-            &request.kind,
-            page,
-            per_page,
+        self.list_resource_summaries::<ListResourcesError>(
+            RemoteListQuery::ByKind(&request.kind),
             maybe_target_account_id.as_ref(),
-        )?;
-
-        let nodes = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminListByKindQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.list_by_kind.nodes
-        } else {
-            let response: fragments::ListByKindQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.list_by_kind.nodes
-        };
-
-        nodes
-            .into_iter()
-            .map(Self::resource_summary_from_fragment)
-            .collect()
+            request.pagination.offset,
+            request.pagination.limit,
+        )
+        .await
     }
 
     async fn list_all(
         &self,
-        _request: ListAllResourcesRequest,
+        request: ListAllResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListAllResourcesError> {
-        unimplemented!("Remote resource facade list_all operation is not implemented yet")
+        let maybe_target_account_id =
+            Self::target_account_id::<ListAllResourcesError>(request.account.as_ref())?;
+
+        self.list_resource_summaries::<ListAllResourcesError>(
+            RemoteListQuery::All,
+            maybe_target_account_id.as_ref(),
+            request.pagination.offset,
+            request.pagination.limit,
+        )
+        .await
     }
 
     async fn plan_apply_manifest(
@@ -788,6 +873,14 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<kamu_resources::ResourceUID, DeleteResourceError> {
         unimplemented!("Remote resource facade delete operation is not implemented yet")
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum RemoteListQuery<'a> {
+    ByKind(&'a str),
+    All,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,7 +23,7 @@ To regenerate this schema from existing code, use the following command:
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
-* `list [ls]` — List all datasets in the workspace
+* `list [ls]` — List datasets or resources
 * `log` — Shows dataset metadata history
 * `login` — Authenticates with a remote ODF server interactively
 * `logout` — Logs out from a remote Kamu server
@@ -973,13 +973,13 @@ Show physical schema of the underlying Parquet files:
 
 ## `kamu list`
 
-List all datasets in the workspace
+List datasets or resources
 
 **Usage:** `kamu list [OPTIONS] [TARGET]`
 
 **Arguments:**
 
-* `<TARGET>` — Target to list: `datasets` or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGET>` — Target to list: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
 
 **Options:**
 
@@ -1014,6 +1014,10 @@ To list datasets explicitly:
 
     kamu list datasets
 
+To list all resources across all kinds:
+
+    kamu list all
+
 To list variable sets:
 
     kamu list variablesets
@@ -1025,6 +1029,10 @@ To list storages from a specific context:
 To see more details:
 
     kamu list -w
+
+To get a machine-readable list of all resources:
+
+    kamu list all -o csv
 
 To get a machine-readable list of datasets:
 
