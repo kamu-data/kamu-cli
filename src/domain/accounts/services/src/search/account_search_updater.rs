@@ -26,7 +26,7 @@ use crate::search::account_search_indexer::*;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalSelfManaged,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct AccountSearchUpdater {

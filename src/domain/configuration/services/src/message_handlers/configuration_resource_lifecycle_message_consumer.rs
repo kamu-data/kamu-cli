@@ -21,7 +21,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ const MESSAGE_CONSUMER_KAMU_CONFIGURATION_RESOURCE_LIFECYCLE_HANDLER: &str =
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct ConfigurationResourceLifecycleMessageConsumer {}

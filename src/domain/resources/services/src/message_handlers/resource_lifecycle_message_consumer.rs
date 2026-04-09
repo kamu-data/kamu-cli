@@ -20,7 +20,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ use messaging_outbox::{
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalSelfManaged,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct ResourceLifecycleMessageConsumer {}

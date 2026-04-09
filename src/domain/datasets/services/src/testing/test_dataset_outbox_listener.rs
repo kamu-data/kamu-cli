@@ -52,7 +52,7 @@ struct State {
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
         MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Immediate,
+    consumption_mode: MessageConsumptionMode::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl TestDatasetOutboxListener {

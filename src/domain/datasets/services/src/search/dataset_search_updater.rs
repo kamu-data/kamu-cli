@@ -46,7 +46,7 @@ use crate::search::dataset_search_indexer::*;
         MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
         MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetSearchUpdater {

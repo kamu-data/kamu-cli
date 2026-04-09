@@ -60,7 +60,7 @@ struct State {
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 #[interface(dyn InitOnStartup)]
