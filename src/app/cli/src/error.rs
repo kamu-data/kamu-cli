@@ -19,6 +19,7 @@ use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_datasets::DeleteDatasetError;
 use kamu_resources_facade::{
     ApplyManifestError,
+    DeleteResourceError,
     GetResourceError,
     ListAllResourcesError,
     ListResourcesError,
@@ -278,6 +279,22 @@ impl From<ListAllResourcesError> for CLIError {
 
         match e {
             e @ E::BadAccount(_) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<DeleteResourceError> for CLIError {
+    fn from(e: DeleteResourceError) -> Self {
+        use DeleteResourceError as E;
+
+        match e {
+            e @ (E::UnsupportedDescriptor(_)
+            | E::BadAccount(_)
+            | E::UIDNotFound(_)
+            | E::NameNotFound(_)
+            | E::KindMismatch(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

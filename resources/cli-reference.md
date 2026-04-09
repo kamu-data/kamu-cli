@@ -17,7 +17,7 @@ To regenerate this schema from existing code, use the following command:
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `ctx` — Manage resource contexts
-* `delete [rm]` — Delete a dataset
+* `delete [rm]` — Delete datasets or resources
 * `export` — Exports a dataset
 * `get` — Returns canonical manifest representation of a resource
 * `ingest` — Adds data to the root dataset according to its push source configuration
@@ -687,34 +687,57 @@ Switch to the local workspace context:
 
 ## `kamu delete`
 
-Delete a dataset
+Delete datasets or resources
 
-**Usage:** `kamu delete [OPTIONS] [DATASET]...`
+**Usage:** `kamu delete [OPTIONS] [TARGET] [ARGS]...`
 
 **Arguments:**
 
-* `<DATASET>` — Local dataset reference(s)
+* `<TARGET>` — Target to delete: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<ARGS>` — Dataset selector(s) in dataset mode, or a single resource selector in resource mode
 
 **Options:**
 
-* `-a`, `--all` — Delete all datasets in the workspace
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-a`, `--all` — Delete all matched datasets or all resources in the selected scope
 * `-r`, `--recursive` — Also delete all transitive dependencies of specified datasets
+* `-f`, `--force` — Do not ask for confirmation
+* `--ignore-not-found` — Exit successfully when a selected resource does not exist
+* `--dry-run` — Preview the resolved resource deletions without deleting anything
+* `--continue-on-error` — Continue processing resource deletions after per-resource failures
 
-This command deletes the dataset from your workspace, including both metadata and the raw data.
-
-Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
-
-Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
+This command deletes datasets using the legacy dataset path by default, or
+resources when a resource target is specified explicitly.
 
 **Examples:**
 
-Delete a local dataset:
+Delete a local dataset using the legacy default:
 
     kamu delete my.dataset
 
-Delete local datasets matching pattern:
+Delete datasets explicitly:
+
+    kamu delete datasets my.dataset
+
+Delete local datasets matching a pattern:
 
     kamu delete my.dataset.%
+
+Delete a single resource:
+
+    kamu delete storages warehouse
+
+Delete all resources of a kind:
+
+    kamu delete storages --all
+
+Delete all resources across kinds:
+
+    kamu delete all
+
+Preview resource deletion:
+
+    kamu delete storages warehouse --dry-run
 
 
 

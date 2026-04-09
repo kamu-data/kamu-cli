@@ -147,9 +147,15 @@ pub fn get_command(
 
         cli::Command::Delete(c) => Box::new(
             DeleteCommand::builder(
-                validate_many_dataset_patterns(cli_catalog, c.dataset)?,
+                c.target,
+                c.args,
+                c.resource_context.context,
                 c.all,
                 c.recursive,
+                c.force,
+                c.ignore_not_found,
+                c.dry_run,
+                c.continue_on_error,
             )
             .cast(),
         ),
@@ -674,29 +680,36 @@ fn validate_dataset_ref(
     catalog: &dill::Catalog,
     dataset_ref: odf::DatasetRef,
 ) -> Result<odf::DatasetRef, CLIError> {
-    if let odf::DatasetRef::Alias(ref alias) = dataset_ref {
-        let workspace_svc = catalog.get_one::<WorkspaceService>()?;
-        if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
-            return Err(MultiTenantRefUnexpectedError {
-                dataset_ref_pattern: odf::DatasetRefPattern::Ref(dataset_ref),
-            }
-            .into());
+    let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+    validate_dataset_ref_with_workspace(workspace_svc.as_ref(), dataset_ref)
+}
+
+pub(crate) fn validate_dataset_ref_with_workspace(
+    workspace_svc: &WorkspaceService,
+    dataset_ref: odf::DatasetRef,
+) -> Result<odf::DatasetRef, CLIError> {
+    if let odf::DatasetRef::Alias(ref alias) = dataset_ref
+        && !workspace_svc.is_multi_tenant_workspace()
+        && alias.is_multi_tenant()
+    {
+        return Err(MultiTenantRefUnexpectedError {
+            dataset_ref_pattern: odf::DatasetRefPattern::Ref(dataset_ref),
         }
+        .into());
     }
     Ok(dataset_ref)
 }
 
-fn validate_dataset_ref_pattern(
-    catalog: &dill::Catalog,
+pub(crate) fn validate_dataset_ref_pattern_with_workspace(
+    workspace_svc: &WorkspaceService,
     dataset_ref_pattern: odf::DatasetRefPattern,
 ) -> Result<odf::DatasetRefPattern, CLIError> {
     match dataset_ref_pattern {
         odf::DatasetRefPattern::Ref(dsr) => {
-            let valid_ref = validate_dataset_ref(catalog, dsr)?;
+            let valid_ref = validate_dataset_ref_with_workspace(workspace_svc, dsr)?;
             Ok(odf::DatasetRefPattern::Ref(valid_ref))
         }
         odf::DatasetRefPattern::Pattern(drp) => {
-            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
                     dataset_ref_pattern: odf::DatasetRefPattern::Pattern(drp),
@@ -706,6 +719,19 @@ fn validate_dataset_ref_pattern(
             Ok(odf::DatasetRefPattern::Pattern(drp))
         }
     }
+}
+
+pub(crate) fn validate_many_dataset_patterns_with_workspace<I>(
+    workspace_svc: &WorkspaceService,
+    dataset_ref_patterns: I,
+) -> Result<Vec<odf::DatasetRefPattern>, CLIError>
+where
+    I: IntoIterator<Item = odf::DatasetRefPattern>,
+{
+    dataset_ref_patterns
+        .into_iter()
+        .map(|p| validate_dataset_ref_pattern_with_workspace(workspace_svc, p))
+        .collect()
 }
 
 fn validate_many_dataset_refs<I>(
@@ -730,10 +756,8 @@ fn validate_many_dataset_patterns<I>(
 where
     I: IntoIterator<Item = odf::DatasetRefPattern>,
 {
-    dataset_ref_patterns
-        .into_iter()
-        .map(|p| validate_dataset_ref_pattern(catalog, p))
-        .collect()
+    let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+    validate_many_dataset_patterns_with_workspace(workspace_svc.as_ref(), dataset_ref_patterns)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

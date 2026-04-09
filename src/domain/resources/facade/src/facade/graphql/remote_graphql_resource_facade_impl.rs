@@ -43,6 +43,7 @@ use crate::{
     RenderResourceManifestRequest,
     RenderResourceManifestResult,
     ResourceFacade,
+    ResourceKindMismatchError,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
 };
@@ -526,6 +527,42 @@ impl RemoteGraphqlResourceFacadeImpl {
         })
     }
 
+    fn delete_resource_query(
+        request: &DeleteResourceRequest,
+        target_account_id: Option<&odf::AccountID>,
+    ) -> Result<String, DeleteResourceError> {
+        let selector = Self::selector_input(&request.kind, None, &request.resource_ref)
+            .map_err(DeleteResourceError::Internal)?;
+
+        Ok(if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                mutation {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      delete(selector: {selector}) {{
+                        resourceId
+                      }}
+                    }}
+                  }}
+                }}
+                "#
+            )
+        } else {
+            format!(
+                r#"
+                mutation {{
+                  resources {{
+                    delete(selector: {selector}) {{
+                      resourceId
+                    }}
+                  }}
+                }}
+                "#
+            )
+        })
+    }
+
     fn resource_ref_input(resource_ref: &GetResourceRef) -> Result<String, InternalError> {
         match resource_ref {
             GetResourceRef::ById(uid) => Ok(format!(
@@ -536,6 +573,69 @@ impl RemoteGraphqlResourceFacadeImpl {
                 "{{ byName: {{ name: {} }} }}",
                 serde_json::to_string(&name).int_err()?
             )),
+        }
+    }
+
+    fn map_delete_graphql_error(
+        request: &DeleteResourceRequest,
+        message: &str,
+    ) -> Option<DeleteResourceError> {
+        match &request.resource_ref {
+            GetResourceRef::ById(uid) => {
+                let not_found = domain::ResourceUIDNotFoundError(*uid);
+                if message.contains(&not_found.to_string()) {
+                    return Some(DeleteResourceError::UIDNotFound(not_found));
+                }
+
+                let mismatch_prefix = format!("Resource uid {uid} refers to kind '");
+                let mismatch_suffix = format!("', expected '{}'", request.kind);
+                if let Some(actual_kind_start) = message.find(&mismatch_prefix) {
+                    let actual_kind_start = actual_kind_start + mismatch_prefix.len();
+                    if let Some(actual_kind_end) =
+                        message[actual_kind_start..].find(&mismatch_suffix)
+                    {
+                        return Some(DeleteResourceError::KindMismatch(
+                            ResourceKindMismatchError {
+                                uid: *uid,
+                                expected_kind: request.kind.clone(),
+                                actual_kind: message
+                                    [actual_kind_start..actual_kind_start + actual_kind_end]
+                                    .to_string(),
+                            },
+                        ));
+                    }
+                }
+
+                None
+            }
+            GetResourceRef::ByName(name) => {
+                let not_found = domain::ResourceNameNotFoundError {
+                    kind: request.kind.clone(),
+                    name: name.clone(),
+                };
+                message
+                    .contains(&not_found.to_string())
+                    .then_some(DeleteResourceError::NameNotFound(not_found))
+            }
+        }
+    }
+
+    fn map_delete_remote_error(
+        request: &DeleteResourceRequest,
+        error: GraphqlHttpRequestError,
+    ) -> DeleteResourceError {
+        match error {
+            GraphqlHttpRequestError::Graphql {
+                endpoint_url,
+                message,
+            } => Self::map_delete_graphql_error(request, &message).unwrap_or_else(|| {
+                DeleteResourceError::RemoteRequest(GraphqlHttpRequestError::Graphql {
+                    endpoint_url,
+                    message,
+                })
+            }),
+            GraphqlHttpRequestError::Internal(error) => DeleteResourceError::Internal(error),
+            other => DeleteResourceError::RemoteRequest(other),
         }
     }
 
@@ -869,9 +969,28 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn delete(
         &self,
-        _request: DeleteResourceRequest,
+        request: DeleteResourceRequest,
     ) -> Result<kamu_resources::ResourceUID, DeleteResourceError> {
-        unimplemented!("Remote resource facade delete operation is not implemented yet")
+        let maybe_target_account_id =
+            Self::target_account_id::<DeleteResourceError>(request.account.as_ref())?;
+
+        let query = Self::delete_resource_query(&request, maybe_target_account_id.as_ref())?;
+
+        let resource_id = if maybe_target_account_id.is_some() {
+            let response: fragments::AdminDeleteMutationDataFragment = self
+                .execute_graphql(&query)
+                .await
+                .map_err(|error| Self::map_delete_remote_error(&request, error))?;
+            response.admin.resources.delete.resource_id
+        } else {
+            let response: fragments::DeleteMutationDataFragment = self
+                .execute_graphql(&query)
+                .await
+                .map_err(|error| Self::map_delete_remote_error(&request, error))?;
+            response.resources.delete.resource_id
+        };
+
+        Ok(resource_id)
     }
 }
 

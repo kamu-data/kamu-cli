@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod apply;
+mod delete;
 mod get;
 mod list;
 mod render_manifest;
@@ -15,6 +16,7 @@ mod summary;
 mod supported_kinds;
 
 pub(crate) use apply::*;
+pub(crate) use delete::*;
 pub(crate) use get::*;
 pub(crate) use list::*;
 pub(crate) use render_manifest::*;

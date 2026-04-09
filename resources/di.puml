@@ -144,6 +144,7 @@ interface "ResourcePersistenceService" <<i>>
 interface "ResourcePresentationDispatcher" <<i>>
 interface "ResourceRawEventStore" <<i>>
 interface "ResourceRepository" <<i>>
+interface "ResourceSelectorResolutionService" <<i>>
 interface "ResourceSummaryService" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
@@ -357,6 +358,7 @@ class "ResourceLifecycleMessageConsumer"
 class "ResourceLoaderImpl"
 class "ResourceManifestDiscoveryServiceImpl"
 class "ResourceManifestExecutionServiceImpl"
+class "ResourceSelectorResolutionServiceImpl"
 class "ResourceSummaryServiceImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
@@ -797,6 +799,7 @@ class "WsSmartTransferProtocolClient"
 "ResourceKindLookupServiceImpl"  --> "ResourceFacadeFactory"
 "ResourceManifestDiscoveryService" <|-- "ResourceManifestDiscoveryServiceImpl"
 "ResourceManifestExecutionService" <|-- "ResourceManifestExecutionServiceImpl"
+"ResourceSelectorResolutionService" <|-- "ResourceSelectorResolutionServiceImpl"
 "ResourceSummaryService" <|-- "ResourceSummaryServiceImpl"
 "ResourceSummaryServiceImpl"  --> "ResourceFacade"
 "ResourceSummaryServiceImpl"  --> "CurrentAccountSubject"

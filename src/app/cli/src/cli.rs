@@ -759,28 +759,56 @@ pub struct ConfigSet {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Delete a dataset
+/// Delete datasets or resources
 #[derive(Debug, clap::Args)]
 #[command(visible_alias = "rm")]
 #[command(after_help = r#"
-This command deletes the dataset from your workspace, including both metadata and the raw data.
-
-Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
-
-Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
+This command deletes datasets using the legacy dataset path by default, or
+resources when a resource target is specified explicitly.
 
 **Examples:**
 
-Delete a local dataset:
+Delete a local dataset using the legacy default:
 
     kamu delete my.dataset
 
-Delete local datasets matching pattern:
+Delete datasets explicitly:
+
+    kamu delete datasets my.dataset
+
+Delete local datasets matching a pattern:
 
     kamu delete my.dataset.%
+
+Delete a single resource:
+
+    kamu delete storages warehouse
+
+Delete all resources of a kind:
+
+    kamu delete storages --all
+
+Delete all resources across kinds:
+
+    kamu delete all
+
+Preview resource deletion:
+
+    kamu delete storages warehouse --dry-run
 "#)]
 pub struct Delete {
-    /// Delete all datasets in the workspace
+    /// Target to delete: `datasets`, `all`, or a resource selector
+    /// such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+    pub target: Option<String>,
+
+    /// Dataset selector(s) in dataset mode, or a single resource selector in
+    /// resource mode
+    pub args: Vec<String>,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Delete all matched datasets or all resources in the selected scope
     #[arg(long, short = 'a')]
     pub all: bool,
 
@@ -788,9 +816,21 @@ pub struct Delete {
     #[arg(long, short = 'r')]
     pub recursive: bool,
 
-    /// Local dataset reference(s)
-    #[arg(value_parser = parsers::dataset_ref_pattern)]
-    pub dataset: Vec<odf::DatasetRefPattern>,
+    /// Do not ask for confirmation
+    #[arg(long, short = 'f')]
+    pub force: bool,
+
+    /// Exit successfully when a selected resource does not exist
+    #[arg(long)]
+    pub ignore_not_found: bool,
+
+    /// Preview the resolved resource deletions without deleting anything
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Continue processing resource deletions after per-resource failures
+    #[arg(long)]
+    pub continue_on_error: bool,
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

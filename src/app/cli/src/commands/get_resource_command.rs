@@ -26,6 +26,7 @@ use crate::resources::{
     ResourceFacadeFactory,
     ResourceKindLookupErrorOptions,
     ResourceKindLookupService,
+    ResourceSelectorResolutionService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,7 @@ use crate::resources::{
 pub struct GetResourceCommand {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
+    resource_selector_resolution_service: Arc<dyn ResourceSelectorResolutionService>,
 
     #[dill::component(explicit)]
     explicit_context_name: Option<String>,
@@ -65,13 +67,12 @@ impl GetResourceCommand {
         }
     }
 
-    fn resource_ref(&self) -> GetResourceRef {
-        match uuid::Uuid::parse_str(&self.name_or_id) {
-            Ok(uid) if uid.get_version() == Some(uuid::Version::Random) => {
-                GetResourceRef::ById(kamu_resources::ResourceUID::new(uid))
-            }
-            _ => GetResourceRef::ByName(self.name_or_id.clone()),
-        }
+    async fn resource_ref(&self) -> Result<GetResourceRef, CLIError> {
+        Ok(self
+            .resource_selector_resolution_service
+            .resolve_single_selector(&self.name_or_id)
+            .await?
+            .resource_ref)
     }
 
     fn render_full_resource(
@@ -242,14 +243,14 @@ impl Command for GetResourceCommand {
             self.run_canonical(
                 resource_facade.as_ref(),
                 kind_descriptor,
-                self.resource_ref(),
+                self.resource_ref().await?,
             )
             .await
         } else {
             self.run_full_view(
                 resource_facade.as_ref(),
                 kind_descriptor,
-                self.resource_ref(),
+                self.resource_ref().await?,
             )
             .await
         }
