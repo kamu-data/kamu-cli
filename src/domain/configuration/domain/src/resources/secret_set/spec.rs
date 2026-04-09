@@ -21,9 +21,25 @@ pub struct SecretSetSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, untagged)]
+pub enum SecretSpec {
+    Literal(String),
+    Value(SecretValueSpec),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SecretSpec {
+pub struct SecretValueSpec {
     pub value: String,
+}
+
+impl SecretSpec {
+    pub fn literal_value(&self) -> &str {
+        match self {
+            Self::Literal(value) => value,
+            Self::Value(value) => &value.value,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,18 +83,20 @@ impl ResourceValidateSpec for SecretSetSpec {
         }
 
         for (name, secret) in &self.secrets {
+            let value = secret.literal_value();
+
             if !Self::is_valid_secret_name(name) {
                 return Err(SecretSetSpecValidationError::InvalidSecretName { name: name.clone() });
             }
 
-            if secret.value.is_empty() {
+            if value.is_empty() {
                 return Err(SecretSetSpecValidationError::EmptySecretValue { name: name.clone() });
             }
 
-            if secret.value.len() > Self::MAX_SECRET_VALUE_LEN {
+            if value.len() > Self::MAX_SECRET_VALUE_LEN {
                 return Err(SecretSetSpecValidationError::SecretValueTooLong {
                     name: name.clone(),
-                    actual: secret.value.len(),
+                    actual: value.len(),
                     max: Self::MAX_SECRET_VALUE_LEN,
                 });
             }
@@ -95,6 +113,8 @@ impl ResourceLinterSpec for SecretSetSpec {
         let mut warnings = Vec::new();
 
         for (name, secret) in &self.secrets {
+            let value = secret.literal_value();
+
             if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX,
@@ -106,14 +126,17 @@ impl ResourceLinterSpec for SecretSetSpec {
                 });
             }
 
-            if secret.value.len() > Self::WARNING_SECRET_VALUE_LEN {
+            if value.len() > Self::WARNING_SECRET_VALUE_LEN {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_LONG_SECRET_VALUE,
-                    path: Some(format!("spec.secrets.{name}.value")),
+                    path: Some(match secret {
+                        SecretSpec::Literal(_) => format!("spec.secrets.{name}"),
+                        SecretSpec::Value(_) => format!("spec.secrets.{name}.value"),
+                    }),
                     message: format!(
                         "Secret '{name}' value is unusually long: got {actual}, warning threshold \
                          is {threshold}",
-                        actual = secret.value.len(),
+                        actual = value.len(),
                         threshold = Self::WARNING_SECRET_VALUE_LEN
                     ),
                 });
@@ -149,6 +172,109 @@ pub enum SecretSetSpecValidationError {
 
     #[error("description is too long: got {actual}, max is {max}")]
     DescriptionTooLong { actual: usize, max: usize },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::{SecretSetSpec, SecretSpec, SecretValueSpec};
+
+    #[test]
+    fn deserializes_scalar_secret_syntax() {
+        let spec: SecretSetSpec = serde_json::from_value(serde_json::json!({
+            "secrets": {
+                "API_TOKEN": "secret-value",
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            spec,
+            SecretSetSpec {
+                secrets: [(
+                    "API_TOKEN".to_string(),
+                    SecretSpec::Literal("secret-value".to_string()),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        );
+    }
+
+    #[test]
+    fn deserializes_structured_secret_syntax() {
+        let spec: SecretSetSpec = serde_json::from_value(serde_json::json!({
+            "secrets": {
+                "API_TOKEN": {
+                    "value": "secret-value",
+                },
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            spec,
+            SecretSetSpec {
+                secrets: [(
+                    "API_TOKEN".to_string(),
+                    SecretSpec::Value(SecretValueSpec {
+                        value: "secret-value".to_string(),
+                    }),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        );
+    }
+
+    #[test]
+    fn serializes_secret_as_scalar_syntax() {
+        let value = serde_json::to_value(SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Literal("secret-value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "secrets": {
+                    "API_TOKEN": "secret-value",
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn serializes_structured_secret_syntax() {
+        let value = serde_json::to_value(SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Value(SecretValueSpec {
+                    value: "secret-value".to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "secrets": {
+                    "API_TOKEN": {
+                        "value": "secret-value",
+                    },
+                }
+            })
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

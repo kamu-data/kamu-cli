@@ -16,6 +16,7 @@ use kamu_configuration::{
     VariableSetResource,
     VariableSetSpec,
     VariableSpec,
+    VariableValueSpec,
 };
 use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot, ResourceUID};
 
@@ -58,9 +59,9 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceUID {
         spec: serde_json::to_value(VariableSetSpec {
             variables: [(
                 "PLACEHOLDER".to_string(),
-                VariableSpec {
+                VariableSpec::Value(VariableValueSpec {
                     value: "placeholder".to_string(),
-                },
+                }),
             )]
             .into(),
         })

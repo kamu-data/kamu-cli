@@ -21,9 +21,25 @@ pub struct VariableSetSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, untagged)]
+pub enum VariableSpec {
+    Literal(String),
+    Value(VariableValueSpec),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariableSpec {
+pub struct VariableValueSpec {
     pub value: String,
+}
+
+impl VariableSpec {
+    pub fn literal_value(&self) -> &str {
+        match self {
+            Self::Literal(value) => value,
+            Self::Value(value) => &value.value,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,22 +83,24 @@ impl ResourceValidateSpec for VariableSetSpec {
         }
 
         for (name, variable) in &self.variables {
+            let value = variable.literal_value();
+
             if !Self::is_valid_variable_name(name) {
                 return Err(VariableSetSpecValidationError::InvalidVariableName {
                     name: name.clone(),
                 });
             }
 
-            if variable.value.is_empty() {
+            if value.is_empty() {
                 return Err(VariableSetSpecValidationError::EmptyVariableValue {
                     name: name.clone(),
                 });
             }
 
-            if variable.value.len() > Self::MAX_VARIABLE_VALUE_LEN {
+            if value.len() > Self::MAX_VARIABLE_VALUE_LEN {
                 return Err(VariableSetSpecValidationError::VariableValueTooLong {
                     name: name.clone(),
-                    actual: variable.value.len(),
+                    actual: value.len(),
                     max: Self::MAX_VARIABLE_VALUE_LEN,
                 });
             }
@@ -99,6 +117,8 @@ impl ResourceLinterSpec for VariableSetSpec {
         let mut warnings = Vec::new();
 
         for (name, variable) in &self.variables {
+            let value = variable.literal_value();
+
             if name.starts_with(Self::RESERVED_VARIABLE_PREFIX) {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_RESERVED_VARIABLE_PREFIX,
@@ -110,14 +130,17 @@ impl ResourceLinterSpec for VariableSetSpec {
                 });
             }
 
-            if variable.value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
+            if value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_LONG_VARIABLE_VALUE,
-                    path: Some(format!("spec.variables.{name}.value")),
+                    path: Some(match variable {
+                        VariableSpec::Literal(_) => format!("spec.variables.{name}"),
+                        VariableSpec::Value(_) => format!("spec.variables.{name}.value"),
+                    }),
                     message: format!(
                         "Variable '{name}' value is unusually long: got {actual}, warning \
                          threshold is {threshold}",
-                        actual = variable.value.len(),
+                        actual = value.len(),
                         threshold = Self::WARNING_VARIABLE_VALUE_LEN
                     ),
                 });
@@ -153,6 +176,109 @@ pub enum VariableSetSpecValidationError {
 
     #[error("description is too long: got {actual}, max is {max}")]
     DescriptionTooLong { actual: usize, max: usize },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::{VariableSetSpec, VariableSpec, VariableValueSpec};
+
+    #[test]
+    fn deserializes_scalar_variable_syntax() {
+        let spec: VariableSetSpec = serde_json::from_value(serde_json::json!({
+            "variables": {
+                "INPUT_TOPIC": "analytics.events",
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            spec,
+            VariableSetSpec {
+                variables: [(
+                    "INPUT_TOPIC".to_string(),
+                    VariableSpec::Literal("analytics.events".to_string()),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        );
+    }
+
+    #[test]
+    fn deserializes_structured_variable_syntax() {
+        let spec: VariableSetSpec = serde_json::from_value(serde_json::json!({
+            "variables": {
+                "INPUT_TOPIC": {
+                    "value": "analytics.events",
+                },
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            spec,
+            VariableSetSpec {
+                variables: [(
+                    "INPUT_TOPIC".to_string(),
+                    VariableSpec::Value(VariableValueSpec {
+                        value: "analytics.events".to_string(),
+                    }),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        );
+    }
+
+    #[test]
+    fn serializes_variable_as_scalar_syntax() {
+        let value = serde_json::to_value(VariableSetSpec {
+            variables: [(
+                "INPUT_TOPIC".to_string(),
+                VariableSpec::Literal("analytics.events".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "variables": {
+                    "INPUT_TOPIC": "analytics.events",
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn serializes_structured_variable_syntax() {
+        let value = serde_json::to_value(VariableSetSpec {
+            variables: [(
+                "INPUT_TOPIC".to_string(),
+                VariableSpec::Value(VariableValueSpec {
+                    value: "analytics.events".to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "variables": {
+                    "INPUT_TOPIC": {
+                        "value": "analytics.events",
+                    },
+                }
+            })
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -56,7 +56,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
                 entry_id: Uuid::new_v4(),
                 account_id: account_id.clone(),
                 key: key.clone(),
-                value: variable.value.clone(),
+                value: variable.literal_value().to_string(),
                 updated_at: now,
             })
             .collect();

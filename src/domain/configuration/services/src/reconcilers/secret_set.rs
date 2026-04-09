@@ -64,8 +64,9 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
 
         let mut entries = Vec::with_capacity(total);
         for (key, secret) in &resource.spec().secrets {
-            let (value, secret_nonce) =
-                encryptor.encrypt_bytes(secret.value.as_bytes()).int_err()?;
+            let (value, secret_nonce) = encryptor
+                .encrypt_bytes(secret.literal_value().as_bytes())
+                .int_err()?;
             entries.push(SecretSetEntry {
                 entry_id: Uuid::new_v4(),
                 account_id: account_id.clone(),
