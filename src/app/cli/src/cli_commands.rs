@@ -617,7 +617,6 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Ctx(_)
-        | cli::Command::Apply(_)
         | cli::Command::ApiResources(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)

@@ -21,7 +21,7 @@ use kamu_resources::{
 use kamu_resources_facade::ResourceFacade;
 use thiserror::Error;
 
-use super::{BatchError, CLIError, Command};
+use super::{BatchError, CLIError, Command, common};
 use crate::output::{ApplyMultiProgress, OutputConfig};
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
@@ -566,27 +566,7 @@ impl ApplyPrinter<'_> {
         progress: Option<&ApplyMultiProgress>,
         resource: &ResourceView,
     ) -> Result<(), CLIError> {
-        #[derive(serde::Serialize)]
-        struct RenderedResourceView<'a> {
-            kind: &'a str,
-            api_version: &'a str,
-            account: &'a kamu_resources::ResourceViewAccount,
-            metadata: &'a kamu_resources::ResourceViewMetadata,
-            last_reconciled_at: &'a Option<chrono::DateTime<chrono::Utc>>,
-            spec: serde_yaml::Value,
-            status: Option<serde_yaml::Value>,
-        }
-
-        let rendered = serde_yaml::to_string(&RenderedResourceView {
-            kind: &resource.kind,
-            api_version: &resource.api_version,
-            account: &resource.account,
-            metadata: &resource.metadata,
-            last_reconciled_at: &resource.last_reconciled_at,
-            spec: Self::json_to_yaml_value(&resource.spec),
-            status: resource.status.as_ref().map(Self::json_to_yaml_value),
-        })
-        .map_err(CLIError::critical)?;
+        let rendered = Self::render_verbose_resource(resource)?;
 
         self.print_line(
             progress,
@@ -598,6 +578,62 @@ impl ApplyPrinter<'_> {
         );
 
         Ok(())
+    }
+
+    fn render_verbose_resource(resource: &ResourceView) -> Result<String, CLIError> {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RenderedResourceViewMetadata<'a> {
+            uid: &'a kamu_resources::ResourceUID,
+            name: &'a str,
+            description: &'a Option<String>,
+            labels: &'a std::collections::BTreeMap<String, String>,
+            annotations: &'a std::collections::BTreeMap<String, String>,
+            generation: u64,
+            created_at: &'a chrono::DateTime<chrono::Utc>,
+            updated_at: &'a chrono::DateTime<chrono::Utc>,
+            deleted_at: &'a Option<chrono::DateTime<chrono::Utc>>,
+        }
+
+        impl<'a> RenderedResourceViewMetadata<'a> {
+            fn new(resource: &'a ResourceView) -> Self {
+                Self {
+                    uid: &resource.metadata.uid,
+                    name: &resource.metadata.name,
+                    description: &resource.metadata.description,
+                    labels: &resource.metadata.labels,
+                    annotations: &resource.metadata.annotations,
+                    generation: resource.metadata.generation,
+                    created_at: &resource.metadata.created_at,
+                    updated_at: &resource.metadata.updated_at,
+                    deleted_at: &resource.metadata.deleted_at,
+                }
+            }
+        }
+
+        #[derive(serde::Serialize)]
+        struct RenderedResourceView<'a> {
+            kind: &'a str,
+            #[serde(rename = "apiVersion")]
+            api_version: &'a str,
+            account: &'a kamu_resources::ResourceViewAccount,
+            metadata: RenderedResourceViewMetadata<'a>,
+            #[serde(rename = "lastReconciledAt")]
+            last_reconciled_at: &'a Option<chrono::DateTime<chrono::Utc>>,
+            spec: serde_yaml::Value,
+            status: Option<serde_yaml::Value>,
+        }
+
+        serde_yaml::to_string(&RenderedResourceView {
+            kind: &resource.kind,
+            api_version: &resource.api_version,
+            account: &resource.account,
+            metadata: RenderedResourceViewMetadata::new(resource),
+            last_reconciled_at: &resource.last_reconciled_at,
+            spec: common::json_to_yaml_value(&resource.spec),
+            status: resource.status.as_ref().map(common::json_to_yaml_value),
+        })
+        .map_err(CLIError::critical)
     }
 
     fn accepted_status_line(
@@ -709,29 +745,6 @@ impl ApplyPrinter<'_> {
             value,
             Some(serde_json::Value::Array(_) | serde_json::Value::Object(_))
         )
-    }
-
-    fn json_to_yaml_value(value: &serde_json::Value) -> serde_yaml::Value {
-        match value {
-            serde_json::Value::Null => serde_yaml::Value::Null,
-            serde_json::Value::Bool(value) => serde_yaml::Value::Bool(*value),
-            serde_json::Value::Number(value) => serde_yaml::to_value(value).unwrap(),
-            serde_json::Value::String(value) => serde_yaml::Value::String(value.clone()),
-            serde_json::Value::Array(values) => {
-                serde_yaml::Value::Sequence(values.iter().map(Self::json_to_yaml_value).collect())
-            }
-            serde_json::Value::Object(entries) => serde_yaml::Value::Mapping(
-                entries
-                    .iter()
-                    .map(|(key, value)| {
-                        (
-                            serde_yaml::Value::String(key.clone()),
-                            Self::json_to_yaml_value(value),
-                        )
-                    })
-                    .collect(),
-            ),
-        }
     }
 
     fn indent_block(value: &str, prefix: &str) -> String {

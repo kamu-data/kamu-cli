@@ -191,17 +191,19 @@ macro_rules! declare_reconcile_resource_use_case {
         #[dill::interface(dyn kamu_resources::ReconcileResourceUseCase<$resource>)]
         pub struct $use_case {
             catalog: dill::Catalog,
-            outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
-            reconciler: std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         impl $use_case {
-            #[::database_common_macros::transactional_method2(
+            #[::database_common_macros::transactional_method4(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>
+                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
+                        outbox:
+                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
                     )]
             async fn start_reconciliation_phase(
                 &self,
@@ -211,19 +213,23 @@ macro_rules! declare_reconcile_resource_use_case {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
                     resource_persistence_service.as_ref(),
-                    self.outbox.as_ref(),
-                    self.reconciler.as_ref(),
+                    outbox.as_ref(),
+                    reconciler.as_ref(),
                     self.time_source.as_ref(),
                 );
 
                 helper.start_reconciliation_phase(id).await
             }
 
-            #[::database_common_macros::transactional_method2(
+            #[::database_common_macros::transactional_method4(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>
+                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
+                        outbox:
+                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
                     )]
             async fn finish_reconciliation_phase(
                 &self,
@@ -234,8 +240,8 @@ macro_rules! declare_reconcile_resource_use_case {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
                     resource_persistence_service.as_ref(),
-                    self.outbox.as_ref(),
-                    self.reconciler.as_ref(),
+                    outbox.as_ref(),
+                    reconciler.as_ref(),
                     self.time_source.as_ref(),
                 );
 
