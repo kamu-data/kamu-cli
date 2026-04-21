@@ -182,14 +182,19 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments {
-                    path
-                    ref
-                  }
                   accessLevel
                   changeBy
                   categories
                   tags
+                  attachments {
+                    path
+                    ref
+                    asVersionedFile {
+                      matching {
+                        version
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -241,14 +246,19 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     id
                     headline
                     body
-                    attachments {
-                      path
-                      ref
-                    }
                     accessLevel
                     changeBy
                     categories
                     tags
+                    attachments {
+                      path
+                      ref
+                      asVersionedFile {
+                        matching {
+                          version
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -6664,7 +6674,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     harness.synchronize_agents().await;
 
-    let expected_activity_node = value!({
+    let expected_activity_node = json!({
         "activity": {
             "nodes": [
                 {
@@ -6673,20 +6683,30 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
-                        "attachments": [
-                            {
-                                "path": "/foo_renamed.txt",
-                                "ref": project_1_file_1_dataset_id,
-                            },
-                            {
-                                "path": "/bar.txt",
-                                "ref": project_1_file_2_dataset_id,
-                            },
-                        ],
                         "accessLevel": "public",
                         "changeBy": USER_1,
                         "categories": ["test-category-1"],
                         "tags": ["test-tag1", "test-tag2"],
+                        "attachments": [
+                            {
+                                "path": "/foo_renamed.txt",
+                                "ref": project_1_file_1_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 2,
+                                    }
+                                }
+                            },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 2,
+                                    }
+                                }
+                            },
+                        ],
                     }
                 },
                 {
@@ -6746,8 +6766,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": expected_activity_node
             }
@@ -6763,8 +6787,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .data
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": expected_activity_node
@@ -6808,7 +6836,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     harness.synchronize_agents().await;
 
-    let expected_activity_node = value!({
+    let expected_activity_node = json!({
         "activity": {
             "nodes": [
                 {
@@ -6826,20 +6854,30 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
-                        "attachments": [
-                            {
-                                "path": "/foo_renamed.txt",
-                                "ref": project_1_file_1_dataset_id,
-                            },
-                            {
-                                "path": "/bar.txt",
-                                "ref": project_1_file_2_dataset_id,
-                            },
-                        ],
                         "accessLevel": "public",
                         "changeBy": USER_1,
                         "categories": ["test-category-1"],
                         "tags": ["test-tag1", "test-tag2"],
+                        "attachments": [
+                            {
+                                "path": "/foo_renamed.txt",
+                                "ref": project_1_file_1_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 3,
+                                    }
+                                }
+                            },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 2,
+                                    }
+                                }
+                            },
+                        ],
                     }
                 },
                 {
@@ -6899,8 +6937,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": expected_activity_node
             }
@@ -6916,8 +6958,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": expected_activity_node
@@ -6986,10 +7032,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
                         "body": "Blah blah 1",
+                        "accessLevel": "public",
+                        "changeBy": USER_1,
+                        "categories": ["test-category-1"],
+                        "tags": ["test-tag1", "test-tag2"],
                         "attachments": [
                             {
                                 "path": "/foo_renamed.txt",
                                 "ref": project_1_file_1_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 3,
+                                    }
+                                }
                             },
                             // NOTE: We removed this file from the data room
                             // {
@@ -6997,10 +7052,6 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     "ref": project_1_file_2_dataset_id,
                             // },
                         ],
-                        "accessLevel": "public",
-                        "changeBy": USER_1,
-                        "categories": ["test-category-1"],
-                        "tags": ["test-tag1", "test-tag2"],
                     }
                 },
                 {
@@ -7060,8 +7111,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": expected_activity_node
             }
@@ -7077,8 +7132,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": expected_activity_node
@@ -7203,11 +7262,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
-                "attachments": [],
                 "accessLevel": "holders",
                 "changeBy": USER_2,
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
+                "attachments": [],
             }
         },
         {
@@ -7234,21 +7293,26 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
-                "attachments": [
-                    {
-                        "path": "/foo_renamed.txt",
-                        "ref": project_1_file_1_dataset_id,
-                    },
-                    // NOTE: We removed this file from the data room
-                    // {
-                    //     "path": "/bar.txt",
-                    //     "ref": project_1_file_2_dataset_id,
-                    // },
-                ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
+                "attachments": [
+                        {
+                            "path": "/foo_renamed.txt",
+                            "ref": project_1_file_1_dataset_id,
+                            "asVersionedFile": {
+                                "matching": {
+                                    "version": 3,
+                                }
+                            }
+                        },
+                        // NOTE: We removed this file from the data room
+                        // {
+                        //     "path": "/bar.txt",
+                        //     "ref": project_1_file_2_dataset_id,
+                        // },
+                    ],
             }
         },
         {
@@ -7306,8 +7370,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "activity": {
@@ -7391,11 +7459,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
-                "attachments": [],
                 "accessLevel": "holders",
                 "changeBy": USER_2,
                 "categories": ["test-category-1", "test-category-2"],
                 "tags": ["test-tag2"],
+                "attachments": [],
             }
         },
         {
@@ -7404,21 +7472,26 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
-                "attachments": [
-                    {
-                        "path": "/foo_renamed.txt",
-                        "ref": project_1_file_1_dataset_id,
-                    },
-                    // NOTE: We removed this file from the data room
-                    // {
-                    //     "path": "/bar.txt",
-                    //     "ref": project_1_file_2_dataset_id,
-                    // },
-                ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
+                "attachments": [
+                        {
+                            "path": "/foo_renamed.txt",
+                            "ref": project_1_file_1_dataset_id,
+                            "asVersionedFile": {
+                                "matching": {
+                                    "version": 3,
+                                }
+                            }
+                        },
+                        // NOTE: We removed this file from the data room
+                        // {
+                        //     "path": "/bar.txt",
+                        //     "ref": project_1_file_2_dataset_id,
+                        // },
+                    ],
             }
         },
     ]);
@@ -7459,8 +7532,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "activity": {
@@ -7500,10 +7577,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
+                "accessLevel": "public",
+                "changeBy": USER_1,
+                "categories": ["test-category-1"],
+                "tags": ["test-tag1", "test-tag2"],
                 "attachments": [
                     {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 3,
+                            }
+                        }
                     },
                     // NOTE: We removed this file from the data room
                     // {
@@ -7511,10 +7597,6 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     //     "ref": project_1_file_2_dataset_id,
                     // },
                 ],
-                "accessLevel": "public",
-                "changeBy": USER_1,
-                "categories": ["test-category-1"],
-                "tags": ["test-tag1", "test-tag2"],
             }
         },
         {
@@ -7641,6 +7723,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 3,
+                            }
+                        }
                     },
                     // NOTE: We removed this file from the data room
                     // {
@@ -7670,8 +7757,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": {
@@ -7697,8 +7788,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": {
@@ -7751,13 +7846,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": {
                         "activity": {
                             "nodes": expected_project_announcement_activity_nodes
+                                .into_json()
+                                .unwrap()
                         }
                     }
                 }
@@ -7828,6 +7929,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -7944,6 +8050,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8060,6 +8171,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8174,6 +8290,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8401,6 +8522,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8517,6 +8643,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8714,13 +8845,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
+                                .into_json()
+                                .unwrap()
                         }
                     }
                 }
@@ -8778,6 +8915,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             {
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 3,
+                                                    }
+                                                }
                                             },
                                             // NOTE: We removed this file from the data room
                                             // {
@@ -8862,12 +9004,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
+                            .clone()
+                            .into_json()
+                            .unwrap()
                     }
                 }
             }
@@ -8886,12 +9035,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
+                            .clone()
+                            .into_json()
+                            .unwrap()
                     }
                 }
             }
@@ -8959,6 +9115,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9085,6 +9246,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9211,6 +9377,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9337,6 +9508,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9589,6 +9765,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9715,6 +9896,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                         {
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 3,
+                                                }
+                                            }
                                         },
                                         // NOTE: We removed this file from the data room
                                         // {
@@ -9920,12 +10106,18 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data,
-        value!({
+        .data
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json()
+        .unwrap(),
+        json!({
             "molecule": {
                 "v2": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
+                            .into_json()
+                            .unwrap()
                     }
                 }
             }
