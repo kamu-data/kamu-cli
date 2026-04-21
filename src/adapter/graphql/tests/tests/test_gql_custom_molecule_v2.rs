@@ -6811,7 +6811,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
                                     "matching": {
-                                        "version": 3,
+                                        "version": 2,
                                     }
                                 }
                             },
@@ -6985,15 +6985,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
                                     "matching": {
-                                        "version": 3,
+                                        "version": 2,
                                     }
                                 }
                             },
-                            // NOTE: We removed this file from the data room
-                            // {
-                            //     "path": "/bar.txt",
-                            //     "ref": project_1_file_2_dataset_id,
-                            // },
+                            {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "asVersionedFile": {
+                                    "matching": {
+                                        "version": 2,
+                                    }
+                                }
+                            },
                         ],
                     }
                 },
@@ -7240,15 +7244,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             "ref": project_1_file_1_dataset_id,
                             "asVersionedFile": {
                                 "matching": {
-                                    "version": 3,
+                                    "version": 2,
                                 }
                             }
                         },
-                        // NOTE: We removed this file from the data room
-                        // {
-                        //     "path": "/bar.txt",
-                        //     "ref": project_1_file_2_dataset_id,
-                        // },
+                        {
+                            "path": "/bar.txt",
+                            "ref": project_1_file_2_dataset_id,
+                            "asVersionedFile": {
+                                "matching": {
+                                    "version": 2,
+                                }
+                            }
+                        },
                     ],
             }
         },
@@ -7412,21 +7420,25 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                 "categories": ["test-category-1"],
                 "tags": ["test-tag1", "test-tag2"],
                 "attachments": [
-                        {
-                            "path": "/foo_renamed.txt",
-                            "ref": project_1_file_1_dataset_id,
-                            "asVersionedFile": {
-                                "matching": {
-                                    "version": 3,
-                                }
+                    {
+                        "path": "/foo_renamed.txt",
+                        "ref": project_1_file_1_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 2,
                             }
-                        },
-                        // NOTE: We removed this file from the data room
-                        // {
-                        //     "path": "/bar.txt",
-                        //     "ref": project_1_file_2_dataset_id,
-                        // },
-                    ],
+                        }
+                    },
+                    {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 2,
+                            }
+                        }
+                    },
+                ],
             }
         },
     ]);
@@ -7520,15 +7532,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "ref": project_1_file_1_dataset_id,
                         "asVersionedFile": {
                             "matching": {
-                                "version": 3,
+                                "version": 2,
                             }
                         }
                     },
-                    // NOTE: We removed this file from the data room
-                    // {
-                    //     "path": "/bar.txt",
-                    //     "ref": project_1_file_2_dataset_id,
-                    // },
+                    {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 2,
+                            }
+                        }
+                    },
                 ],
             }
         },
@@ -7658,15 +7674,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "ref": project_1_file_1_dataset_id,
                         "asVersionedFile": {
                             "matching": {
-                                "version": 3,
+                                "version": 2,
                             }
                         }
                     },
-                    // NOTE: We removed this file from the data room
-                    // {
-                    //     "path": "/bar.txt",
-                    //     "ref": project_1_file_2_dataset_id,
-                    // },
+                    {
+                        "path": "/bar.txt",
+                        "ref": project_1_file_2_dataset_id,
+                        "asVersionedFile": {
+                            "matching": {
+                                "version": 2,
+                            }
+                        }
+                    },
                 ],
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -7979,15 +7999,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -8100,15 +8124,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -8219,15 +8247,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -8451,15 +8483,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -8572,15 +8608,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -8842,15 +8882,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
                                                     "matching": {
-                                                        "version": 3,
+                                                        "version": 2,
                                                     }
                                                 }
                                             },
-                                            // NOTE: We removed this file from the data room
-                                            // {
-                                            //     "path": "/bar.txt",
-                                            //     "ref": project_1_file_2_dataset_id,
-                                            // },
+                                            {
+                                                "path": "/bar.txt",
+                                                "ref": project_1_file_2_dataset_id,
+                                                "asVersionedFile": {
+                                                    "matching": {
+                                                        "version": 2,
+                                                    }
+                                                }
+                                            },
                                         ],
                                         "accessLevel": "public",
                                         "changeBy": USER_1,
@@ -9038,15 +9082,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -9169,15 +9217,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -9300,15 +9352,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -9431,15 +9487,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -9688,15 +9748,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
@@ -9819,15 +9883,19 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
                                                 "matching": {
-                                                    "version": 3,
+                                                    "version": 2,
                                                 }
                                             }
                                         },
-                                        // NOTE: We removed this file from the data room
-                                        // {
-                                        //     "path": "/bar.txt",
-                                        //     "ref": project_1_file_2_dataset_id,
-                                        // },
+                                        {
+                                            "path": "/bar.txt",
+                                            "ref": project_1_file_2_dataset_id,
+                                            "asVersionedFile": {
+                                                "matching": {
+                                                    "version": 2,
+                                                }
+                                            }
+                                        },
                                     ],
                                     "accessLevel": "public",
                                     "changeBy": USER_1,
