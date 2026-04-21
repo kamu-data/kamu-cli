@@ -16,6 +16,7 @@ use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
+use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
@@ -575,9 +576,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         dataset_reg
             .get_dataset_by_id(
@@ -2785,9 +2784,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2896,9 +2893,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2920,9 +2915,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -2990,9 +2983,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3060,9 +3051,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3130,9 +3119,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3200,9 +3187,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3270,9 +3255,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3340,9 +3323,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3410,9 +3391,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3480,9 +3459,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -3505,9 +3482,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3634,9 +3609,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3959,9 +3932,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -4021,9 +3992,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"]["extraData"],
+        .into_json_data()["datasets"]["byId"]["asVersionedFile"]["latest"]["extraData"],
         json!({
             "categories": ["test-category-1", "test-category-2"],
             "content_text": "bye bye bye",
@@ -4834,9 +4803,7 @@ async fn test_molecule_v2_announcements_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -4890,9 +4857,7 @@ async fn test_molecule_v2_announcements_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -4934,9 +4899,7 @@ async fn test_molecule_v2_announcements_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -4977,9 +4940,7 @@ async fn test_molecule_v2_announcements_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -5023,9 +4984,7 @@ async fn test_molecule_v2_announcements_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -6113,9 +6072,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             )
             .execute(&harness.schema, &harness.catalog_authorized)
             .await
-            .data
-            .into_json()
-            .unwrap();
+            .into_json_data();
 
             res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
         },
@@ -6196,9 +6153,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -6251,9 +6206,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -6646,9 +6599,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -6766,11 +6717,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": expected_activity_node
@@ -6789,9 +6738,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .await
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .data
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -6937,11 +6884,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": expected_activity_node
@@ -6958,11 +6903,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7111,11 +7054,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": expected_activity_node
@@ -7132,11 +7073,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7188,9 +7127,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -7370,11 +7307,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7532,11 +7467,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7757,11 +7690,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7788,11 +7719,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -7846,11 +7775,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -8845,11 +8772,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -9004,11 +8929,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -9035,11 +8958,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -10106,11 +10027,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
         // NOTE: For correct number comparison, which sometimes appear as
         //       `{"$serde_json::private::Number": "2"}`
-        .into_json()
-        .unwrap(),
+        .into_json_data(),
         json!({
             "molecule": {
                 "v2": {
@@ -10325,9 +10244,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -10477,9 +10394,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -10532,9 +10447,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -10699,9 +10612,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -10796,9 +10707,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
@@ -10842,9 +10751,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -11479,9 +11386,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         )
         .execute(&harness_clone.schema, &harness_clone.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -11536,9 +11441,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         )
         .execute(&harness_clone.schema, &harness_clone.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -11691,9 +11594,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut upload_file_node =
             res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
@@ -11735,9 +11636,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .data
-        .into_json()
-        .unwrap();
+        .into_json_data();
 
         let mut announcement_create_node =
             res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
