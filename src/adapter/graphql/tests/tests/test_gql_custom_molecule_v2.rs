@@ -194,6 +194,9 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                       matching {
                         version
                       }
+                      latest {
+                        version
+                      }
                     }
                   }
                 }
@@ -255,6 +258,9 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                       path
                       ref
                       asVersionedFile {
+                        latest {
+                          version
+                        }
                         matching {
                           version
                         }
@@ -5141,6 +5147,9 @@ async fn test_molecule_v2_announcements_operations(
                                 "path": "/foo.txt",
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 1,
+                                    },
                                     "matching": {
                                         "version": 1,
                                     }
@@ -5150,6 +5159,9 @@ async fn test_molecule_v2_announcements_operations(
                                 "path": "/bar.txt",
                                 "ref": project_1_file_2_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 1,
+                                    },
                                     "matching": {
                                         "version": 1,
                                     }
@@ -5169,6 +5181,9 @@ async fn test_molecule_v2_announcements_operations(
                                 "path": "/foo.txt",
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 1,
+                                    },
                                     "matching": {
                                         "version": 1,
                                     }
@@ -6658,6 +6673,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/foo_renamed.txt",
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 2,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -6667,6 +6685,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/bar.txt",
                                 "ref": project_1_file_2_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 2,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -6825,6 +6846,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/foo_renamed.txt",
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 3,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -6834,6 +6858,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/bar.txt",
                                 "ref": project_1_file_2_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 2,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -6999,6 +7026,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/foo_renamed.txt",
                                 "ref": project_1_file_1_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 3,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -7008,6 +7038,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 "path": "/bar.txt",
                                 "ref": project_1_file_2_dataset_id,
                                 "asVersionedFile": {
+                                    "latest": {
+                                        "version": 2,
+                                    },
                                     "matching": {
                                         "version": 2,
                                     }
@@ -7258,6 +7291,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             "path": "/foo_renamed.txt",
                             "ref": project_1_file_1_dataset_id,
                             "asVersionedFile": {
+                                "latest": {
+                                    "version": 3,
+                                },
                                 "matching": {
                                     "version": 2,
                                 }
@@ -7267,6 +7303,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             "path": "/bar.txt",
                             "ref": project_1_file_2_dataset_id,
                             "asVersionedFile": {
+                                "latest": {
+                                    "version": 2,
+                                },
                                 "matching": {
                                     "version": 2,
                                 }
@@ -7439,6 +7478,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 3,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7448,6 +7490,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 2,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7546,6 +7591,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 3,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7555,6 +7603,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 2,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7688,6 +7739,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 3,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7697,6 +7751,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
                         "asVersionedFile": {
+                            "latest": {
+                                "version": 2,
+                            },
                             "matching": {
                                 "version": 2,
                             }
@@ -7896,6 +7953,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -7905,6 +7965,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8017,6 +8080,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8026,6 +8092,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8142,6 +8211,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8151,6 +8223,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8265,6 +8340,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8274,6 +8352,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8501,6 +8582,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8510,6 +8594,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8626,6 +8713,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8635,6 +8725,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8900,6 +8993,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/foo_renamed.txt",
                                                 "ref": project_1_file_1_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 3,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -8909,6 +9005,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                                 "path": "/bar.txt",
                                                 "ref": project_1_file_2_dataset_id,
                                                 "asVersionedFile": {
+                                                    "latest": {
+                                                        "version": 2,
+                                                    },
                                                     "matching": {
                                                         "version": 2,
                                                     }
@@ -9100,6 +9199,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9109,6 +9211,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9235,6 +9340,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9244,6 +9352,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9370,6 +9481,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9379,6 +9493,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9505,6 +9622,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9514,6 +9634,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9766,6 +9889,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9775,6 +9901,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9901,6 +10030,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/foo_renamed.txt",
                                             "ref": project_1_file_1_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 3,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }
@@ -9910,6 +10042,9 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                             "path": "/bar.txt",
                                             "ref": project_1_file_2_dataset_id,
                                             "asVersionedFile": {
+                                                "latest": {
+                                                    "version": 2,
+                                                },
                                                 "matching": {
                                                     "version": 2,
                                                 }

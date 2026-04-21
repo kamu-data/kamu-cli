@@ -255,14 +255,14 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         level = "debug",
         name = MoleculeDataRoomCollectionServiceImpl_find_data_room_collection_entries_by_refs,
         skip_all,
-        fields(%data_room_dataset_id, ?as_of, refs = %format_utils::format_collection(refs), ?before_event_time)
+        fields(%data_room_dataset_id, ?as_of, refs = %format_utils::format_collection(refs), ?as_of_event_time)
     )]
     async fn find_data_room_collection_entries_by_refs(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-        before_event_time: Option<DateTime<Utc>>,
+        as_of_event_time: Option<DateTime<Utc>>,
     ) -> Result<
         BatchLookup<
             CollectionEntry,
@@ -279,7 +279,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 ReadCheckedDataset::from_ref(&readable_data_room),
                 as_of,
                 refs,
-                before_event_time,
+                as_of_event_time,
             )
             .await
             .map_err(|e| match e {

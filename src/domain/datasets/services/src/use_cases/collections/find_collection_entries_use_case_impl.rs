@@ -107,14 +107,14 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     #[tracing::instrument(
         name = FindCollectionEntriesUseCaseImpl_execute_find_multi_by_refs,
         skip_all,
-        fields(as_of = ?as_of, refs = ?refs, before_event_time = ?before_event_time,)
+        fields(as_of = ?as_of, refs = ?refs, as_of_event_time = ?as_of_event_time,)
     )]
     async fn execute_find_multi_by_refs(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-        before_event_time: Option<DateTime<Utc>>,
+        as_of_event_time: Option<DateTime<Utc>>,
     ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError> {
         use datafusion::common::ScalarValue;
         use datafusion::logical_expr::{col, lit};
@@ -138,10 +138,10 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         // Note: we are still working with a changelog here in hope to narrow down the
         // record set before projecting
         let predicate = {
-            let before_event_time_predicate = before_event_time.map_or_else(
+            let as_of_event_time_predicate = as_of_event_time.map_or_else(
                 || lit(true),
                 |t| {
-                    col("event_time").lt(lit(ScalarValue::TimestampMillisecond(
+                    col("event_time").lt_eq(lit(ScalarValue::TimestampMillisecond(
                         Some(t.timestamp_millis()),
                         Some("UTC".into()),
                     )))
@@ -150,7 +150,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
             let refs_predicate =
                 col("ref").in_list(refs.iter().map(|r| lit(r.to_string())).collect(), false);
 
-            before_event_time_predicate.and(refs_predicate)
+            as_of_event_time_predicate.and(refs_predicate)
         };
 
         let df = df.filter(predicate).int_err()?;

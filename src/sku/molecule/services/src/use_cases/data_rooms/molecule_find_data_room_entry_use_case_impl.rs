@@ -98,14 +98,14 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
         level = "debug",
         name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_refs,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, refs = %format_utils::format_collection(refs), before_event_time = ?before_event_time)
+        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, refs = %format_utils::format_collection(refs), as_of_event_time = ?as_of_event_time)
     )]
     async fn execute_find_by_refs(
         &self,
         molecule_project: &MoleculeProject,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-        before_event_time: Option<DateTime<Utc>>,
+        as_of_event_time: Option<DateTime<Utc>>,
     ) -> Result<
         BatchLookup<MoleculeDataRoomEntry, odf::DatasetID, MoleculeDataRoomEntryNotFoundByRefError>,
         MoleculeFindDataRoomEntryError,
@@ -116,7 +116,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
                 &molecule_project.data_room_dataset_id,
                 as_of,
                 refs,
-                before_event_time,
+                as_of_event_time,
             )
             .await
             .map_err(Self::map_read_collection_error)?;

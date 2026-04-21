@@ -35,7 +35,7 @@ pub trait FindCollectionEntriesUseCase: Send + Sync {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
-        before_event_time: Option<DateTime<Utc>>,
+        as_of_event_time: Option<DateTime<Utc>>,
     ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError>;
 }
 
