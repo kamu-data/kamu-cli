@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
 use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
@@ -34,9 +35,12 @@ pub trait FindCollectionEntriesUseCase: Send + Sync {
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
+        before_event_time: Option<DateTime<Utc>>,
     ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]

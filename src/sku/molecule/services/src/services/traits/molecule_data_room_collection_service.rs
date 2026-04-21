@@ -47,6 +47,7 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         data_room_dataset_id: &odf::DatasetID,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
+        before_event_time: Option<DateTime<Utc>>,
     ) -> Result<
         BatchLookup<
             CollectionEntry,

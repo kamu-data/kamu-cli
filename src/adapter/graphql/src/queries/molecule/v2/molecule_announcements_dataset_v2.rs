@@ -194,7 +194,12 @@ impl MoleculeAnnouncementEntry {
         let refs = self.entity.attachments.iter().collect::<Vec<_>>();
 
         let lookup = find_data_room_entry_uc
-            .execute_find_by_refs(&self.project.entity, None /* latest */, &refs)
+            .execute_find_by_refs(
+                &self.project.entity,
+                None,
+                &refs,
+                Some(self.entity.event_time), // before
+            )
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeFindDataRoomEntryError as E;
