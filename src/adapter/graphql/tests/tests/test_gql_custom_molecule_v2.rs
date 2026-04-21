@@ -426,14 +426,14 @@ const SEARCH_QUERY: &str = indoc!(
                   id
                   headline
                   body
-                  attachments {
-                    path
-                    ref
-                  }
                   accessLevel
                   changeBy
                   categories
                   tags
+                  attachments {
+                    path
+                    ref
+                  }
                 }
               }
             }
@@ -4728,14 +4728,14 @@ async fn test_molecule_v2_announcements_operations(
                       id
                       headline
                       body
-                      attachments {
-                        path
-                        ref
-                      }
                       accessLevel
                       changeBy
                       categories
                       tags
+                      attachments {
+                        path
+                        ref
+                      }
                     }
                   }
                 }
@@ -5132,6 +5132,10 @@ async fn test_molecule_v2_announcements_operations(
                         "id": project_1_announcement_3_id,
                         "headline": "Test announcement 3",
                         "body": "Blah blah 3",
+                        "accessLevel": "holders",
+                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
+                        "categories": [],
+                        "tags": ["test-tag1"],
                         "attachments": [
                             {
                                 "path": "/foo.txt",
@@ -5152,10 +5156,6 @@ async fn test_molecule_v2_announcements_operations(
                                 }
                             },
                         ],
-                        "accessLevel": "holders",
-                        "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BE",
-                        "categories": [],
-                        "tags": ["test-tag1"],
                     }
                 },
                 {
