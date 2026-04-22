@@ -95,7 +95,7 @@ jobs:
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ingest-ftp,web-ui
             nextest-flags: --cargo-profile ci --features ingest-ftp,web-ui
-            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::elasticsearch::) | test(::spark::) | test(::flink::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::database::) | test(::elasticsearch::) | test(::spark::) | test(::flink::) | test(::examples::))'
             nextest-exclusions-database-set-part: ''
             nextest-exclusions-elasticsearch-set-part: ''
             container-runtime: podman
@@ -109,7 +109,7 @@ jobs:
             runs-on: macos-15
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
-            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::) | test(::elasticsearch::))'
+            nextest-exclusions-main-set-tests: -E '!(test(::containerized::) | test(::database::) | test(::elasticsearch::) | test(::examples::))'
             nextest-exclusions-database-set-part: '& !(test(::containerized::))'
             nextest-exclusions-elasticsearch-set-part: '& !(test(::containerized::))'
             container-runtime: ''
@@ -124,7 +124,7 @@ jobs:
             cargo-flags: --profile ci
             nextest-flags: --cargo-profile ci
             # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-            nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::) | test(::elasticsearch::))'
+            nextest-exclusions-main-set-tests: -E 'platform(target) & !(test(::containerized::) | test(::datafusion::) | test(::database::) | test(::elasticsearch::) | test(::examples::))'
             nextest-exclusions-database-set-part: '& !(test(::datafusion::))'
             nextest-exclusions-elasticsearch-set-part: '& !(test(::datafusion::))'
             container-runtime: ''

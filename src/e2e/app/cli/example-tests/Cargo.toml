@@ -28,11 +28,9 @@ default = []
 [dependencies]
 
 [dev-dependencies]
-indoc = "2"
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",
 ] }
 test-group = { version = "1" }
 serde_json = { version = "1", default-features = false }
-tempfile = { version = "3" }

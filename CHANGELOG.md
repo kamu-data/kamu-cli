@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.262.0] - 2026-04-22
 ### Changed
 - Updated default RisingWave engine image that fixes Parquet compatibility bug
 
