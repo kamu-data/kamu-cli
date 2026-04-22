@@ -58,5 +58,10 @@ jobs:
 
           echo $(dirname ${{ matrix.expected-install-path }}) >> $GITHUB_PATH
 
-      - name: Run example tests
-        run: make test-examples
+      - name: Build test runner
+        run: |
+          cargo test -p kamu-cli-e2e-example-tests --no-run
+
+      - name: Run tests
+        run: |
+          cargo nextest run -p kamu-cli-e2e-example-tests -E 'test(::examples::)' -v
