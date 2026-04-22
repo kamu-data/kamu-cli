@@ -1,14 +1,18 @@
 name: build
 on:
   push:
+    branches:
+      - "**"
     paths:
       - "**"
       - "!.github/**"
+      - ".github/workflows/build.yaml"
       - "!docs/**"
       - "!examples/**"
       - "!images/**"
       - "!**.md"
       - "!**.ipynb"
+      - "resources/**"
   # manual trigger
   workflow_dispatch: { }
 env:
@@ -187,6 +191,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          cache-workspace-crates: true
 
       - uses: cargo-bins/cargo-binstall@main
 

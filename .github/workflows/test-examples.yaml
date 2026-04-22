@@ -36,6 +36,8 @@ jobs:
       
       - uses: actions-rs/toolchain@v1
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Install cargo tools
         run: |
           cargo binstall cargo-nextest -y --force --github-token ${{ secrets.GITHUB_TOKEN }}
