@@ -194,7 +194,12 @@ impl MoleculeAnnouncementEntry {
         let refs = self.entity.attachments.iter().collect::<Vec<_>>();
 
         let lookup = find_data_room_entry_uc
-            .execute_find_by_refs(&self.project.entity, None /* latest */, &refs)
+            .execute_find_by_refs(
+                &self.project.entity,
+                None,
+                &refs,
+                Some(self.entity.event_time), // before
+            )
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeFindDataRoomEntryError as E;
@@ -204,14 +209,15 @@ impl MoleculeAnnouncementEntry {
                 }
             })?;
 
-        // NOTE: If data room entries are not found, they were removed and should not be
-        //       displayed.
-
         let actual_attachment_data_room_entries = lookup
             .found
             .into_iter()
             .map(|data_room_entry| {
-                let latest = true;
+                // NOTE: We don't know in advance whether the entities are their latest
+                //       versions, so if a user wants to call
+                //       `asVersionedFile { latest { ... } }`, we need to ensure
+                //       an additional request
+                let latest = false;
                 MoleculeDataRoomEntry::new_from_data_room_entry(
                     &self.project,
                     data_room_entry,

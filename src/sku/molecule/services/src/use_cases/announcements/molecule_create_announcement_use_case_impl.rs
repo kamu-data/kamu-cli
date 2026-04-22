@@ -43,11 +43,8 @@ impl MoleculeCreateAnnouncementUseCaseImpl {
 
         let lookup = self
             .find_data_room_entry_uc
-            .execute_find_by_refs(
-                molecule_project,
-                None, /* check latest version */
-                &attachment_refs,
-            )
+            // check latest version
+            .execute_find_by_refs(molecule_project, None, &attachment_refs, None)
             .await
             .map_err(|e| -> MoleculeCreateAnnouncementError {
                 use MoleculeFindDataRoomEntryError as E;
