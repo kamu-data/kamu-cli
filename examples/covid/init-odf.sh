@@ -4,7 +4,7 @@ set -e
 
 BASE_URL="odf+https://node.demo.kamu.dev/kamu/"
 
-kamu init || true
+kamu init --exists-ok
 
 kamu pull "${BASE_URL}covid19.alberta.case-details"
 kamu pull "${BASE_URL}covid19.british-columbia.case-details"

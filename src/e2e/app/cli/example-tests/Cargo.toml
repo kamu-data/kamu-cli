@@ -1,0 +1,38 @@
+[package]
+name = "kamu-cli-e2e-example-tests"
+description = "Tests repository examples"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+
+[dev-dependencies]
+indoc = "2"
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
+test-group = { version = "1" }
+serde_json = { version = "1", default-features = false }
+tempfile = { version = "3" }

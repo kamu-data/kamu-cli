@@ -128,6 +128,7 @@ members = [
     # E2E
     "src/e2e/app/cli/common",
     "src/e2e/app/cli/common-macros",
+    "src/e2e/app/cli/example-tests",
     "src/e2e/app/cli/repo-tests",
     "src/e2e/app/cli/postgres",
     "src/e2e/app/cli/mysql",
@@ -276,6 +277,7 @@ kamu-adapter-oauth = { version = "0.261.1", path = "src/adapter/oauth", default-
 # E2E
 kamu-cli-e2e-common = { version = "0.261.1", path = "src/e2e/app/cli/common", default-features = false }
 kamu-cli-e2e-common-macros = { version = "0.261.1", path = "src/e2e/app/cli/common-macros", default-features = false }
+kamu-cli-e2e-example-tests = { version = "0.261.1", path = "src/e2e/app/cli/example-tests", default-features = false }
 kamu-cli-e2e-repo-tests = { version = "0.261.1", path = "src/e2e/app/cli/repo-tests", default-features = false }
 
 [workspace.package]

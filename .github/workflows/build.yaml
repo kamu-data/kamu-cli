@@ -3,12 +3,12 @@ on:
   push:
     paths:
       - "**"
+      - "!.github/**"
       - "!docs/**"
       - "!examples/**"
       - "!images/**"
       - "!**.md"
       - "!**.ipynb"
-      - "resources/**"
   # manual trigger
   workflow_dispatch: { }
 env:
