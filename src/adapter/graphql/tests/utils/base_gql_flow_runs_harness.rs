@@ -621,7 +621,8 @@ impl BaseGQLFlowRunsHarness {
         task_outcome: TaskOutcome,
     ) {
         use chrono::Utc;
-        use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+        use kamu_adapter_flow_dataset as afs;
+        use kamu_flow_system as fs;
 
         let flow_run_service = self
             .catalog_authorized

@@ -15,8 +15,11 @@ content:
       read:
         kind: NdJson
         schema:
-          - event_time TIMESTAMP
-          - value FLOAT
+          fields:
+            - name: event_time
+              type: timestamp
+            - name: value
+              type: float32
       merge:
         kind: Ledger
         primaryKey:

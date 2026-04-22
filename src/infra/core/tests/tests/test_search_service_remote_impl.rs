@@ -181,6 +181,8 @@ async fn test_search_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_search_s3() {
     let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
     do_test_search(tmp_workspace_dir.path(), s3.url).await;

@@ -1,0 +1,16 @@
+FROM rustfs/rustfs:1.0.0-alpha.90
+
+COPY data /data.tmp
+
+# Random sleep is needed when building multi-arch images as they will race for the same port
+RUN mkdir /data; \
+    sleep $(($RANDOM % 10)); \
+    minio server /data & \
+    server_pid=$!; \
+    until mc alias set local http://localhost:9000 minioadmin minioadmin; do \
+        sleep 1; \
+    done; \
+    mc mb local/kamu-hub && \
+    mc cp --recursive /data.tmp/kamu-hub/* local/kamu-hub && \
+    kill $server_pid && \
+    rm -rf /data.tmp

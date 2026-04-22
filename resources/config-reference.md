@@ -59,7 +59,7 @@
   &quot;images&quot;: {
     &quot;datafusion&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-datafusion:0.9.0&quot;,
     &quot;flink&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8&quot;,
-    &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;,
+    &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;,
     &quot;spark&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-spark:0.23.1-spark_3.5.0&quot;
   },
   &quot;networkNs&quot;: &quot;Private&quot;,
@@ -185,7 +185,7 @@
   &quot;http&quot;: {
     &quot;connectTimeout&quot;: &quot;30s&quot;,
     &quot;maxRedirects&quot;: 10,
-    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.260.2&quot;
+    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.263.0&quot;
   },
   &quot;mqtt&quot;: {
     &quot;brokerIdleTimeout&quot;: &quot;1s&quot;
@@ -568,7 +568,6 @@ Base type: `string`
 <tbody>
 <tr><td><a href="#databasecredentialsourceconfigrawpassword"><code>RawPassword</code></a></td></tr>
 <tr><td><a href="#databasecredentialsourceconfigawssecret"><code>AwsSecret</code></a></td></tr>
-<tr><td><a href="#databasecredentialsourceconfigawsiamtoken"><code>AwsIamToken</code></a></td></tr>
 </tbody>
 </table>
 
@@ -613,27 +612,6 @@ Base type: `string`
 </tr>
 <tr>
 <td><code>secretName</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-
-## `DatabaseCredentialSourceConfig::AwsIamToken`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>kind</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>userName</code></td>
 <td><code>string</code></td>
 <td></td>
 <td></td>
@@ -716,7 +694,7 @@ The encryption key must be a 32-character alphanumeric string, which
 includes both uppercase and lowercase Latin letters (A-Z, a-z) and
 digits (0-9).
 
-To generate use:
+To generate, use:
 ```sh
 tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 ```
@@ -866,7 +844,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;datafusion&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-datafusion:0.9.0&quot;,
   &quot;flink&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8&quot;,
-  &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;,
+  &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;,
   &quot;spark&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-spark:0.23.1-spark_3.5.0&quot;
 }</code></pre></td>
 <td>UNSTABLE: Default engine images</td>
@@ -997,7 +975,7 @@ UNSTABLE: `Flink` engine image
 <tr>
 <td><code>risingwave</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;</code></td>
+<td><code class="language-json">&quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;</code></td>
 <td>
 
 UNSTABLE: `RisingWave` engine image
@@ -1301,13 +1279,16 @@ the resources (for authenticated clients)
 <tr>
 <td><code>userAgent</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;kamu-cli&#x2F;0.260.2&quot;</code></td>
+<td><code class="language-json">&quot;kamu-cli&#x2F;0.263.0&quot;</code></td>
 <td>Value to use for User-Agent header</td>
 </tr>
 </tbody>
 </table>
 
 ## `IdentityConfig`
+
+Private keys are used to sign API responses.
+Supported algorithms: `ed25519`, `secp256k1`.
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
@@ -1318,22 +1299,35 @@ the resources (for authenticated clients)
 <td><code class="language-json">null</code></td>
 <td>
 
-Private key used to sign API responses.
-Currently only `ed25519` keys are supported.
+To generate, use:
 
-To generate use:
-
-    dd if=/dev/urandom bs=1 count=32 status=none |
-        base64 -w0 |
-        tr '+/' '-_' |
-        tr -d '=' |
-        (echo -n u && cat)
+```sh
+dd if=/dev/urandom bs=1 count=32 status=none |
+    base64 -w0 |
+    tr '+/' '-_' |
+    tr -d '=' |
+    (echo -n u && cat)
+```
 
 The command above:
-- reads 32 random bytes
+- Reads 32 random bytes
 - base64-encodes them
-- converts default base64 encoding to base64url and removes padding
-- prepends a multibase prefix
+- Converts default base64 encoding to base64url and removes padding
+- Prepends a multibase prefix
+
+</td>
+</tr>
+<tr>
+<td><code>secp256k1PrivateKey</code></td>
+<td><a href="#secp256k1signer"><code>Secp256k1Signer</code></a></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Secp256k1 private key used to sign EIP-712 typed data.
+
+```sh
+cast wallet new
+```
 
 </td>
 </tr>
@@ -1739,6 +1733,10 @@ Base type: `string`
 </tbody>
 </table>
 
+## `Secp256k1Signer`
+
+Base type: `string`
+
 ## `SourceConfig`
 
 <table>
@@ -1761,7 +1759,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;connectTimeout&quot;: &quot;30s&quot;,
   &quot;maxRedirects&quot;: 10,
-  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.260.2&quot;
+  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.263.0&quot;
 }</code></pre></td>
 <td>HTTP-specific configuration</td>
 </tr>

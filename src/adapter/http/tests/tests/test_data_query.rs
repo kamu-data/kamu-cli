@@ -13,12 +13,11 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
-use ed25519_dalek::Signer;
 use kamu::domain::*;
 use kamu::*;
-use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf::metadata::ed25519::Signer;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
@@ -33,7 +32,7 @@ struct Harness {
     root_url: url::Url,
     dataset_handle: odf::DatasetHandle,
     dataset_url: url::Url,
-    private_key: odf::metadata::PrivateKey,
+    ed25519_private_key: odf::metadata::PrivateKey,
 }
 
 impl Harness {
@@ -41,11 +40,13 @@ impl Harness {
         // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
-        let private_key: odf::metadata::PrivateKey =
-            ed25519_dalek::SigningKey::from_bytes(&[123; ed25519_dalek::SECRET_KEY_LENGTH]).into();
-
-        let identity_config = IdentityConfig {
-            private_key: private_key.clone(),
+        let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
+        let identity_config = kamu_signing::entities::IdentityConfig {
+            ed25519_private_key: ed25519_private_key.clone(),
+            secp256k1_private_key: kamu_signing::utils::Secp256k1Signer::from_bytes(
+                &[124; _].into(),
+            )
+            .unwrap(),
         };
 
         let catalog = dill::CatalogBuilder::new()
@@ -205,7 +206,7 @@ impl Harness {
             root_url,
             dataset_handle: create_result.dataset_handle,
             dataset_url,
-            private_key,
+            ed25519_private_key,
         }
     }
 }
@@ -488,7 +489,7 @@ async fn test_data_query_handler_success() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f162030c096eb1476c579e460d35e35e56da99bbb7e9f584e265e1b07839ba0177c57",
+                        "blockHash": "f1620354e9a2c081393afc7b94846fd1e62f6e25f32e238dc0474a9a5bd4074b8c740",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -503,14 +504,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620b7ca979eb3ca9393c57555ed4ce028027ea799070eda35a4511a21742296f57f",
+                    "inputHash": "f1620d2b55fb8df2d106a4e9ffd44bac530adfa725954ddbe202510dc8b3c3fbde520",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uzFZu9kFkSWwiAQo9wborQVPbY0wT2O_R17HPfA4alf_8t6IinjIyLjbAjntZrJdJerYG3L8VdzmvZgzkfcESDA",
+                    "proofValue": "uOE_tMf5GeMLYS4fAEWzvmR8pyYE7Qv2YG_Wm8IqrfrwjsqCf55YEg02y1dnSJ3mN6Ifn4DtVJ9cyVCVQ738hBQ",
                 }
             }),
             response
@@ -648,7 +649,7 @@ async fn test_data_verify_handler() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f162030c096eb1476c579e460d35e35e56da99bbb7e9f584e265e1b07839ba0177c57",
+                        "blockHash": "f1620354e9a2c081393afc7b94846fd1e62f6e25f32e238dc0474a9a5bd4074b8c740",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -661,14 +662,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162014d03d1cc4d599f195e126d6b7277eaada3ccf689967c52912906f9d7bf5f80c",
+                    "inputHash": "f16208ce1893977a7449d3b830e02531a7ca00feca3f2723e97a272f0c56e2547b4dc",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u-4jUxRiC046d4e4mdwleRo-lE-_0peEbqjUvI8A1lazI5ywnKQNampdzrPU7kuif7zJARYEgxWoX2cD-kzU-Bw",
+                    "proofValue": "uCIwOoFXgg9wIy07MWWMHjhfSp6bOrRRqzH7LJuKxTQBC6BTH1Gov-1aeXJy1turWwuHt4EfV77d7YfN8nGRUAA",
                 }
             }),
             response
@@ -771,7 +772,7 @@ async fn test_data_verify_handler() {
         invalid_request["commitment"]["outputHash"] =
             "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2d".into();
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -814,7 +815,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -857,7 +858,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl

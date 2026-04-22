@@ -481,6 +481,7 @@ impl PollingIngestServiceImpl {
             .get_reader(
                 args.ctx.clone(),
                 args.polling_source.read.clone(),
+                odf::schema::ToArrowSettings::default(),
                 temp_path,
             )
             .await?;
@@ -489,7 +490,7 @@ impl PollingIngestServiceImpl {
             !input_data_path.exists() || input_data_path.metadata().int_err()?.len() == 0;
 
         if input_is_missing_or_empty {
-            if let Some(read_schema) = reader.input_schema().await {
+            if let Some(read_schema) = reader.schema_arrow() {
                 tracing::info!(
                     path = ?input_data_path,
                     "Returning an empty data frame as input file is empty",
@@ -497,7 +498,7 @@ impl PollingIngestServiceImpl {
 
                 let df = args
                     .ctx
-                    .read_batch(RecordBatch::new_empty(read_schema))
+                    .read_batch(RecordBatch::new_empty(read_schema.clone()))
                     .int_err()?;
 
                 return Ok(Some(df.into()));

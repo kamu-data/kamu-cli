@@ -12,10 +12,15 @@ content:
         kind: Csv
         header: true
         schema:
-          - event_time TIMESTAMP
-          - shipment_id BIGINT
-          - order_id BIGINT
-          - quantity BIGINT
+          fields:
+            - name: event_time
+              type: timestamp
+            - name: shipment_id
+              type: int64
+            - name: order_id
+              type: int64
+            - name: quantity
+              type: int64
       merge:
         kind: Ledger
         primaryKey:

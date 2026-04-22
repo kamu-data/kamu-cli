@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::str::FromStr;
 
 use chrono::DateTime;
@@ -952,9 +952,9 @@ async fn test_smart_push_all_smart_pull_all(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -976,9 +976,9 @@ async fn test_smart_push_all_smart_pull_all(
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 place (INTEGER(64,false));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1250,9 +1250,9 @@ async fn test_smart_push_recursive_smart_pull_recursive(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1274,9 +1274,9 @@ async fn test_smart_push_recursive_smart_pull_recursive(
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 place (INTEGER(64,false));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1495,8 +1495,10 @@ async fn test_simple_push_to_s3_smart_pull(
     )
     .await;
 
-    let s3_server = LocalS3Server::new().await;
-    let dataset_url = format!("{}/e2e-user/{}", s3_server.url, dataset_alias.dataset_name);
+    let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
+    let dataset_url = format!("{}e2e-user/{}", s3.url, dataset_alias.dataset_name);
 
     // Push dataset
     kamu.assert_success_command_execution(
@@ -1530,9 +1532,9 @@ async fn test_simple_push_to_s3_smart_pull(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );

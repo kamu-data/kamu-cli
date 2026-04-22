@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -715,12 +715,11 @@ async fn test_transform_with_compaction_retry() {
                 MetadataFactory::add_push_source()
                     .read(odf::metadata::ReadStepCsv {
                         header: Some(true),
-                        schema: Some(
-                            ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                .iter()
-                                .map(|s| (*s).to_string())
-                                .collect(),
-                        ),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("date"),
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
                         ..odf::metadata::ReadStepCsv::default()
                     })
                     .merge(odf::metadata::MergeStrategyLedger {

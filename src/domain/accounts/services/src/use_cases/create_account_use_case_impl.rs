@@ -99,13 +99,36 @@ impl CreateAccountUseCaseImpl {
     ) -> Result<(), CreateAccountError> {
         self.account_service.save_account(account).await?;
 
-        if account.provider == AccountProvider::Password.to_string() {
+        if account.provider == <&'static str>::from(AccountProvider::Password) {
             self.account_service
                 .save_account_password(account, password)
                 .await?;
         }
 
         Ok(())
+    }
+
+    async fn save_private_key(
+        &self,
+        account_id: &odf::AccountID,
+        key: odf::metadata::SigningKey,
+    ) -> Result<(), InternalError> {
+        let Some(did_secret_encryption_key) = &self.did_secret_encryption_key else {
+            return Ok(());
+        };
+
+        use odf::metadata::AsStackString;
+
+        let account_id = account_id.as_stack_string();
+        let did_secret_key =
+            DidSecretKey::try_new(&key.into(), did_secret_encryption_key.expose_secret())
+                .int_err()?;
+        let account_entity = DidEntity::new_account(account_id.as_str());
+
+        self.did_secret_key_repo
+            .save_did_secret_key(&account_entity, &did_secret_key)
+            .await
+            .int_err()
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
@@ -137,6 +160,10 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
         self.save_account(account, password).await?;
+
+        // Generate a new private key.
+        let (private_key, _) = odf::AccountID::new_generated_ed25519();
+        self.save_private_key(&account.id, private_key).await?;
 
         if !quiet {
             self.notify_account_created(account).await?;
@@ -178,25 +205,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         };
 
         self.save_account(&account, &password).await?;
-
-        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
-            use odf::metadata::AsStackString;
-
-            let account_id = account.id.as_stack_string();
-            let did_secret_key = DidSecretKey::try_new(
-                &account_key.into(),
-                did_secret_encryption_key.expose_secret(),
-            )
-            .int_err()?;
-
-            self.did_secret_key_repo
-                .save_did_secret_key(
-                    &DidEntity::new_account(account_id.as_str()),
-                    &did_secret_key,
-                )
-                .await
-                .int_err()?;
-        }
+        self.save_private_key(&account.id, account_key).await?;
 
         self.notify_account_created(&account).await?;
 

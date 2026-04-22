@@ -139,7 +139,7 @@ impl SqlShellImpl {
         };
 
         self.container_runtime
-            .wait_for_socket(host_port, Duration::from_secs(60))
+            .wait_for_socket(host_port, Duration::from_mins(1))
             .await
             .int_err()?;
 

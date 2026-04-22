@@ -10,6 +10,7 @@
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
+use odf::schema::*;
 
 use super::test_reader_common;
 
@@ -23,14 +24,14 @@ async fn test_read_csv_with_schema() {
             SessionContext::new(),
             odf::metadata::ReadStepCsv {
                 header: Some(true),
-                schema: Some(vec![
-                    "city string not null".to_string(),
-                    "population int not null".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::string("city"),
+                    DataField::i32("population"),
+                ])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -75,8 +76,8 @@ async fn test_read_csv_no_schema_no_infer() {
                 header: Some(true),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -122,8 +123,8 @@ async fn test_read_csv_no_schema_infer() {
                 infer_schema: Some(true),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -165,14 +166,14 @@ async fn test_read_csv_no_header() {
         ReaderCsv::new(
             SessionContext::new(),
             odf::metadata::ReadStepCsv {
-                schema: Some(vec![
-                    "city STRING".to_string(),
-                    "population BIGINT".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::string("city").optional(),
+                    DataField::i64("population").optional(),
+                ])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -217,8 +218,8 @@ async fn test_read_csv_null_values() {
                 infer_schema: Some(true),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -262,16 +263,16 @@ async fn test_read_tsv_null_values() {
             odf::metadata::ReadStepCsv {
                 header: Some(false),
                 separator: Some("\t".to_string()),
-                schema: Some(vec![
-                    "a INT".to_string(),
-                    "b INT".to_string(),
-                    "c INT".to_string(),
-                    "d INT".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::i32("a").optional(),
+                    DataField::i32("b").optional(),
+                    DataField::i32("c").optional(),
+                    DataField::i32("d").optional(),
+                ])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             "

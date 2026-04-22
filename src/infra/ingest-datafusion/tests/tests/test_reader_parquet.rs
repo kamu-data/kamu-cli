@@ -14,6 +14,7 @@ use chrono::DateTime;
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
+use odf::schema::*;
 
 use super::test_reader_common;
 
@@ -94,9 +95,9 @@ async fn test_read_parquet() {
     test_reader_common::test_reader_success(
         ReaderParquet::new(
             SessionContext::new(),
-            odf::metadata::ReadStepParquet { schema: None },
+            odf::metadata::ReadStepParquet::default(),
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         |path| async {
             write_test_data(path);
@@ -136,13 +137,15 @@ async fn test_read_parquet_schema_coercion() {
         ReaderParquet::new(
             SessionContext::new(),
             odf::metadata::ReadStepParquet {
-                schema: Some(vec![
-                    "city string not null".to_string(),
-                    "population string not null".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::string("city"),
+                    // Coercion from int to string
+                    DataField::string("population"),
+                ])),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         |path| async {
             write_test_data(path);

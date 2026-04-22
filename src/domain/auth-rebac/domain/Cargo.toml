@@ -33,9 +33,10 @@ kamu-datasets = { workspace = true }
 odf = { workspace = true }
 
 async-trait = "0.1"
+indoc = { version = "2", default-features = false }
 itertools = { version = "0.14", default-features = false }
 serde = { version = "1", features = ["derive"] }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 
 # Optional
@@ -45,3 +46,5 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 
 
 [dev-dependencies]
+pretty_assertions = { version = "1", default-features = false, features = [] }
+rstest = { version = "0.26", default-features = false }

@@ -51,7 +51,7 @@ jsonwebtoken = { version = "10", default-features = false, features = [
     "rust_crypto",
 ] }
 mockall = { optional = true, version = "0.14" }
-nutype = { version = "0.6", default-features = false, features = [
+nutype = { version = "0.7", default-features = false, features = [
     "new_unchecked",
     "serde",
 ] }
@@ -62,13 +62,14 @@ serde = "1"
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 setty = { version = "1.0", default-features = false }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 uuid = { version = "1", default-features = false, features = [
     "v4",
     "v5",
     "serde",
 ] }
+zeroize = { version = "1", default-features = false, features = [] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

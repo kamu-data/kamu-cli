@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 
 use chrono::{SubsecRound, Utc};
 use database_common::PaginationOpts;
@@ -103,7 +103,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
         .await
         .unwrap();
 
-    db_access_tokens.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    db_access_tokens.sort_by_key(|a| a.created_at);
     assert_eq!(db_access_tokens, vec![foo_access_token, bar_access_token]);
 
     let db_access_tokens_count = access_token_repo

@@ -74,10 +74,9 @@ impl WebhookDeliveryRecord {
             payload: self.request_payload,
         };
 
-        let response = if self.response_code.is_some() {
-            let response_code =
-                http::StatusCode::from_u16(u16::try_from(self.response_code.unwrap()).unwrap())
-                    .map_err(ErrorIntoInternal::int_err)?;
+        let response = if let Some(response_code) = self.response_code {
+            let response_code = http::StatusCode::from_u16(u16::try_from(response_code).unwrap())
+                .map_err(ErrorIntoInternal::int_err)?;
 
             let response_headers = Self::deserialize_http_headers(self.response_headers.unwrap())?;
 

@@ -27,14 +27,16 @@ common-macros = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
-odf-data-utils = { workspace = true }
 
 async-trait = "0.1"
 bytes = { version = "1", default-features = false }
 digest = "0.10"
 
 sha3 = "0.10"
-tokio = { version = "1", default-features = false, features = ["fs"] }
+tokio = { version = "1", default-features = false, features = [
+    "fs",
+    "io-util",
+] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 

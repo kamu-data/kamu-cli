@@ -354,23 +354,6 @@
             "secretName"
           ],
           "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "AwsIamToken",
-              "type": "string"
-            },
-            "userName": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "userName"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -419,7 +402,7 @@
           "type": "boolean"
         },
         "encryptionKey": {
-          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
+          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate, use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
           "type": [
             "string",
             "null"
@@ -539,7 +522,7 @@
           "default": {
             "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
             "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
             "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
           },
           "description": "UNSTABLE: Default engine images"
@@ -646,7 +629,7 @@
           "type": "string"
         },
         "risingwave": {
-          "default": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+          "default": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
           "description": "UNSTABLE: `RisingWave` engine image",
           "type": "string"
         },
@@ -862,7 +845,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "default": "kamu-cli/0.260.2",
+          "default": "kamu-cli/0.263.0",
           "description": "Value to use for User-Agent header",
           "type": "string"
         }
@@ -871,6 +854,7 @@
     },
     "IdentityConfig": {
       "additionalProperties": false,
+      "description": "Private keys are used to sign API responses.\nSupported algorithms: `ed25519`, `secp256k1`.",
       "properties": {
         "privateKey": {
           "anyOf": [
@@ -882,7 +866,19 @@
             }
           ],
           "combine": "replace",
-          "description": "Private key used to sign API responses.\nCurrently only `ed25519` keys are supported.\n\nTo generate use:\n\n    dd if=/dev/urandom bs=1 count=32 status=none |\n        base64 -w0 |\n        tr '+/' '-_' |\n        tr -d '=' |\n        (echo -n u && cat)\n\nThe command above:\n- reads 32 random bytes\n- base64-encodes them\n- converts default base64 encoding to base64url and removes padding\n- prepends a multibase prefix"
+          "description": "To generate, use:\n\n```sh\ndd if=/dev/urandom bs=1 count=32 status=none |\n    base64 -w0 |\n    tr '+/' '-_' |\n    tr -d '=' |\n    (echo -n u && cat)\n```\n\nThe command above:\n- Reads 32 random bytes\n- base64-encodes them\n- Converts default base64 encoding to base64url and removes padding\n- Prepends a multibase prefix"
+        },
+        "secp256k1PrivateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Secp256k1Signer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "combine": "replace",
+          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\n```sh\ncast wallet new\n```"
         }
       },
       "type": "object"
@@ -1194,6 +1190,9 @@
         }
       ]
     },
+    "Secp256k1Signer": {
+      "type": "string"
+    },
     "SourceConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1212,7 +1211,7 @@
           "default": {
             "connectTimeout": "30s",
             "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.260.2"
+            "userAgent": "kamu-cli/0.263.0"
           },
           "description": "HTTP-specific configuration"
         },
@@ -1347,7 +1346,7 @@
         "images": {
           "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
           "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
           "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
         },
         "networkNs": "Private",
@@ -1464,7 +1463,7 @@
         "http": {
           "connectTimeout": "30s",
           "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.260.2"
+          "userAgent": "kamu-cli/0.263.0"
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"

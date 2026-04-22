@@ -11,10 +11,10 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use async_utils::AsyncReadObj;
-use aws_config::{BehaviorVersion, SdkConfig};
+use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
-use aws_sdk_s3::config::SharedCredentialsProvider;
 use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::create_bucket::{CreateBucketError, CreateBucketOutput};
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
 use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
@@ -31,12 +31,11 @@ use crate::S3Metrics;
 struct S3ContextSharedState {
     endpoint: Option<String>,
     bucket: String,
-    sdk_config: SdkConfig,
     bucket_url: String,
 }
 
 impl S3ContextSharedState {
-    fn new(endpoint: Option<String>, bucket: String, sdk_config: SdkConfig) -> Self {
+    fn new(endpoint: Option<String>, bucket: String) -> Self {
         let bucket_url = match &endpoint {
             Some(endpoint) => {
                 format!("s3+{endpoint}/{bucket}")
@@ -49,7 +48,6 @@ impl S3ContextSharedState {
         Self {
             endpoint,
             bucket,
-            sdk_config,
             bucket_url,
         }
     }
@@ -76,6 +74,10 @@ pub struct S3Context {
 #[common_macros::method_names_consts]
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
+
+    pub fn builder() -> S3ContextBuilder {
+        S3ContextBuilder::new()
+    }
 
     fn make_url(endpoint: Option<&str>, bucket: &str, key_prefix: &str) -> Url {
         let context_url_str = match endpoint {
@@ -109,12 +111,12 @@ impl S3Context {
         &self.state.url
     }
 
-    pub fn new(
+    fn new(
         client: Client,
         endpoint: Option<impl Into<String>>,
         bucket: impl Into<String>,
         key_prefix: impl Into<String>,
-        sdk_config: SdkConfig,
+        maybe_metrics: Option<Arc<S3Metrics>>,
     ) -> Self {
         let endpoint = endpoint.map(Into::into);
         let bucket = bucket.into();
@@ -124,9 +126,9 @@ impl S3Context {
 
         Self {
             client,
-            shared_state: Arc::new(S3ContextSharedState::new(endpoint, bucket, sdk_config)),
+            shared_state: Arc::new(S3ContextSharedState::new(endpoint, bucket)),
             state: Arc::new(S3ContextState { key_prefix, url }),
-            maybe_metrics: None,
+            maybe_metrics,
         }
     }
 
@@ -152,88 +154,6 @@ impl S3Context {
             key_prefix,
         });
         self
-    }
-
-    pub fn with_metrics(mut self, metrics: Arc<S3Metrics>) -> Self {
-        self.maybe_metrics = Some(metrics);
-        self
-    }
-
-    pub fn credentials_provider(&self) -> Option<SharedCredentialsProvider> {
-        self.shared_state.sdk_config.credentials_provider()
-    }
-
-    async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
-        // Note: Falling back to `unspecified` region as SDK errors out when the region
-        // not set even if using custom endpoint
-        let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
-            .or_else("unspecified");
-
-        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(region_provider)
-            .load()
-            .await;
-
-        let s3_config = if let Some(endpoint) = endpoint.clone() {
-            aws_sdk_s3::config::Builder::from(&sdk_config)
-                .endpoint_url(endpoint)
-                .force_path_style(true)
-                .build()
-        } else {
-            aws_sdk_s3::config::Builder::from(&sdk_config).build()
-        };
-
-        // TODO: PERF: Client construction is expensive and should only be done once
-        let client = Client::from_conf(s3_config);
-
-        Self::new(client, endpoint, bucket, key_prefix, sdk_config)
-    }
-
-    #[tracing::instrument(level = "info", name = S3Context_from_url)]
-    pub async fn from_url(url: &Url) -> Self {
-        let (endpoint, bucket, key_prefix) = Self::split_url(url);
-
-        assert!(
-            key_prefix.is_empty() || key_prefix.ends_with('/'),
-            "Base URL does not contain a trailing slash: {url}"
-        );
-
-        Self::from_items(endpoint, bucket, key_prefix).await
-    }
-
-    fn split_url(url: &Url) -> (Option<String>, String, String) {
-        // TODO: Support virtual hosted style URLs
-        // See https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
-        let (endpoint, path): (Option<String>, String) =
-            match (url.scheme(), url.host_str(), url.port(), url.path()) {
-                ("s3", Some(host), None, path) => {
-                    return (
-                        None,
-                        host.to_owned(),
-                        path.trim_start_matches('/').to_owned(),
-                    );
-                }
-                ("s3+http", Some(host), None, path) => {
-                    (Some(format!("http://{host}")), path.to_owned())
-                }
-                ("s3+http", Some(host), Some(port), path) => {
-                    (Some(format!("http://{host}:{port}")), path.to_owned())
-                }
-                ("s3+https", Some(host), None, path) => {
-                    (Some(format!("https://{host}")), path.to_owned())
-                }
-                ("s3+https", Some(host), Some(port), path) => {
-                    (Some(format!("https://{host}:{port}")), path.to_owned())
-                }
-                _ => panic!("Unsupported S3 url format: {url}"),
-            };
-
-        let (bucket, key_prefix) = match path.trim_start_matches('/').split_once('/') {
-            Some((b, p)) => (b.to_owned(), p.to_owned()),
-            None => (path.trim_start_matches('/').to_owned(), String::new()),
-        };
-
-        (endpoint, bucket, key_prefix)
     }
 
     pub fn region(&self) -> Option<&str> {
@@ -278,6 +198,13 @@ impl S3Context {
             // Just a call without metrics
             f().await
         }
+    }
+
+    pub async fn create_bucket(
+        &self,
+        bucket: &str,
+    ) -> Result<CreateBucketOutput, SdkError<CreateBucketError>> {
+        self.client.create_bucket().bucket(bucket).send().await
     }
 
     pub async fn head_object(
@@ -448,6 +375,35 @@ impl S3Context {
         .await
     }
 
+    pub async fn bucket_list_object_keys(
+        &self,
+        key_prefix: &str,
+    ) -> Result<Vec<String>, InternalError> {
+        self.api_call("list_objects_v2(bucket_list_object_keys)", || async {
+            let mut keys = Vec::new();
+
+            let mut paginator = self
+                .client
+                .list_objects_v2()
+                .bucket(self.shared_state.bucket.clone())
+                .prefix(self.get_key(key_prefix))
+                .max_keys(Self::MAX_LISTED_OBJECTS)
+                .into_paginator()
+                .send();
+
+            while let Some(page) = paginator.next().await {
+                let page = page.int_err()?;
+
+                for object in page.contents.unwrap_or_default() {
+                    keys.push(object.key.unwrap());
+                }
+            }
+
+            Ok(keys)
+        })
+        .await
+    }
+
     pub async fn recursive_delete(&self, key_prefix: String) -> Result<(), InternalError> {
         // ListObjectsV2Request returns at most S3Context::MAX_LISTED_OBJECTS=1000 items
         let mut has_next_page = true;
@@ -590,6 +546,181 @@ pub struct GetObjectOptions {
 pub struct PutObjectOptions {
     presigned_config: PresigningConfig,
     acl: Option<ObjectCannedAcl>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub struct S3ContextBuilder {
+    region: Option<String>,
+    endpoint: Option<String>,
+    bucket: Option<String>,
+    key_prefix: Option<String>,
+    credentials: Option<aws_sdk_s3::config::Credentials>,
+    metrics: Option<Arc<S3Metrics>>,
+}
+
+#[common_macros::method_names_consts]
+impl S3ContextBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn maybe<T>(self, opt: Option<T>, action: impl FnOnce(Self, T) -> Self) -> Self {
+        if let Some(val) = opt {
+            action(self, val)
+        } else {
+            self
+        }
+    }
+
+    pub fn with_region(self, region: impl Into<String>) -> Self {
+        Self {
+            region: Some(region.into()),
+            ..self
+        }
+    }
+
+    pub fn with_endpoint(self, endpoint: impl Into<String>) -> Self {
+        Self {
+            endpoint: Some(endpoint.into()),
+            ..self
+        }
+    }
+
+    pub fn with_bucket(self, bucket: impl Into<String>) -> Self {
+        Self {
+            bucket: Some(bucket.into()),
+            ..self
+        }
+    }
+
+    pub fn with_key_prefix(self, key_prefix: impl Into<String>) -> Self {
+        Self {
+            key_prefix: Some(key_prefix.into()),
+            ..self
+        }
+    }
+
+    pub fn with_url(self, url: &Url) -> Self {
+        let (endpoint, bucket, key_prefix) = Self::split_url(url);
+
+        assert!(
+            key_prefix.is_empty() || key_prefix.ends_with('/'),
+            "Base URL does not contain a trailing slash: {url}"
+        );
+
+        Self {
+            endpoint,
+            bucket: Some(bucket),
+            key_prefix: Some(key_prefix),
+            ..self
+        }
+    }
+
+    fn split_url(url: &Url) -> (Option<String>, String, String) {
+        // TODO: Support virtual hosted style URLs
+        // See https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
+        let (endpoint, path): (Option<String>, String) =
+            match (url.scheme(), url.host_str(), url.port(), url.path()) {
+                ("s3", Some(host), None, path) => {
+                    return (
+                        None,
+                        host.to_owned(),
+                        path.trim_start_matches('/').to_owned(),
+                    );
+                }
+                ("s3+http", Some(host), None, path) => {
+                    (Some(format!("http://{host}")), path.to_owned())
+                }
+                ("s3+http", Some(host), Some(port), path) => {
+                    (Some(format!("http://{host}:{port}")), path.to_owned())
+                }
+                ("s3+https", Some(host), None, path) => {
+                    (Some(format!("https://{host}")), path.to_owned())
+                }
+                ("s3+https", Some(host), Some(port), path) => {
+                    (Some(format!("https://{host}:{port}")), path.to_owned())
+                }
+                _ => panic!("Unsupported S3 url format: {url}"),
+            };
+
+        let (bucket, key_prefix) = match path.trim_start_matches('/').split_once('/') {
+            Some((b, p)) => (b.to_owned(), p.to_owned()),
+            None => (path.trim_start_matches('/').to_owned(), String::new()),
+        };
+
+        (endpoint, bucket, key_prefix)
+    }
+
+    pub fn with_credentials(self, credentials: aws_sdk_s3::config::Credentials) -> Self {
+        Self {
+            credentials: Some(credentials),
+            ..self
+        }
+    }
+
+    pub fn with_credentials_from_keys(self, access_key: &str, secret_key: &str) -> Self {
+        let credentials =
+            aws_sdk_s3::config::Credentials::new(access_key, secret_key, None, None, "static");
+
+        self.with_credentials(credentials)
+    }
+
+    pub fn with_metrics(mut self, metrics: Arc<S3Metrics>) -> Self {
+        self.metrics = Some(metrics);
+        self
+    }
+
+    #[tracing::instrument(level = "info", name = S3ContextBuilder_build, skip_all)]
+    pub async fn build(self) -> S3Context {
+        // SDK Config
+        let config_loader = aws_config::defaults(BehaviorVersion::latest());
+        let config_loader = if let Some(credentials) = self.credentials {
+            config_loader.credentials_provider(credentials)
+        } else {
+            // Let config loader use default lookups
+            config_loader
+        };
+        let config_loader = if let Some(region) = self.region {
+            config_loader.region(aws_config::Region::new(region))
+        } else if self.endpoint.is_some() {
+            // TODO: This is not ideal, but we usually override endpoint only in tests and
+            // don't want to engage the default lookup mechanism which slows down tests
+            config_loader.region("unspecified")
+        } else {
+            // Let config loader use default lookups
+            config_loader
+        };
+
+        // TODO: Avoid this async load here
+        // Consider splitting into speacial `load_defaults` method
+        let sdk_config = config_loader.load().await;
+
+        // S3 Config
+        let config_builder = aws_sdk_s3::config::Builder::from(&sdk_config);
+        let config_builder = if let Some(endpoint) = &self.endpoint {
+            config_builder.endpoint_url(endpoint).force_path_style(true)
+        } else {
+            config_builder
+        };
+        let s3_config = config_builder.build();
+
+        // Client
+        let client = Client::from_conf(s3_config);
+
+        let bucket = self
+            .bucket
+            .expect("Must specify a bucket name when building S3Context");
+
+        S3Context::new(
+            client,
+            self.endpoint,
+            bucket,
+            self.key_prefix.unwrap_or_default(),
+            self.metrics,
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

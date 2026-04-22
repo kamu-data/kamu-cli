@@ -57,6 +57,7 @@ pub mod metadata {
 
 pub mod dataset {
     pub use odf_dataset::*;
+    #[cfg(feature = "dataset")]
     pub use odf_dataset_impl::*;
 }
 
@@ -76,6 +77,6 @@ pub mod serde {
 }
 
 pub mod utils {
-    #[cfg(feature = "datafusion")]
+    #[cfg(feature = "utils")]
     pub use odf_data_utils::*;
 }

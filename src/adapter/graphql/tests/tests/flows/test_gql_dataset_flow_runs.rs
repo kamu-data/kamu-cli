@@ -1914,6 +1914,152 @@ async fn test_list_flows_with_filters_and_pagination() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_list_flows_with_ordering() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: None,
+    })
+    .await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_result = harness.create_root_dataset(foo_alias).await;
+
+    let response = harness
+        .trigger_ingest_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    let response_json = response.data.into_json().unwrap();
+    let flow_id_0 = harness
+        .extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow")
+        .to_owned();
+
+    let response = harness
+        .trigger_compaction_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    let response_json = response.data.into_json().unwrap();
+    let flow_id_1 = harness
+        .extract_flow_id_from_trigger_response(&response_json, "triggerCompactionFlow")
+        .to_owned();
+
+    let response = harness
+        .trigger_reset_to_metadata_flow_mutation(&create_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    let response_json = response.data.into_json().unwrap();
+    let flow_id_2 = harness
+        .extract_flow_id_from_trigger_response(&response_json, "triggerResetToMetadataFlow")
+        .to_owned();
+
+    let now = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let earliest_scheduled_at = now + Duration::minutes(10);
+    let middle_scheduled_at = now + Duration::minutes(20);
+    let latest_scheduled_at = now + Duration::minutes(30);
+
+    harness
+        .reschedule_waiting_flow(&flow_id_1, now + Duration::seconds(1), latest_scheduled_at)
+        .await;
+    harness
+        .reschedule_waiting_flow(
+            &flow_id_0,
+            now + Duration::seconds(2),
+            earliest_scheduled_at,
+        )
+        .await;
+    harness
+        .reschedule_waiting_flow(&flow_id_2, now + Duration::seconds(3), middle_scheduled_at)
+        .await;
+
+    let response = harness
+        .list_flows_ordered_query(
+            &create_result.dataset_handle.id,
+            Some(value!("SCHEDULED_FOR_ACTIVATION")),
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": flow_id_0,
+                                        "timing": {
+                                            "scheduledAt": earliest_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                    {
+                                        "flowId": flow_id_2,
+                                        "timing": {
+                                            "scheduledAt": middle_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                    {
+                                        "flowId": flow_id_1,
+                                        "timing": {
+                                            "scheduledAt": latest_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let response = harness
+        .list_flows_ordered_query(&create_result.dataset_handle.id, Some(value!("QUEUE")))
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": flow_id_2,
+                                        "timing": {
+                                            "scheduledAt": middle_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                    {
+                                        "flowId": flow_id_0,
+                                        "timing": {
+                                            "scheduledAt": earliest_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                    {
+                                        "flowId": flow_id_1,
+                                        "timing": {
+                                            "scheduledAt": latest_scheduled_at.to_rfc3339(),
+                                        },
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_list_flows_with_webhooks() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
         dataset_changes_mock: None,
@@ -4319,6 +4465,37 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
+    async fn reschedule_waiting_flow(
+        &self,
+        flow_id: &str,
+        event_time: chrono::DateTime<Utc>,
+        scheduled_for_activation_at: chrono::DateTime<Utc>,
+    ) {
+        let flow_event_store = self
+            .catalog_authorized
+            .get_one::<dyn FlowEventStore>()
+            .unwrap();
+
+        let mut flow = Flow::load(
+            FlowID::new(flow_id.parse::<u64>().unwrap()),
+            flow_event_store.as_ref(),
+        )
+        .await
+        .unwrap();
+
+        flow.set_relevant_start_condition(
+            event_time,
+            FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                wake_up_at: scheduled_for_activation_at,
+            }),
+        )
+        .unwrap();
+        flow.schedule_for_activation(event_time, scheduled_for_activation_at)
+            .unwrap();
+
+        flow.save(flow_event_store.as_ref()).await.unwrap();
+    }
+
     fn list_flows_query(&self, id: &odf::DatasetID) -> GraphQLQueryRequest {
         let query_code = indoc!(
             r#"
@@ -4542,6 +4719,45 @@ impl FlowRunsHarness {
                 "datasetId": id.to_string()
             })),
         )
+    }
+
+    fn list_flows_ordered_query(
+        &self,
+        id: &odf::DatasetID,
+        order: Option<async_graphql::Value>,
+    ) -> GraphQLQueryRequest {
+        let query_code = indoc!(
+            r#"
+            query($datasetId: DatasetID!, $order: FlowRunOrder) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            runs {
+                                listFlows(order: $order) {
+                                    nodes {
+                                        flowId
+                                        timing {
+                                            scheduledAt
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        );
+
+        let mut vars = async_graphql::Variables::from_value(value!({
+            "datasetId": id.to_string()
+        }));
+
+        if let Some(order) = order {
+            vars.insert(async_graphql::Name::new("order"), order);
+        }
+
+        GraphQLQueryRequest::new(query_code, vars)
     }
 
     fn flow_history_query(&self, id: &odf::DatasetID, flow_id: &str) -> GraphQLQueryRequest {

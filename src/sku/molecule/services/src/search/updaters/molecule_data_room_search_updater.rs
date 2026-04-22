@@ -59,7 +59,7 @@ impl MoleculeDataRoomSearchUpdater {
 
         let data_room_entry_document = indexing_helper
             .index_data_room_entry_from_entity(
-                &created_message.ipnft_uid,
+                &created_message.ocl_id,
                 &created_message.data_room_entry,
                 created_message.content_text.as_ref(),
             )
@@ -71,7 +71,7 @@ impl MoleculeDataRoomSearchUpdater {
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
-                        &created_message.ipnft_uid,
+                        &created_message.ocl_id,
                         &created_message.data_room_entry.path,
                     ),
                     doc: data_room_entry_document,
@@ -95,7 +95,7 @@ impl MoleculeDataRoomSearchUpdater {
 
         let data_room_entry_document = indexing_helper
             .index_data_room_entry_from_entity(
-                &updated_message.ipnft_uid,
+                &updated_message.ocl_id,
                 &updated_message.data_room_entry,
                 updated_message.content_text.as_ref(),
             )
@@ -107,7 +107,7 @@ impl MoleculeDataRoomSearchUpdater {
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
-                        &updated_message.ipnft_uid,
+                        &updated_message.ocl_id,
                         &updated_message.data_room_entry.path,
                     ),
                     doc: data_room_entry_document,
@@ -125,7 +125,7 @@ impl MoleculeDataRoomSearchUpdater {
         moved_message: &MoleculeDataRoomMessageEntryMoved,
     ) -> Result<(), InternalError> {
         let old_id = data_room_entry_schema::unique_id_for_data_room_entry(
-            &moved_message.ipnft_uid,
+            &moved_message.ocl_id,
             &moved_message.path_from,
         );
 
@@ -137,7 +137,7 @@ impl MoleculeDataRoomSearchUpdater {
 
         let Some(existing_document) = maybe_existing_document else {
             tracing::warn!(
-                ipnft_uid = moved_message.ipnft_uid.as_str(),
+                ocl_id = moved_message.ocl_id.as_ref(),
                 path_from = moved_message.path_from.as_str(),
                 "Could not find document for moved data room entry at its old location. Skipping \
                  move handling.",
@@ -146,7 +146,7 @@ impl MoleculeDataRoomSearchUpdater {
         };
 
         let new_id = data_room_entry_schema::unique_id_for_data_room_entry(
-            &moved_message.ipnft_uid,
+            &moved_message.ocl_id,
             &moved_message.path_to,
         );
 
@@ -218,7 +218,7 @@ impl MoleculeDataRoomSearchUpdater {
                 data_room_entry_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Delete {
                     id: data_room_entry_schema::unique_id_for_data_room_entry(
-                        &removed_message.ipnft_uid,
+                        &removed_message.ocl_id,
                         &removed_message.path,
                     ),
                 }],

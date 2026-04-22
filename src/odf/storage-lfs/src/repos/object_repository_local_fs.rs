@@ -289,7 +289,7 @@ where
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
         } else {
-            odf_data_utils::data::hash::get_file_physical_hash(src).int_err()?
+            get_file_physical_hash(src).int_err()?
         };
 
         if let Some(expected_hash) = options.expected_hash
@@ -327,6 +327,29 @@ where
         }
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tracing::instrument(level = "info")]
+pub fn get_file_physical_hash(file_path: &Path) -> Result<Multihash, std::io::Error> {
+    use std::io::Read;
+
+    use digest::Digest;
+
+    let mut file = std::fs::File::open(file_path)?;
+    let mut buffer = [0; 2048];
+    let mut hasher = sha3::Sha3_256::new();
+
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+
+    Ok(Multihash::new(Multicodec::Sha3_256, &hasher.finalize()).unwrap())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

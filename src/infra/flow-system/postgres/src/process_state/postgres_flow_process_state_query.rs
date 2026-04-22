@@ -41,19 +41,19 @@ impl PostgresFlowProcessStateQuery {
                 )
             }
             FlowProcessOrderField::NextPlannedAt => {
-                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}",)
+                format!("next_planned_at {direction} NULLS LAST, {default_tiebreaker}")
             }
             FlowProcessOrderField::LastFailureAt => {
-                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}",)
+                format!("last_failure_at {direction} NULLS LAST, {default_tiebreaker}")
             }
             FlowProcessOrderField::ConsecutiveFailures => {
-                format!("consecutive_failures {direction}, {default_tiebreaker}",)
+                format!("consecutive_failures {direction}, {default_tiebreaker}")
             }
             FlowProcessOrderField::EffectiveState => {
-                format!("effective_state {direction}, {default_tiebreaker}",)
+                format!("effective_state {direction}, {default_tiebreaker}")
             }
             FlowProcessOrderField::FlowType => {
-                format!("flow_type {direction}, {default_tiebreaker}",)
+                format!("flow_type {direction}, {default_tiebreaker}")
             }
         }
     }

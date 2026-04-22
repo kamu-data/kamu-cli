@@ -33,9 +33,10 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
-use odf::dataset::DatasetLayout;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
+
+use super::ServerSideDatasetFixture;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +45,7 @@ pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub(crate) trait ServerSideHarness {
     fn server_account_id(&self) -> odf::AccountID;
 
@@ -70,8 +71,6 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
 
-    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout;
-
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 
     fn dataset_url(&self, dataset_alias: &odf::DatasetAlias) -> Url {
@@ -83,6 +82,8 @@ pub(crate) trait ServerSideHarness {
     fn api_server_account(&self) -> Account;
 
     fn system_time_source(&self) -> &SystemTimeSourceStub;
+
+    fn dataset_fixture(&self) -> Arc<dyn ServerSideDatasetFixture>;
 
     async fn api_server_run(self) -> Result<(), InternalError>;
 }

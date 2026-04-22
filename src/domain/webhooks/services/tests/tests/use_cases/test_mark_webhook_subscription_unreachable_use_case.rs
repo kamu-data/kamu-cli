@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::*;
@@ -115,7 +115,7 @@ async fn test_mark_unreachable_idempotence() {
     );
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Second mark not ignored: {res:?}",);
+    assert!(res.is_ok(), "Second mark not ignored: {res:?}");
     assert_eq!(
         subscription.status(),
         WebhookSubscriptionStatus::Unreachable

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -32,7 +32,6 @@ use kamu_datasets_services::{
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -134,8 +133,8 @@ async fn test_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -179,7 +178,7 @@ async fn test_dataset_compact() {
 #[tokio::test]
 async fn test_dataset_compact_s3() {
     let s3 = LocalS3Server::new().await;
-    let harness = CompactTestHarness::new_s3(&s3).await;
+    let harness = CompactTestHarness::new_s3(&s3);
 
     let target = harness.create_test_root_dataset().await;
     let dataset_ref = target.get_handle().as_local_ref();
@@ -390,8 +389,8 @@ async fn test_dataset_compaction_watermark_only_blocks() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -553,8 +552,8 @@ async fn test_dataset_compaction_limits() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                     "#
                 ),
@@ -707,8 +706,8 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -817,8 +816,8 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -867,8 +866,8 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -1166,8 +1165,8 @@ async fn test_hard_compaction_with_schema_migration() {
                 DataField::i32("op"),
                 DataField::timestamp_millis_utc("system_time"),
                 DataField::timestamp_millis_utc("date"),
-                DataField::string("city").optional(), // Poor ingest inference
-                DataField::i64("population").optional(), // Poor ingest inference
+                DataField::string("city"),
+                DataField::i64("population"),
                 DataField::string("census_url").optional(),
             ]))
             .into(),
@@ -1186,17 +1185,12 @@ async fn test_hard_compaction_with_schema_migration() {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        [
-                            "date TIMESTAMP",
-                            "city STRING",
-                            "population BIGINT",
-                            "census_url STRING",
-                        ]
-                        .iter()
-                        .map(|s| (*s).to_string())
-                        .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                        odf::schema::DataField::string("census_url").optional(),
+                    ])),
                     ..Default::default()
                 }
                 .into(),
@@ -1281,8 +1275,8 @@ async fn test_hard_compaction_with_schema_migration() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                   OPTIONAL BYTE_ARRAY census_url (STRING);
                 }
                 "#
@@ -1445,19 +1439,16 @@ impl CompactTestHarness {
         }
     }
 
-    async fn new_s3(s3: &LocalS3Server) -> Self {
+    fn new_s3(s3: &LocalS3Server) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
-        let s3_context = S3Context::from_url(&s3.url).await;
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-                s3_context.clone(),
-            ))
+            .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<AlwaysHappyDatasetActionAuthorizer>()
@@ -1466,7 +1457,12 @@ impl CompactTestHarness {
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
+            .add_builder(ObjectStoreBuilderS3::builder(
+                s3.ctx.clone(),
+                true,
+                Some(s3.access_key.clone()),
+                Some(s3.secret_key.clone()),
+            ))
             .add::<VerificationServiceImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
@@ -1566,12 +1562,11 @@ impl CompactTestHarness {
                         MetadataFactory::add_push_source()
                             .read(odf::metadata::ReadStepCsv {
                                 header: Some(true),
-                                schema: Some(
-                                    ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                        .iter()
-                                        .map(|s| (*s).to_string())
-                                        .collect(),
-                                ),
+                                schema: Some(odf::schema::DataSchema::new(vec![
+                                    odf::schema::DataField::timestamp_millis_utc("date"),
+                                    odf::schema::DataField::string("city"),
+                                    odf::schema::DataField::i64("population"),
+                                ])),
                                 ..odf::metadata::ReadStepCsv::default()
                             })
                             .merge(odf::metadata::MergeStrategyLedger {

@@ -27,19 +27,39 @@ content:
         kind: Csv
         header: true
         schema:
-          - date_reported TIMESTAMP
-          - objectid BIGINT
-          - row_id BIGINT
-          - health_region STRING
-          - age_group STRING
-          - gender STRING
-          - exposure STRING
-          - case_status STRING
-          - latitude FLOAT
-          - longitude FLOAT
-          - province STRING
-          - province_abbr STRING
-          - hr_uid INT
+          fields:
+            - name: date_reported
+              type: timestamp
+            - name: objectid
+              type: int64
+            - name: row_id
+              type: int64
+            - name: health_region
+              type: string
+            - name: age_group
+              type: string
+            - name: gender
+              type: string
+            - name: exposure
+              type: string
+            - name: case_status
+              type: string
+            - name: latitude
+              type:
+                kind: option
+                inner: float32
+            - name: longitude
+              type:
+                kind: option
+                inner: float32
+            - name: province
+              type: string
+            - name: province_abbr
+              type: string
+            - name: hr_uid
+              type:
+                kind: option
+                inner: int32
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: Ledger

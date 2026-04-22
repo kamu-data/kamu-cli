@@ -57,7 +57,7 @@ impl MoleculeAnnouncementSearchUpdater {
                 published_message.event_time,
                 published_message.system_time,
                 &published_message.molecule_account_id,
-                &published_message.ipnft_uid,
+                &published_message.ocl_id,
                 &published_message.announcement_record,
             )
             .await?;

@@ -16,13 +16,9 @@ content:
       - name: system_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: event_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: version
         type:
           kind: Int32
@@ -99,17 +95,74 @@ content:
     read:
       kind: NdJson
       schema:
-      - event_time TIMESTAMP
-      - version INT
-      - content_hash STRING
-      - content_length BIGINT
-      - content_type STRING
-      - molecule_access_level STRING
-      - molecule_change_by STRING
-      - description STRING
-      - categories ARRAY<STRING>
-      - tags ARRAY<STRING>
-      - content_text STRING
-      - encryption_metadata STRING
+        fields:
+        - name: event_time
+          type:
+            kind: Option
+            inner:
+              kind: Timestamp
+        - name: version
+          type:
+            kind: Option
+            inner:
+              kind: Int32
+        - name: content_hash
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: content_length
+          type:
+            kind: Option
+            inner:
+              kind: Int64
+        - name: content_type
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: molecule_access_level
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: molecule_change_by
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: description
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: categories
+          type:
+            kind: Option
+            inner:
+              kind: List
+              itemType:
+                kind: Option
+                inner:
+                  kind: String
+        - name: tags
+          type:
+            kind: Option
+            inner:
+              kind: List
+              itemType:
+                kind: Option
+                inner:
+                  kind: String
+        - name: content_text
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: encryption_metadata
+          type:
+            kind: Option
+            inner:
+              kind: String
     merge:
       kind: Append

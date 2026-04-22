@@ -131,7 +131,7 @@ impl DatasetsMut {
             .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetAction::Write)
             .await?;
 
-        if let Some(error_msg) = resolution.try_get_error_message(skip_missing) {
+        if let Some(error_msg) = resolution.try_get_user_error_report(skip_missing) {
             return Err(GqlError::gql(error_msg));
         }
 
@@ -304,8 +304,11 @@ impl DatasetsMut {
         #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
             '_,
         >,
-        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+        #[graphql(desc = "DEPRECATED: Additional user-defined columns")] extra_columns: Option<
             Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "User-defined schema that will be merged with base")] extra_schema: Option<
+            DataSchemaInput,
         >,
         #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
             Vec<String>,
@@ -325,7 +328,8 @@ impl DatasetsMut {
 
         let snapshot = match crate::queries::VersionedFile::dataset_snapshot(
             dataset_alias.into(),
-            extra_columns.unwrap_or_default(),
+            extra_schema,
+            extra_columns,
             extra_events_parsed,
         ) {
             Ok(s) => s,
@@ -353,8 +357,11 @@ impl DatasetsMut {
         #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
             '_,
         >,
-        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+        #[graphql(desc = "DEPRECATED Additional user-defined columns")] extra_columns: Option<
             Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "User-defined schema that will be merged with base")] extra_schema: Option<
+            DataSchemaInput,
         >,
         #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
             Vec<String>,
@@ -374,7 +381,8 @@ impl DatasetsMut {
 
         let snapshot = match crate::queries::Collection::dataset_snapshot(
             dataset_alias.into(),
-            extra_columns.unwrap_or_default(),
+            extra_schema,
+            extra_columns,
             extra_events_parsed,
         ) {
             Ok(s) => s,

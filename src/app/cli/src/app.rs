@@ -597,6 +597,8 @@ pub fn configure_base_catalog(
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
+    kamu_signing_services::register_dependencies(&mut b);
+
     kamu_molecule_services::register_dependencies(
         &mut b,
         kamu_molecule_services::MoleculeDomainDependenciesOptions {
@@ -1122,7 +1124,7 @@ fn prepare_run_dir(run_dir: &Path) {
             )
         });
         std::fs::create_dir(run_dir).unwrap_or_else(|e| {
-            panic!("Unable to create run directory {}: {e}", run_dir.display(),)
+            panic!("Unable to create run directory {}: {e}", run_dir.display())
         });
     }
 }

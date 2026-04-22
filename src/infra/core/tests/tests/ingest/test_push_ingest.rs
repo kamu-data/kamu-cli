@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
@@ -47,12 +47,11 @@ async fn test_ingest_push_url_stream() {
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -106,8 +105,8 @@ async fn test_ingest_push_url_stream() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -191,12 +190,11 @@ async fn test_ingest_push_media_type_override() {
         .push_event(
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..Default::default()
                 })
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -250,8 +248,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -301,8 +299,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -354,8 +352,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -386,12 +384,11 @@ async fn test_ingest_push_schema_stability() {
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategyAppend {})
@@ -493,14 +490,14 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -554,14 +551,14 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -1077,11 +1074,11 @@ async fn test_ingest_push_schema_and_source_evolution() {
         .push_event(
             MetadataFactory::add_push_source()
                 .read(ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..Default::default()
                 })
                 .merge(MergeStrategyLedger {
@@ -1157,12 +1154,12 @@ async fn test_ingest_push_schema_and_source_evolution() {
             AddPushSource {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                        "census_url STRING".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                        odf::schema::DataField::string("census_url").optional(),
+                    ])),
                     ..Default::default()
                 }
                 .into(),
@@ -1213,6 +1210,108 @@ async fn test_ingest_push_schema_and_source_evolution() {
             "#
         ))
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_deprecated_ddl_schema() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(odf::DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(odf::metadata::ReadStepCsv {
+                    header: Some(true),
+                    ddl_schema: Some(vec![
+                        "date TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..odf::metadata::ReadStepCsv::default()
+                })
+                .merge(odf::metadata::MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .push_event(odf::metadata::SetVocab {
+            event_time_column: Some("date".to_string()),
+            ..Default::default()
+        })
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    // Round 1
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness
+        .ingest_from(
+            target.clone(),
+            None,
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  REQUIRED INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
+
+    assert_eq!(
+        data_helper
+            .get_last_data_block()
+            .await
+            .event
+            .new_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2020-01-01T00:00:00+00:00".to_string())
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,6 +9,8 @@
 
 mod s3_context;
 mod s3_metrics;
+mod s3_prefix_files;
 
 pub use s3_context::*;
 pub use s3_metrics::*;
+pub use s3_prefix_files::*;

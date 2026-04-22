@@ -10,9 +10,7 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
-use thiserror::Error;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +25,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     async fn get_allowed_actions(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, InternalError>;
+    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError>;
 
     async fn filter_datasets_allowing(
         &self,
@@ -84,7 +82,8 @@ pub enum DatasetActionAccess {
 
 #[test]
 fn test_dataset_action_resolve_access() {
-    use {DatasetAction as Action, DatasetActionAccess as Access};
+    use DatasetAction as Action;
+    use DatasetActionAccess as Access;
 
     struct FixtureSubTest {
         current_action: Action,
@@ -254,8 +253,11 @@ impl oso::ToPolar for DatasetAction {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum DatasetActionUnauthorizedError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -279,7 +281,7 @@ impl DatasetActionUnauthorizedError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
 #[error("User has no '{action}' permission in dataset '{dataset_ref}'")]
 pub struct DatasetActionNotEnoughPermissionsError {
     pub action: DatasetAction,
@@ -288,7 +290,18 @@ pub struct DatasetActionNotEnoughPermissionsError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
+pub enum GetAllowedActionsError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
 pub enum ClassifyByAllowanceDatasetActionUnauthorizedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
@@ -339,6 +352,11 @@ pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
         action: DatasetAction,
     ) -> Result<bool, InternalError>;
 
+    async fn get_allowed_actions_for_exist_dataset(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashSet<DatasetAction>, InternalError>;
+
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
@@ -359,11 +377,28 @@ where
         dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<bool, InternalError> {
+        use DatasetActionUnauthorizedError as E;
+
         match self.check_action_allowed(dataset_id, action).await {
             Ok(()) => Ok(true),
-            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
-            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
+            Err(E::NotFound(_) | E::Access(_)) => Ok(false),
+            Err(e @ E::Internal(_)) => Err(e.int_err()),
         }
+    }
+
+    async fn get_allowed_actions_for_exist_dataset(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashSet<DatasetAction>, InternalError> {
+        self.get_allowed_actions(dataset_id).await.map_err(|e| {
+            use GetAllowedActionsError as E;
+
+            // NOTE: We checked for the presence of datasets earlier,
+            //       so if any are missing now, that would be unexpected.
+            match e {
+                e @ (E::NotFound(_) | E::Internal(_)) => e.int_err(),
+            }
+        })
     }
 
     fn filtered_datasets_stream<'a>(
@@ -423,8 +458,8 @@ impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn DatasetActionAuthorizer)]
+#[dill::component]
+#[dill::interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
 
 #[async_trait::async_trait]
@@ -441,7 +476,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn get_allowed_actions(
         &self,
         _dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, InternalError> {
+    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError> {
         let all_actions = [
             DatasetAction::Read,
             DatasetAction::Write,

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
-use kamu::testing::DatasetTestHelper;
 
 use crate::harness::{ClientSideHarness, ServerSideHarness, await_client_server_flow};
 use crate::tests::tests_pull::scenarios::*;
@@ -20,6 +19,7 @@ pub(crate) async fn test_smart_pull_new_dataset<TServerHarness: ServerSideHarnes
     a_server_harness: TServerHarness,
 ) {
     let scenario = SmartPullNewDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -37,10 +37,13 @@ pub(crate) async fn test_smart_pull_new_dataset<TServerHarness: ServerSideHarnes
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -54,6 +57,7 @@ pub(crate) async fn test_smart_pull_new_empty_dataset<TServerHarness: ServerSide
 ) {
     let scenario =
         SmartPullNewEmptyDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -71,10 +75,13 @@ pub(crate) async fn test_smart_pull_new_empty_dataset<TServerHarness: ServerSide
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_create_result.dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -90,6 +97,7 @@ pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
 ) {
     let scenario =
         SmartPullExistingUpToDateDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -100,10 +108,13 @@ pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
 
         assert_eq!(PullResult::UpToDate(PullResultUpToDate::Sync), pull_result);
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -117,6 +128,7 @@ pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: Ser
 ) {
     let scenario =
         SmartPullExistingEvolvedDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -134,10 +146,13 @@ pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: Ser
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_create_result.dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -151,6 +166,7 @@ pub(crate) async fn test_smart_pull_existing_diverged_dataset<TServerHarness: Se
 ) {
     let scenario =
         SmartPullExistingDivergedDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -176,10 +192,13 @@ pub(crate) async fn test_smart_pull_existing_diverged_dataset<TServerHarness: Se
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -224,6 +243,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_new_reread_succeeds<
         a_server_harness,
     )
     .await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -241,10 +261,13 @@ pub(crate) async fn test_smart_pull_aborted_read_of_new_reread_succeeds<
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -263,6 +286,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
         a_server_harness,
     )
     .await;
+    let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
@@ -280,10 +304,13 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(
-            &scenario.server_dataset_layout,
-            &scenario.client_dataset_layout,
-        );
+        dataset_fixture
+            .assert_dataset_in_sync(
+                &scenario.server_create_result.dataset_handle,
+                &scenario.client_dataset_layout,
+            )
+            .await
+            .unwrap();
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

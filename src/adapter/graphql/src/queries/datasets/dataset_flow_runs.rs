@@ -10,7 +10,8 @@
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AccountService;
-use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
+use kamu_adapter_flow_dataset as afs;
+use kamu_flow_system as fs;
 
 use crate::mutations::{FlowInDatasetError, FlowNotFound, check_if_flow_belongs_to_dataset};
 use crate::prelude::*;
@@ -18,6 +19,7 @@ use crate::queries::{
     Account,
     DatasetRequestState,
     Flow,
+    FlowRunOrder,
     prepare_flows_filter_by_initiator,
     prepare_flows_filter_by_types,
     prepare_flows_scope_query,
@@ -77,6 +79,7 @@ impl<'a> DatasetFlowRuns<'a> {
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<DatasetFlowFilters>,
+        order: Option<FlowRunOrder>,
     ) -> Result<FlowConnection> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
@@ -114,6 +117,7 @@ impl<'a> DatasetFlowRuns<'a> {
             .list_scoped_flows(
                 scope_query,
                 maybe_filters.unwrap_or_default(),
+                order.map(FlowRunOrder::into_domain).unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
             )
             .await

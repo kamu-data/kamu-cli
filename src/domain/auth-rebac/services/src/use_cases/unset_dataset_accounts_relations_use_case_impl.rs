@@ -31,23 +31,26 @@ impl UnsetDatasetAccountsRelationsUseCase for UnsetDatasetAccountsRelationsUseCa
         dataset_id: &odf::DatasetID,
         account_ids: &[&odf::AccountID],
     ) -> Result<(), UnsetDatasetAccountsRelationsError> {
-        self.rebac_service
+        let changes = self
+            .rebac_service
             .unset_accounts_dataset_relations(account_ids, dataset_id)
             .await
             .int_err()?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-                RebacDatasetRelationsMessage::modified(
-                    dataset_id.clone(),
-                    self.rebac_service
-                        .get_authorized_accounts(dataset_id)
-                        .await
-                        .int_err()?,
-                ),
-            )
-            .await?;
+        if changes.changed_dataset_ids.contains(dataset_id) {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
+                    RebacDatasetRelationsMessage::modified(
+                        dataset_id.clone(),
+                        self.rebac_service
+                            .get_authorized_accounts(dataset_id)
+                            .await
+                            .int_err()?,
+                    ),
+                )
+                .await?;
+        }
 
         Ok(())
     }

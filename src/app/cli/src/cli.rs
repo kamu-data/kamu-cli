@@ -601,7 +601,7 @@ Displays the schema of the dataset. Note that dataset schemas can evolve over ti
 
 **Examples:**
 
-Show logical schema of a dataset in the DDL format:
+Show logical schema of a dataset in the ODF format:
 
     kamu inspect schema my.dataset
 
@@ -1093,8 +1093,8 @@ For local file system repositories use the following URL formats:
 For S3-compatible basic repositories use:
 
     s3://bucket.my-company.example/
-    s3+http://my-minio-server:9000/bucket/
-    s3+https://my-minio-server:9000/bucket/
+    s3+http://my-server:9000/bucket/
+    s3+https://my-server:9000/bucket/
 
 For ODF-compatible smart repositories use:
 

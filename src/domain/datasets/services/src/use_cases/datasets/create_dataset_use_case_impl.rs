@@ -88,13 +88,14 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        // TODO: HACK: SEC: When creating a dataaset under another account we currently
+        // TODO: HACK: SEC: When creating a dataset under another account we currently
         // give subject a "maintainer" role on it. In future this should be refactored
         // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
         if target_account_id != subject.account_id {
-            self.rebac_svc
+            let _ = self
+                .rebac_svc
                 .get()
                 .int_err()?
                 .set_account_dataset_relation(

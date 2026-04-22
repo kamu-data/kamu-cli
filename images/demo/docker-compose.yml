@@ -5,7 +5,7 @@ networks:
 
 services:
     jupyter:
-        image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.17.9
+        image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.18.0
         # Unfortunately running podman within another container requires elevated permissions
         privileged: true
         command:
@@ -15,11 +15,11 @@ services:
             - "--port=8765"
             - "--NotebookApp.iopub_data_rate_limit=1000000000"
         environment:
-            - AWS_ACCESS_KEY_ID=minio
-            - AWS_SECRET_ACCESS_KEY=minio123
+            - AWS_ACCESS_KEY_ID=demo
+            - AWS_SECRET_ACCESS_KEY=demo123
             # This is a free tier token - get one at https://etherscan.io/apis
             - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
-            # TODO: Restore support for local Minio
+            # TODO: Restore support for local RustFS
             - GITHUB_LOGIN=guest
             - GITHUB_TOKEN=
             - KAMU_NODE_URL=odf+https://node.demo.kamu.dev/
@@ -34,20 +34,20 @@ services:
         ports:
             - "8765:8765"
         depends_on:
-            - minio
+            - rustfs
 
-    minio:
-        image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.17.9
+    rustfs:
+        image: ghcr.io/kamu-data/kamu-cli-demo-rustfs:0.18.0
         command:
             - "server"
             - "--address"
             - ":80"
             - "/data"
         environment:
-            - MINIO_ACCESS_KEY=minio
-            - MINIO_SECRET_KEY=minio123
+            - RUSTFS_ACCESS_KEY=demo
+            - RUSTFS_SECRET_KEY=demo123
         # volumes:
-        #     - ./minio-data:/data
+        #     - ./data:/data
         networks:
             - kamu
         expose:

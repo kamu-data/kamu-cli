@@ -16,32 +16,22 @@ content:
       - name: system_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: event_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
-      - name: account_id
+      - name: ocl_id
         type:
           kind: String
-      - name: ipnft_symbol
+      - name: symbol
         type:
           kind: String
-      - name: ipnft_uid
+      - name: odf_account_id
         type:
           kind: String
-      - name: ipnft_address
+      - name: odf_data_room_dataset_id
         type:
           kind: String
-      - name: ipnft_token_id
-        type:
-          kind: String
-      - name: data_room_dataset_id
-        type:
-          kind: String
-      - name: announcements_dataset_id
+      - name: odf_announcements_dataset_id
         type:
           kind: String
   - kind: AddPushSource
@@ -49,18 +39,29 @@ content:
     read:
       kind: NdJson
       schema:
-      - op INT NOT NULL
-      - account_id STRING NOT NULL
-      - ipnft_symbol STRING NOT NULL
-      - ipnft_uid STRING NOT NULL
-      - ipnft_address STRING NOT NULL
-      - ipnft_token_id STRING NOT NULL
-      - data_room_dataset_id STRING NOT NULL
-      - announcements_dataset_id STRING NOT NULL
+        fields:
+        - name: op
+          type:
+            kind: Int32
+        - name: ocl_id
+          type:
+            kind: String
+        - name: symbol
+          type:
+            kind: String
+        - name: odf_account_id
+          type:
+            kind: String
+        - name: odf_data_room_dataset_id
+          type:
+            kind: String
+        - name: odf_announcements_dataset_id
+          type:
+            kind: String
     merge:
       kind: ChangelogStream
       primaryKey:
-      - account_id
+      - ocl_id
   - kind: SetInfo
     description: List of projects tracked by Molecule.xyz
     keywords:

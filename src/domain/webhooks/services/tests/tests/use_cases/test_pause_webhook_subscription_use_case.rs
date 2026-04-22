@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::*;
@@ -41,20 +41,20 @@ async fn test_pause_success() {
     subscription.enable().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to pause subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to pause subscription: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Paused);
 
     subscription.resume().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to pause subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to pause subscription: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Paused);
 
     subscription.mark_unreachable().unwrap();
     subscription.reactivate().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to pause subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to pause subscription: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Paused);
 }
 
@@ -77,10 +77,10 @@ async fn test_pause_idempotence() {
     subscription.enable().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to pause subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to pause subscription: {res:?}");
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Second pause not ignored: {res:?}",);
+    assert!(res.is_ok(), "Second pause not ignored: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Paused);
 }
 

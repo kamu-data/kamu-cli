@@ -189,7 +189,9 @@ pub async fn query_handler_impl(
         body.include.insert(Include::Schema);
     }
 
-    let identity = catalog.get_one::<IdentityConfig>().ok();
+    let identity = catalog
+        .get_one::<kamu_signing::entities::IdentityConfig>()
+        .ok();
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let res = query_svc
@@ -256,7 +258,7 @@ pub async fn query_handler_impl(
             proof: None,
         }
     } else if let Some(identity) = identity {
-        use ed25519_dalek::Signer;
+        use odf::metadata::ed25519::Signer;
 
         let sub_queries = Vec::new();
 
@@ -271,7 +273,9 @@ pub async fn query_handler_impl(
             )),
         };
 
-        let signature = identity.private_key.sign(&to_canonical_json(&commitment));
+        let signature = identity
+            .ed25519_private_key
+            .sign(&to_canonical_json(&commitment));
 
         QueryResponse {
             input,
@@ -279,8 +283,8 @@ pub async fn query_handler_impl(
             sub_queries: Some(sub_queries),
             commitment: Some(commitment),
             proof: Some(Proof {
-                r#type: ProofType::Ed25519Signature2020,
-                verification_method: identity.did(),
+                r#type: kamu_signing::common::ProofType::Ed25519Signature2020,
+                verification_method: identity.ed25519_private_key.verifying_key(),
                 proof_value: signature.into(),
             }),
         }
@@ -295,6 +299,6 @@ pub async fn query_handler_impl(
 
 #[derive(Debug, thiserror::Error)]
 #[error("Response signing is not enabled by the node operator")]
-struct ResponseSigningNotConfigured;
+pub struct ResponseSigningNotConfigured;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

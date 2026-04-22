@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetColumn, DatasetSnapshots};
+use kamu_datasets::DatasetSnapshots;
 use odf::schema::{DataField, DataSchema, DataType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,13 +28,11 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("account_id"),
-                DataField::string("ipnft_symbol"),
-                DataField::string("ipnft_uid"),
-                DataField::string("ipnft_address"),
-                DataField::string("ipnft_token_id"),
-                DataField::string("data_room_dataset_id"),
-                DataField::string("announcements_dataset_id"),
+                DataField::string("ocl_id"),
+                DataField::string("symbol"),
+                DataField::string("odf_account_id"),
+                DataField::string("odf_data_room_dataset_id"),
+                DataField::string("odf_announcements_dataset_id"),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -47,27 +45,20 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "account_id STRING NOT NULL",
-                                "ipnft_symbol STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
-                                "ipnft_address STRING NOT NULL",
-                                "ipnft_token_id STRING NOT NULL",
-                                "data_room_dataset_id STRING NOT NULL",
-                                "announcements_dataset_id STRING NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::string("ocl_id"),
+                            DataField::string("symbol"),
+                            DataField::string("odf_account_id"),
+                            DataField::string("odf_data_room_dataset_id"),
+                            DataField::string("odf_announcements_dataset_id"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
                     preprocess: None,
                     merge: odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["account_id".to_string()],
+                        primary_key: vec!["ocl_id".to_string()],
                     }
                     .into(),
                 }
@@ -110,7 +101,7 @@ impl MoleculeDatasetSnapshots {
         }
     }
 
-    pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn data_room(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "data-room";
         // Extra columns
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -133,23 +124,23 @@ impl MoleculeDatasetSnapshots {
             alias,
             vec![
                 // Extra columns
-                DatasetColumn::string(COLUMN_NAME_CHANGE_BY),
+                DataField::string(COLUMN_NAME_CHANGE_BY).optional(),
                 // Denormalized values from the latest file state
-                DatasetColumn::string(COLUMN_NAME_ACCESS_LEVEL),
-                DatasetColumn::string(COLUMN_NAME_CONTENT_TYPE),
-                DatasetColumn::string(COLUMN_NAME_CONTENT_HASH),
-                DatasetColumn::int(COLUMN_NAME_CONTENT_LENGTH),
-                DatasetColumn::string(COLUMN_NAME_DESCRIPTION),
-                DatasetColumn::string_array(COLUMN_NAME_CATEGORIES),
-                DatasetColumn::string_array(COLUMN_NAME_TAGS),
-                DatasetColumn::int(COLUMN_NAME_VERSION),
+                DataField::string(COLUMN_NAME_ACCESS_LEVEL).optional(),
+                DataField::string(COLUMN_NAME_CONTENT_TYPE).optional(),
+                DataField::string(COLUMN_NAME_CONTENT_HASH).optional(),
+                DataField::i32(COLUMN_NAME_CONTENT_LENGTH).optional(), // NOTE: i32 instead of u64 for legacy reasons
+                DataField::string(COLUMN_NAME_DESCRIPTION).optional(),
+                DataField::list(COLUMN_NAME_CATEGORIES, DataType::string().optional()).optional(),
+                DataField::list(COLUMN_NAME_TAGS, DataType::string().optional()).optional(),
+                DataField::i32(COLUMN_NAME_VERSION).optional(),
             ],
             Vec::new(),
         )
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn versioned_file_v2(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+    pub fn versioned_file(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
         // Extra columns
         const COLUMN_NAME_ACCESS_LEVEL: &str = "molecule_access_level";
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -166,23 +157,23 @@ impl MoleculeDatasetSnapshots {
             alias,
             vec![
                 // Extra columns
-                DatasetColumn::string(COLUMN_NAME_ACCESS_LEVEL),
-                DatasetColumn::string(COLUMN_NAME_CHANGE_BY),
-                DatasetColumn::string(COLUMN_NAME_DESCRIPTION),
+                DataField::string(COLUMN_NAME_ACCESS_LEVEL).optional(),
+                DataField::string(COLUMN_NAME_CHANGE_BY).optional(),
+                DataField::string(COLUMN_NAME_DESCRIPTION).optional(),
                 // Extended metadata
-                DatasetColumn::string_array(COLUMN_NAME_CATEGORIES),
-                DatasetColumn::string_array(COLUMN_NAME_TAGS),
+                DataField::list(COLUMN_NAME_CATEGORIES, DataType::string().optional()).optional(),
+                DataField::list(COLUMN_NAME_TAGS, DataType::string().optional()).optional(),
                 // Semantic search
-                DatasetColumn::string(COLUMN_NAME_CONTENT_TEXT),
+                DataField::string(COLUMN_NAME_CONTENT_TEXT).optional(),
                 // E2EE
-                DatasetColumn::string(COLUMN_NAME_ENCRYPTION_METADATA),
+                DataField::string(COLUMN_NAME_ENCRYPTION_METADATA).optional(),
             ],
             Vec::new(),
         )
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn announcements_v2(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn announcements(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "announcements";
 
         let alias = odf::DatasetAlias::new(
@@ -215,22 +206,17 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "announcement_id STRING NOT NULL",
-                                "headline STRING NOT NULL",
-                                "body STRING NOT NULL",
-                                "attachments Array<STRING> NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::string("announcement_id"),
+                            DataField::string("headline"),
+                            DataField::string("body"),
+                            DataField::list("attachments", DataType::string().optional()),
+                            DataField::string("molecule_access_level"),
+                            DataField::string("molecule_change_by"),
+                            DataField::list("categories", DataType::string().optional()),
+                            DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -295,7 +281,7 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("announcement_id"),
                 DataField::string("headline"),
                 DataField::string("body"),
@@ -317,24 +303,19 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "event_time TIMESTAMP",
-                                "ipnft_uid STRING NOT NULL",
-                                "announcement_id STRING NOT NULL",
-                                "headline STRING NOT NULL",
-                                "body STRING NOT NULL",
-                                "attachments Array<STRING> NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                                .into_iter()
-                                .map(str::to_string)
-                                .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::timestamp_millis_utc("event_time").optional(),
+                            DataField::string("ocl_id"),
+                            DataField::string("announcement_id"),
+                            DataField::string("headline"),
+                            DataField::string("body"),
+                            DataField::list("attachments", DataType::string().optional()),
+                            DataField::string("molecule_access_level"),
+                            DataField::string("molecule_change_by"),
+                            DataField::list("categories", DataType::string().optional()),
+                            DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                         .into(),
@@ -396,7 +377,7 @@ impl MoleculeDatasetSnapshots {
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
                 DataField::string("activity_type"),
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("path"),
                 DataField::string("ref"),
                 DataField::u32("version"),
@@ -420,27 +401,22 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "event_time TIMESTAMP",
-                                "activity_type STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
-                                "path STRING NOT NULL",
-                                "ref STRING NOT NULL",
-                                "version INT UNSIGNED NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "content_type STRING",
-                                "content_length BIGINT UNSIGNED NOT NULL",
-                                "content_hash STRING NOT NULL",
-                                "description STRING",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                                DataField::timestamp_millis_utc("event_time").optional(),
+                                DataField::string("activity_type"),
+                                DataField::string("ocl_id"),
+                                DataField::string("path"),
+                                DataField::string("ref"),
+                                DataField::u32("version"),
+                                DataField::string("molecule_change_by"),
+                                DataField::string("molecule_access_level"),
+                                DataField::string("content_type").optional(),
+                                DataField::u64("content_length"),
+                                DataField::string("content_hash"),
+                                DataField::string("description").optional(),
+                                DataField::list("categories", DataType::string().optional()),
+                                DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                     .into(),

@@ -224,6 +224,7 @@ impl InspectSchemaCommand {
             DataType::Timestamp(DataTypeTimestamp { unit, timezone }) => {
                 println!("{}", console::style("Timestamp").cyan());
 
+                let unit = unit.unwrap_or(DataTypeTimestamp::default_unit());
                 self.indent(depth);
                 println!(
                     "{} {}",
@@ -231,14 +232,15 @@ impl InspectSchemaCommand {
                     console::style(format!("{unit:?}")).cyan(),
                 );
 
-                if let Some(timezone) = timezone {
-                    self.indent(depth);
-                    println!(
-                        "{} {}",
-                        console::style("timezone:").dim(),
-                        console::style(timezone).cyan(),
-                    );
-                }
+                let timezone = timezone
+                    .as_deref()
+                    .unwrap_or(DataTypeTimestamp::default_timezone());
+                self.indent(depth);
+                println!(
+                    "{} {}",
+                    console::style("timezone:").dim(),
+                    console::style(timezone).cyan(),
+                );
             }
             DataType::String(DataTypeString {}) => println!("{}", console::style("String").cyan()),
         }

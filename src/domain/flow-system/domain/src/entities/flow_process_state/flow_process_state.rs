@@ -392,11 +392,14 @@ impl FlowProcessState {
         }
 
         // Emit auto-stop event if just auto-stopped
-        if !old_auto_stopped && self.auto_stopped_reason.is_some() {
+        if let Some(reason) = (!old_auto_stopped)
+            .then_some(self.auto_stopped_reason)
+            .flatten()
+        {
             self.pending_events
                 .push(FlowProcessEvent::AutoStopped(FlowProcessEventAutoStopped {
-                    reason: self.auto_stopped_reason.unwrap(),
                     event_time,
+                    reason,
                 }));
         }
 

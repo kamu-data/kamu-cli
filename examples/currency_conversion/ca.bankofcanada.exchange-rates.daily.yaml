@@ -19,33 +19,35 @@ content:
         header: true
         # TODO: Use DECIMAL type
         schema:
-          - date TIMESTAMP
-          - FXAUDCAD DOUBLE
-          - FXBRLCAD DOUBLE
-          - FXCNYCAD DOUBLE
-          - FXEURCAD DOUBLE
-          - FXHKDCAD DOUBLE
-          - FXINRCAD DOUBLE
-          - FXIDRCAD DOUBLE
-          - FXJPYCAD DOUBLE
-          - FXMYRCAD DOUBLE
-          - FXMXNCAD DOUBLE
-          - FXNZDCAD DOUBLE
-          - FXNOKCAD DOUBLE
-          - FXPENCAD DOUBLE
-          - FXRUBCAD DOUBLE
-          - FXSARCAD DOUBLE
-          - FXSGDCAD DOUBLE
-          - FXZARCAD DOUBLE
-          - FXKRWCAD DOUBLE
-          - FXSEKCAD DOUBLE
-          - FXCHFCAD DOUBLE
-          - FXTWDCAD DOUBLE
-          - FXTHBCAD DOUBLE
-          - FXTRYCAD DOUBLE
-          - FXGBPCAD DOUBLE
-          - FXUSDCAD DOUBLE
-          - FXVNDCAD DOUBLE
+          fields:
+            - { name: date, type: timestamp }
+            - { name: FXAUDCAD, type: float64 }
+            - { name: FXBRLCAD, type: float64 }
+            - { name: FXCNYCAD, type: float64 }
+            - { name: FXEURCAD, type: float64 }
+            - { name: FXHKDCAD, type: float64 }
+            - { name: FXINRCAD, type: float64 }
+            - { name: FXIDRCAD, type: float64 }
+            - { name: FXJPYCAD, type: float64 }
+            - { name: FXMYRCAD, type: float64 }
+            - { name: FXMXNCAD, type: float64 }
+            - { name: FXNZDCAD, type: float64 }
+            - { name: FXNOKCAD, type: float64 }
+            - { name: FXPENCAD, type: float64 }
+            - { name: FXPLNCAD, type: float64 }
+            - { name: FXRUBCAD, type: float64 }
+            - { name: FXSARCAD, type: float64 }
+            - { name: FXSGDCAD, type: float64 }
+            - { name: FXZARCAD, type: float64 }
+            - { name: FXKRWCAD, type: float64 }
+            - { name: FXSEKCAD, type: float64 }
+            - { name: FXCHFCAD, type: float64 }
+            - { name: FXTWDCAD, type: float64 }
+            - { name: FXTHBCAD, type: float64 }
+            - { name: FXTRYCAD, type: float64 }
+            - { name: FXGBPCAD, type: float64 }
+            - { name: FXUSDCAD, type: float64 }
+            - { name: FXVNDCAD, type: float64 }
       merge:
         kind: Ledger
         primaryKey:
