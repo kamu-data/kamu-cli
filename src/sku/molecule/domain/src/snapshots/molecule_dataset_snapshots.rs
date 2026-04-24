@@ -28,13 +28,11 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("account_id"),
-                DataField::string("ipnft_symbol"),
-                DataField::string("ipnft_uid"),
-                DataField::string("ipnft_address"),
-                DataField::string("ipnft_token_id"),
-                DataField::string("data_room_dataset_id"),
-                DataField::string("announcements_dataset_id"),
+                DataField::string("ocl_id"),
+                DataField::string("symbol"),
+                DataField::string("odf_account_id"),
+                DataField::string("odf_data_room_dataset_id"),
+                DataField::string("odf_announcements_dataset_id"),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -50,13 +48,11 @@ impl MoleculeDatasetSnapshots {
                         schema: Some(
                             [
                                 "op INT NOT NULL",
-                                "account_id STRING NOT NULL",
-                                "ipnft_symbol STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
-                                "ipnft_address STRING NOT NULL",
-                                "ipnft_token_id STRING NOT NULL",
-                                "data_room_dataset_id STRING NOT NULL",
-                                "announcements_dataset_id STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
+                                "symbol STRING NOT NULL",
+                                "odf_account_id STRING NOT NULL",
+                                "odf_data_room_dataset_id STRING NOT NULL",
+                                "odf_announcements_dataset_id STRING NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -67,7 +63,7 @@ impl MoleculeDatasetSnapshots {
                     .into(),
                     preprocess: None,
                     merge: odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["account_id".to_string()],
+                        primary_key: vec!["ocl_id".to_string()],
                     }
                     .into(),
                 }
