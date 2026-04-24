@@ -36,7 +36,7 @@ pub enum StorageProviderSpec {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageProviderSpecLocalFs {
-    pub workspace_path: String,
+    pub workspace_path: String, // TODO: ValueRef
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
