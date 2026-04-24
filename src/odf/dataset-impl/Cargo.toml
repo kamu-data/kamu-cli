@@ -52,7 +52,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
-hickory-resolver = "0.25"
+hickory-resolver = "0.26"
 http = { version = "1", default-features = false }
 mockall = { optional = true, version = "0.14", default-features = false }
 regex = { version = "1", default-features = false }
