@@ -40,7 +40,7 @@ digest = "0.10"
 http = "1"
 
 sha3 = "0.10"
-tokio = { version = "1.50.0", default-features = false, features = ["io-util"] }
+tokio = { version = "1", default-features = false, features = ["io-util"] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
 
