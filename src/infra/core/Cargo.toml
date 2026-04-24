@@ -140,7 +140,7 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
-alloy = { optional = true, version = "1.7", default-features = false, features = [
+alloy = { optional = true, version = "=1.7.3", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
