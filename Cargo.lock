@@ -8071,7 +8071,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8088,7 +8088,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration-inmem"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "database-common-macros",
@@ -8105,7 +8105,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration-postgres"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8126,7 +8126,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration-repo-tests"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "chrono",
  "dill",
@@ -8139,7 +8139,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration-services"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8167,7 +8167,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-configuration-sqlite"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8752,7 +8752,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8775,7 +8775,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-facade"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8800,7 +8800,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-inmem"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -8820,7 +8820,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-postgres"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8844,7 +8844,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-repo-tests"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -8860,7 +8860,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-services"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8885,7 +8885,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-resources-sqlite"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -9076,7 +9076,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-storage"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9091,7 +9091,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-storage-services"
-version = "0.261.1"
+version = "0.262.0"
 dependencies = [
  "async-trait",
  "chrono",
