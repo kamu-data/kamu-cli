@@ -85,7 +85,7 @@ pub fn get_multitenant_molecule_config_with_elasticsearch() -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_molecule_v2_data_room_quota_exceeded(
+pub async fn test_molecule_data_room_quota_exceeded(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
     const ACCOUNT: &str = "molecule";
@@ -116,7 +116,7 @@ pub async fn test_molecule_v2_data_room_quota_exceeded(
         .into_json()
         .unwrap_or_default();
     assert_eq!(
-        create_project_json["molecule"]["v2"]["createProject"]["isSuccess"],
+        create_project_json["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
         "Project creation failed: {create_project_res:?}"
     );
@@ -141,7 +141,7 @@ pub async fn test_molecule_v2_data_room_quota_exceeded(
         upload_res.errors.is_empty(),
         "Upload mutation failed: {upload_res:?}"
     );
-    let payload = upload_res.data.into_json().unwrap_or_default()["molecule"]["v2"]["project"]
+    let payload = upload_res.data.into_json().unwrap_or_default()["molecule"]["v3"]["project"]
         ["dataRoom"]["uploadFile"]
         .clone();
     assert_eq!(payload["isSuccess"], json!(false), "{payload:?}");
@@ -155,7 +155,7 @@ pub async fn test_molecule_v2_data_room_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_molecule_v2_announcements_quota_exceeded(
+pub async fn test_molecule_announcements_quota_exceeded(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
     const ACCOUNT: &str = "molecule";
@@ -186,7 +186,7 @@ pub async fn test_molecule_v2_announcements_quota_exceeded(
         .into_json()
         .unwrap_or_default();
     assert_eq!(
-        create_project_json["molecule"]["v2"]["createProject"]["isSuccess"],
+        create_project_json["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
         "Project creation failed: {create_project_res:?}"
     );
@@ -215,7 +215,7 @@ pub async fn test_molecule_v2_announcements_quota_exceeded(
         announcement_res.errors.is_empty(),
         "Announcement mutation failed: {announcement_res:?}"
     );
-    let payload = announcement_res.data.into_json().unwrap_or_default()["molecule"]["v2"]
+    let payload = announcement_res.data.into_json().unwrap_or_default()["molecule"]["v3"]
         ["project"]["announcements"]["create"]
         .clone();
     assert_eq!(payload["isSuccess"], json!(false), "{payload:?}");
@@ -234,7 +234,7 @@ pub async fn test_molecule_v2_announcements_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_molecule_v2_activity_change_by_for_remove(
+pub async fn test_molecule_activity_change_by_for_remove(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
     const USER_ACCOUNT: &str = "molecule";
@@ -276,7 +276,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
         .into_json()
         .unwrap_or_default();
     assert_eq!(
-        create_payload["molecule"]["v2"]["createProject"]["isSuccess"],
+        create_payload["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
         "{create_payload:?}"
     );
@@ -305,7 +305,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
         "Upload mutation failed: {upload_res:?}"
     );
     let upload_json = upload_res.data.into_json().unwrap_or_default();
-    let file_ref = upload_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_ref = upload_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .expect("ref missing")
@@ -333,7 +333,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
     );
     let update_json = update_res.data.into_json().unwrap_or_default();
     assert_eq!(
-        update_json["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"]["isSuccess"],
+        update_json["molecule"]["v3"]["project"]["dataRoom"]["updateFileMetadata"]["isSuccess"],
         json!(true),
         "{update_json:?}"
     );
@@ -354,7 +354,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
     );
     let remove_json = remove_res.data.into_json().unwrap_or_default();
     assert_eq!(
-        remove_json["molecule"]["v2"]["project"]["dataRoom"]["removeEntry"]["isSuccess"],
+        remove_json["molecule"]["v3"]["project"]["dataRoom"]["removeEntry"]["isSuccess"],
         json!(true),
         "{remove_json:?}"
     );
@@ -377,7 +377,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
             project_activity.errors.is_empty(),
             "Project activity query failed: {project_activity:?}"
         );
-        let project_nodes = project_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+        let project_nodes = project_activity.data.into_json().unwrap_or_default()["molecule"]["v3"]
             ["project"]["activity"]["nodes"]
             .as_array()
             .cloned()
@@ -394,7 +394,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
         );
         assert_eq!(
             project_nodes[0]["__typename"],
-            json!("MoleculeActivityFileRemovedV2"),
+            json!("MoleculeActivityFileRemoved"),
             "{project_nodes:?}"
         );
         assert_eq!(
@@ -435,7 +435,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
             global_activity.errors.is_empty(),
             "Global activity query failed: {global_activity:?}"
         );
-        let global_nodes = global_activity.data.into_json().unwrap_or_default()["molecule"]["v2"]
+        let global_nodes = global_activity.data.into_json().unwrap_or_default()["molecule"]["v3"]
             ["activity"]["nodes"]
             .as_array()
             .cloned()
@@ -451,7 +451,7 @@ pub async fn test_molecule_v2_activity_change_by_for_remove(
         );
         assert_eq!(
             global_nodes[0]["__typename"],
-            json!("MoleculeActivityFileRemovedV2"),
+            json!("MoleculeActivityFileRemoved"),
             "{global_nodes:?}"
         );
         assert_eq!(
@@ -489,7 +489,7 @@ const CREATE_PROJECT: &str = indoc!(
         $ipnftTokenId: Int!,
     ) {
         molecule {
-            v2 {
+            v3 {
                 createProject(
                     ipnftSymbol: $ipnftSymbol,
                     ipnftUid: $ipnftUid,
@@ -510,7 +510,7 @@ const DATA_ROOM_UPLOAD: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               uploadFile(
@@ -537,10 +537,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
+        v3 {
           activity(filters: $filters) {
             nodes {
-              ... on MoleculeActivityFileAddedV2 {
+              ... on MoleculeActivityFileAdded {
                 __typename
                 entry {
                   path
@@ -549,7 +549,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileUpdatedV2 {
+              ... on MoleculeActivityFileUpdated {
                 __typename
                 entry {
                   path
@@ -558,7 +558,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileRemovedV2 {
+              ... on MoleculeActivityFileRemoved {
                 __typename
                 entry {
                   path
@@ -567,7 +567,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityAnnouncementV2 {
+              ... on MoleculeActivityAnnouncement {
                 __typename
                 announcement {
                   id
@@ -595,11 +595,11 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             activity(filters: $filters) {
               nodes {
-                ... on MoleculeActivityFileAddedV2 {
+                ... on MoleculeActivityFileAdded {
                   __typename
                   entry {
                     path
@@ -608,7 +608,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileUpdatedV2 {
+                ... on MoleculeActivityFileUpdated {
                   __typename
                   entry {
                     path
@@ -617,7 +617,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileRemovedV2 {
+                ... on MoleculeActivityFileRemoved {
                   __typename
                   entry {
                     path
@@ -626,7 +626,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityAnnouncementV2 {
+                ... on MoleculeActivityAnnouncement {
                   __typename
                   announcement {
                     id
@@ -655,7 +655,7 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             announcements {
               create(
@@ -683,7 +683,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               uploadFile(
@@ -720,7 +720,7 @@ const UPDATE_METADATA_QUERY: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               updateFileMetadata(
@@ -753,7 +753,7 @@ const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               removeEntry(path: $path, changeBy: $changeBy) {

@@ -52,13 +52,13 @@ macro_rules! test_gql_custom_molecule {
             #[::test_group::group(elasticsearch)]
             #[::test_log::test(::kamu_search_elasticsearch::test)]
             async fn [<$test_name "_es">](es_ctx: Arc<ElasticsearchTestContext>) {
-                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx);
+                let search_variant = GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(es_ctx);
                 $test_name(search_variant).await;
             }
 
             #[::test_log::test(::tokio::test)]
             async fn [<$test_name "_src">]() {
-                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::SourceBased;
+                let search_variant = GraphQLMoleculeHarnessSearchVariant::SourceBased;
                 $test_name(search_variant).await;
             }
         }
@@ -76,7 +76,7 @@ const CREATE_PROJECT: &str = indoc!(
     r#"
     mutation ($ipnftSymbol: String!, $ipnftUid: String!, $ipnftAddress: String!, $ipnftTokenId: Int!) {
       molecule {
-        v2 {
+        v3 {
           createProject(
             ipnftSymbol: $ipnftSymbol
             ipnftUid: $ipnftUid
@@ -118,7 +118,7 @@ const DISABLE_PROJECT: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!) {
         molecule {
-            v2 {
+            v3 {
                 disableProject(ipnftUid: $ipnftUid) {
                     project { __typename }
                 }
@@ -132,7 +132,7 @@ const ENABLE_PROJECT: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!) {
         molecule {
-            v2 {
+            v3 {
                 enableProject(ipnftUid: $ipnftUid) {
                     project { __typename }
                 }
@@ -147,10 +147,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
+        v3 {
           activity(filters: $filters) {
             nodes {
-              ... on MoleculeActivityFileAddedV2 {
+              ... on MoleculeActivityFileAdded {
                 __typename
                 entry {
                   path
@@ -159,7 +159,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileUpdatedV2 {
+              ... on MoleculeActivityFileUpdated {
                 __typename
                 entry {
                   path
@@ -168,7 +168,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileRemovedV2 {
+              ... on MoleculeActivityFileRemoved {
                 __typename
                 entry {
                   path
@@ -177,7 +177,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityAnnouncementV2 {
+              ... on MoleculeActivityAnnouncement {
                 __typename
                 announcement {
                   id
@@ -213,11 +213,11 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             activity(filters: $filters) {
               nodes {
-                ... on MoleculeActivityFileAddedV2 {
+                ... on MoleculeActivityFileAdded {
                   __typename
                   entry {
                     path
@@ -226,7 +226,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileUpdatedV2 {
+                ... on MoleculeActivityFileUpdated {
                   __typename
                   entry {
                     path
@@ -235,7 +235,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileRemovedV2 {
+                ... on MoleculeActivityFileRemoved {
                   __typename
                   entry {
                     path
@@ -244,7 +244,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityAnnouncementV2 {
+                ... on MoleculeActivityAnnouncement {
                   __typename
                   announcement {
                     id
@@ -280,7 +280,7 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               uploadFile(
@@ -314,7 +314,7 @@ const MOVE_ENTRY_QUERY: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               moveEntry(fromPath: $fromPath, toPath: $toPath, changeBy: $changeBy) {
@@ -332,7 +332,7 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             announcements {
               create(
@@ -362,7 +362,7 @@ const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
     mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
-        v2 {
+        v3 {
           project(ipnftUid: $ipnftUid) {
             dataRoom {
               removeEntry(path: $path, changeBy: $changeBy) {
@@ -380,7 +380,7 @@ const SEARCH_QUERY: &str = indoc!(
     r#"
     query ($prompt: String!, $filters: MoleculeSemanticSearchFilters) {
       molecule {
-        v2 {
+        v3 {
           search(prompt: $prompt, filters: $filters) {
             totalCount
             nodes {
@@ -454,69 +454,69 @@ const SEARCH_QUERY: &str = indoc!(
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_provision_project);
+test_gql_custom_molecule!(test_molecule_provision_project);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_disable_enable_project);
+test_gql_custom_molecule!(test_molecule_disable_enable_project);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_disable_enable_project_errors);
+test_gql_custom_molecule!(test_molecule_disable_enable_project_errors);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol);
+test_gql_custom_molecule!(test_molecule_cannot_recreate_disabled_project_with_same_symbol);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_quota_exceeded);
+test_gql_custom_molecule!(test_molecule_data_room_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_operations);
+test_gql_custom_molecule!(test_molecule_data_room_operations);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_as_of_block_hash);
+test_gql_custom_molecule!(test_molecule_data_room_as_of_block_hash);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_alternative_encryption_metadata);
+test_gql_custom_molecule!(test_molecule_alternative_encryption_metadata);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_announcements_quota_exceeded);
+test_gql_custom_molecule!(test_molecule_announcements_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_announcements_operations);
+test_gql_custom_molecule!(test_molecule_announcements_operations);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity);
+test_gql_custom_molecule!(test_molecule_activity);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity_access_level_rules_filters);
+test_gql_custom_molecule!(test_molecule_activity_access_level_rules_filters);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_search);
+test_gql_custom_molecule!(test_molecule_search);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]
-async fn test_molecule_v2_dump_dataset_snapshots_src() {
+async fn test_molecule_dump_dataset_snapshots_src() {
     // NOTE: Instead of dumping the source snapshots of datasets here we create
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
     const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
-        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -543,7 +543,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let data_room_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["dataset"]["id"]
+                    data["molecule"]["v3"]["createProject"]["project"]["dataRoom"]["dataset"]["id"]
                         .as_str()
                         .unwrap(),
                 )
@@ -555,7 +555,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let announcements_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["dataset"]
+                    data["molecule"]["v3"]["createProject"]["project"]["announcements"]["dataset"]
                         ["id"]
                         .as_str()
                         .unwrap(),
@@ -587,7 +587,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
+                    data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
                         .as_str()
                         .unwrap(),
                 )
@@ -712,8 +712,8 @@ async fn dump_snapshot(
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -727,7 +727,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
         r#"
         query {
             molecule {
-                v2 {
+                v3 {
                     projects(page: 0, perPage: 100) {
                         nodes {
                             ipnftSymbol
@@ -746,7 +746,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([]),
     );
 
@@ -763,7 +763,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let res = &res.data.into_json().unwrap()["molecule"]["v2"]["createProject"];
+    let res = &res.data.into_json().unwrap()["molecule"]["v3"]["createProject"];
     let project_account_id = res["project"]["account"]["id"].as_str().unwrap();
     let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
     let data_room_did = res["project"]["dataRoom"]["dataset"]["id"]
@@ -809,7 +809,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                 r#"
                 query ($ipnftUid: String!) {
                     molecule {
-                        v2 {
+                        v3 {
                             project(ipnftUid: $ipnftUid) {
                                 account { id accountName }
                                 ipnftSymbol
@@ -830,7 +830,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
             "account": {
                 "id": project_account_id,
@@ -850,7 +850,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                 r#"
                 query ($ipnftUid: String!) {
                     molecule {
-                        v2 {
+                        v3 {
                             project(ipnftUid: $ipnftUid) {
                                 account { id accountName }
                                 ipnftSymbol
@@ -871,7 +871,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
             "account": {
                 "id": project_account_id,
@@ -891,7 +891,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
             "ipnftSymbol": "vitafast",
             "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
@@ -912,7 +912,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
             "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
@@ -934,7 +934,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
             "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
@@ -957,7 +957,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -968,7 +968,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([
             {
                 "ipnftSymbol": "vitafast",
@@ -984,12 +984,10 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_disable_enable_project(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
-) {
+async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1026,16 +1024,13 @@ async fn test_molecule_v2_disable_enable_project(
         .projects_metadata_chain_len(&projects_dataset_alias)
         .await;
 
-    async fn query_project(
-        harness: &GraphQLMoleculeV2Harness,
-        uid: &str,
-    ) -> async_graphql::Response {
+    async fn query_project(harness: &GraphQLMoleculeHarness, uid: &str) -> async_graphql::Response {
         GraphQLQueryRequest::new(
             indoc!(
                 r#"
                 query ($ipnftUid: String!) {
                     molecule {
-                        v2 {
+                        v3 {
                             project(ipnftUid: $ipnftUid) {
                                 ipnftUid
                                 ipnftSymbol
@@ -1060,8 +1055,8 @@ async fn test_molecule_v2_disable_enable_project(
     assert!(res.is_ok(), "{res:#?}");
     let disable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        disable_res["molecule"]["v2"]["disableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        disable_res["molecule"]["v3"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     // Trying to disable disabled account will return error
@@ -1072,7 +1067,7 @@ async fn test_molecule_v2_disable_enable_project(
         .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
+    assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
     pretty_assertions::assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
 
     // Project is no longer visible in the listing
@@ -1081,7 +1076,7 @@ async fn test_molecule_v2_disable_enable_project(
             r#"
             query {
                 molecule {
-                    v2 {
+                    v3 {
                         projects(page: 0, perPage: 100) {
                             nodes { ipnftUid }
                         }
@@ -1095,7 +1090,7 @@ async fn test_molecule_v2_disable_enable_project(
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([]),
     );
 
@@ -1103,7 +1098,7 @@ async fn test_molecule_v2_disable_enable_project(
     let res = query_project(&harness, ipnft_uid).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!(null),
     );
 
@@ -1117,8 +1112,8 @@ async fn test_molecule_v2_disable_enable_project(
         assert!(res.is_ok(), "{res:#?}");
         let enable_res = res.data.into_json().unwrap();
         pretty_assertions::assert_eq!(
-            enable_res["molecule"]["v2"]["enableProject"]["project"],
-            json!({ "__typename": "MoleculeProjectMutV2" }),
+            enable_res["molecule"]["v3"]["enableProject"]["project"],
+            json!({ "__typename": "MoleculeProjectMut" }),
         );
     }
 
@@ -1134,7 +1129,7 @@ async fn test_molecule_v2_disable_enable_project(
             r#"
             query {
                 molecule {
-                    v2 {
+                    v3 {
                         projects(page: 0, perPage: 100) {
                             nodes { ipnftUid }
                         }
@@ -1148,7 +1143,7 @@ async fn test_molecule_v2_disable_enable_project(
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
             "ipnftUid": ipnft_uid,
         }]),
@@ -1157,7 +1152,7 @@ async fn test_molecule_v2_disable_enable_project(
     let res = query_project(&harness, ipnft_uid).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
             "ipnftUid": ipnft_uid,
             "ipnftSymbol": "vitafast",
@@ -1167,10 +1162,10 @@ async fn test_molecule_v2_disable_enable_project(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_disable_enable_project_errors(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_disable_enable_project_errors(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1189,7 +1184,7 @@ async fn test_molecule_v2_disable_enable_project_errors(
     .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
+    assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
     pretty_assertions::assert_eq!(disable_error, format!("Project {missing_uid} not found"));
 
     let res = GraphQLQueryRequest::new(
@@ -1201,7 +1196,7 @@ async fn test_molecule_v2_disable_enable_project_errors(
     .await;
     let enable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
+    assert!(res_json["molecule"]["v3"]["enableProject"].is_null());
     pretty_assertions::assert_eq!(
         enable_error,
         format!("No historical entries for project {missing_uid}")
@@ -1210,10 +1205,10 @@ async fn test_molecule_v2_disable_enable_project_errors(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1236,7 +1231,7 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
         .await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -1262,7 +1257,7 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
             "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
@@ -1273,12 +1268,12 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_quota_exceeded(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_data_room_quota_exceeded(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
@@ -1331,7 +1326,7 @@ async fn test_molecule_v2_data_room_quota_exceeded(
                 r#"
                 mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
                   molecule {
-                    v2 {
+                    v3 {
                       project(ipnftUid: $ipnftUid) {
                         dataRoom {
                           uploadFile(
@@ -1365,7 +1360,7 @@ async fn test_molecule_v2_data_room_quota_exceeded(
         )
         .await;
 
-    let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
+    let payload = upload_res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]
         ["uploadFile"]
         .clone();
     pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
@@ -1376,12 +1371,10 @@ async fn test_molecule_v2_data_room_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_operations(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
-) {
+async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarnessSearchVariant) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1401,7 +1394,7 @@ async fn test_molecule_v2_data_room_operations(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -1416,7 +1409,7 @@ async fn test_molecule_v2_data_room_operations(
         r#"
         mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   uploadFile(
@@ -1544,16 +1537,16 @@ async fn test_molecule_v2_data_room_operations(
 
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
             "isSuccess": true,
@@ -1626,7 +1619,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -1681,7 +1674,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -1704,7 +1697,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -1721,7 +1714,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -1736,7 +1729,7 @@ async fn test_molecule_v2_data_room_operations(
                 r#"
                 mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
-                    v2 {
+                    v3 {
                       project(ipnftUid: $ipnftUid) {
                         dataRoom {
                           uploadFile(
@@ -1821,16 +1814,16 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_2_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_2_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -1872,7 +1865,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -1881,7 +1874,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -1904,7 +1897,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -1921,7 +1914,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -1936,7 +1929,7 @@ async fn test_molecule_v2_data_room_operations(
                 r#"
                 mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
-                    v2 {
+                    v3 {
                       project(ipnftUid: $ipnftUid) {
                         dataRoom {
                           uploadFile(
@@ -2006,16 +1999,16 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_3_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_3_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -2047,7 +2040,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2056,7 +2049,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2065,7 +2058,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2088,7 +2081,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2105,7 +2098,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2117,7 +2110,7 @@ async fn test_molecule_v2_data_room_operations(
         r#"
         query ($ipnftUid: String!, $filters: MoleculeDataRoomEntriesFilters) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   latest {
@@ -2159,7 +2152,7 @@ async fn test_molecule_v2_data_room_operations(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": [
@@ -2218,7 +2211,7 @@ async fn test_molecule_v2_data_room_operations(
         r#"
         mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   uploadFile(
@@ -2298,7 +2291,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -2347,12 +2340,12 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -2394,7 +2387,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2403,7 +2396,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2412,7 +2405,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2421,7 +2414,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2444,7 +2437,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2461,7 +2454,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2475,7 +2468,7 @@ async fn test_molecule_v2_data_room_operations(
                 r#"
                 query ($ipnftUid: String!) {
                   molecule {
-                    v2 {
+                    v3 {
                       project(ipnftUid: $ipnftUid) {
                         dataRoom {
                           latest {
@@ -2525,7 +2518,7 @@ async fn test_molecule_v2_data_room_operations(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/foo.txt",
             "ref": file_1_did,
@@ -2565,7 +2558,7 @@ async fn test_molecule_v2_data_room_operations(
                 r#"
                 query ($ipnftUid: String!) {
                   molecule {
-                    v2 {
+                    v3 {
                       project(ipnftUid: $ipnftUid) {
                         dataRoom {
                           latest {
@@ -2615,7 +2608,7 @@ async fn test_molecule_v2_data_room_operations(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/baz.txt",
             "ref": file_3_did,
@@ -2657,7 +2650,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2687,7 +2680,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2717,7 +2710,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2790,7 +2783,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2801,7 +2794,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -2810,7 +2803,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2819,7 +2812,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2828,7 +2821,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2837,7 +2830,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2860,7 +2853,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2877,7 +2870,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2899,7 +2892,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2921,7 +2914,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -2989,7 +2982,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3057,7 +3050,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3125,7 +3118,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3193,7 +3186,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3261,7 +3254,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3329,7 +3322,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3397,7 +3390,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3465,7 +3458,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -3488,7 +3481,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3560,7 +3553,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -3589,7 +3582,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -3615,7 +3608,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3657,7 +3650,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -3666,7 +3659,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -3675,7 +3668,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -3684,7 +3677,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -3693,7 +3686,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -3702,7 +3695,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -3725,7 +3718,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -3742,7 +3735,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -3756,7 +3749,7 @@ async fn test_molecule_v2_data_room_operations(
         r#"
         mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   updateFileMetadata(
@@ -3825,7 +3818,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -3861,7 +3854,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -3908,7 +3901,7 @@ async fn test_molecule_v2_data_room_operations(
     .unwrap();
 
     let cas_failure_payload =
-        &cas_failure_res["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"];
+        &cas_failure_res["molecule"]["v3"]["project"]["dataRoom"]["updateFileMetadata"];
     pretty_assertions::assert_eq!(
         cas_failure_payload["__typename"],
         "UpdateVersionErrorCasFailed"
@@ -3938,7 +3931,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -4014,7 +4007,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -4023,7 +4016,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -4032,7 +4025,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -4041,7 +4034,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -4050,7 +4043,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -4059,7 +4052,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -4068,7 +4061,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -4091,7 +4084,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -4108,7 +4101,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -4126,12 +4119,12 @@ async fn test_molecule_v2_data_room_operations(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_as_of_block_hash(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_data_room_as_of_block_hash(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -4149,7 +4142,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .await;
     assert!(create_res.is_ok(), "{create_res:#?}");
 
-    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]
+    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]
         ["project"]["dataRoom"]["dataset"]["id"]
         .as_str()
         .unwrap()
@@ -4182,10 +4175,10 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     .await;
     let upload_1_data = upload_1_res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        upload_1_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did = upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did = upload_1_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
@@ -4211,7 +4204,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         r#"
         mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   updateFileMetadata(
@@ -4254,7 +4247,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -4275,7 +4268,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         r#"
         query ($ipnftUid: String!) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   latest {
@@ -4310,7 +4303,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "latest": {
@@ -4347,7 +4340,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     .await;
     let upload_2_data = upload_2_res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        upload_2_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        upload_2_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
 
@@ -4357,7 +4350,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         r#"
         query ($dataRoomBlockHash: Multihash!, $fileBlockHash: Multihash!) {
           molecule {
-            v2 {
+            v3 {
               projects(page: 0, perPage: 100) {
                 nodes {
                   dataRoom {
@@ -4396,7 +4389,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "projects": {
                         "nodes": [{
                             "dataRoom": {
@@ -4424,12 +4417,12 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_alternative_encryption_metadata(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_alternative_encryption_metadata(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -4449,7 +4442,7 @@ async fn test_molecule_v2_alternative_encryption_metadata(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -4469,7 +4462,7 @@ async fn test_molecule_v2_alternative_encryption_metadata(
             $encryptionMetadata: MoleculeEncryptionMetadataInput!,
         ) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   uploadFile(
@@ -4560,16 +4553,16 @@ async fn test_molecule_v2_alternative_encryption_metadata(
 
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
             "isSuccess": true,
@@ -4612,12 +4605,12 @@ async fn test_molecule_v2_alternative_encryption_metadata(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_announcements_quota_exceeded(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_announcements_quota_exceeded(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
     let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
@@ -4676,7 +4669,7 @@ async fn test_molecule_v2_announcements_quota_exceeded(
         ))
         .await;
 
-    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
+    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v3"]["project"]
         ["announcements"]["create"]
         .clone();
     pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
@@ -4686,10 +4679,10 @@ async fn test_molecule_v2_announcements_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_announcements_operations(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_announcements_operations(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -4715,7 +4708,7 @@ async fn test_molecule_v2_announcements_operations(
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -4725,7 +4718,7 @@ async fn test_molecule_v2_announcements_operations(
         r#"
         query ($ipnftUid: String!, $filters: MoleculeAnnouncementsFilters) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 announcements {
                   tail(filters: $filters) {
@@ -4765,7 +4758,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -4812,7 +4805,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -4866,7 +4859,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -4908,7 +4901,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -4949,7 +4942,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -4993,7 +4986,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -5038,7 +5031,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "create": {
@@ -5115,7 +5108,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5133,7 +5126,7 @@ async fn test_molecule_v2_announcements_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_3_id,
                         "headline": "Test announcement 3",
@@ -5171,7 +5164,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_2_id,
                         "headline": "Test announcement 2",
@@ -5197,7 +5190,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -5210,7 +5203,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -5219,7 +5212,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -5243,7 +5236,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -5260,7 +5253,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -5289,7 +5282,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5321,7 +5314,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5398,7 +5391,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5475,7 +5468,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5552,7 +5545,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5629,7 +5622,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5706,7 +5699,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5783,7 +5776,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5860,7 +5853,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5937,7 +5930,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -6015,7 +6008,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -6077,8 +6070,8 @@ async fn test_molecule_v2_announcements_operations(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -6104,7 +6097,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             .await
             .into_json_data();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -6129,7 +6122,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6146,7 +6139,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6186,7 +6179,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -6239,7 +6232,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -6267,7 +6260,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6276,7 +6269,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6299,7 +6292,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6316,7 +6309,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6328,7 +6321,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         r#"
         mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $categories: [String!], $tags: [String!]) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   uploadFile(
@@ -6368,7 +6361,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6399,7 +6392,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6419,7 +6412,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6428,7 +6421,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6437,7 +6430,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6446,7 +6439,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6469,7 +6462,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6486,7 +6479,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6509,7 +6502,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -6529,7 +6522,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6538,7 +6531,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6547,7 +6540,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6556,7 +6549,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6565,7 +6558,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6588,7 +6581,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6605,7 +6598,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6632,7 +6625,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -6659,7 +6652,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -6697,7 +6690,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6706,7 +6699,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6715,7 +6708,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6724,7 +6717,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6733,7 +6726,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6758,7 +6751,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6777,7 +6770,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6803,7 +6796,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6823,7 +6816,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6832,7 +6825,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -6870,7 +6863,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6879,7 +6872,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6888,7 +6881,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6897,7 +6890,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6906,7 +6899,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6931,7 +6924,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6950,7 +6943,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6972,7 +6965,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -6994,7 +6987,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7003,7 +6996,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7012,7 +7005,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -7050,7 +7043,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7059,7 +7052,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7068,7 +7061,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7077,7 +7070,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7086,7 +7079,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7111,7 +7104,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -7130,7 +7123,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -7157,7 +7150,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -7182,7 +7175,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -7218,12 +7211,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_2_announcement_1_id,
                                         "headline": "Test announcement 2",
@@ -7246,7 +7239,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
     // Check global activity events
     let expected_all_global_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
@@ -7259,7 +7252,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7268,7 +7261,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7277,7 +7270,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7315,7 +7308,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7324,7 +7317,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7333,7 +7326,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7342,7 +7335,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7351,7 +7344,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7374,7 +7367,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                     }
@@ -7385,7 +7378,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_global_file_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7394,7 +7387,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7403,7 +7396,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7412,7 +7405,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7421,7 +7414,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7430,7 +7423,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7439,7 +7432,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7451,7 +7444,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_global_announcement_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
@@ -7464,7 +7457,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7518,7 +7511,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_global_file_activity_nodes
                     }
@@ -7544,7 +7537,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_global_announcement_activity_nodes
                     }
@@ -7559,7 +7552,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_all_project_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7568,7 +7561,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7577,7 +7570,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7615,7 +7608,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7624,7 +7617,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7633,7 +7626,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7642,7 +7635,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7651,7 +7644,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7663,7 +7656,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_project_file_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7672,7 +7665,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7681,7 +7674,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7690,7 +7683,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7699,7 +7692,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7708,7 +7701,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7717,7 +7710,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7729,7 +7722,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_project_announcement_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7787,7 +7780,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -7816,7 +7809,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -7843,7 +7836,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_project_file_activity_nodes
@@ -7872,7 +7865,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_project_announcement_activity_nodes
@@ -7903,12 +7896,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_2_announcement_1_id,
                                 //         "headline": "Test announcement 2",
@@ -7921,7 +7914,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -7930,7 +7923,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -7939,7 +7932,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -7977,7 +7970,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -7986,7 +7979,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -7995,7 +7988,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8004,7 +7997,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8013,7 +8006,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8047,12 +8040,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8061,7 +8054,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8070,7 +8063,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8108,7 +8101,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8117,7 +8110,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8126,7 +8119,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8135,7 +8128,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8144,7 +8137,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8178,12 +8171,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8192,7 +8185,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8201,7 +8194,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8239,7 +8232,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8248,7 +8241,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8257,7 +8250,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8266,7 +8259,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8275,7 +8268,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8309,12 +8302,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8322,7 +8315,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8330,7 +8323,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8368,7 +8361,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8376,7 +8369,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8384,7 +8377,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8392,7 +8385,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8400,7 +8393,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8433,12 +8426,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8447,7 +8440,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8456,7 +8449,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_1_announcement_1_id,
                                 //         "headline": "Test announcement 1",
@@ -8479,7 +8472,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8488,7 +8481,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8497,7 +8490,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8506,7 +8499,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8515,7 +8508,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8549,12 +8542,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8563,7 +8556,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8572,7 +8565,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8610,7 +8603,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                      }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8619,7 +8612,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8628,7 +8621,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8637,7 +8630,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8646,7 +8639,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8680,12 +8673,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8694,7 +8687,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8703,7 +8696,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8741,7 +8734,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8750,7 +8743,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8759,7 +8752,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8768,7 +8761,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8777,7 +8770,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8811,12 +8804,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8825,7 +8818,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8834,7 +8827,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_1_announcement_1_id,
                                 //         "headline": "Test announcement 1",
@@ -8857,7 +8850,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8866,7 +8859,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8875,7 +8868,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8884,7 +8877,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8893,7 +8886,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8929,7 +8922,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -8960,12 +8953,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8974,7 +8967,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8983,7 +8976,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -9021,7 +9014,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9030,7 +9023,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -9039,7 +9032,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9048,7 +9041,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -9057,7 +9050,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9096,7 +9089,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .clone()
@@ -9125,7 +9118,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .clone()
@@ -9154,11 +9147,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_2_announcement_1_id,
                             //         "headline": "Test announcement 2",
@@ -9171,7 +9164,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9180,7 +9173,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9189,7 +9182,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9227,7 +9220,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9236,7 +9229,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9245,7 +9238,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9254,7 +9247,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9263,7 +9256,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9295,11 +9288,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9312,7 +9305,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9321,7 +9314,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9330,7 +9323,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9368,7 +9361,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9377,7 +9370,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9386,7 +9379,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9395,7 +9388,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9404,7 +9397,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9436,11 +9429,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "__typename": "MoleculeActivityAnnouncement",
                                  "announcement": {
                                      "id": project_2_announcement_1_id,
                                      "headline": "Test announcement 2",
@@ -9453,7 +9446,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9462,7 +9455,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9471,7 +9464,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9509,7 +9502,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9518,7 +9511,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9527,7 +9520,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9536,7 +9529,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9545,7 +9538,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9577,11 +9570,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9594,7 +9587,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9603,7 +9596,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9612,7 +9605,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9650,7 +9643,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9659,7 +9652,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9668,7 +9661,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9677,7 +9670,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9686,7 +9679,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9718,11 +9711,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9735,7 +9728,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileRemovedV2",
+                                "__typename": "MoleculeActivityFileRemoved",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9744,7 +9737,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9753,7 +9746,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -9776,7 +9769,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9785,7 +9778,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9794,7 +9787,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9803,7 +9796,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9812,7 +9805,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9844,11 +9837,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9861,7 +9854,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                 "__typename": "MoleculeActivityFileRemovedV2",
+                                 "__typename": "MoleculeActivityFileRemoved",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9870,7 +9863,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9879,7 +9872,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9917,7 +9910,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9926,7 +9919,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                 "__typename": "MoleculeActivityFileUpdatedV2",
+                                 "__typename": "MoleculeActivityFileUpdated",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9935,7 +9928,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9944,7 +9937,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                 "__typename": "MoleculeActivityFileAddedV2",
+                                 "__typename": "MoleculeActivityFileAdded",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9953,7 +9946,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9985,11 +9978,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_2_announcement_1_id,
                             //         "headline": "Test announcement 2",
@@ -10002,7 +9995,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10011,7 +10004,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10020,7 +10013,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -10058,7 +10051,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10067,7 +10060,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10076,7 +10069,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10085,7 +10078,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10094,7 +10087,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10126,11 +10119,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -10143,7 +10136,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileRemovedV2",
+                                "__typename": "MoleculeActivityFileRemoved",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10152,7 +10145,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10161,7 +10154,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -10184,7 +10177,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10193,7 +10186,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10202,7 +10195,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10211,7 +10204,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10220,7 +10213,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10254,7 +10247,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .into_json()
@@ -10282,11 +10275,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -10299,7 +10292,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10308,7 +10301,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10317,7 +10310,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -10340,7 +10333,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10349,7 +10342,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10358,7 +10351,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10367,7 +10360,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10376,7 +10369,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10394,10 +10387,10 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity_access_level_rules_filters(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_activity_access_level_rules_filters(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -10436,14 +10429,14 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                 .into_json()
                 .unwrap();
 
-                res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+                res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
             },
             Some(true),
         );
     }
 
     async fn create_file(
-        harness: &GraphQLMoleculeV2Harness,
+        harness: &GraphQLMoleculeHarness,
         ipnft_uid: &str,
         path: &str,
         access_level: &str,
@@ -10469,7 +10462,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
 
         upload_file_node["entry"]["ref"]
             .take()
@@ -10505,11 +10498,11 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p2-private.txt",
                                     "ref": project_2_private,
@@ -10518,7 +10511,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p1-holders.txt",
                                     "ref": project_1_holders,
@@ -10527,7 +10520,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p1-public.txt",
                                     "ref": project_1_public,
@@ -10545,15 +10538,15 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
+async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVariant) {
     // NOTE: In this test, we allow different orderings in some places where the
     //       sequence of results may vary.
     let elasticsearch_backed = match &search_variant {
-        GraphQLMoleculeV2HarnessSearchVariant::SourceBased => false,
-        GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(_) => true,
+        GraphQLMoleculeHarnessSearchVariant::SourceBased => false,
+        GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(_) => true,
     };
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -10581,7 +10574,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -10619,7 +10612,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -10672,7 +10665,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -10699,7 +10692,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         r#"
         mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
           molecule {
-            v2 {
+            v3 {
               project(ipnftUid: $ipnftUid) {
                 dataRoom {
                   uploadFile(
@@ -10741,7 +10734,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -10773,7 +10766,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -10803,7 +10796,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -10837,7 +10830,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -10873,7 +10866,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -10907,7 +10900,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -10932,7 +10925,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -10976,7 +10969,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11540,8 +11533,8 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
 
 #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 8))]
 async fn test_competitive_writing_of_global_activities_src_multi_thread() {
-    let harness = GraphQLMoleculeV2Harness::builder()
-        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -11567,7 +11560,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -11610,7 +11603,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11665,7 +11658,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11706,7 +11699,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
             .into_json()
             .unwrap();
 
-            let mut nodes = res_json["molecule"]["v2"]["activity"]["nodes"].take();
+            let mut nodes = res_json["molecule"]["v3"]["activity"]["nodes"].take();
 
             use serde_json::Value;
 
@@ -11724,7 +11717,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         },
         json!([
             {
-                "__typename": "MoleculeActivityFileAddedV2",
+                "__typename": "MoleculeActivityFileAdded",
                 "entry": {
                     "path": "/bar.txt",
                     "ref": project_1_file_2_dataset_id,
@@ -11733,7 +11726,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
                 }
             },
             {
-                "__typename": "MoleculeActivityFileAddedV2",
+                "__typename": "MoleculeActivityFileAdded",
                 "entry": {
                     "path": "/foo.txt",
                     "ref": project_1_file_1_dataset_id,
@@ -11747,14 +11740,14 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity_announcements_search_disabled_projects);
+test_gql_custom_molecule!(test_molecule_activity_announcements_search_disabled_projects);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity_announcements_search_disabled_projects(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_activity_announcements_search_disabled_projects(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -11780,7 +11773,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -11818,7 +11811,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11860,7 +11853,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -11888,7 +11881,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -11901,7 +11894,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -11924,7 +11917,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -12008,8 +12001,8 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
     assert!(res.is_ok(), "{res:#?}");
     let disable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        disable_res["molecule"]["v2"]["disableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        disable_res["molecule"]["v3"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     harness.synchronize_agents().await;
@@ -12028,7 +12021,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         value!({
             "molecule": {
 
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": []
                     }
@@ -12055,8 +12048,8 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
     assert!(res.is_ok(), "{res:#?}");
     let enable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        enable_res["molecule"]["v2"]["enableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        enable_res["molecule"]["v3"]["enableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     harness.synchronize_agents().await;
@@ -12074,7 +12067,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -12096,13 +12089,13 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum GraphQLMoleculeV2HarnessSearchVariant {
+enum GraphQLMoleculeHarnessSearchVariant {
     SourceBased,
     ElasticsearchBased(Arc<ElasticsearchTestContext>),
 }
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct GraphQLMoleculeV2Harness {
+struct GraphQLMoleculeHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     maybe_es_base_harness: Option<ElasticsearchBaseHarness>,
     schema: kamu_adapter_graphql::Schema,
@@ -12112,10 +12105,10 @@ struct GraphQLMoleculeV2Harness {
 }
 
 #[bon]
-impl GraphQLMoleculeV2Harness {
+impl GraphQLMoleculeHarness {
     #[builder]
     async fn new(
-        search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+        search_variant: GraphQLMoleculeHarnessSearchVariant,
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
         #[builder(default = PredefinedAccountOpts {
@@ -12125,8 +12118,8 @@ impl GraphQLMoleculeV2Harness {
         predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let maybe_es_base_harness = match search_variant {
-            GraphQLMoleculeV2HarnessSearchVariant::SourceBased => None,
-            GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx) => Some(
+            GraphQLMoleculeHarnessSearchVariant::SourceBased => None,
+            GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(es_ctx) => Some(
                 ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default),
             ),
         };
@@ -12313,7 +12306,7 @@ impl GraphQLMoleculeV2Harness {
         .data;
 
         let json_value = gql_value.into_json().unwrap();
-        json_value["molecule"]["v2"]["search"].clone()
+        json_value["molecule"]["v3"]["search"].clone()
     }
 
     async fn synchronize_agents(&self) {

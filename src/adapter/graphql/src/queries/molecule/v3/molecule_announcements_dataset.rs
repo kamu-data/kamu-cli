@@ -23,14 +23,14 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::Dataset;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevel,
     MoleculeAccessLevelRuleInput,
     MoleculeAnnouncementId,
     MoleculeCategory,
     MoleculeChangeBy,
     MoleculeDataRoomEntry,
-    MoleculeProjectV2,
+    MoleculeProject,
     MoleculeTag,
 };
 
@@ -38,7 +38,7 @@ use crate::queries::molecule::v2::{
 
 pub struct MoleculeAnnouncements {
     pub dataset: Dataset,
-    pub project: Arc<MoleculeProjectV2>,
+    pub project: Arc<MoleculeProject>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -136,12 +136,12 @@ impl MoleculeAnnouncements {
 
 pub struct MoleculeAnnouncementEntry {
     pub entity: kamu_molecule_domain::MoleculeAnnouncement,
-    pub project: Arc<MoleculeProjectV2>,
+    pub project: Arc<MoleculeProject>,
 }
 
 impl MoleculeAnnouncementEntry {
     pub fn new_from_global_announcement(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         global_entity: kamu_molecule_domain::MoleculeGlobalAnnouncement,
     ) -> Self {
         Self {
@@ -151,7 +151,7 @@ impl MoleculeAnnouncementEntry {
     }
 
     pub fn new_from_announcement(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         entity: kamu_molecule_domain::MoleculeAnnouncement,
     ) -> Self {
         Self {
@@ -164,7 +164,7 @@ impl MoleculeAnnouncementEntry {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementEntry {
-    async fn project(&self) -> &MoleculeProjectV2 {
+    async fn project(&self) -> &MoleculeProject {
         self.project.as_ref()
     }
 

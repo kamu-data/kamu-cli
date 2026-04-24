@@ -954,7 +954,7 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 }
 
 type CreateProjectErrorConflict implements CreateProjectResult {
-	project: MoleculeProjectV2!
+	project: MoleculeProject!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -965,7 +965,7 @@ interface CreateProjectResult {
 }
 
 type CreateProjectSuccess implements CreateProjectResult {
-	project: MoleculeProjectV2!
+	project: MoleculeProject!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -3171,9 +3171,9 @@ type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 
 type Molecule {
 	"""
-	2-nd Molecule API version (query).
+	3rd Molecule API version (query).
 	"""
-	v2: MoleculeV2!
+	v3: MoleculeV3!
 }
 
 input MoleculeAccessLevelRuleInput {
@@ -3181,37 +3181,37 @@ input MoleculeAccessLevelRuleInput {
 	accessLevels: [String!]!
 }
 
-type MoleculeActivityAnnouncementV2 {
+type MoleculeActivityAnnouncement {
 	announcement: MoleculeAnnouncementEntry!
 }
 
-union MoleculeActivityEventV2 = MoleculeActivityFileAddedV2 | MoleculeActivityFileUpdatedV2 | MoleculeActivityFileRemovedV2 | MoleculeActivityAnnouncementV2
+union MoleculeActivityEvent = MoleculeActivityFileAdded | MoleculeActivityFileUpdated | MoleculeActivityFileRemoved | MoleculeActivityAnnouncement
 
-type MoleculeActivityEventV2Connection {
+type MoleculeActivityEventConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeActivityEventV2!]!
+	nodes: [MoleculeActivityEvent!]!
 	"""
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeActivityEventV2Edge!]!
+	edges: [MoleculeActivityEventEdge!]!
 }
 
-type MoleculeActivityEventV2Edge {
-	node: MoleculeActivityEventV2!
+type MoleculeActivityEventEdge {
+	node: MoleculeActivityEvent!
 }
 
-type MoleculeActivityFileAddedV2 {
+type MoleculeActivityFileAdded {
 	entry: MoleculeDataRoomEntry!
 }
 
-type MoleculeActivityFileRemovedV2 {
+type MoleculeActivityFileRemoved {
 	entry: MoleculeDataRoomEntry!
 }
 
-type MoleculeActivityFileUpdatedV2 {
+type MoleculeActivityFileUpdated {
 	entry: MoleculeDataRoomEntry!
 }
 
@@ -3221,7 +3221,7 @@ enum MoleculeActivityKindInput {
 }
 
 type MoleculeAnnouncementEntry {
-	project: MoleculeProjectV2!
+	project: MoleculeProject!
 	systemTime: DateTime!
 	eventTime: DateTime!
 	id: String!
@@ -3263,7 +3263,7 @@ type MoleculeAnnouncements {
 	byId(id: String!): MoleculeAnnouncementEntry
 }
 
-type MoleculeAnnouncementsDatasetMutV2 {
+type MoleculeAnnouncementsDatasetMut {
 	"""
 	Creates an announcement record for the project.
 	"""
@@ -3302,7 +3302,7 @@ type MoleculeDataRoomEntry {
 	"""
 	Backlink to the project
 	"""
-	project: MoleculeProjectV2!
+	project: MoleculeProject!
 	"""
 	Access the linked core Dataset
 	"""
@@ -3352,7 +3352,7 @@ interface MoleculeDataRoomMoveEntryResult {
 	message: String!
 }
 
-type MoleculeDataRoomMutV2 {
+type MoleculeDataRoomMut {
 	"""
 	Allows creating a file, upload a new version, and link a file into the
 	data room via a single transaction. Uploads a new version of content
@@ -3498,12 +3498,12 @@ input MoleculeEncryptionMetadataInput {
 
 type MoleculeMut {
 	"""
-	2-nd Molecule API version (mutation).
+	3rd Molecule API version (mutation).
 	"""
-	v2: MoleculeMutV2!
+	v3: MoleculeMutV3!
 }
 
-type MoleculeMutV2 {
+type MoleculeMutV3 {
 	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
 	"""
 	Retracts a project from the `projects` dataset.
@@ -3511,39 +3511,15 @@ type MoleculeMutV2 {
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	disableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
-	enableProject(ipnftUid: String!): MoleculeProjectMutationResultV2!
+	disableProject(ipnftUid: String!): MoleculeProjectMutationResult!
+	enableProject(ipnftUid: String!): MoleculeProjectMutationResult!
 	"""
 	Looks up the project
 	"""
-	project(ipnftUid: String!): MoleculeProjectMutV2
+	project(ipnftUid: String!): MoleculeProjectMut
 }
 
-input MoleculeProjectActivityFilters {
-	byTags: [String!]
-	byCategories: [String!]
-	byAccessLevels: [String!]
-	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
-	byKinds: [MoleculeActivityKindInput!]
-}
-
-type MoleculeProjectMutV2 {
-	"""
-	Strongly typed data room mutator
-	"""
-	dataRoom: MoleculeDataRoomMutV2!
-	"""
-	Strongly typed announcements mutator
-	"""
-	announcements: MoleculeAnnouncementsDatasetMutV2!
-}
-
-type MoleculeProjectMutationResultV2 {
-	project: MoleculeProjectMutV2!
-	message: String!
-}
-
-type MoleculeProjectV2 {
+type MoleculeProject {
 	"""
 	System time when this project was created/updated
 	"""
@@ -3583,14 +3559,22 @@ type MoleculeProjectV2 {
 	"""
 	Project's activity events in reverse chronological order
 	"""
-	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventConnection!
 }
 
-type MoleculeProjectV2Connection {
+input MoleculeProjectActivityFilters {
+	byTags: [String!]
+	byCategories: [String!]
+	byAccessLevels: [String!]
+	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
+	byKinds: [MoleculeActivityKindInput!]
+}
+
+type MoleculeProjectConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MoleculeProjectV2!]!
+	nodes: [MoleculeProject!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -3599,11 +3583,27 @@ type MoleculeProjectV2Connection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
-	edges: [MoleculeProjectV2Edge!]!
+	edges: [MoleculeProjectEdge!]!
 }
 
-type MoleculeProjectV2Edge {
-	node: MoleculeProjectV2!
+type MoleculeProjectEdge {
+	node: MoleculeProject!
+}
+
+type MoleculeProjectMut {
+	"""
+	Strongly typed data room mutator
+	"""
+	dataRoom: MoleculeDataRoomMut!
+	"""
+	Strongly typed announcements mutator
+	"""
+	announcements: MoleculeAnnouncementsDatasetMut!
+}
+
+type MoleculeProjectMutationResult {
+	project: MoleculeProjectMut!
+	message: String!
 }
 
 type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & MoleculeDataRoomMoveEntryResult & MoleculeDataRoomRemoveEntryResult & MoleculeDataRoomUpdateFileMetadataResult {
@@ -3662,20 +3662,20 @@ type MoleculeSemanticSearchHitEdge {
 	node: MoleculeSemanticSearchHit!
 }
 
-type MoleculeV2 {
+type MoleculeV3 {
 	"""
 	Looks up the project
 	"""
-	project(ipnftUid: String!): MoleculeProjectV2
+	project(ipnftUid: String!): MoleculeProject
 	"""
 	List the registered projects
 	"""
-	projects(page: Int, perPage: Int): MoleculeProjectV2Connection!
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
 	"""
 	Latest activity events across all projects in reverse chronological
 	order
 	"""
-	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventV2Connection!
+	activity(page: Int, perPage: Int, filters: MoleculeProjectActivityFilters): MoleculeActivityEventConnection!
 	"""
 	Performs a semantic search
 	Using `filters` parameters, a search can be narrowed down to:

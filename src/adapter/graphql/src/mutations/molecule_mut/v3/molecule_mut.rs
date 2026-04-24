@@ -11,21 +11,22 @@ use kamu_molecule_domain::*;
 use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
-use crate::mutations::molecule_mut::v2::{MoleculeProjectMutV2, MoleculeProjectMutationResultV2};
+use crate::mutations::molecule_mut::v3::{MoleculeProjectMut, MoleculeProjectMutationResult};
 use crate::prelude::*;
-use crate::queries::molecule::v2::MoleculeProjectV2;
+use crate::queries::molecule::v3::MoleculeProject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeMutV2;
+// NOTE: MoleculeMut GQL name is already taken by a top-level type
+pub struct MoleculeMutV3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeMutV2 {
+impl MoleculeMutV3 {
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV2_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
     async fn create_project(
         &self,
         ctx: &Context<'_>,
@@ -54,9 +55,9 @@ impl MoleculeMutV2 {
             )
             .await
         {
-            Ok(project_entity) => MoleculeProjectV2::new(project_entity),
+            Ok(project_entity) => MoleculeProject::new(project_entity),
             Err(MoleculeCreateProjectError::Conflict { project }) => {
-                let project = MoleculeProjectV2::new(project);
+                let project = MoleculeProject::new(project);
                 return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
                     project,
                 }));
@@ -77,12 +78,12 @@ impl MoleculeMutV2 {
     /// its symbol will remain reserved, data will remain intact,
     /// but the project will no longer appear in the listing.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV2_disable_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_disable_project, skip_all, fields(?ipnft_uid))]
     async fn disable_project(
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectMutationResultV2> {
+    ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, disable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeDisableProjectUseCase);
@@ -96,19 +97,19 @@ impl MoleculeMutV2 {
             .await
             .map_err(|err| map_disable_error(err, &ipnft_uid))?;
 
-        Ok(MoleculeProjectMutationResultV2::from_entity(
+        Ok(MoleculeProjectMutationResult::from_entity(
             project,
             "Project disabled successfully".to_string(),
         ))
     }
 
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV2_enable_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_enable_project, skip_all, fields(?ipnft_uid))]
     async fn enable_project(
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<MoleculeProjectMutationResultV2> {
+    ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, enable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeEnableProjectUseCase);
@@ -122,19 +123,19 @@ impl MoleculeMutV2 {
             .await
             .map_err(|err| map_enable_error(err, &ipnft_uid))?;
 
-        Ok(MoleculeProjectMutationResultV2::from_entity(
+        Ok(MoleculeProjectMutationResult::from_entity(
             project,
             "Project enabled successfully".to_string(),
         ))
     }
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = MoleculeMutV2_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_project, skip_all, fields(?ipnft_uid))]
     async fn project(
         &self,
         ctx: &Context<'_>,
         ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectMutV2>> {
+    ) -> Result<Option<MoleculeProjectMut>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
@@ -148,7 +149,7 @@ impl MoleculeMutV2 {
                 e @ MoleculeFindProjectError::Internal(_) => e.int_err().into(),
             })?;
 
-        Ok(maybe_project_entity.map(MoleculeProjectMutV2::from_entity))
+        Ok(maybe_project_entity.map(MoleculeProjectMut::from_entity))
     }
 }
 
@@ -167,7 +168,7 @@ pub enum CreateProjectResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectSuccess {
-    pub project: MoleculeProjectV2,
+    pub project: MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectSuccess {
@@ -182,7 +183,7 @@ impl CreateProjectSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateProjectErrorConflict {
-    project: MoleculeProjectV2,
+    project: MoleculeProject,
 }
 #[ComplexObject]
 impl CreateProjectErrorConflict {

@@ -21,10 +21,10 @@ use kamu_molecule_domain::{
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevelRuleInput,
-    MoleculeActivityEventV2,
-    MoleculeActivityEventV2Connection,
+    MoleculeActivityEvent,
+    MoleculeActivityEventConnection,
     MoleculeAnnouncementEntry,
     MoleculeAnnouncements,
     MoleculeDataRoom,
@@ -36,11 +36,11 @@ use crate::queries::{Account, Dataset};
 
 // TODO: revisit after IPNFT-less projects changes.
 #[derive(Clone)]
-pub struct MoleculeProjectV2 {
+pub struct MoleculeProject {
     pub(crate) entity: kamu_molecule_domain::MoleculeProject,
 }
 
-impl MoleculeProjectV2 {
+impl MoleculeProject {
     pub fn new(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self { entity }
     }
@@ -52,7 +52,7 @@ impl MoleculeProjectV2 {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeProjectV2 {
+impl MoleculeProject {
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
 
     /// System time when this project was created/updated
@@ -86,14 +86,14 @@ impl MoleculeProjectV2 {
     }
 
     /// Project's organizational account
-    #[tracing::instrument(level = "info", name = MoleculeProjectV2_account, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeProject_account, skip_all)]
     async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
         let account = Account::from_account_id(ctx, self.entity.account_id.clone()).await?;
         Ok(account)
     }
 
     /// Strongly typed data room accessor
-    #[tracing::instrument(level = "info", name = MoleculeProjectV2_data_room, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeProject_data_room, skip_all)]
     async fn data_room(&self, ctx: &Context<'_>) -> Result<MoleculeDataRoom> {
         // TODO: revisit after use-case breakdown (to remove auth checks)
 
@@ -112,7 +112,7 @@ impl MoleculeProjectV2 {
     }
 
     /// Strongly typed announcements accessor
-    #[tracing::instrument(level = "info", name = MoleculeProjectV2_announcements, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeProject_announcements, skip_all)]
     async fn announcements(&self, ctx: &Context<'_>) -> Result<MoleculeAnnouncements> {
         // TODO: revisit after use-case breakdown (to remove auth checks)
 
@@ -132,14 +132,14 @@ impl MoleculeProjectV2 {
     }
 
     /// Project's activity events in reverse chronological order
-    #[tracing::instrument(level = "info", name = MoleculeProjectV2_activity, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeProject_activity, skip_all)]
     async fn activity(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
-    ) -> Result<MoleculeActivityEventV2Connection> {
+    ) -> Result<MoleculeActivityEventConnection> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
 
@@ -185,9 +185,9 @@ impl MoleculeProjectV2 {
                     use MoleculeDataRoomFileActivityType as Type;
 
                     match activity_type {
-                        Type::Added => MoleculeActivityEventV2::file_added(entry),
-                        Type::Updated => MoleculeActivityEventV2::file_updated(entry),
-                        Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+                        Type::Added => MoleculeActivityEvent::file_added(entry),
+                        Type::Updated => MoleculeActivityEvent::file_updated(entry),
+                        Type::Removed => MoleculeActivityEvent::file_removed(entry),
                     }
                 }
                 MoleculeProjectActivity::Announcement(announcement_activity_entity) => {
@@ -195,23 +195,21 @@ impl MoleculeProjectV2 {
                         &self_arc,
                         announcement_activity_entity,
                     );
-                    MoleculeActivityEventV2::announcement(entry)
+                    MoleculeActivityEvent::announcement(entry)
                 }
             })
             .collect::<Vec<_>>();
 
-        Ok(MoleculeActivityEventV2Connection::new(
-            nodes, page, per_page,
-        ))
+        Ok(MoleculeActivityEventConnection::new(nodes, page, per_page))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(
-    MoleculeProjectV2,
-    MoleculeProjectV2Connection,
-    MoleculeProjectV2Edge
+    MoleculeProject,
+    MoleculeProjectConnection,
+    MoleculeProjectEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

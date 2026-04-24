@@ -145,7 +145,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         };
 
         // Create `data-room` dataset
-        let snapshot = MoleculeDatasetSnapshots::data_room_v2(project_account_name.clone());
+        let snapshot = MoleculeDatasetSnapshots::data_room(project_account_name.clone());
         let data_room_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
@@ -158,7 +158,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeDatasetSnapshots::announcements_v2(project_account_name);
+        let snapshot = MoleculeDatasetSnapshots::announcements(project_account_name);
         let announcements_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(

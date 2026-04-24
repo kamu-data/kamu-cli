@@ -110,7 +110,7 @@ impl MoleculeDatasetSnapshots {
         }
     }
 
-    pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn data_room(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "data-room";
         // Extra columns
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -149,7 +149,7 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn versioned_file_v2(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+    pub fn versioned_file(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
         // Extra columns
         const COLUMN_NAME_ACCESS_LEVEL: &str = "molecule_access_level";
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -182,7 +182,7 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn announcements_v2(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn announcements(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "announcements";
 
         let alias = odf::DatasetAlias::new(

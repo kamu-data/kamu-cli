@@ -27,12 +27,12 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::Dataset;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevel,
     MoleculeAccessLevelRuleInput,
     MoleculeCategory,
     MoleculeChangeBy,
-    MoleculeProjectV2,
+    MoleculeProject,
     MoleculeTag,
     MoleculeVersionedFile,
 };
@@ -43,7 +43,7 @@ use crate::queries::molecule::v2::{
 
 pub struct MoleculeDataRoom {
     pub dataset: Dataset,
-    pub project: Arc<MoleculeProjectV2>,
+    pub project: Arc<MoleculeProject>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -77,7 +77,7 @@ impl MoleculeDataRoom {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MoleculeDataRoomProjection<'a> {
-    project: &'a Arc<MoleculeProjectV2>,
+    project: &'a Arc<MoleculeProject>,
     as_of: Option<odf::Multihash>,
 }
 
@@ -206,13 +206,13 @@ impl From<MoleculeDataRoomEntriesFilters> for kamu_molecule_domain::MoleculeData
 
 pub struct MoleculeDataRoomEntry {
     pub entity: kamu_molecule_domain::MoleculeDataRoomEntry,
-    project: Arc<MoleculeProjectV2>,
+    project: Arc<MoleculeProject>,
     is_latest_data_room_entry: bool,
 }
 
 impl MoleculeDataRoomEntry {
     pub fn new_from_data_room_entry(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         data_room_entry: kamu_molecule_domain::MoleculeDataRoomEntry,
         is_latest_data_room_entry: bool,
     ) -> Self {
@@ -224,7 +224,7 @@ impl MoleculeDataRoomEntry {
     }
 
     pub fn new_from_data_room_activity_entity(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         activity_entity: MoleculeDataRoomActivity,
     ) -> Self {
         let entity = kamu_molecule_domain::MoleculeDataRoomEntry {
@@ -260,7 +260,7 @@ impl MoleculeDataRoomEntry {
 #[Object]
 impl MoleculeDataRoomEntry {
     /// Backlink to the project
-    async fn project(&self) -> &MoleculeProjectV2 {
+    async fn project(&self) -> &MoleculeProject {
         self.project.as_ref()
     }
 

@@ -19,7 +19,7 @@ use kamu_molecule_domain::{
 
 use crate::prelude::*;
 use crate::queries::VersionedFileContentDownload;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevel,
     MoleculeCategory,
     MoleculeEncryptionMetadata,
