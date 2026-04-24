@@ -59,7 +59,7 @@
   &quot;images&quot;: {
     &quot;datafusion&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-datafusion:0.9.0&quot;,
     &quot;flink&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8&quot;,
-    &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;,
+    &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;,
     &quot;spark&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-spark:0.23.1-spark_3.5.0&quot;
   },
   &quot;networkNs&quot;: &quot;Private&quot;,
@@ -185,7 +185,7 @@
   &quot;http&quot;: {
     &quot;connectTimeout&quot;: &quot;30s&quot;,
     &quot;maxRedirects&quot;: 10,
-    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.261.1&quot;
+    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.262.0&quot;
   },
   &quot;mqtt&quot;: {
     &quot;brokerIdleTimeout&quot;: &quot;1s&quot;
@@ -844,7 +844,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;datafusion&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-datafusion:0.9.0&quot;,
   &quot;flink&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8&quot;,
-  &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;,
+  &quot;risingwave&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;,
   &quot;spark&quot;: &quot;ghcr.io&#x2F;kamu-data&#x2F;engine-spark:0.23.1-spark_3.5.0&quot;
 }</code></pre></td>
 <td>UNSTABLE: Default engine images</td>
@@ -975,7 +975,7 @@ UNSTABLE: `Flink` engine image
 <tr>
 <td><code>risingwave</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.2.0-risingwave_1.7.0-alpha&quot;</code></td>
+<td><code class="language-json">&quot;ghcr.io&#x2F;kamu-data&#x2F;engine-risingwave:0.3.0&quot;</code></td>
 <td>
 
 UNSTABLE: `RisingWave` engine image
@@ -1279,7 +1279,7 @@ the resources (for authenticated clients)
 <tr>
 <td><code>userAgent</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;kamu-cli&#x2F;0.261.1&quot;</code></td>
+<td><code class="language-json">&quot;kamu-cli&#x2F;0.262.0&quot;</code></td>
 <td>Value to use for User-Agent header</td>
 </tr>
 </tbody>
@@ -1739,7 +1739,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;connectTimeout&quot;: &quot;30s&quot;,
   &quot;maxRedirects&quot;: 10,
-  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.261.1&quot;
+  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.262.0&quot;
 }</code></pre></td>
 <td>HTTP-specific configuration</td>
 </tr>

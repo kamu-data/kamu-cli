@@ -522,7 +522,7 @@
           "default": {
             "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
             "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
             "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
           },
           "description": "UNSTABLE: Default engine images"
@@ -629,7 +629,7 @@
           "type": "string"
         },
         "risingwave": {
-          "default": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+          "default": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
           "description": "UNSTABLE: `RisingWave` engine image",
           "type": "string"
         },
@@ -1330,7 +1330,7 @@
         "images": {
           "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
           "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.2.0-risingwave_1.7.0-alpha",
+          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
           "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
         },
         "networkNs": "Private",
