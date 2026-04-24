@@ -296,19 +296,20 @@ impl DatasetFactoryImpl {
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
         use hickory_resolver::Resolver;
         use hickory_resolver::config::ResolverConfig;
-        use hickory_resolver::name_server::TokioConnectionProvider;
+        use hickory_resolver::net::runtime::TokioRuntimeProvider;
 
         let r = Resolver::builder_with_config(
             ResolverConfig::default(),
-            TokioConnectionProvider::default(),
+            TokioRuntimeProvider::default(),
         )
-        .build();
+        .build()
+        .unwrap();
         let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 
         let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
 
-        for record in result {
+        for record in result.answers() {
             let data = record.to_string();
             tracing::debug!(%data, "Observed TXT record");
 

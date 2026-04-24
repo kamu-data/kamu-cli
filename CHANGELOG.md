@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.262.0] - 2026-04-22
+### Changed
+- Updated default RisingWave engine image that fixes Parquet compatibility bug
+
 ## [0.261.1] - 2026-03-30
 ### Changed
 - Minio usage replaced with RustFS

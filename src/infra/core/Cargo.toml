@@ -140,7 +140,7 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
-alloy = { optional = true, version = "1.7", default-features = false, features = [
+alloy = { optional = true, version = "=1.7.3", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
@@ -189,7 +189,7 @@ datafusion = { version = "53", default-features = false, features = ["parquet"] 
 filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }
-nanoid = "0.4.0"
+nanoid = "0.5"
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

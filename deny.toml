@@ -93,7 +93,6 @@ allow-org = { github = [
 
 [advisories]
 yanked = "deny"
-# TODO: Remove when patches are available
 ignore = [
     # rsa crate vulnerability (used by sqlx), no fix available yet
     # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
@@ -116,7 +115,13 @@ ignore = [
     # Unmaintained (rustls-pemfile)
     # https://rustsec.org/advisories/RUSTSEC-2025-0134
     "RUSTSEC-2025-0134",
-    # Unsound (lru)
-    # https://rustsec.org/advisories/RUSTSEC-2026-0002
-    "RUSTSEC-2026-0002",
-]
+    # rustls-webpki: transitive dependency; there are currently no updates for higher-order dependencies
+    # https://rustsec.org/advisories/RUSTSEC-2026-0104
+    # https://rustsec.org/advisories/RUSTSEC-2026-0049
+    # https://rustsec.org/advisories/RUSTSEC-2026-0098
+    # https://rustsec.org/advisories/RUSTSEC-2026-0099
+    "RUSTSEC-2026-0104",
+    "RUSTSEC-2026-0049",
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+] # TODO: Remove when patches are available
