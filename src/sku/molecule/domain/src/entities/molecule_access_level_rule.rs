@@ -11,7 +11,7 @@
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoleculeAccessLevelRule {
-    pub ipnft_uid: Option<String>,
+    pub ocl_id: Option<String>,
     pub access_levels: Vec<String>,
 }
 

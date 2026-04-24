@@ -37,16 +37,16 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ipnft_uid: String,
-        ipnft_symbol: String,
+        ocl_id: String,
+        symbol: String,
     ) -> Self {
         Self::Created(MoleculeProjectMessageCreated {
             event_time,
             system_time,
             molecule_account_id,
             project_account_id,
-            ipnft_uid,
-            ipnft_symbol,
+            ocl_id,
+            symbol,
         })
     }
 
@@ -55,16 +55,16 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ipnft_uid: String,
-        ipnft_symbol: String,
+        ocl_id: String,
+        symbol: String,
     ) -> Self {
         Self::Disabled(MoleculeProjectMessageDisabled {
             event_time,
             system_time,
             molecule_account_id,
             project_account_id,
-            ipnft_uid,
-            ipnft_symbol,
+            ocl_id,
+            symbol,
         })
     }
 
@@ -73,16 +73,16 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ipnft_uid: String,
-        ipnft_symbol: String,
+        ocl_id: String,
+        symbol: String,
     ) -> Self {
         Self::Reenabled(MoleculeProjectMessageReenabled {
             event_time,
             system_time,
             molecule_account_id,
             project_account_id,
-            ipnft_uid,
-            ipnft_symbol,
+            ocl_id,
+            symbol,
         })
     }
 
@@ -110,11 +110,11 @@ impl MoleculeProjectMessage {
         }
     }
 
-    pub fn ipnft_uid(&self) -> &str {
+    pub fn ocl_id(&self) -> &str {
         match self {
-            MoleculeProjectMessage::Created(msg) => &msg.ipnft_uid,
-            MoleculeProjectMessage::Disabled(msg) => &msg.ipnft_uid,
-            MoleculeProjectMessage::Reenabled(msg) => &msg.ipnft_uid,
+            MoleculeProjectMessage::Created(msg) => &msg.ocl_id,
+            MoleculeProjectMessage::Disabled(msg) => &msg.ocl_id,
+            MoleculeProjectMessage::Reenabled(msg) => &msg.ocl_id,
         }
     }
 }
@@ -134,8 +134,8 @@ pub struct MoleculeProjectMessageCreated {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ipnft_uid: String,
-    pub ipnft_symbol: String,
+    pub ocl_id: String,
+    pub symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,8 +147,8 @@ pub struct MoleculeProjectMessageDisabled {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ipnft_uid: String,
-    pub ipnft_symbol: String,
+    pub ocl_id: String,
+    pub symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +160,8 @@ pub struct MoleculeProjectMessageReenabled {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ipnft_uid: String,
-    pub ipnft_symbol: String,
+    pub ocl_id: String,
+    pub symbol: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

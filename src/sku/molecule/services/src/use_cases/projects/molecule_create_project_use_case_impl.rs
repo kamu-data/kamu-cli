@@ -49,16 +49,14 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         level = "info",
         name = MoleculeCreateProjectUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_symbol, ipnft_uid)
+        fields(ocl_id, symbol)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        mut ipnft_symbol: String,
-        ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: num_bigint::BigInt,
+        ocl_id: String,
+        mut symbol: String,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Gain write access to projects dataset
         let projects_writer = self
@@ -77,16 +75,16 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         use datafusion::prelude::*;
 
         // Normalize symbol to lowercase
-        ipnft_symbol.make_ascii_lowercase();
-        let lowercase_ipnft_symbol = ipnft_symbol;
+        symbol.make_ascii_lowercase();
+        let lowercase_symbol = symbol;
 
         // Check for conflicts
         if let Some(df) = maybe_raw_ledger_df {
             let df = df
                 .filter(
-                    col("ipnft_uid")
-                        .eq(lit(&ipnft_uid))
-                        .or(lower(col("ipnft_symbol")).eq(lit(&lowercase_ipnft_symbol))),
+                    col("ocl_id")
+                        .eq(lit(&ocl_id))
+                        .or(lower(col("symbol")).eq(lit(&lowercase_symbol))),
                 )
                 .int_err()?
                 .sort(vec![col("offset").sort(false, false)])
@@ -111,7 +109,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("{}.{lowercase_ipnft_symbol}", molecule_account.account_name)
+            format!("{}.{lowercase_symbol}", molecule_account.account_name)
                 .parse()
                 .int_err()?;
 
@@ -119,6 +117,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .parse()
             .unwrap();
 
+        // TODO: Molecule: Phase 3: looks we are ready
         // TODO: Remove tolerance to accounts that already exist after we have account
         // deletion api? Reusing existing accounts may be a security threat via
         // name squatting.
@@ -191,13 +190,11 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         // Add project entry
         let project_payload = MoleculeProjectPayloadRecord {
-            account_id: project_account.id.clone(),
-            ipnft_symbol: lowercase_ipnft_symbol.clone(),
-            ipnft_address,
-            ipnft_token_id: ipnft_token_id.to_string(),
-            ipnft_uid: ipnft_uid.clone(),
-            data_room_dataset_id: data_room_create_res.dataset_handle.id,
-            announcements_dataset_id: announcements_create_res.dataset_handle.id,
+            ocl_id: ocl_id.clone(),
+            symbol: lowercase_symbol.clone(),
+            odf_account_id: project_account.id.clone(),
+            odf_data_room_dataset_id: data_room_create_res.dataset_handle.id,
+            odf_announcements_dataset_id: announcements_create_res.dataset_handle.id,
         };
 
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
@@ -230,8 +227,8 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
                             project_account.id,
-                            ipnft_uid.clone(),
-                            lowercase_ipnft_symbol.clone(),
+                            ocl_id,
+                            lowercase_symbol,
                         ),
                     )
                     .await

@@ -65,24 +65,14 @@ impl MoleculeProject {
         self.entity.event_time
     }
 
+    /// Unique ID: OCL (On-Chain Labs)
+    pub async fn ocl_id(&self) -> &str {
+        &self.entity.ocl_id
+    }
+
     /// Symbolic name of the project
-    pub async fn ipnft_symbol(&self) -> &str {
-        &self.entity.ipnft_symbol
-    }
-
-    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-    pub async fn ipnft_uid(&self) -> &str {
-        &self.entity.ipnft_uid
-    }
-
-    /// Address of the IPNFT contract
-    pub async fn ipnft_address(&self) -> &str {
-        &self.entity.ipnft_address
-    }
-
-    /// Token ID withing the IPNFT contract
-    pub async fn ipnft_token_id(&self) -> U256 {
-        U256::new(self.entity.ipnft_token_id.clone())
+    pub async fn symbol(&self) -> &str {
+        &self.entity.symbol
     }
 
     /// Project's organizational account

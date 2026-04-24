@@ -21,10 +21,8 @@ pub trait MoleculeCreateProjectUseCase: Send + Sync {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ipnft_symbol: String,
-        ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: num_bigint::BigInt,
+        ocl_id: String,
+        symbol: String,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError>;
 }
 
@@ -32,7 +30,7 @@ pub trait MoleculeCreateProjectUseCase: Send + Sync {
 
 #[derive(thiserror::Error, Debug)]
 pub enum MoleculeCreateProjectError {
-    #[error("Project with the same IPNFT UID or symbol already exists")]
+    #[error("Project with the same OCL ID or symbol already exists")]
     Conflict { project: MoleculeProject },
 
     #[error(transparent)]

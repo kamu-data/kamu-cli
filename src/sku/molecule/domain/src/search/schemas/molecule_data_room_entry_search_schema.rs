@@ -29,7 +29,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
-    molecule_schema::field_definitions::IPNFT_UID,
+    molecule_schema::field_definitions::OCL_ID,
     molecule_schema::field_definitions::REF,
     SearchSchemaField {
         path: molecule_schema::fields::PATH,
@@ -76,8 +76,8 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn unique_id_for_data_room_entry(ipnft_uid: &str, entry_path: &str) -> String {
-    format!("{ipnft_uid}:{entry_path}")
+pub fn unique_id_for_data_room_entry(ocl_id: &str, entry_path: &str) -> String {
+    format!("{ocl_id}:{entry_path}")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

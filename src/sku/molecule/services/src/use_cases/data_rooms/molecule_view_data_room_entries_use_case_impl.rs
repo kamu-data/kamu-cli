@@ -96,7 +96,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         };
 
         let filter = Self::prepare_full_text_search_filter(
-            &molecule_project.ipnft_uid,
+            &molecule_project.ocl_id,
             path_prefix.as_ref(),
             max_depth,
             filters,
@@ -128,15 +128,15 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
     }
 
     fn prepare_full_text_search_filter(
-        ipnft_uid: &str,
+        ocl_id: &str,
         path_prefix: Option<&CollectionPath>,
         max_depth: Option<usize>,
         filters: Option<MoleculeDataRoomEntriesFilters>,
     ) -> SearchFilterExpr {
         let mut and_clauses = vec![];
 
-        // ipnft_uid equality
-        and_clauses.push(field_eq_str(molecule_schema::fields::IPNFT_UID, ipnft_uid));
+        // ocl_id equality
+        and_clauses.push(field_eq_str(molecule_schema::fields::OCL_ID, ocl_id));
 
         // path prefix
         if let Some(path_prefix) = path_prefix {
@@ -173,7 +173,7 @@ impl MoleculeViewDataRoomEntriesUseCase for MoleculeViewDataRoomEntriesUseCaseIm
         name = MoleculeViewDataRoomEntriesUseCaseImpl_execute,
         skip_all,
         fields(
-            ipnft_uid = %molecule_project.ipnft_uid,
+            ocl_id = %molecule_project.ocl_id,
             mode = ?mode,
             path_prefix = ?path_prefix,
             max_depth = ?max_depth,

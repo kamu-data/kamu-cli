@@ -32,7 +32,7 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
-    molecule_schema::field_definitions::IPNFT_UID,
+    molecule_schema::field_definitions::OCL_ID,
     SearchSchemaField {
         path: fields::HEADLINE,
         role: SearchSchemaFieldRole::Description {

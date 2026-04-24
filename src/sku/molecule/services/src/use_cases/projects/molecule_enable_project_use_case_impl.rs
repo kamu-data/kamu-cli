@@ -37,13 +37,13 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         level = "info",
         name = MoleculeEnableProjectUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid)
+        fields(ocl_id)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
@@ -65,14 +65,14 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         let Some(ledger_df): Option<odf::utils::data::DataFrameExt> = maybe_raw_ledger_df else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.clone(),
+                    ocl_id: ocl_id.clone(),
                 },
             ));
         };
 
-        // Find the latest ledger record for the given ipnft_uid
+        // Find the latest ledger record for the given ocl_id
         let df = ledger_df
-            .filter(col("ipnft_uid").eq(lit(&ipnft_uid)))
+            .filter(col("ocl_id").eq(lit(&ocl_id)))
             .int_err()?
             .sort(vec![col("offset").sort(false, false)])
             .int_err()?
@@ -86,7 +86,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         let Some(record) = records.into_iter().next() else {
             return Err(MoleculeEnableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.clone(),
+                    ocl_id: ocl_id.clone(),
                 },
             ));
         };
@@ -141,9 +141,9 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
-                            new_changelog_record.payload.account_id.clone(),
-                            new_changelog_record.payload.ipnft_uid.clone(),
-                            new_changelog_record.payload.ipnft_symbol.clone(),
+                            new_changelog_record.payload.odf_account_id.clone(),
+                            new_changelog_record.payload.ocl_id.clone(),
+                            new_changelog_record.payload.symbol.clone(),
                         ),
                     )
                     .await

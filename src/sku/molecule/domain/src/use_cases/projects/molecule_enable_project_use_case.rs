@@ -21,7 +21,7 @@ pub trait MoleculeEnableProjectUseCase: Send + Sync {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<MoleculeProject, MoleculeEnableProjectError>;
 }
 

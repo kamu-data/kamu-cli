@@ -19,7 +19,7 @@ pub trait MoleculeFindProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError>;
 }
 

@@ -43,12 +43,12 @@ pub trait MoleculeProjectsReader: Send + Sync {
             .await
     }
 
-    async fn changelog_entry_by_ipnft_uid(
+    async fn changelog_entry_by_ocl_id(
         &self,
-        ipnft_uid: &str,
+        ocl_id: &str,
     ) -> Result<Option<serde_json::Value>, QueryError> {
         self.raw_reader()
-            .changelog_projection_entry_by("account_id", "ipnft_uid", ipnft_uid)
+            .changelog_projection_entry_by("account_id", "ocl_id", ocl_id)
             .await
     }
 }

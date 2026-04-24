@@ -34,8 +34,8 @@ pub(crate) fn index_project_from_entity(
         molecule_schema::fields::EVENT_TIME: project.event_time,
         molecule_schema::fields::SYSTEM_TIME: project.system_time,
         molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        project_schema::fields::IPNFT_SYMBOL: project.ipnft_symbol,
-        molecule_schema::fields::IPNFT_UID: project.ipnft_uid,
+        project_schema::fields::SYMBOL: project.symbol,
+        molecule_schema::fields::OCL_ID: project.ocl_id,
         project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
         kamu_search::fields::IS_BANNED: false,
         kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
@@ -47,8 +47,8 @@ pub(crate) fn index_project_from_entity(
 
 pub(crate) fn index_project_from_parts(
     molecule_account_id: &odf::AccountID,
-    ipnft_uid: &str,
-    ipnft_symbol: &str,
+    ocl_id: &str,
+    symbol: &str,
     account_id: &odf::AccountID,
     event_time: DateTime<Utc>,
     system_time: DateTime<Utc>,
@@ -57,8 +57,8 @@ pub(crate) fn index_project_from_parts(
         molecule_schema::fields::EVENT_TIME: event_time,
         molecule_schema::fields::SYSTEM_TIME: system_time,
         molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-        project_schema::fields::IPNFT_SYMBOL: ipnft_symbol,
-        molecule_schema::fields::IPNFT_UID: ipnft_uid,
+        project_schema::fields::SYMBOL: symbol,
+        molecule_schema::fields::OCL_ID: ocl_id,
         project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
         kamu_search::fields::IS_BANNED: false,
         kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
@@ -113,10 +113,10 @@ pub(crate) async fn index_projects(
         // Serialize project into search document
         let document = index_project_from_entity(&organization_account.account_id, &project);
 
-        // Note: for now, use IPNFT UID as document ID
+        // Note: for now, use OCL ID as document ID
         // This should be revised after implementing non-tokenized projects
         operations.push(SearchIndexUpdateOperation::Index {
-            id: project.ipnft_uid.clone(),
+            id: project.ocl_id.clone(),
             doc: document,
         });
 

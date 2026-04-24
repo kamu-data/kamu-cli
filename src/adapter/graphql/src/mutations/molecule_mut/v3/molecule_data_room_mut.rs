@@ -207,7 +207,7 @@ impl MoleculeDataRoomMut {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path,
                 r#ref: versioned_file_dataset_id,
                 version: versioned_file_entry.version,
@@ -348,7 +348,7 @@ impl MoleculeDataRoomMut {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path: updated_data_room_entry.path.clone(),
                 r#ref: existing_data_room_entry.reference,
                 version: versioned_file_entry.version,
@@ -449,7 +449,7 @@ impl MoleculeDataRoomMut {
 
         let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
             activity_type,
-            ipnft_uid: self.project.entity.ipnft_uid.clone(),
+            ocl_id: self.project.entity.ocl_id.clone(),
             // SAFETY: All paths should be normalized after v2 migration
             path: CollectionPathV2::from_v1_unchecked(collection_entry_record.path).into(),
             r#ref: collection_entry_record.reference,
@@ -980,7 +980,7 @@ impl MoleculeDataRoomMut {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path: updated_data_room_entry.path.clone(),
                 r#ref: updated_data_room_entry.reference.clone(),
                 version: updated_versioned_file_entry.version,

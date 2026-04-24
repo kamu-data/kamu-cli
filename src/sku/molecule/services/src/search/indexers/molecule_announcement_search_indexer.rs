@@ -48,8 +48,8 @@ impl MoleculeAnnouncementIndexingHelper<'_> {
         let mut index_doc = serde_json::json!({
             molecule_schema::fields::EVENT_TIME: global_announcement.announcement.event_time,
             molecule_schema::fields::SYSTEM_TIME: global_announcement.announcement.system_time,
-            molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-            molecule_schema::fields::IPNFT_UID: global_announcement.ipnft_uid,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id,
+            molecule_schema::fields::OCL_ID: global_announcement.ocl_id,
             announcement_schema::fields::HEADLINE: global_announcement.announcement.headline,
             announcement_schema::fields::BODY: global_announcement.announcement.body,
             announcement_schema::fields::ATTACHMENTS: global_announcement.announcement.attachments,
@@ -58,7 +58,7 @@ impl MoleculeAnnouncementIndexingHelper<'_> {
             molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
             molecule_schema::fields::TAGS: global_announcement.announcement.tags,
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
+            kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id ],
         });
 
         self.attach_embeddings(
@@ -76,14 +76,14 @@ impl MoleculeAnnouncementIndexingHelper<'_> {
         event_time: DateTime<Utc>,
         system_time: DateTime<Utc>,
         molecule_account_id: &odf::AccountID,
-        ipnft_uid: &str,
+        ocl_id: &str,
         announcement_record: &MoleculeAnnouncementPayloadRecord,
     ) -> Result<serde_json::Value, InternalError> {
         let mut index_doc = serde_json::json!({
             molecule_schema::fields::EVENT_TIME: event_time,
             molecule_schema::fields::SYSTEM_TIME: system_time,
             molecule_schema::fields::MOLECULE_ACCOUNT_ID: molecule_account_id.to_string(),
-            molecule_schema::fields::IPNFT_UID: ipnft_uid,
+            molecule_schema::fields::OCL_ID: ocl_id,
             announcement_schema::fields::HEADLINE: announcement_record.headline,
             announcement_schema::fields::BODY: announcement_record.body,
             announcement_schema::fields::ATTACHMENTS: announcement_record.attachments,

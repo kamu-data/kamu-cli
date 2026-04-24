@@ -15,18 +15,17 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Applies common molecule filters (tags/categories/ipnft/access-level rules)
+/// Applies common molecule filters (tags/categories/ocl_id/access-level rules)
 /// to the provided dataframe.
 pub fn apply_molecule_filters_to_df(
     df: DataFrameExt,
-    by_ipnft_uids: Option<Vec<String>>,
+    by_ocl_ids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
     by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
 ) -> Result<DataFrameExt, InternalError> {
-    let df = if let Some(filter) =
-        utils::molecule_fields_filter(by_ipnft_uids, by_tags, by_categories)
+    let df = if let Some(filter) = utils::molecule_fields_filter(by_ocl_ids, by_tags, by_categories)
     {
         kamu_datasets_services::utils::DataFrameExtraDataFieldsFilterApplier::apply(df, filter)
             .int_err()?
@@ -50,8 +49,8 @@ fn apply_access_level_rules(
                 let access_expr = col("molecule_access_level")
                     .in_list(access_levels.into_iter().map(lit).collect(), false);
 
-                if let Some(ipnft_uid) = rule.ipnft_uid {
-                    access_expr.and(col("ipnft_uid").eq(lit(ipnft_uid)))
+                if let Some(ocl_id) = rule.ocl_id {
+                    access_expr.and(col("ocl_id").eq(lit(ocl_id)))
                 } else {
                     access_expr
                 }

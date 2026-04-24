@@ -291,7 +291,7 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("announcement_id"),
                 DataField::string("headline"),
                 DataField::string("body"),
@@ -317,7 +317,7 @@ impl MoleculeDatasetSnapshots {
                             [
                                 "op INT NOT NULL",
                                 "event_time TIMESTAMP",
-                                "ipnft_uid STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
                                 "announcement_id STRING NOT NULL",
                                 "headline STRING NOT NULL",
                                 "body STRING NOT NULL",
@@ -392,7 +392,7 @@ impl MoleculeDatasetSnapshots {
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
                 DataField::string("activity_type"),
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("path"),
                 DataField::string("ref"),
                 DataField::u32("version"),
@@ -420,7 +420,7 @@ impl MoleculeDatasetSnapshots {
                             [
                                 "event_time TIMESTAMP",
                                 "activity_type STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
                                 "path STRING NOT NULL",
                                 "ref STRING NOT NULL",
                                 "version INT UNSIGNED NOT NULL",

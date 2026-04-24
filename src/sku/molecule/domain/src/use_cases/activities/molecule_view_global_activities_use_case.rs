@@ -54,10 +54,10 @@ impl MoleculeGlobalActivity {
         }
     }
 
-    pub fn ipnft_uid(&self) -> &String {
+    pub fn ocl_id(&self) -> &str {
         match self {
-            Self::DataRoomActivity(entity) => &entity.ipnft_uid,
-            Self::Announcement(entity) => &entity.ipnft_uid,
+            Self::DataRoomActivity(entity) => &entity.ocl_id,
+            Self::Announcement(entity) => &entity.ocl_id,
         }
     }
 }

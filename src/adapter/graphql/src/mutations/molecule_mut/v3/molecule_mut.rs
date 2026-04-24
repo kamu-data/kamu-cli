@@ -17,7 +17,7 @@ use crate::queries::molecule::v3::MoleculeProject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: MoleculeMut GQL name is already taken by a top-level type
+// NOTE: A top-level type already takes MoleculeMut GQL name
 pub struct MoleculeMutV3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,33 +26,20 @@ pub struct MoleculeMutV3;
 #[Object]
 impl MoleculeMutV3 {
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV3_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_create_project, skip_all, fields(?ocl_id, ?symbol))]
     async fn create_project(
         &self,
         ctx: &Context<'_>,
-        ipnft_symbol: String,
-        ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: U256,
+        ocl_id: String,
+        symbol: String,
     ) -> Result<CreateProjectResult> {
-        if ipnft_uid != format!("{ipnft_address}_{}", ipnft_token_id.as_ref()) {
-            return Err(Error::new("Inconsistent ipnft info").into());
-        }
-
         let molecule_subject = molecule_subject(ctx)?;
 
         let (time_source, create_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeCreateProjectUseCase);
 
         let project = match create_project_uc
-            .execute(
-                &molecule_subject,
-                Some(time_source.now()),
-                ipnft_symbol,
-                ipnft_uid,
-                ipnft_address,
-                ipnft_token_id.as_ref().clone(),
-            )
+            .execute(&molecule_subject, Some(time_source.now()), ocl_id, symbol)
             .await
         {
             Ok(project_entity) => MoleculeProject::new(project_entity),
@@ -78,24 +65,20 @@ impl MoleculeMutV3 {
     /// its symbol will remain reserved, data will remain intact,
     /// but the project will no longer appear in the listing.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV3_disable_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_disable_project, skip_all, fields(?ocl_id))]
     async fn disable_project(
         &self,
         ctx: &Context<'_>,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, disable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeDisableProjectUseCase);
 
         let project = disable_project_uc
-            .execute(
-                &molecule_subject,
-                Some(time_source.now()),
-                ipnft_uid.clone(),
-            )
+            .execute(&molecule_subject, Some(time_source.now()), ocl_id.clone())
             .await
-            .map_err(|err| map_disable_error(err, &ipnft_uid))?;
+            .map_err(|err| map_disable_error(err, &ocl_id))?;
 
         Ok(MoleculeProjectMutationResult::from_entity(
             project,
@@ -104,24 +87,20 @@ impl MoleculeMutV3 {
     }
 
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeMutV3_enable_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_enable_project, skip_all, fields(?ocl_id))]
     async fn enable_project(
         &self,
         ctx: &Context<'_>,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, enable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeEnableProjectUseCase);
 
         let project = enable_project_uc
-            .execute(
-                &molecule_subject,
-                Some(time_source.now()),
-                ipnft_uid.clone(),
-            )
+            .execute(&molecule_subject, Some(time_source.now()), ocl_id.clone())
             .await
-            .map_err(|err| map_enable_error(err, &ipnft_uid))?;
+            .map_err(|err| map_enable_error(err, &ocl_id))?;
 
         Ok(MoleculeProjectMutationResult::from_entity(
             project,
@@ -130,18 +109,18 @@ impl MoleculeMutV3 {
     }
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = MoleculeMutV3_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMutV3_project, skip_all, fields(?ocl_id))]
     async fn project(
         &self,
         ctx: &Context<'_>,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<Option<MoleculeProjectMut>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ipnft_uid)
+            .execute(&molecule_subject, ocl_id)
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -193,7 +172,7 @@ impl CreateProjectErrorConflict {
     async fn message(&self) -> String {
         format!(
             "Conflict with existing project {} ({})",
-            self.project.entity.ipnft_symbol, self.project.entity.ipnft_uid,
+            self.project.entity.symbol, self.project.entity.ocl_id,
         )
     }
 }
@@ -202,10 +181,10 @@ impl CreateProjectErrorConflict {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlError {
+fn map_disable_error(err: MoleculeDisableProjectError, ocl_id: &str) -> GqlError {
     match err {
         MoleculeDisableProjectError::ProjectNotFound(_) => {
-            GqlError::gql(format!("Project {ipnft_uid} not found"))
+            GqlError::gql(format!("Project [{ocl_id}] not found"))
         }
         MoleculeDisableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
         MoleculeDisableProjectError::Access(e) => GqlError::Access(e),
@@ -213,10 +192,10 @@ fn map_disable_error(err: MoleculeDisableProjectError, ipnft_uid: &str) -> GqlEr
     }
 }
 
-fn map_enable_error(err: MoleculeEnableProjectError, ipnft_uid: &str) -> GqlError {
+fn map_enable_error(err: MoleculeEnableProjectError, ocl_id: &str) -> GqlError {
     match err {
         MoleculeEnableProjectError::ProjectNotFound(_) => {
-            GqlError::gql(format!("No historical entries for project {ipnft_uid}"))
+            GqlError::gql(format!("No historical entries for project [{ocl_id}]"))
         }
         MoleculeEnableProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
         MoleculeEnableProjectError::Access(e) => GqlError::Access(e),

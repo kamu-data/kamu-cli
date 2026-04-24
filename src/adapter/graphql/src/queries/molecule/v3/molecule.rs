@@ -42,7 +42,7 @@ use crate::queries::molecule::v3::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: Molecule GQL name is already taken by a top-level type
+// NOTE: A top-level type already takes Molecule GQL name
 pub struct MoleculeV3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +71,7 @@ impl MoleculeV3 {
     async fn get_molecule_projects_mapping(
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
-    ) -> Result<HashMap<String, Arc<MoleculeProject>>, GqlError> {
+    ) -> Result<HashMap</* ocl_id */ String, Arc<MoleculeProject>>, GqlError> {
         let listing = molecule_view_projects_uc
             .execute(molecule_subject, None)
             .await
@@ -88,7 +88,7 @@ impl MoleculeV3 {
             .into_iter()
             .map(|project| {
                 (
-                    project.ipnft_uid.clone(),
+                    project.ocl_id.clone(),
                     Arc::new(MoleculeProject::new(project)),
                 )
             })
@@ -108,18 +108,14 @@ impl MoleculeV3 {
     const DEFAULT_SEARCH_RESULTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = MoleculeV3_project, skip_all, fields(?ipnft_uid))]
-    async fn project(
-        &self,
-        ctx: &Context<'_>,
-        ipnft_uid: String,
-    ) -> Result<Option<MoleculeProject>> {
+    #[tracing::instrument(level = "info", name = MoleculeV3_project, skip_all, fields(?ocl_id))]
+    async fn project(&self, ctx: &Context<'_>, ocl_id: String) -> Result<Option<MoleculeProject>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ipnft_uid)
+            .execute(&molecule_subject, ocl_id)
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -208,12 +204,12 @@ impl MoleculeV3 {
             .list
             .into_iter()
             .filter_map(|activity| {
-                let ipnft_uid = activity.ipnft_uid();
-                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                let ocl_id = activity.ocl_id();
+                if let Some(project) = projects_mapping.get(ocl_id) {
                     Some((activity, project))
                 } else {
                     tracing::warn!(
-                        "Project [{ipnft_uid}] not found for activity, skipping the activity event"
+                        "Project [{ocl_id}] not found for activity, skipping the activity event"
                     );
                     None
                 }
@@ -302,11 +298,11 @@ impl MoleculeV3 {
             .list
             .into_iter()
             .filter_map(|search_hit| {
-                let ipnft_uid = search_hit.entity.ipnft_uid();
-                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                let ocl_id = search_hit.entity.ocl_id();
+                if let Some(project) = projects_mapping.get(ocl_id) {
                     Some((search_hit, project))
                 } else {
-                    tracing::warn!("Project [{ipnft_uid}] not found, skipping the search hit");
+                    tracing::warn!("Project [{ocl_id}] not found, skipping the search hit");
                     None
                 }
             })
@@ -349,7 +345,7 @@ impl MoleculeV3 {
 
 #[derive(InputObject)]
 pub struct MoleculeSemanticSearchFilters {
-    by_ipnft_uids: Option<Vec<String>>,
+    by_ocl_ids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
@@ -360,7 +356,7 @@ pub struct MoleculeSemanticSearchFilters {
 impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearchFilters {
     fn from(value: MoleculeSemanticSearchFilters) -> Self {
         kamu_molecule_domain::MoleculeSearchFilters {
-            by_ipnft_uids: value.by_ipnft_uids,
+            by_ocl_ids: value.by_ocl_ids,
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,

@@ -27,11 +27,11 @@ pub struct MoleculeFindProjectUseCaseImpl {
 #[async_trait::async_trait]
 #[common_macros::method_names_consts]
 impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeFindProjectUseCaseImpl_execute, skip_all, fields(ipnft_uid))]
+    #[tracing::instrument(level = "debug", name = MoleculeFindProjectUseCaseImpl_execute, skip_all, fields(ocl_id))]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ipnft_uid: String,
+        ocl_id: String,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
         // Gain read access to projects dataset
         let projects_reader = self
@@ -40,9 +40,9 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;
 
-        // Query for the project by ipnft_uid
+        // Query for the project by ocl_id
         let maybe_project = projects_reader
-            .changelog_entry_by_ipnft_uid(&ipnft_uid)
+            .changelog_entry_by_ocl_id(&ocl_id)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?
             .map(MoleculeProject::from_json)

@@ -102,7 +102,7 @@ impl MoleculeAnnouncement {
 
 #[derive(Clone, Debug)]
 pub struct MoleculeGlobalAnnouncement {
-    pub ipnft_uid: String,
+    pub ocl_id: String,
     pub announcement: MoleculeAnnouncement,
 }
 
@@ -112,7 +112,7 @@ impl MoleculeGlobalAnnouncement {
             serde_json::from_value(record).int_err()?;
 
         Ok(Self {
-            ipnft_uid: entry.payload.ipnft_uid,
+            ocl_id: entry.payload.ocl_id,
             announcement: MoleculeAnnouncement {
                 system_time: entry.system_columns.timestamp_columns.system_time,
                 event_time: entry.system_columns.timestamp_columns.event_time,
@@ -137,7 +137,7 @@ impl MoleculeGlobalAnnouncement {
             #[serde(flatten)]
             pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
 
-            pub ipnft_uid: String,
+            pub ocl_id: String,
 
             #[serde(flatten)]
             pub payload: MoleculeAnnouncementPayloadRecord,
@@ -155,7 +155,7 @@ impl MoleculeGlobalAnnouncement {
         let record = serde_json::from_value::<GlobalAnnouncementRecord>(record).int_err()?;
 
         Ok(Self {
-            ipnft_uid: record.ipnft_uid,
+            ocl_id: record.ocl_id,
             announcement: MoleculeAnnouncement {
                 system_time: record.timestamp_columns.system_time,
                 event_time: record.timestamp_columns.event_time,
@@ -184,7 +184,7 @@ pub type MoleculeAnnouncementChangelogInsertionRecord =
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeGlobalAnnouncementPayloadRecord {
-    pub ipnft_uid: String,
+    pub ocl_id: String,
 
     #[serde(flatten)]
     pub announcement: MoleculeAnnouncementPayloadRecord,

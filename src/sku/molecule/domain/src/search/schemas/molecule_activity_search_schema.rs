@@ -25,7 +25,7 @@ pub mod fields {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEMA_FIELDS: &[kamu_search::SearchSchemaField] = &[
+const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::EVENT_TIME,
     molecule_schema::field_definitions::SYSTEM_TIME,
     SearchSchemaField {
@@ -33,7 +33,7 @@ const SCHEMA_FIELDS: &[kamu_search::SearchSchemaField] = &[
         role: SearchSchemaFieldRole::Integer,
     },
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
-    molecule_schema::field_definitions::IPNFT_UID,
+    molecule_schema::field_definitions::OCL_ID,
     SearchSchemaField {
         path: fields::ACTIVITY_TYPE,
         role: SearchSchemaFieldRole::Keyword,
