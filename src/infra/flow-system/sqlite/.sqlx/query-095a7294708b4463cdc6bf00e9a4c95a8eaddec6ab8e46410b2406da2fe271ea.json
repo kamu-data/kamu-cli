@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                producer_name,\n                IFNULL(MAX(message_id), 0) AS max_message_id\n            FROM outbox_messages\n            GROUP BY producer_name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "producer_name",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "max_message_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "095a7294708b4463cdc6bf00e9a4c95a8eaddec6ab8e46410b2406da2fe271ea"
+}
