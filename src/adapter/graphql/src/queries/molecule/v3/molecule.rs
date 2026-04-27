@@ -38,6 +38,7 @@ use crate::queries::molecule::v3::{
     MoleculeProject,
     MoleculeProjectActivityFilters,
     MoleculeProjectConnection,
+    OclId,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,13 +110,17 @@ impl MoleculeV3 {
 
     /// Looks up the project
     #[tracing::instrument(level = "info", name = MoleculeV3_project, skip_all, fields(?ocl_id))]
-    async fn project(&self, ctx: &Context<'_>, ocl_id: String) -> Result<Option<MoleculeProject>> {
+    async fn project(
+        &self,
+        ctx: &Context<'_>,
+        ocl_id: OclId<'_>,
+    ) -> Result<Option<MoleculeProject>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ocl_id)
+            .execute(&molecule_subject, ocl_id.into())
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),

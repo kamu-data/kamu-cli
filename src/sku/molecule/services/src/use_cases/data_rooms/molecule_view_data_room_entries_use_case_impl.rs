@@ -96,7 +96,7 @@ impl MoleculeViewDataRoomEntriesUseCaseImpl {
         };
 
         let filter = Self::prepare_full_text_search_filter(
-            &molecule_project.ocl_id,
+            molecule_project.ocl_id.as_ref(),
             path_prefix.as_ref(),
             max_depth,
             filters,

@@ -350,7 +350,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             // ocl_id equality
             and_clauses.push(field_eq_str(
                 molecule_schema::fields::OCL_ID,
-                &molecule_project.ocl_id,
+                molecule_project.ocl_id.as_ref(),
             ));
 
             // filters by categories, tags, access levels

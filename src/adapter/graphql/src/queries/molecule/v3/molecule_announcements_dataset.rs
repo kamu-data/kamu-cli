@@ -106,16 +106,13 @@ impl MoleculeAnnouncements {
     async fn by_id(
         &self,
         ctx: &Context<'_>,
-        id: MoleculeAnnouncementId,
+        id: MoleculeAnnouncementId<'_>,
     ) -> Result<Option<MoleculeAnnouncementEntry>> {
         let find_project_announcement_uc =
             from_catalog_n!(ctx, dyn MoleculeFindProjectAnnouncementUseCase);
 
-        // TODO: scalar validation
-        let id = uuid::Uuid::parse_str(&id).int_err()?;
-
         let maybe_announcement = find_project_announcement_uc
-            .execute(&self.project.entity, id)
+            .execute(&self.project.entity, id.into())
             .await
             .map_err(|e| {
                 use MoleculeFindProjectAnnouncementError as E;
@@ -176,8 +173,8 @@ impl MoleculeAnnouncementEntry {
         self.entity.event_time
     }
 
-    async fn id(&self) -> MoleculeAnnouncementId {
-        self.entity.announcement_id.to_string()
+    async fn id(&self) -> MoleculeAnnouncementId<'_> {
+        (&self.entity.announcement_id).into()
     }
 
     async fn headline(&self) -> &str {

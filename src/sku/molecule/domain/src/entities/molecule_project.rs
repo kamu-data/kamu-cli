@@ -7,8 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype::nutype(
+    validate(len_char_min = 2),
+    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq)
+)]
+pub struct Symbol(String);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static OCL_ID_REGEX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^0x[0-9a-f]{64}$").unwrap());
+
+/// Unique OCL (On-Chain Labs) ID.
+///
+/// Format: bytes32 hex (0x-prefixed, 64 lowercase hex chars).
+#[nutype::nutype(
+    validate(regex = OCL_ID_REGEX),
+    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)
+)]
+pub struct OclId(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,12 +46,11 @@ pub struct MoleculeProject {
     /// Event time when this project was created/updated
     pub event_time: DateTime<Utc>,
 
-    // TODO: Molecule: Phase 3: stack-based type? oclId is bytes32 in Solidity terms
-    /// Unique ID: OCL (On-Chain Labs)
-    pub ocl_id: String,
+    /// Unique OCL (On-Chain Labs) ID.
+    pub ocl_id: OclId,
 
     /// Symbolic name of the project
-    pub symbol: String,
+    pub symbol: Symbol,
 
     /// Account ID associated with this project
     pub account_id: odf::AccountID,
@@ -83,8 +106,8 @@ pub type MoleculeProjectChangelogInsertionRecord =
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectPayloadRecord {
-    pub ocl_id: String,
-    pub symbol: String,
+    pub ocl_id: OclId,
+    pub symbol: Symbol,
     pub odf_account_id: odf::AccountID,
     pub odf_data_room_dataset_id: odf::DatasetID,
     pub odf_announcements_dataset_id: odf::DatasetID,

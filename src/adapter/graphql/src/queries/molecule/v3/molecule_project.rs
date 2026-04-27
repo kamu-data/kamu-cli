@@ -29,6 +29,8 @@ use crate::queries::molecule::v3::{
     MoleculeAnnouncements,
     MoleculeDataRoom,
     MoleculeDataRoomEntry,
+    OclId,
+    Symbol,
 };
 use crate::queries::{Account, Dataset};
 
@@ -66,13 +68,13 @@ impl MoleculeProject {
     }
 
     /// Unique ID: OCL (On-Chain Labs)
-    pub async fn ocl_id(&self) -> &str {
-        &self.entity.ocl_id
+    pub async fn ocl_id(&self) -> OclId<'_> {
+        (&self.entity.ocl_id).into()
     }
 
     /// Symbolic name of the project
-    pub async fn symbol(&self) -> &str {
-        &self.entity.symbol
+    pub async fn symbol(&self) -> Symbol<'_> {
+        (&self.entity.symbol).into()
     }
 
     /// Project's organizational account

@@ -271,7 +271,7 @@ async fn load_project_indexing_data(
         .await
         .map_err(|e| {
             tracing::warn!(
-                ocl_id = project.ocl_id,
+                ocl_id = %project.ocl_id,
                 error = ?e,
                 "Failed to load data room entries for project",
             );
@@ -280,7 +280,8 @@ async fn load_project_indexing_data(
         .int_err();
 
     let versioned_files_map = if let Ok(ref entries_listing) = result {
-        load_versioned_files_for_entries(entries_listing, &project.ocl_id, &dependencies).await
+        load_versioned_files_for_entries(entries_listing, project.ocl_id.as_ref(), &dependencies)
+            .await
     } else {
         HashMap::new()
     };
@@ -379,12 +380,16 @@ async fn index_project_data(
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
         let document = indexing_helper
-            .index_data_room_entry_from_entity(&project_data.project.ocl_id, &entry, content_text)
+            .index_data_room_entry_from_entity(
+                project_data.project.ocl_id.as_ref(),
+                &entry,
+                content_text,
+            )
             .await?;
 
         operations.push(SearchIndexUpdateOperation::Index {
             id: data_room_entry_schema::unique_id_for_data_room_entry(
-                &project_data.project.ocl_id,
+                &project_data.project.ocl_id.as_ref(),
                 &entry.path,
             ),
             doc: document,

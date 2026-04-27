@@ -13,7 +13,7 @@ use time_source::SystemTimeSource;
 use crate::molecule::molecule_subject;
 use crate::mutations::molecule_mut::v3::{MoleculeProjectMut, MoleculeProjectMutationResult};
 use crate::prelude::*;
-use crate::queries::molecule::v3::MoleculeProject;
+use crate::queries::molecule::v3::{MoleculeProject, OclId, Symbol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +30,8 @@ impl MoleculeMutV3 {
     async fn create_project(
         &self,
         ctx: &Context<'_>,
-        ocl_id: String,
-        symbol: String,
+        ocl_id: OclId<'_>,
+        symbol: Symbol<'_>,
     ) -> Result<CreateProjectResult> {
         let molecule_subject = molecule_subject(ctx)?;
 
@@ -39,7 +39,12 @@ impl MoleculeMutV3 {
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeCreateProjectUseCase);
 
         let project = match create_project_uc
-            .execute(&molecule_subject, Some(time_source.now()), ocl_id, symbol)
+            .execute(
+                &molecule_subject,
+                Some(time_source.now()),
+                ocl_id.into(),
+                symbol.into(),
+            )
             .await
         {
             Ok(project_entity) => MoleculeProject::new(project_entity),
@@ -69,7 +74,7 @@ impl MoleculeMutV3 {
     async fn disable_project(
         &self,
         ctx: &Context<'_>,
-        ocl_id: String,
+        ocl_id: OclId<'_>,
     ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, disable_project_uc) =
@@ -91,7 +96,7 @@ impl MoleculeMutV3 {
     async fn enable_project(
         &self,
         ctx: &Context<'_>,
-        ocl_id: String,
+        ocl_id: OclId<'_>,
     ) -> Result<MoleculeProjectMutationResult> {
         let molecule_subject = molecule_subject(ctx)?;
         let (time_source, enable_project_uc) =
@@ -113,14 +118,14 @@ impl MoleculeMutV3 {
     async fn project(
         &self,
         ctx: &Context<'_>,
-        ocl_id: String,
+        ocl_id: OclId<'_>,
     ) -> Result<Option<MoleculeProjectMut>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ocl_id)
+            .execute(&molecule_subject, ocl_id.into())
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
