@@ -3177,7 +3177,7 @@ type Molecule {
 }
 
 input MoleculeAccessLevelRuleInput {
-	ipnftUid: String!
+	oclId: String!
 	accessLevels: [String!]!
 }
 
@@ -3504,19 +3504,19 @@ type MoleculeMut {
 }
 
 type MoleculeMutV3 {
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: U256!): CreateProjectResult!
+	createProject(oclId: String!, symbol: String!): CreateProjectResult!
 	"""
 	Retracts a project from the `projects` dataset.
 	History of this project existing will be preserved,
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	disableProject(ipnftUid: String!): MoleculeProjectMutationResult!
-	enableProject(ipnftUid: String!): MoleculeProjectMutationResult!
+	disableProject(oclId: String!): MoleculeProjectMutationResult!
+	enableProject(oclId: String!): MoleculeProjectMutationResult!
 	"""
 	Looks up the project
 	"""
-	project(ipnftUid: String!): MoleculeProjectMut
+	project(oclId: String!): MoleculeProjectMut
 }
 
 type MoleculeProject {
@@ -3529,21 +3529,13 @@ type MoleculeProject {
 	"""
 	eventTime: DateTime!
 	"""
+	Unique ID: OCL (On-Chain Labs)
+	"""
+	oclId: String!
+	"""
 	Symbolic name of the project
 	"""
-	ipnftSymbol: String!
-	"""
-	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-	"""
-	ipnftUid: String!
-	"""
-	Address of the IPNFT contract
-	"""
-	ipnftAddress: String!
-	"""
-	Token ID withing the IPNFT contract
-	"""
-	ipnftTokenId: U256!
+	symbol: String!
 	"""
 	Project's organizational account
 	"""
@@ -3620,7 +3612,7 @@ enum MoleculeSearchEntityKindInput {
 }
 
 input MoleculeSemanticSearchFilters {
-	byIpnftUids: [String!]
+	byOclIds: [String!]
 	byTags: [String!]
 	byCategories: [String!]
 	byAccessLevels: [String!]
@@ -3666,7 +3658,7 @@ type MoleculeV3 {
 	"""
 	Looks up the project
 	"""
-	project(ipnftUid: String!): MoleculeProject
+	project(oclId: String!): MoleculeProject
 	"""
 	List the registered projects
 	"""
@@ -4902,11 +4894,6 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
-
-"""
-256-bit unsigned number. Can be constructed from string.
-"""
-scalar U256
 
 scalar URL
 

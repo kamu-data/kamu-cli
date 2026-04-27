@@ -96,17 +96,12 @@ pub async fn test_molecule_data_room_quota_exceeded(
         .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
-    const IPNFT_ADDRESS: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1";
-    const IPNFT_TOKEN_ID: &str = "1201";
-    let ipnft_uid = format!("{IPNFT_ADDRESS}_{IPNFT_TOKEN_ID}");
-
+    const OCL_ID: &str = "ocl-quota-room-e2e";
     let create_project_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
-                "ipnftSymbol": "quota-room-e2e",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": IPNFT_ADDRESS,
-                "ipnftTokenId": IPNFT_TOKEN_ID,
+                "symbol": "quota-room-e2e",
+                "oclId": OCL_ID,
             }))),
         )
         .await;
@@ -130,7 +125,7 @@ pub async fn test_molecule_data_room_quota_exceeded(
     let upload_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(DATA_ROOM_UPLOAD).variables(Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/quota.txt",
                 "content": encoded,
             }))),
@@ -166,17 +161,12 @@ pub async fn test_molecule_announcements_quota_exceeded(
         .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
-    const IPNFT_ADDRESS: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1";
-    const IPNFT_TOKEN_ID: &str = "1202";
-    let ipnft_uid = format!("{IPNFT_ADDRESS}_{IPNFT_TOKEN_ID}");
-
+    const OCL_ID: &str = "ocl-quota-announce-e2e";
     let create_project_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
-                "ipnftSymbol": "quota-announce-e2e",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": IPNFT_ADDRESS,
-                "ipnftTokenId": IPNFT_TOKEN_ID,
+                "symbol": "quota-announce-e2e",
+                "oclId": OCL_ID,
             }))),
         )
         .await;
@@ -199,7 +189,7 @@ pub async fn test_molecule_announcements_quota_exceeded(
     let announcement_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_ANNOUNCEMENT).variables(Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "headline": "quota",
                 "body": "exceeded",
                 "attachments": [],
@@ -241,10 +231,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     const USER_PASSWORD: &str = "molecule.dev";
     const USER_DID: &str = "did:ethr:0xE2eActivityUser";
     const ADMIN_DID: &str = "did:ethr:0xE2eActivityAdmin";
-
-    const IPNFT_ADDRESS: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1";
-    const IPNFT_TOKEN_ID: &str = "1300";
-    let ipnft_uid = format!("{IPNFT_ADDRESS}_{IPNFT_TOKEN_ID}");
+    const OCL_ID: &str = "ocl-activity-remove-e2e";
 
     let path = "/activity-entry.txt";
     let tag = "e2e-activity-tag";
@@ -259,10 +246,8 @@ pub async fn test_molecule_activity_change_by_for_remove(
     let create_project_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
-                "ipnftSymbol": "activity-remove-e2e",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": IPNFT_ADDRESS,
-                "ipnftTokenId": IPNFT_TOKEN_ID,
+                "symbol": "activity-remove-e2e",
+                "oclId": OCL_ID,
             }))),
         )
         .await;
@@ -286,7 +271,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     let upload_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_VERSIONED_FILE).variables(Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": path,
                 "content": encoded,
                 "contentType": "text/plain",
@@ -315,7 +300,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     let update_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(UPDATE_METADATA_QUERY).variables(Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "ref": file_ref,
                 "expectedHead": Value::Null,
                 "changeBy": USER_DID,
@@ -342,7 +327,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     let remove_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(REMOVE_ENTRY_QUERY).variables(Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": path,
                 "changeBy": ADMIN_DID,
             }))),
@@ -366,7 +351,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
         let project_activity = kamu_api_server_client
             .graphql_api_call_ex(Request::new(LIST_PROJECT_ACTIVITY_QUERY).variables(
                 Variables::from_json(json!({
-                    "ipnftUid": ipnft_uid,
+                    "oclId": OCL_ID,
                     "filters": {
                         "byTags": [tag],
                     },
@@ -483,18 +468,14 @@ pub async fn test_molecule_activity_change_by_for_remove(
 const CREATE_PROJECT: &str = indoc!(
     r#"
     mutation (
-        $ipnftSymbol: String!,
-        $ipnftUid: String!,
-        $ipnftAddress: String!,
-        $ipnftTokenId: Int!,
+        $symbol: String!,
+        $oclId: String!,
     ) {
         molecule {
             v3 {
                 createProject(
-                    ipnftSymbol: $ipnftSymbol,
-                    ipnftUid: $ipnftUid,
-                    ipnftAddress: $ipnftAddress,
-                    ipnftTokenId: $ipnftTokenId,
+                    symbol: $symbol,
+                    oclId: $oclId,
                 ) {
                     isSuccess
                     message
@@ -508,10 +489,10 @@ const CREATE_PROJECT: &str = indoc!(
 
 const DATA_ROOM_UPLOAD: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
+    mutation ($oclId: String!, $path: CollectionPath!, $content: Base64Usnp!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               uploadFile(
                 path: $path
@@ -593,10 +574,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
 
 const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
-    query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
+    query ($oclId: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             activity(filters: $filters) {
               nodes {
                 ... on MoleculeActivityFileAdded {
@@ -653,10 +634,10 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
 
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+    mutation ($oclId: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             announcements {
               create(
                 headline: $headline
@@ -681,10 +662,10 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
 
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               uploadFile(
                 path: $path
@@ -718,10 +699,10 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 
 const UPDATE_METADATA_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+    mutation ($oclId: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               updateFileMetadata(
                 ref: $ref
@@ -751,10 +732,10 @@ const UPDATE_METADATA_QUERY: &str = indoc!(
 
 const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               removeEntry(path: $path, changeBy: $changeBy) {
                 isSuccess

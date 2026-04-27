@@ -31,7 +31,6 @@ use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
 use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider};
-use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
 use serde_json::json;
 use time_source::SystemTimeSourceProvider;
@@ -74,14 +73,12 @@ const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
 const CREATE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftSymbol: String!, $ipnftUid: String!, $ipnftAddress: String!, $ipnftTokenId: Int!) {
+    mutation ($symbol: String!, $oclId: String!) {
       molecule {
         v3 {
           createProject(
-            ipnftSymbol: $ipnftSymbol
-            ipnftUid: $ipnftUid
-            ipnftAddress: $ipnftAddress
-            ipnftTokenId: $ipnftTokenId
+            symbol: $symbol
+            oclId: $oclId
           ) {
             isSuccess
             message
@@ -92,7 +89,7 @@ const CREATE_PROJECT: &str = indoc!(
                   id
                   accountName
                 }
-                ipnftUid
+                oclId
                 dataRoom {
                   dataset {
                     id
@@ -116,10 +113,10 @@ const CREATE_PROJECT: &str = indoc!(
 
 const DISABLE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!) {
+    mutation ($oclId: String!) {
         molecule {
             v3 {
-                disableProject(ipnftUid: $ipnftUid) {
+                disableProject(oclId: $oclId) {
                     project { __typename }
                 }
             }
@@ -130,10 +127,10 @@ const DISABLE_PROJECT: &str = indoc!(
 
 const ENABLE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!) {
+    mutation ($oclId: String!) {
         molecule {
             v3 {
-                enableProject(ipnftUid: $ipnftUid) {
+                enableProject(oclId: $oclId) {
                     project { __typename }
                 }
             }
@@ -211,10 +208,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
 // TODO: find a way to output tags/categories
 const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
-    query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
+    query ($oclId: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             activity(filters: $filters) {
               nodes {
                 ... on MoleculeActivityFileAdded {
@@ -278,10 +275,10 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
 );
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               uploadFile(
                 path: $path
@@ -312,10 +309,10 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 );
 const MOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
+    mutation ($oclId: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               moveEntry(fromPath: $fromPath, toPath: $toPath, changeBy: $changeBy) {
                 isSuccess
@@ -330,10 +327,10 @@ const MOVE_ENTRY_QUERY: &str = indoc!(
 );
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+    mutation ($oclId: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             announcements {
               create(
                 headline: $headline
@@ -360,10 +357,10 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
 );
 const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
         v3 {
-          project(ipnftUid: $ipnftUid) {
+          project(oclId: $oclId) {
             dataRoom {
               removeEntry(path: $path, changeBy: $changeBy) {
                 isSuccess
@@ -388,7 +385,7 @@ const SEARCH_QUERY: &str = indoc!(
                 __typename
                 entry {
                   project {
-                    ipnftUid
+                    oclId
                   }
                   asDataset {
                     id
@@ -427,7 +424,7 @@ const SEARCH_QUERY: &str = indoc!(
                 __typename
                 announcement {
                   project {
-                    ipnftUid
+                    oclId
                   }
                   id
                   headline
@@ -513,7 +510,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
-    const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
@@ -530,10 +527,8 @@ async fn test_molecule_dump_dataset_snapshots_src() {
         let res = harness
             .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
                 async_graphql::Variables::from_json(json!({
-                    "ipnftSymbol": "VITAFAST",
-                    "ipnftUid": PROJECT_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "VITAFAST",
+                    "oclId": PROJECT_OCL_ID,
                 })),
             ))
             .await;
@@ -572,7 +567,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
         let data = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_UID,
+                "oclId": PROJECT_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -601,7 +596,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
     GraphQLQueryRequest::new(
         CREATE_ANNOUNCEMENT,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_UID,
+            "oclId": PROJECT_OCL_ID,
             "headline": "Test announcement",
             "body": "Blah blah",
             "attachments": [],
@@ -730,8 +725,8 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 v3 {
                     projects(page: 0, perPage: 100) {
                         nodes {
-                            ipnftSymbol
-                            ipnftUid
+                            symbol
+                            oclId
                         }
                     }
                 }
@@ -754,10 +749,8 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "VITAFAST",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "VITAFAST",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             })),
         ))
         .await;
@@ -785,7 +778,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                     "id": project_account_id,
                     "accountName": project_account_name,
                 },
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "dataRoom": {
                     "dataset": {
                         "id": data_room_did,
@@ -802,20 +795,18 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         }),
     );
 
-    // Read back the project entry by `ipnftUid``
+    // Read back the project entry by `oclId``
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
                         v3 {
-                            project(ipnftUid: $ipnftUid) {
+                            project(oclId: $oclId) {
                                 account { id accountName }
-                                ipnftSymbol
-                                ipnftUid
-                                ipnftAddress
-                                ipnftTokenId
+                                symbol
+                                oclId
                             }
                         }
                     }
@@ -823,7 +814,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             }))),
         )
         .await;
@@ -836,27 +827,23 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "id": project_account_id,
                 "accountName": project_account_name,
             },
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": "9",
+            "symbol": "vitafast",
+            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
         }),
     );
 
-    // Read back the project entry by `ipnftUid`` with modified character casing
+    // Read back the project entry by `oclId` again
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
                         v3 {
-                            project(ipnftUid: $ipnftUid) {
+                            project(oclId: $oclId) {
                                 account { id accountName }
-                                ipnftSymbol
-                                ipnftUid
-                                ipnftAddress
-                                ipnftTokenId
+                                symbol
+                                oclId
                             }
                         }
                     }
@@ -864,7 +851,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcad88677cA87a7815728C72D74B4ff4982d54fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             }))),
         )
         .await;
@@ -877,10 +864,8 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "id": project_account_id,
                 "accountName": project_account_name,
             },
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": "9",
+            "symbol": "vitafast",
+            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
         }),
     );
 
@@ -893,19 +878,17 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "symbol": "vitafast",
+            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
         }]),
     );
 
-    // Ensure errors on ipnftUid collision
+    // Ensure errors on oclId collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitaslow",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             })),
         ))
         .await;
@@ -920,14 +903,12 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         }),
     );
 
-    // Ensure errors on ipnftSymbol collision
+    // Ensure errors on symbol collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "1",
+                "symbol": "vitafast",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
             })),
         ))
         .await;
@@ -943,14 +924,12 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
     );
 
     // Create another project
-    // Ensure errors on ipnftUid collision
+    // Ensure errors on oclId collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": r#"0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912"#,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "108494037067113761580099112583860151730516105403483528465874625006707409835912",
+                "symbol": "vitaslow",
+                "oclId": r#"0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912"#,
             })),
         ))
         .await;
@@ -971,12 +950,12 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([
             {
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "symbol": "vitafast",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             },
             {
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
+                "symbol": "vitaslow",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
             }
         ]),
     );
@@ -985,7 +964,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -1007,10 +986,8 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         .execute(
             &molecule_subject,
             Some(Utc::now()),
+            ocl_id.to_string(),
             "VITAFAST".to_string(),
-            ipnft_uid.to_string(),
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1".to_string(),
-            BigInt::from(9u32),
         )
         .await
         .unwrap();
@@ -1028,19 +1005,19 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         GraphQLQueryRequest::new(
             indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
                         v3 {
-                            project(ipnftUid: $ipnftUid) {
-                                ipnftUid
-                                ipnftSymbol
+                            project(oclId: $oclId) {
+                                oclId
+                                symbol
                             }
                         }
                     }
                 }
                 "#
             ),
-            async_graphql::Variables::from_json(json!({ "ipnftUid": uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": uid })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -1049,7 +1026,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     // Disable project multiple times to test idempotence
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -1062,13 +1039,13 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     // Trying to disable disabled account will return error
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         ))
         .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
-    pretty_assertions::assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
+    pretty_assertions::assert_eq!(disable_error, format!("Project [{ocl_id}] not found"));
 
     // Project is no longer visible in the listing
     let res = GraphQLQueryRequest::new(
@@ -1078,7 +1055,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
                 molecule {
                     v3 {
                         projects(page: 0, perPage: 100) {
-                            nodes { ipnftUid }
+                            nodes { oclId }
                         }
                     }
                 }
@@ -1094,8 +1071,8 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         json!([]),
     );
 
-    // Querying by UID returns None
-    let res = query_project(&harness, ipnft_uid).await;
+    // Querying by OCL ID returns None
+    let res = query_project(&harness, ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["project"],
@@ -1106,7 +1083,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     for _ in 0..2 {
         let res = harness
             .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+                async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
             ))
             .await;
         assert!(res.is_ok(), "{res:#?}");
@@ -1131,7 +1108,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
                 molecule {
                     v3 {
                         projects(page: 0, perPage: 100) {
-                            nodes { ipnftUid }
+                            nodes { oclId }
                         }
                     }
                 }
@@ -1145,17 +1122,17 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
         }]),
     );
 
-    let res = query_project(&harness, ipnft_uid).await;
+    let res = query_project(&harness, ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
-            "ipnftUid": ipnft_uid,
-            "ipnftSymbol": "vitafast",
+            "oclId": ocl_id,
+            "symbol": "vitafast",
         }),
     );
 }
@@ -1173,11 +1150,11 @@ async fn test_molecule_disable_enable_project_errors(
 
     harness.create_projects_dataset().await;
 
-    let missing_uid = "foo";
+    let missing_ocl_id = "foo";
 
     let res = GraphQLQueryRequest::new(
         DISABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        async_graphql::Variables::from_json(json!({ "oclId": missing_ocl_id })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
@@ -1185,11 +1162,14 @@ async fn test_molecule_disable_enable_project_errors(
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
     assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
-    pretty_assertions::assert_eq!(disable_error, format!("Project {missing_uid} not found"));
+    pretty_assertions::assert_eq!(
+        disable_error,
+        format!("Project [{missing_ocl_id}] not found")
+    );
 
     let res = GraphQLQueryRequest::new(
         ENABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        async_graphql::Variables::from_json(json!({ "oclId": missing_ocl_id })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
@@ -1199,7 +1179,7 @@ async fn test_molecule_disable_enable_project_errors(
     assert!(res_json["molecule"]["v3"]["enableProject"].is_null());
     pretty_assertions::assert_eq!(
         enable_error,
-        format!("No historical entries for project {missing_uid}")
+        format!("No historical entries for project [{missing_ocl_id}]")
     );
 }
 
@@ -1216,16 +1196,14 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
 
     harness.create_projects_dataset().await;
 
-    let original_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    let original_ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     // Create project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": original_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": original_ocl_id,
             })),
         ))
         .await;
@@ -1238,7 +1216,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": original_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": original_ocl_id })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -1247,10 +1225,8 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "10",
+                "symbol": "vitafast",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
             })),
         ))
         .await;
@@ -1271,7 +1247,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
 async fn test_molecule_data_room_quota_exceeded(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -1287,10 +1263,8 @@ async fn test_molecule_data_room_quota_exceeded(
     let create_project_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "quota-room",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "901",
+                "symbol": "quota-room",
+                "oclId": ocl_id,
             })),
         ))
         .await;
@@ -1324,10 +1298,10 @@ async fn test_molecule_data_room_quota_exceeded(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
+                mutation ($oclId: String!, $path: CollectionPath!, $content: Base64Usnp!) {
                   molecule {
                     v3 {
-                      project(ipnftUid: $ipnftUid) {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1353,7 +1327,7 @@ async fn test_molecule_data_room_quota_exceeded(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/quota.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             }))),
@@ -1372,7 +1346,7 @@ async fn test_molecule_data_room_quota_exceeded(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarnessSearchVariant) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -1384,10 +1358,8 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": ocl_id,
             })),
         ))
         .await;
@@ -1407,10 +1379,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     // to the data room entry.
     const UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
+        mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     path: $path
@@ -1464,7 +1436,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                     ... on MoleculeDataRoomPathOccupied {
                       byEntry {
                         project {
-                          ipnftUid
+                          oclId
                         }
                         ref
                         changeBy
@@ -1509,7 +1481,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let res = GraphQLQueryRequest::new(
         UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -1591,7 +1563,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello 2"),
                 "contentType": "application/octet-stream",
@@ -1628,7 +1600,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                                 "message": "Path is occupied",
                                 "byEntry": {
                                     "project": {
-                                        "ipnftUid": ipnft_uid,
+                                        "oclId": ocl_id,
                                     },
                                     "ref": file_1_did,
                                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
@@ -1705,7 +1677,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -1727,10 +1699,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
                     v3 {
-                      project(ipnftUid: $ipnftUid) {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1786,7 +1758,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -1905,7 +1877,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -1927,10 +1899,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
                     v3 {
-                      project(ipnftUid: $ipnftUid) {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1986,7 +1958,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/baz.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -2089,7 +2061,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -2108,10 +2080,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     // List data room entries and denormalized file fields
     const LIST_ENTRIES_QUERY: &str = indoc!(
         r#"
-        query ($ipnftUid: String!, $filters: MoleculeDataRoomEntriesFilters) {
+        query ($oclId: String!, $filters: MoleculeDataRoomEntriesFilters) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   latest {
                     entries(filters: $filters) {
@@ -2144,7 +2116,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_ENTRIES_QUERY).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "filters": null,
             })),
         ))
@@ -2209,10 +2181,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
 
     const UPDATE_FILE_BY_REF_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -2273,7 +2245,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_FILE_BY_REF_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "ref": random_ref,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye -- random ref"),
                 "contentType": "application/octet-stream",
@@ -2311,7 +2283,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(UPDATE_FILE_BY_REF_QUERY).variables(
                 async_graphql::Variables::from_json(json!({
-                    "ipnftUid": ipnft_uid,
+                    "oclId": ocl_id,
                     "ref": file_1_did,
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
                     "contentType": "text/plain",
@@ -2445,7 +2417,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -2466,10 +2438,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                   molecule {
                     v3 {
-                      project(ipnftUid: $ipnftUid) {
+                      project(oclId: $oclId) {
                         dataRoom {
                           latest {
                             entry(path: "/foo.txt") {
@@ -2511,7 +2483,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             }))),
         )
         .await;
@@ -2556,10 +2528,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                   molecule {
                     v3 {
-                      project(ipnftUid: $ipnftUid) {
+                      project(oclId: $oclId) {
                         dataRoom {
                           latest {
                             entry(path: "/baz.txt") {
@@ -2601,7 +2573,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             }))),
         )
         .await;
@@ -2639,7 +2611,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "fromPath": "/non-existent-path.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2669,7 +2641,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "fromPath": "/foo.txt",
                 "toPath": "/baz.txt",
                 "changeBy": USER_1,
@@ -2699,7 +2671,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "fromPath": "/foo.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2777,7 +2749,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -2861,7 +2833,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -2886,7 +2858,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -2904,7 +2876,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": null,
@@ -2972,7 +2944,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag1"],
                     "byCategories": null,
@@ -3040,7 +3012,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -3108,7 +3080,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -3176,7 +3148,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -3244,7 +3216,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-3", "test-category-1"],
@@ -3312,7 +3284,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3380,7 +3352,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3448,7 +3420,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3471,7 +3443,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": ["test-category-1"],
@@ -3543,7 +3515,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/non-existent-path.txt",
                 "changeBy": USER_1,
             })),
@@ -3572,7 +3544,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": "/baz.txt",
                 "changeBy": USER_1,
             })),
@@ -3602,7 +3574,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -3726,7 +3698,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -3747,10 +3719,10 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+        mutation ($oclId: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
@@ -3802,7 +3774,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "ref": random_dataset_id.to_string(),
                 "expectedHead": null,
                 "accessLevel": "holder",
@@ -3838,7 +3810,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "ref": file_1_did,
                 "expectedHead": null,
                 "accessLevel": "holders",
@@ -3872,7 +3844,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let cas_failure_res = GraphQLQueryRequest::new(
         UPDATE_METADATA_QUERY,
         async_graphql::Variables::from_json(json!({
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
             "ref": file_1_did,
             "expectedHead": cas_expected_head.to_string(),
             "accessLevel": "holders",
@@ -3925,7 +3897,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -4092,7 +4064,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "filters": null,
             })),
         )
@@ -4122,7 +4094,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
 async fn test_molecule_data_room_as_of_block_hash(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4133,10 +4105,8 @@ async fn test_molecule_data_room_as_of_block_hash(
     let create_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "901",
+                "symbol": "vitafast",
+                "oclId": ocl_id,
             })),
         ))
         .await;
@@ -4160,7 +4130,7 @@ async fn test_molecule_data_room_as_of_block_hash(
     let upload_1_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4202,10 +4172,10 @@ async fn test_molecule_data_room_as_of_block_hash(
 
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+        mutation ($oclId: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
@@ -4232,7 +4202,7 @@ async fn test_molecule_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "ref": file_1_did,
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -4266,10 +4236,10 @@ async fn test_molecule_data_room_as_of_block_hash(
 
     const PROJECT_DATA_ROOM_LATEST_QUERY: &str = indoc!(
         r#"
-        query ($ipnftUid: String!) {
+        query ($oclId: String!) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   latest {
                     entries {
@@ -4295,7 +4265,7 @@ async fn test_molecule_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             PROJECT_DATA_ROOM_LATEST_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -4328,7 +4298,7 @@ async fn test_molecule_data_room_as_of_block_hash(
     let upload_2_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
             "path": "/bar.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
             "contentType": "text/plain",
@@ -4420,7 +4390,7 @@ async fn test_molecule_data_room_as_of_block_hash(
 async fn test_molecule_alternative_encryption_metadata(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4432,10 +4402,8 @@ async fn test_molecule_alternative_encryption_metadata(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": ocl_id,
             })),
         ))
         .await;
@@ -4449,7 +4417,7 @@ async fn test_molecule_alternative_encryption_metadata(
     const UPLOAD_FILE: &str = indoc!(
         r#"
         mutation (
-            $ipnftUid: String!,
+            $oclId: String!,
             $path: CollectionPathV2!,
             $content: Base64Usnp!,
             $contentType: String!,
@@ -4463,7 +4431,7 @@ async fn test_molecule_alternative_encryption_metadata(
         ) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     path: $path
@@ -4526,7 +4494,7 @@ async fn test_molecule_alternative_encryption_metadata(
     let res = GraphQLQueryRequest::new(
         UPLOAD_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4608,7 +4576,7 @@ async fn test_molecule_alternative_encryption_metadata(
 async fn test_molecule_announcements_quota_exceeded(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
+    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4624,10 +4592,8 @@ async fn test_molecule_announcements_quota_exceeded(
     let create_project_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "quota-announce",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "902",
+                "symbol": "quota-announce",
+                "oclId": ocl_id,
             })),
         ))
         .await;
@@ -4657,7 +4623,7 @@ async fn test_molecule_announcements_quota_exceeded(
     let announcement_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "headline": "Quota limited",
                 "body": "This should fail",
                 "attachments": [],
@@ -4689,17 +4655,15 @@ async fn test_molecule_announcements_operations(
         .await;
 
     // Create the first project
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
 
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": PROJECT_1_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -4716,10 +4680,10 @@ async fn test_molecule_announcements_operations(
     // Announcements are empty
     const LIST_ANNOUNCEMENTS: &str = indoc!(
         r#"
-        query ($ipnftUid: String!, $filters: MoleculeAnnouncementsFilters) {
+        query ($oclId: String!, $filters: MoleculeAnnouncementsFilters) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 announcements {
                   tail(filters: $filters) {
                     totalCount
@@ -4749,7 +4713,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -4777,7 +4741,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -4831,7 +4795,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -4886,7 +4850,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -4927,7 +4891,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [project_1_file_1_dataset_id],
@@ -4968,7 +4932,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 3",
                 "body": "Blah blah 3",
                 "attachments": [
@@ -5012,7 +4976,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 4",
                 "body": "Blah blah 4",
                 "attachments": [
@@ -5099,7 +5063,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -5244,7 +5208,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -5269,7 +5233,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5301,7 +5265,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": null,
@@ -5378,7 +5342,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag3"],
                     "byCategories": null,
@@ -5455,7 +5419,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -5532,7 +5496,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -5609,7 +5573,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -5686,7 +5650,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -5763,7 +5727,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5840,7 +5804,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5917,7 +5881,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5995,7 +5959,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag2"],
                     "byCategories": ["test-category-2"],
@@ -6077,8 +6041,8 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
@@ -6087,10 +6051,8 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": PROJECT_1_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -6130,7 +6092,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6151,7 +6113,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -6204,7 +6166,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -6300,7 +6262,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6319,10 +6281,10 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $categories: [String!], $tags: [String!]) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $categories: [String!], $tags: [String!]) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -6347,7 +6309,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -6378,7 +6340,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -6470,7 +6432,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6491,7 +6453,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -6589,7 +6551,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6610,7 +6572,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -6759,7 +6721,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6782,7 +6744,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo [2]"),
                 "changeBy": USER_1,
@@ -6932,7 +6894,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -6955,7 +6917,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -7112,7 +7074,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": null,
             })),
         )
@@ -7138,10 +7100,8 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitaslow",
-                    "ipnftUid": PROJECT_2_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                    "ipnftTokenId": "10",
+                    "symbol": "vitaslow",
+                    "oclId": PROJECT_2_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -7160,7 +7120,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [],
@@ -7202,7 +7162,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
                 "filters": null,
             })),
         )
@@ -7765,7 +7725,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -7794,7 +7754,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -7825,7 +7785,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byKinds": ["FILE"],
                 },
@@ -7852,7 +7812,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byKinds": ["ANNOUNCEMENT"],
                 },
@@ -7883,7 +7843,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": [],
@@ -8027,7 +7987,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": [],
@@ -8158,7 +8118,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": [],
@@ -8289,7 +8249,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-1"],
@@ -8413,7 +8373,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2"],
@@ -8529,7 +8489,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -8660,7 +8620,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8791,7 +8751,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8907,7 +8867,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8940,7 +8900,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": ["test-category-1"],
@@ -10396,31 +10356,17 @@ async fn test_molecule_activity_access_level_rules_filters(
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
+    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
 
-    for (uid, addr, token_id) in [
-        (
-            PROJECT_1_UID,
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
-            201,
-        ),
-        (
-            PROJECT_2_UID,
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
-            202,
-        ),
-    ] {
-        let token_id_str = token_id.to_string();
+    for (uid, token_id) in [(PROJECT_1_OCL_ID, 201), (PROJECT_2_OCL_ID, 202)] {
         assert_eq!(
             {
                 let res_json = GraphQLQueryRequest::new(
                     CREATE_PROJECT,
                     async_graphql::Variables::from_value(value!({
-                        "ipnftSymbol": format!("sym{token_id}"),
-                        "ipnftUid": uid,
-                        "ipnftAddress": addr,
-                        "ipnftTokenId": token_id_str,
+                        "symbol": format!("sym{token_id}"),
+                        "oclId": uid,
                     })),
                 )
                 .execute(&harness.schema, &harness.catalog_authorized)
@@ -10437,14 +10383,14 @@ async fn test_molecule_activity_access_level_rules_filters(
 
     async fn create_file(
         harness: &GraphQLMoleculeHarness,
-        ipnft_uid: &str,
+        ocl_id: &str,
         path: &str,
         access_level: &str,
     ) -> String {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": path,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"payload"),
                 "contentType": "text/plain",
@@ -10471,11 +10417,12 @@ async fn test_molecule_activity_access_level_rules_filters(
             .to_owned()
     }
 
-    let project_1_public = create_file(&harness, PROJECT_1_UID, "/p1-public.txt", "public").await;
+    let project_1_public =
+        create_file(&harness, PROJECT_1_OCL_ID, "/p1-public.txt", "public").await;
     let project_1_holders =
-        create_file(&harness, PROJECT_1_UID, "/p1-holders.txt", "holders").await;
+        create_file(&harness, PROJECT_1_OCL_ID, "/p1-holders.txt", "holders").await;
     let project_2_private =
-        create_file(&harness, PROJECT_2_UID, "/p2-private.txt", "private").await;
+        create_file(&harness, PROJECT_2_OCL_ID, "/p2-private.txt", "private").await;
 
     harness.synchronize_agents().await;
 
@@ -10487,8 +10434,8 @@ async fn test_molecule_activity_access_level_rules_filters(
             async_graphql::Variables::from_json(json!({
                 "filters": {
                     "byAccessLevelRules": [
-                        { "ipnftUid": PROJECT_1_UID, "accessLevels": ["holders", "public"] },
-                        { "ipnftUid": PROJECT_2_UID, "accessLevels": ["private"] }
+                        { "oclId": PROJECT_1_OCL_ID, "accessLevels": ["holders", "public"] },
+                        { "oclId": PROJECT_2_OCL_ID, "accessLevels": ["private"] }
                     ]
                 },
             })),
@@ -10552,8 +10499,8 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
@@ -10562,10 +10509,8 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": PROJECT_1_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10584,7 +10529,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -10637,7 +10582,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -10690,10 +10635,10 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
           molecule {
             v3 {
-              project(ipnftUid: $ipnftUid) {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -10719,7 +10664,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -10751,7 +10696,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -10785,7 +10730,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -10815,7 +10760,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1 text",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -10856,7 +10801,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -10888,10 +10833,8 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitaslow",
-                    "ipnftUid": PROJECT_2_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                    "ipnftTokenId": "10",
+                    "symbol": "vitaslow",
+                    "oclId": PROJECT_2_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10910,7 +10853,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2 text",
                 "attachments": [],
@@ -10951,7 +10894,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                 "contentType": "text/plain",
@@ -11022,7 +10965,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "changeBy": USER_1,
             "path": "/foo_renamed.txt",
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -11047,7 +10990,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
             },
             "tags": ["test-tag1", "test-tag2"]
         }
@@ -11063,7 +11006,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "headline": "Test announcement 2",
             "id": project_2_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
             },
             "tags": ["test-tag2"]
         }
@@ -11092,7 +11035,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "changeBy": USER_2,
             "path": "/foo.txt",
             "project": {
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": PROJECT_2_OCL_ID,
             },
             "ref": project_2_file_1_dataset_id,
         }
@@ -11188,13 +11131,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_1_UID]
+    // Filters: byOclIds: [PROJECT_1_OCL_ID]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_1_UID],
+                Some(json!({
+                    "byOclIds": [PROJECT_1_OCL_ID],
                 }))
             )
             .await,
@@ -11209,13 +11152,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_2_UID]
+    // Filters: byOclIds: [PROJECT_2_OCL_ID]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_2_UID],
+                Some(json!({
+                    "byOclIds": [PROJECT_2_OCL_ID],
                 }))
             )
             .await,
@@ -11230,13 +11173,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_2_UID, PROJECT_1_UID]
+    // Filters: byOclIds: [PROJECT_2_OCL_ID, PROJECT_1_OCL_ID]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
+                Some(json!({
+                    "byOclIds": [PROJECT_2_OCL_ID, PROJECT_1_OCL_ID],
                 }))
             )
             .await,
@@ -11256,7 +11199,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["FILE"],
                 }))
             )
@@ -11277,7 +11220,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["ANNOUNCEMENT"],
                 }))
             )
@@ -11298,7 +11241,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
                 }))
             )
@@ -11319,7 +11262,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag1"],
                 })),
             )
@@ -11340,7 +11283,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2"],
                 })),
             )
@@ -11361,7 +11304,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2", "test-tag1"],
                 })),
             )
@@ -11382,7 +11325,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-1"],
                 })),
             )
@@ -11403,7 +11346,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-2"],
                 })),
             )
@@ -11424,7 +11367,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-2", "test-category-1"],
                 })),
             )
@@ -11445,7 +11388,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["public"],
                 })),
             )
@@ -11466,7 +11409,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["holders"],
                 })),
             )
@@ -11487,7 +11430,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["holders", "public"],
                 })),
             )
@@ -11509,7 +11452,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         harness
             .execute_search_query(
                 "blah blah 1",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
@@ -11539,7 +11482,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
     const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
@@ -11548,10 +11491,8 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": PROJECT_1_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11575,7 +11516,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11630,7 +11571,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -11753,7 +11694,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
     const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
 
     pretty_assertions::assert_eq!(
@@ -11761,10 +11702,8 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": PROJECT_1_OCL_ID,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11783,7 +11722,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11838,7 +11777,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -11935,7 +11874,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
             },
             "tags": ["test-tag1", "test-tag2", "test-tag3"]
         }
@@ -11975,7 +11914,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
             "changeBy": USER_1,
             "path": "/foo.txt",
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": PROJECT_1_OCL_ID,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -11995,7 +11934,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+            async_graphql::Variables::from_json(json!({ "oclId": PROJECT_1_OCL_ID })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -12042,7 +11981,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
     // Re-enable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+            async_graphql::Variables::from_json(json!({ "oclId": PROJECT_1_OCL_ID })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");

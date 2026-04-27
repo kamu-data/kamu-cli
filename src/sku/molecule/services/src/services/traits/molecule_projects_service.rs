@@ -39,7 +39,7 @@ pub trait MoleculeProjectsReader: Send + Sync {
 
     async fn changelog_projection_data_frame(&self) -> Result<Option<DataFrameExt>, QueryError> {
         self.raw_reader()
-            .changelog_projection_data_frame_by("account_id")
+            .changelog_projection_data_frame_by("ocl_id")
             .await
     }
 
@@ -48,7 +48,7 @@ pub trait MoleculeProjectsReader: Send + Sync {
         ocl_id: &str,
     ) -> Result<Option<serde_json::Value>, QueryError> {
         self.raw_reader()
-            .changelog_projection_entry_by("account_id", "ocl_id", ocl_id)
+            .changelog_projection_entry_by("ocl_id", "ocl_id", ocl_id)
             .await
     }
 }
