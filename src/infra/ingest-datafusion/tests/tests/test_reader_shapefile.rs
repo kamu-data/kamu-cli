@@ -9,10 +9,11 @@
 
 use std::assert_matches;
 
-use datafusion::arrow::array::StringViewArray;
+use datafusion::arrow::array::StringArray;
 use datafusion::prelude::{SessionContext, *};
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
+use odf::schema::*;
 
 use super::test_reader_common;
 
@@ -27,16 +28,16 @@ async fn test_read_shapefile_with_schema() {
         ReaderEsriShapefile::new(
             SessionContext::new(),
             odf::metadata::ReadStepEsriShapefile {
-                schema: Some(vec![
-                    "iso string not null".to_string(),
-                    "name_0 string not null".to_string(),
-                    "name_1 string not null".to_string(),
-                ]),
-                sub_path: None,
+                schema: Some(DataSchema::new(vec![
+                    DataField::string("iso"),
+                    DataField::string("name_0"),
+                    DataField::string("name_1"),
+                ])),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp"),
         )
-        .await
         .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
@@ -99,13 +100,10 @@ async fn test_read_shapefile_infer_schema() {
     test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
-            odf::metadata::ReadStepEsriShapefile {
-                schema: None,
-                sub_path: None,
-            },
+            odf::metadata::ReadStepEsriShapefile::default(),
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp"),
         )
-        .await
         .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
@@ -150,12 +148,12 @@ async fn test_read_shapefile_with_subpath_exists() {
         ReaderEsriShapefile::new(
             SessionContext::new(),
             odf::metadata::ReadStepEsriShapefile {
-                schema: None,
                 sub_path: Some("gg870xt4706.shp".to_string()),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp"),
         )
-        .await
         .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
@@ -178,12 +176,12 @@ async fn test_read_shapefile_with_subpath_missing() {
         ReaderEsriShapefile::new(
             SessionContext::new(),
             odf::metadata::ReadStepEsriShapefile {
-                schema: None,
                 sub_path: Some("invalid.shp".to_string()),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp"),
         )
-        .await
         .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
@@ -206,15 +204,15 @@ async fn test_read_shapefile_geom() {
         ReaderEsriShapefile::new(
             SessionContext::new(),
         odf::metadata::ReadStepEsriShapefile {
-                schema: Some(vec![
-                    "geometry string not null".to_string(),
-                    "name_1 string not null".to_string(),
-                ]),
-                sub_path: None,
+            schema: Some(DataSchema::new(vec![
+                    DataField::string("geometry"),
+                    DataField::string("name_1"),
+                ])),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp")
         )
-        .await
         .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
@@ -235,7 +233,7 @@ async fn test_read_shapefile_geom() {
             let geom = batch
                 .column(0)
                 .as_any()
-                .downcast_ref::<StringViewArray>()
+                .downcast_ref::<StringArray>()
                 .unwrap()
                 .value(0);
 

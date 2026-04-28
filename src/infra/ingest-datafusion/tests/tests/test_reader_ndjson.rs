@@ -13,6 +13,7 @@ use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
+use odf::schema::*;
 
 use super::test_reader_common;
 
@@ -25,14 +26,14 @@ async fn test_read_ndjson_with_schema() {
         ReaderNdJson::new(
             SessionContext::new(),
             odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "city string not null".to_string(),
-                    "population int not null".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::string("city"),
+                    DataField::i32("population"),
+                ])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -75,8 +76,8 @@ async fn test_read_ndjson_infer_schema() {
             odf::metadata::ReadStepNdJson {
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -117,11 +118,11 @@ async fn test_read_ndjson_format_date() {
         ReaderNdJson::new(
             SessionContext::new(),
             odf::metadata::ReadStepNdJson {
-                schema: Some(vec!["date date not null".to_string()]),
+                schema: Some(DataSchema::new(vec![DataField::date("date")])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -163,11 +164,13 @@ async fn test_read_ndjson_format_timestamp() {
         ReaderNdJson::new(
             SessionContext::new(),
             odf::metadata::ReadStepNdJson {
-                schema: Some(vec!["event_time timestamp not null".to_string()]),
+                schema: Some(DataSchema::new(vec![DataField::timestamp_millis_utc(
+                    "event_time",
+                )])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -180,7 +183,7 @@ async fn test_read_ndjson_format_timestamp() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 event_time (TIMESTAMP(NANOS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
             }
             "#
         ),
@@ -215,11 +218,13 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
         ReaderNdJson::new(
             SessionContext::new(),
             odf::metadata::ReadStepNdJson {
-                schema: Some(vec!["event_time timestamp not null".to_string()]),
+                schema: Some(DataSchema::new(vec![DataField::timestamp_millis_utc(
+                    "event_time",
+                )])),
                 ..Default::default()
             },
+            &ToArrowSettings::default(),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"

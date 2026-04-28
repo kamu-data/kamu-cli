@@ -51,10 +51,10 @@ async fn test_ingest_polling_snapshot() {
                 }))
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .preprocess(odf::metadata::TransformSql {
@@ -129,8 +129,8 @@ async fn test_ingest_polling_snapshot() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -257,12 +257,11 @@ async fn test_ingest_polling_ledger() {
                 }))
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -307,8 +306,8 @@ async fn test_ingest_polling_ledger() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -541,12 +540,11 @@ async fn test_ingest_polling_event_time_as_date() {
                 }))
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["date DATE", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::date("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .merge(odf::metadata::MergeStrategySnapshot {
@@ -591,8 +589,8 @@ async fn test_ingest_polling_event_time_as_date() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT32 date (DATE);
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -645,11 +643,11 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
                 }))
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "date STRING".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .build(),
@@ -705,11 +703,11 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                     headers: None,
                 }))
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec![
-                        "\"Date (UTC)\" DATE not null".to_string(),
-                        "\"City Name\" STRING not null".to_string(),
-                        "\"Population\" BIGINT not null".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::date("Date (UTC)"),
+                        odf::schema::DataField::string("City Name"),
+                        odf::schema::DataField::i64("Population"),
+                    ])),
                     ..odf::metadata::ReadStepNdJson::default()
                 })
                 .build(),
@@ -889,11 +887,11 @@ async fn test_ingest_polling_schema_case_sensitivity() {
                 }))
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "date TIMESTAMP".to_string(),
-                        "UPPER STRING".to_string(),
-                        "lower BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("UPPER"),
+                        odf::schema::DataField::i64("lower"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -938,8 +936,8 @@ async fn test_ingest_polling_schema_case_sensitivity() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY UPPER (STRING);
-                  OPTIONAL INT64 lower;
+                  REQUIRED BYTE_ARRAY UPPER (STRING);
+                  REQUIRED INT64 lower;
                 }
                 "#
             ),
@@ -1072,10 +1070,10 @@ async fn test_ingest_polling_preprocess_with_spark() {
                 .fetch_file(&src_path)
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .preprocess(odf::metadata::TransformSql {
@@ -1165,10 +1163,10 @@ async fn test_ingest_polling_preprocess_with_flink() {
                 .fetch_file(&src_path)
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .preprocess(odf::metadata::TransformSql {
@@ -1209,8 +1207,8 @@ async fn test_ingest_polling_preprocess_with_flink() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),

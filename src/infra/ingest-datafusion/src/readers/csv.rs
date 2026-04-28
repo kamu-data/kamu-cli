@@ -22,21 +22,35 @@ use crate::*;
 
 pub struct ReaderCsv {
     ctx: SessionContext,
-    schema: Option<SchemaRef>,
     conf: odf::metadata::ReadStepCsv,
+    schema_arrow: Option<SchemaRef>,
 }
 
 impl ReaderCsv {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
 
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepCsv,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
     ) -> Result<Self, ReadError> {
+        assert!(
+            conf.ddl_schema.is_none(),
+            "DDL schema must be normalized before into ODF before creating a reader"
+        );
+
+        let schema_arrow = conf
+            .schema
+            .as_ref()
+            .map(|s| s.to_arrow(to_arrow_settings))
+            .transpose()
+            .int_err()?
+            .map(std::sync::Arc::new);
+
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
             conf,
+            schema_arrow,
         })
     }
 }
@@ -45,8 +59,12 @@ impl ReaderCsv {
 
 #[async_trait::async_trait]
 impl Reader for ReaderCsv {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.schema.clone()
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.conf.schema.as_ref()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.schema_arrow.as_ref()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderCsv::read", skip_all)]
@@ -107,7 +125,7 @@ impl Reader for ReaderCsv {
         }?;
 
         let options = CsvReadOptions {
-            schema: self.schema.as_deref(),
+            schema: self.schema_arrow.as_deref(),
             delimiter,
             terminator: None,
             comment: None,

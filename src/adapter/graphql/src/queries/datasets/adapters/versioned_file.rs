@@ -32,22 +32,23 @@ impl<'a> VersionedFile<'a> {
         Self { readable_state }
     }
 
+    // TODO: Replace `Vec<ColumnInput>` with a schema GQL input object
     pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        use kamu_datasets::{DatasetColumn, DatasetSnapshots};
-
-        DatasetSnapshots::versioned_file(
-            alias,
-            extra_columns
+        let extra_columns_schema = odf::utils::schema::parse::parse_ddl_to_odf_schema(
+            &extra_columns
                 .into_iter()
-                .map(|c| DatasetColumn {
-                    name: c.name,
-                    data_type_ddl: c.data_type.ddl,
-                })
-                .collect(),
+                .map(|c| format!("{} {}", c.name, c.data_type.ddl))
+                .collect::<Vec<String>>()
+                .join(", "),
+        )?;
+
+        kamu_datasets::DatasetSnapshots::versioned_file(
+            alias,
+            extra_columns_schema.fields,
             extra_events,
         )
     }

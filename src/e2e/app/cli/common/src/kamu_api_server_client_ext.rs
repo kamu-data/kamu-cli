@@ -53,10 +53,21 @@ pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
           read:
             kind: NdJson
             schema:
-              - "match_time TIMESTAMP"
-              - "match_id BIGINT"
-              - "player_id STRING"
-              - "score BIGINT"
+              fields:
+                - name: match_time
+                  type:
+                    kind: Timestamp
+                    unit: Millisecond
+                    timezone: UTC
+                - name: match_id
+                  type:
+                    kind: int64
+                - name: player_id
+                  type:
+                    kind: string
+                - name: score
+                  type:
+                    kind: int64
           merge:
             kind: Ledger
             primaryKey:

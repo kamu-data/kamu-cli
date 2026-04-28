@@ -47,12 +47,11 @@ async fn test_ingest_push_url_stream() {
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -106,8 +105,8 @@ async fn test_ingest_push_url_stream() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -191,12 +190,11 @@ async fn test_ingest_push_media_type_override() {
         .push_event(
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..Default::default()
                 })
                 .merge(odf::metadata::MergeStrategyLedger {
@@ -250,8 +248,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -301,8 +299,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -354,8 +352,8 @@ async fn test_ingest_push_media_type_override() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -386,12 +384,11 @@ async fn test_ingest_push_schema_stability() {
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| (*s).to_string())
-                            .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategyAppend {})
@@ -493,14 +490,14 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -554,14 +551,14 @@ async fn test_ingest_push_schema_stability() {
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }, {
                 "name": "population",
                 "data_type": "Int64",
                 "dict_id": 0,
                 "dict_is_ordered": false,
                 "metadata": {},
-                "nullable": true,
+                "nullable": false,
             }],
             "metadata": {},
         }),
@@ -1077,11 +1074,11 @@ async fn test_ingest_push_schema_and_source_evolution() {
         .push_event(
             MetadataFactory::add_push_source()
                 .read(ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                    ])),
                     ..Default::default()
                 })
                 .merge(MergeStrategyLedger {
@@ -1157,12 +1154,12 @@ async fn test_ingest_push_schema_and_source_evolution() {
             AddPushSource {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_string(),
-                        "city STRING".to_string(),
-                        "population BIGINT".to_string(),
-                        "census_url STRING".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                        odf::schema::DataField::string("census_url").optional(),
+                    ])),
                     ..Default::default()
                 }
                 .into(),

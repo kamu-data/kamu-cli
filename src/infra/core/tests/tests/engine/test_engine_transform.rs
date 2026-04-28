@@ -422,10 +422,10 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
                 .fetch_file(&src_path)
                 .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population INT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i32("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 }))
                 .merge(odf::metadata::MergeStrategySnapshot {
@@ -526,8 +526,8 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT32 population_x10;
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT32 population_x10;
             }
             "#
         ),
@@ -601,8 +601,8 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT32 population_x10;
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT32 population_x10;
             }
             "#
         ),
@@ -742,30 +742,22 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
         let f = f.clone();
         let (q, _) = s.qualified_field(i);
         let f = match engine {
-            // Datafusion has poor control over nullability
-            "datafusion" => match f.name().as_str() {
-                "offset" | "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
-                _ => f,
-            },
-            // Spark:
-            // - produces optional `offset` and `event_time`
+            // Datafusion, Flink - all good
+            "datafusion" | "flink" => f,
+            // Spark produces all columns as optional except `offset` and `system_time`
             "spark" => match f.name().as_str() {
-                "op" => {
+                "offset" | "system_time" => f,
+                _ => {
                     assert!(f.is_nullable());
                     Arc::new(f.as_ref().clone().with_nullable(false))
                 }
-                "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
-                _ => f,
             },
-            // Flink:
-            // - produces optional `event_time`
-            "flink" => match f.name().as_str() {
-                "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
-                _ => f,
-            },
-            // RisingWave has no control over nullability
+            // RisingWave has no control over nullability - all fields in select are null
             "risingwave" => match f.name().as_str() {
-                "offset" | "event_time" => Arc::new(f.as_ref().clone().with_nullable(false)),
+                "event_time" | "city" | "population_x10" => {
+                    assert!(f.is_nullable());
+                    Arc::new(f.as_ref().clone().with_nullable(false))
+                }
                 _ => f,
             },
             _ => unreachable!(),
@@ -868,10 +860,10 @@ async fn test_transform_empty_inputs() {
         .commit_event(
             MetadataFactory::add_push_source()
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population INT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i32("population"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -913,9 +905,9 @@ async fn test_transform_empty_inputs() {
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time"),
-            odf::schema::DataField::string("city").optional(),
+            odf::schema::DataField::string("city"),
             odf::schema::DataField::string("country"),
-            odf::schema::DataField::i32("population").optional(),
+            odf::schema::DataField::i32("population"),
         ]))
         .await;
 
@@ -957,9 +949,9 @@ async fn test_transform_empty_inputs() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
+                  REQUIRED BYTE_ARRAY city (STRING);
                   REQUIRED BYTE_ARRAY country (STRING);
-                  OPTIONAL INT32 population;
+                  REQUIRED INT32 population;
                 }
                 "#
             ),

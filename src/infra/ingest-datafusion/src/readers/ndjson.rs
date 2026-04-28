@@ -22,21 +22,35 @@ use crate::*;
 
 pub struct ReaderNdJson {
     ctx: SessionContext,
-    schema: Option<SchemaRef>,
     conf: odf::metadata::ReadStepNdJson,
+    schema_arrow: Option<SchemaRef>,
 }
 
 impl ReaderNdJson {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
 
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepNdJson,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
     ) -> Result<Self, ReadError> {
+        assert!(
+            conf.ddl_schema.is_none(),
+            "DDL schema must be normalized before into ODF before creating a reader"
+        );
+
+        let schema_arrow = conf
+            .schema
+            .as_ref()
+            .map(|s| s.to_arrow(to_arrow_settings))
+            .transpose()
+            .int_err()?
+            .map(std::sync::Arc::new);
+
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
             conf,
+            schema_arrow,
         })
     }
 }
@@ -45,8 +59,12 @@ impl ReaderNdJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderNdJson {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.schema.clone()
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.conf.schema.as_ref()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.schema_arrow.as_ref()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderNdJson::read", skip_all)]
@@ -68,7 +86,7 @@ impl Reader for ReaderNdJson {
         let options = JsonReadOptions {
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
-            schema: self.schema.as_deref(),
+            schema: self.schema_arrow.as_deref(),
             schema_infer_max_records: Self::DEFAULT_INFER_SCHEMA_ROWS,
             // TODO: PERF: Reader support compression, thus we could detect decompress step and
             // optimize the ingest plan to avoid writing uncompressed data to disc or having to

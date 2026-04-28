@@ -3436,13 +3436,13 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepCsv {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	
 	Examples:
 	- ["date TIMESTAMP","city STRING","population INT"]
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets a single character as a separator for each field and value.
 	
@@ -3504,6 +3504,10 @@ type ReadStepCsv {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3513,16 +3517,20 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepEsriShapefile {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	If the ZIP archive contains multiple shapefiles use this field to
 	specify a sub-path to the desired `.shp` file. Can contain glob patterns
 	to act as a filter.
 	"""
 	subPath: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3535,10 +3543,14 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepGeoJson {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3554,10 +3566,10 @@ type ReadStepJson {
 	"""
 	subPath: String
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets the string that indicates a date format. The `rfc3339` is the only
 	required format, the other format strings are implementation-specific.
@@ -3579,6 +3591,10 @@ type ReadStepJson {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3590,10 +3606,14 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepNdGeoJson {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3604,10 +3624,10 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepNdJson {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets the string that indicates a date format. The `rfc3339` is the only
 	required format, the other format strings are implementation-specific.
@@ -3629,6 +3649,10 @@ type ReadStepNdJson {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 """
@@ -3638,10 +3662,14 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type ReadStepParquet {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema: DataSchema
 }
 
 interface RemoveWebhookSubscriptionResult {

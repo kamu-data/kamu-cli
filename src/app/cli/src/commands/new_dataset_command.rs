@@ -69,9 +69,18 @@ impl NewDatasetCommand {
                             header: true
                             timestampFormat: yyyy-M-d
                             schema:
-                              - "date TIMESTAMP"
-                              - "city STRING"
-                              - "population STRING"
+                              fields:
+                                - name: date
+                                  type:
+                                    kind: Timestamp
+                                    unit: Millisecond
+                                    timezone: UTC
+                                - name: city
+                                  type:
+                                    kind: String
+                                - name: population
+                                  type:
+                                    kind: String
                           # OPTIONAL: Pre-processing query that shapes the data.
                           # Useful for converting text data read from CSVs into strict types
                           # See: https://docs.kamu.dev/odf/reference/#transform

@@ -118,10 +118,10 @@ async fn test_engine_io_common<
                 .fetch_file(&src_path)
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population INT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i32("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategySnapshot {

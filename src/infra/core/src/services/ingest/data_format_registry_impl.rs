@@ -106,20 +106,34 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
         &self,
         ctx: SessionContext,
         conf: ReadStep,
+        to_arrow_settings: odf::schema::ToArrowSettings,
         temp_path: PathBuf,
     ) -> Result<Arc<dyn Reader>, ReadError> {
         let reader: Arc<dyn Reader> = match conf {
-            ReadStep::Csv(conf) => Arc::new(ReaderCsv::new(ctx, conf).await?),
-            ReadStep::Json(conf) => Arc::new(ReaderJson::new(ctx, conf, temp_path).await?),
-            ReadStep::NdJson(conf) => Arc::new(ReaderNdJson::new(ctx, conf).await?),
-            ReadStep::GeoJson(conf) => Arc::new(ReaderGeoJson::new(ctx, conf, temp_path).await?),
-            ReadStep::NdGeoJson(conf) => {
-                Arc::new(ReaderNdGeoJson::new(ctx, conf, temp_path).await?)
+            ReadStep::Csv(conf) => Arc::new(ReaderCsv::new(ctx, conf, &to_arrow_settings)?),
+            ReadStep::Json(conf) => {
+                Arc::new(ReaderJson::new(ctx, conf, &to_arrow_settings, temp_path)?)
             }
-            ReadStep::EsriShapefile(conf) => {
-                Arc::new(ReaderEsriShapefile::new(ctx, conf, temp_path).await?)
-            }
-            ReadStep::Parquet(conf) => Arc::new(ReaderParquet::new(ctx, conf).await?),
+            ReadStep::NdJson(conf) => Arc::new(ReaderNdJson::new(ctx, conf, &to_arrow_settings)?),
+            ReadStep::GeoJson(conf) => Arc::new(ReaderGeoJson::new(
+                ctx,
+                conf,
+                &to_arrow_settings,
+                temp_path,
+            )?),
+            ReadStep::NdGeoJson(conf) => Arc::new(ReaderNdGeoJson::new(
+                ctx,
+                conf,
+                &to_arrow_settings,
+                temp_path,
+            )?),
+            ReadStep::EsriShapefile(conf) => Arc::new(ReaderEsriShapefile::new(
+                ctx,
+                conf,
+                &to_arrow_settings,
+                temp_path,
+            )?),
+            ReadStep::Parquet(conf) => Arc::new(ReaderParquet::new(ctx, conf, &to_arrow_settings)?),
         };
 
         Ok(reader)
@@ -143,7 +157,7 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
 
     fn get_best_effort_config(
         &self,
-        schema: Option<Vec<String>>,
+        schema: Option<odf::schema::DataSchema>,
         media_type: &MediaType,
     ) -> Result<ReadStep, UnsupportedMediaTypeError> {
         use odf::metadata::*;
@@ -167,9 +181,21 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
                 ..Default::default()
             }
             .into()),
-            MediaType::GEOJSON => Ok(ReadStepGeoJson { schema }.into()),
-            MediaType::NDGEOJSON => Ok(ReadStepNdGeoJson { schema }.into()),
-            MediaType::PARQUET => Ok(ReadStepParquet { schema }.into()),
+            MediaType::GEOJSON => Ok(ReadStepGeoJson {
+                schema,
+                ..Default::default()
+            }
+            .into()),
+            MediaType::NDGEOJSON => Ok(ReadStepNdGeoJson {
+                schema,
+                ..Default::default()
+            }
+            .into()),
+            MediaType::PARQUET => Ok(ReadStepParquet {
+                schema,
+                ..Default::default()
+            }
+            .into()),
             MediaType::ESRI_SHAPEFILE | MediaTypeRef("x-gis/x-shapefile") => {
                 Ok(ReadStepEsriShapefile {
                     schema,

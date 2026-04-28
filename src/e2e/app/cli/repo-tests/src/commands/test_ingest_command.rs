@@ -31,11 +31,11 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
                 odf::metadata::AddPushSource {
                     source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("event_time"),
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -84,8 +84,8 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
             }
             "#
         ),
@@ -115,10 +115,10 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
                 odf::metadata::AddPushSource {
                     source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -171,8 +171,8 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
             }
             "#
         ),

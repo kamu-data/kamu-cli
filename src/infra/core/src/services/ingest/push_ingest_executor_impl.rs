@@ -308,18 +308,23 @@ impl PushIngestExecutorImpl {
         let temp_path = args.operation_dir.join("reader.tmp");
         let reader = self
             .data_format_registry
-            .get_reader(ctx.clone(), conf, temp_path)
+            .get_reader(
+                ctx.clone(),
+                conf,
+                odf::schema::ToArrowSettings::default(),
+                temp_path,
+            )
             .await?;
 
         if input_data_path.metadata().int_err()?.len() == 0 {
-            if let Some(read_schema) = reader.input_schema().await {
+            if let Some(read_schema) = reader.schema_arrow() {
                 tracing::info!(
                     path = ?input_data_path,
                     "Returning an empty data frame as input file is empty",
                 );
 
                 let df = ctx
-                    .read_batch(RecordBatch::new_empty(read_schema))
+                    .read_batch(RecordBatch::new_empty(read_schema.clone()))
                     .int_err()?;
 
                 return Ok(Some(df.into()));

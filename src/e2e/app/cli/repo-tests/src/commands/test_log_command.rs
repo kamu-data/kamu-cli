@@ -78,15 +78,13 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
             let expected_push_source = odf::metadata::AddPushSource {
                 source_name: "default".to_string(),
                 read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec![
-                        "match_time TIMESTAMP".into(),
-                        "match_id BIGINT".into(),
-                        "player_id STRING".into(),
-                        "score BIGINT".into(),
-                    ]),
-                    date_format: None,
-                    encoding: None,
-                    timestamp_format: None,
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("match_time"),
+                        odf::schema::DataField::i64("match_id"),
+                        odf::schema::DataField::string("player_id"),
+                        odf::schema::DataField::i64("score"),
+                    ])),
+                    ..Default::default()
                 }),
                 preprocess: None,
                 merge: odf::metadata::MergeStrategy::Ledger(odf::metadata::MergeStrategyLedger {
@@ -128,9 +126,9 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
                         DataField::i32("op"),
                         DataField::timestamp_millis_utc("system_time"),
                         DataField::timestamp_millis_utc("match_time"),
-                        DataField::i64("match_id").optional(),
-                        DataField::string("player_id").optional(),
-                        DataField::i64("score").optional(),
+                        DataField::i64("match_id"),
+                        DataField::string("player_id"),
+                        DataField::i64("score"),
                     ],
                     extra: None,
                 }),

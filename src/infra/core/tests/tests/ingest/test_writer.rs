@@ -780,7 +780,7 @@ fn test_data_writer_offsets_are_sequential_partitioned() {
                   BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Field { "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW": UInt64 }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], mode=[Sorted]
                     SortExec: expr=[event_time@1 ASC], preserve_partitioning=[true]
                       RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
-                        DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[0 as op, CASE WHEN CAST(event_time@0 AS Timestamp(ms, "UTC")) IS NOT NULL THEN CAST(event_time@0 AS Timestamp(ms, "UTC")) ELSE 946728000000 END as event_time, city, population, 1262347200000 as system_time], file_type=json
+                        DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[0 as op, event_time, city, population, 1262347200000 as system_time], file_type=json
             "#
         ).trim(),
         plan
@@ -807,7 +807,7 @@ fn test_data_writer_offsets_are_sequential_serialized() {
               ProjectionExec: expr=[CAST(CAST(row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW@5 AS Decimal128(20, 0)) + Some(-1),20,0 AS Int64) as offset, op@0 as op, system_time@4 as system_time, event_time@1 as event_time, city@2 as city, population@3 as population]
                 BoundedWindowAggExec: wdw=[row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW: Field { "row_number() PARTITION BY [Int32(1)] ORDER BY [event_time ASC NULLS FIRST] ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW": UInt64 }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], mode=[Sorted]
                   SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
-                    DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[0 as op, CASE WHEN CAST(event_time@0 AS Timestamp(ms, "UTC")) IS NOT NULL THEN CAST(event_time@0 AS Timestamp(ms, "UTC")) ELSE 946728000000 END as event_time, city, population, 1262347200000 as system_time], file_type=json
+                    DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[0 as op, event_time, city, population, 1262347200000 as system_time], file_type=json
             "#
         ).trim(),
         plan
@@ -860,15 +860,15 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     let df = ReaderNdJson::new(
         ctx.clone(),
         odf::metadata::ReadStepNdJson {
-            schema: Some(vec![
-                "event_time TIMESTAMP".to_string(),
-                "city STRING".to_string(),
-                "population BIGINT".to_string(),
-            ]),
+            schema: Some(odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::timestamp_millis_utc("event_time"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])),
             ..Default::default()
         },
+        &odf::schema::ToArrowSettings::default(),
     )
-    .await
     .unwrap()
     .read(&data_path)
     .await
@@ -2211,11 +2211,11 @@ async fn test_data_writer_builder_scan_push_source() {
     let harness = Harness::new(vec![
         MetadataFactory::add_push_source()
             .read(odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "event_time".to_string(),
-                    "city".to_string(),
-                    "population".to_string(),
-                ]),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
                 ..Default::default()
             })
             .merge(odf::metadata::MergeStrategyLedger {
@@ -2254,11 +2254,11 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     let harness = Harness::new(vec![
         MetadataFactory::add_push_source()
             .read(odf::metadata::ReadStepNdJson {
-                schema: Some(vec![
-                    "event_time".to_string(),
-                    "city".to_string(),
-                    "population".to_string(),
-                ]),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
                 ..Default::default()
             })
             .merge(odf::metadata::MergeStrategyLedger {
@@ -2444,6 +2444,8 @@ impl Harness {
         schema: &str,
         new_source_state: Option<odf::metadata::SourceState>,
     ) -> Result<WriteDataResult, WriteDataError> {
+        let schema = odf::utils::schema::parse::parse_ddl_to_odf_schema(schema).unwrap();
+
         let df = if data.is_empty() {
             None
         } else {
@@ -2454,11 +2456,11 @@ impl Harness {
                 self.ctx.clone(),
                 odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(schema.split(',').map(ToString::to_string).collect()),
+                    schema: Some(schema),
                     ..Default::default()
                 },
+                &odf::schema::ToArrowSettings::default(),
             )
-            .await
             .unwrap()
             .read(&data_path)
             .await

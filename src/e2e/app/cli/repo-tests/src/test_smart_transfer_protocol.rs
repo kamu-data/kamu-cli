@@ -952,9 +952,9 @@ async fn test_smart_push_all_smart_pull_all(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -976,9 +976,9 @@ async fn test_smart_push_all_smart_pull_all(
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 place (INTEGER(64,false));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1250,9 +1250,9 @@ async fn test_smart_push_recursive_smart_pull_recursive(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1274,9 +1274,9 @@ async fn test_smart_push_recursive_smart_pull_recursive(
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 place (INTEGER(64,false));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
@@ -1532,9 +1532,9 @@ async fn test_simple_push_to_s3_smart_pull(
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         );
