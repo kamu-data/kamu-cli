@@ -22,6 +22,8 @@ pub struct Symbol(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: store as [u8; 32]?
+
 static OCL_ID_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^0x[0-9a-f]{64}$").unwrap());
 

@@ -9,6 +9,7 @@
 
 use kamu_search::*;
 
+use crate::OclId;
 use crate::search::schemas::molecule_search_schema_common as molecule_schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +77,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn unique_id_for_data_room_entry(ocl_id: &str, entry_path: &str) -> String {
+pub fn unique_id_for_data_room_entry(ocl_id: &OclId, entry_path: &str) -> String {
     format!("{ocl_id}:{entry_path}")
 }
 

@@ -18,6 +18,7 @@ pub trait MoleculeFindProjectAnnouncementUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_project: &MoleculeProject,
+        // todo type
         id: uuid::Uuid,
     ) -> Result<Option<MoleculeAnnouncement>, MoleculeFindProjectAnnouncementError>;
 }

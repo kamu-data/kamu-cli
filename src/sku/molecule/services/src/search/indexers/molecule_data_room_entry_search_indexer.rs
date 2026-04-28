@@ -21,6 +21,7 @@ use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewProjectsUseCase,
+    OclId,
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
@@ -48,14 +49,14 @@ pub(crate) struct MoleculeDataRoomEntryIndexingHelper<'a> {
 impl MoleculeDataRoomEntryIndexingHelper<'_> {
     pub(crate) async fn index_data_room_entry_from_entity(
         &self,
-        ocl_id: &str,
+        ocl_id: &OclId,
         entry: &MoleculeDataRoomEntry,
         content_text: Option<&String>,
     ) -> Result<serde_json::Value, InternalError> {
         let mut index_doc = serde_json::json!({
             molecule_schema::fields::EVENT_TIME: entry.event_time,
             molecule_schema::fields::SYSTEM_TIME: entry.system_time,
-            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id.to_string(),
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id,
             molecule_schema::fields::OCL_ID: ocl_id,
             molecule_schema::fields::REF: entry.reference,
             molecule_schema::fields::PATH: entry.path,
@@ -71,7 +72,7 @@ impl MoleculeDataRoomEntryIndexingHelper<'_> {
             molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
             molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![ self.molecule_account_id.to_string() ],
+            kamu_search::fields::PRINCIPAL_IDS: [self.molecule_account_id],
         });
 
         self.attach_embeddings(
@@ -380,16 +381,12 @@ async fn index_project_data(
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
         let document = indexing_helper
-            .index_data_room_entry_from_entity(
-                project_data.project.ocl_id.as_ref(),
-                &entry,
-                content_text,
-            )
+            .index_data_room_entry_from_entity(&project_data.project.ocl_id, &entry, content_text)
             .await?;
 
         operations.push(SearchIndexUpdateOperation::Index {
             id: data_room_entry_schema::unique_id_for_data_room_entry(
-                &project_data.project.ocl_id.as_ref(),
+                &project_data.project.ocl_id,
                 &entry.path,
             ),
             doc: document,

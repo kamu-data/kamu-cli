@@ -43,7 +43,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ocl_id: String,
+        ocl_id: OclId,
     ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
         // Gain write access to projects dataset
         let projects_writer = self

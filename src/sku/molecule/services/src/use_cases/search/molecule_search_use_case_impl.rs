@@ -367,18 +367,18 @@ impl MoleculeSearchUseCaseImpl {
                 .map(|hit| match hit.schema_name {
                     dataroom_entry_schema::SCHEMA_NAME => {
                         // Extract "ocl_id" field from source
-                        let ocl_id = if let Some(obj) = hit.source.as_object() {
-                            obj.get(molecule_schema::fields::OCL_ID)
-                                .and_then(|v| v.as_str())
-                                .map(ToString::to_string)
-                                .ok_or_else(|| {
-                                    InternalError::new(
-                                        "Missing or invalid ocl_id field in search hit",
-                                    )
-                                })?
-                        } else {
-                            unreachable!()
-                        };
+                        let ocl_id = hit
+                            .source
+                            .get(molecule_schema::fields::OCL_ID)
+                            .and_then(serde_json::Value::as_str)
+                            .and_then(|v| OclId::try_new(v).ok())
+                            .ok_or_else(|| {
+                                format!(
+                                    "Missing or invalid ocl_id field in search hit: [{}]",
+                                    hit.source
+                                )
+                                .int_err()
+                            })?;
 
                         // Recover data room entry
                         let data_room_entry =

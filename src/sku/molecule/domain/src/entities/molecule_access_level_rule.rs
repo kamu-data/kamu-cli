@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::OclId;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoleculeAccessLevelRule {
-    pub ocl_id: Option<String>,
+    pub ocl_id: Option<OclId>,
     pub access_levels: Vec<String>,
 }
 

@@ -137,7 +137,7 @@ impl MoleculeDataRoomSearchUpdater {
 
         let Some(existing_document) = maybe_existing_document else {
             tracing::warn!(
-                ocl_id = moved_message.ocl_id.as_str(),
+                ocl_id = moved_message.ocl_id.as_ref(),
                 path_from = moved_message.path_from.as_str(),
                 "Could not find document for moved data room entry at its old location. Skipping \
                  move handling.",

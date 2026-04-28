@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::MoleculeAccessLevelRule;
+use crate::{MoleculeAccessLevelRule, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,7 +102,7 @@ impl MoleculeAnnouncement {
 
 #[derive(Clone, Debug)]
 pub struct MoleculeGlobalAnnouncement {
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub announcement: MoleculeAnnouncement,
 }
 
@@ -137,7 +137,7 @@ impl MoleculeGlobalAnnouncement {
             #[serde(flatten)]
             pub timestamp_columns: odf::serde::DatasetDefaultVocabularyTimestampColumns,
 
-            pub ocl_id: String,
+            pub ocl_id: OclId,
 
             #[serde(flatten)]
             pub payload: MoleculeAnnouncementPayloadRecord,
@@ -184,7 +184,7 @@ pub type MoleculeAnnouncementChangelogInsertionRecord =
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct MoleculeGlobalAnnouncementPayloadRecord {
-    pub ocl_id: String,
+    pub ocl_id: OclId,
 
     #[serde(flatten)]
     pub announcement: MoleculeAnnouncementPayloadRecord,

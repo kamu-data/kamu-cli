@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::MoleculeDataRoomEntry;
+use crate::{MoleculeDataRoomEntry, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,8 +36,7 @@ pub struct MoleculeDataRoomActivity {
 
     pub activity_type: MoleculeDataRoomFileActivityType,
 
-    // TODO: typing
-    pub ocl_id: String,
+    pub ocl_id: OclId,
 
     pub path: kamu_datasets::CollectionPathV2,
 
@@ -126,7 +125,7 @@ impl MoleculeDataRoomActivity {
         offset: u64,
         activity_type: MoleculeDataRoomFileActivityType,
         entry: MoleculeDataRoomEntry,
-        ocl_id: String,
+        ocl_id: OclId,
     ) -> Self {
         Self {
             offset,
@@ -155,7 +154,7 @@ impl MoleculeDataRoomActivity {
 pub struct MoleculeDataRoomActivityPayloadRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 
-    pub ocl_id: String,
+    pub ocl_id: OclId,
 
     pub path: kamu_datasets::CollectionPathV2,
 
@@ -187,7 +186,7 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
 impl MoleculeDataRoomActivityPayloadRecord {
     fn total_size_bytes(&self) -> usize {
         let stack_size = size_of::<Self>();
-        let heap_size = self.ocl_id.len()
+        let heap_size = self.ocl_id.as_ref().len()
             + self.path.len()
             + self.change_by.len()
             + self.access_level.len()

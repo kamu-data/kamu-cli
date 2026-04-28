@@ -13,6 +13,8 @@ use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     MoleculeProject,
     MoleculeViewProjectsUseCase,
+    OclId,
+    Symbol,
     molecule_project_search_schema as project_schema,
     molecule_search_schema_common as molecule_schema,
 };
@@ -47,8 +49,8 @@ pub(crate) fn index_project_from_entity(
 
 pub(crate) fn index_project_from_parts(
     molecule_account_id: &odf::AccountID,
-    ocl_id: &str,
-    symbol: &str,
+    ocl_id: &OclId,
+    symbol: &Symbol,
     account_id: &odf::AccountID,
     event_time: DateTime<Utc>,
     system_time: DateTime<Utc>,
@@ -116,7 +118,7 @@ pub(crate) async fn index_projects(
         // Note: for now, use OCL ID as document ID
         // This should be revised after implementing non-tokenized projects
         operations.push(SearchIndexUpdateOperation::Index {
-            id: project.ocl_id.clone(),
+            id: project.ocl_id.to_string(),
             doc: document,
         });
 

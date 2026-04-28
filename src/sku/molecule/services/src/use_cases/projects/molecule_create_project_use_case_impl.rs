@@ -55,7 +55,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ocl_id: String,
+        ocl_id: OclId,
         mut symbol: String,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Gain write access to projects dataset
@@ -83,7 +83,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             let df = df
                 .filter(
                     col("ocl_id")
-                        .eq(lit(&ocl_id))
+                        .eq(lit(ocl_id.as_ref()))
                         .or(lower(col("symbol")).eq(lit(&lowercase_symbol))),
                 )
                 .int_err()?

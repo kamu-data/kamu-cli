@@ -43,7 +43,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ocl_id: String,
+        ocl_id: OclId,
     ) -> Result<MoleculeProject, MoleculeEnableProjectError> {
         use datafusion::prelude::*;
 
@@ -72,7 +72,7 @@ impl MoleculeEnableProjectUseCase for MoleculeEnableProjectUseCaseImpl {
 
         // Find the latest ledger record for the given ocl_id
         let df = ledger_df
-            .filter(col("ocl_id").eq(lit(&ocl_id)))
+            .filter(col("ocl_id").eq(lit(ocl_id.as_ref())))
             .int_err()?
             .sort(vec![col("offset").sort(false, false)])
             .int_err()?

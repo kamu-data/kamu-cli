@@ -16,6 +16,7 @@ use crate::{
     MoleculeDataRoomActivity,
     MoleculeGlobalAnnouncement,
     MoleculeSearchEntityKind,
+    OclId,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +79,7 @@ impl MoleculeSearchHitEntity {
         }
     }
 
-    pub fn ocl_id(&self) -> &String {
+    pub fn ocl_id(&self) -> &OclId {
         match self {
             Self::DataRoomActivity(entity) => &entity.ocl_id,
             Self::Announcement(entity) => &entity.ocl_id,

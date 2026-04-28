@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu_datasets::CollectionPath;
 use messaging_outbox::Message;
 
-use crate::MoleculeDataRoomEntry;
+use crate::{MoleculeDataRoomEntry, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ impl MoleculeDataRoomMessage {
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
+        ocl_id: OclId,
         data_room_entry: MoleculeDataRoomEntry,
         content_text: Option<String>,
     ) -> Self {
@@ -53,7 +53,7 @@ impl MoleculeDataRoomMessage {
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
+        ocl_id: OclId,
         data_room_entry: MoleculeDataRoomEntry,
         content_text: Option<String>,
     ) -> Self {
@@ -71,7 +71,7 @@ impl MoleculeDataRoomMessage {
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
+        ocl_id: OclId,
         path_from: CollectionPath,
         path_to: CollectionPath,
         data_room_entry: MoleculeDataRoomEntry,
@@ -91,7 +91,7 @@ impl MoleculeDataRoomMessage {
         event_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
+        ocl_id: OclId,
         path: CollectionPath,
     ) -> Self {
         Self::EntryRemoved(MoleculeDataRoomMessageEntryRemoved {
@@ -130,7 +130,7 @@ impl MoleculeDataRoomMessage {
         }
     }
 
-    pub fn ocl_id(&self) -> &String {
+    pub fn ocl_id(&self) -> &OclId {
         match self {
             MoleculeDataRoomMessage::EntryCreated(msg) => &msg.ocl_id,
             MoleculeDataRoomMessage::EntryUpdated(msg) => &msg.ocl_id,
@@ -155,7 +155,7 @@ pub struct MoleculeDataRoomMessageEntryCreated {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub data_room_entry: MoleculeDataRoomEntry,
     pub content_text: Option<String>,
 }
@@ -167,7 +167,7 @@ pub struct MoleculeDataRoomMessageEntryUpdated {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub data_room_entry: MoleculeDataRoomEntry,
     pub content_text: Option<String>,
 }
@@ -179,7 +179,7 @@ pub struct MoleculeDataRoomMessageEntryMoved {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub path_from: CollectionPath,
     pub path_to: CollectionPath,
     pub data_room_entry: MoleculeDataRoomEntry,
@@ -192,7 +192,7 @@ pub struct MoleculeDataRoomMessageEntryRemoved {
     pub event_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub path: CollectionPath,
 }
 

@@ -50,7 +50,7 @@ fn apply_access_level_rules(
                     .in_list(access_levels.into_iter().map(lit).collect(), false);
 
                 if let Some(ocl_id) = rule.ocl_id {
-                    access_expr.and(col("ocl_id").eq(lit(ocl_id)))
+                    access_expr.and(col("ocl_id").eq(lit(ocl_id.as_ref())))
                 } else {
                     access_expr
                 }

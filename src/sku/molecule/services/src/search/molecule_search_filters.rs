@@ -201,10 +201,10 @@ fn map_molecule_access_level_rules_to_search(
     for rule in access_level_rules {
         or_clauses.push(filter_and!(
             // Match access levels
-            field_in_str(molecule_schema::fields::ACCESS_LEVEL, &rule.access_levels,),
+            field_in_str(molecule_schema::fields::ACCESS_LEVEL, &rule.access_levels),
             // Match ocl_id
             match &rule.ocl_id {
-                Some(ocl_id) => field_eq_str(molecule_schema::fields::OCL_ID, ocl_id),
+                Some(ocl_id) => field_eq_str(molecule_schema::fields::OCL_ID, ocl_id.as_ref()),
                 None => unreachable!(),
             }
         ));

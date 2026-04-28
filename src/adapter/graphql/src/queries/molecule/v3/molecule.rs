@@ -72,7 +72,7 @@ impl MoleculeV3 {
     async fn get_molecule_projects_mapping(
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
-    ) -> Result<HashMap</* ocl_id */ String, Arc<MoleculeProject>>, GqlError> {
+    ) -> Result<HashMap<kamu_molecule_domain::OclId, Arc<MoleculeProject>>, GqlError> {
         let listing = molecule_view_projects_uc
             .execute(molecule_subject, None)
             .await

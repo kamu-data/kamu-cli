@@ -31,7 +31,7 @@ impl MoleculeFindProjectUseCase for MoleculeFindProjectUseCaseImpl {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
-        ocl_id: String,
+        ocl_id: OclId,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError> {
         // Gain read access to projects dataset
         let projects_reader = self

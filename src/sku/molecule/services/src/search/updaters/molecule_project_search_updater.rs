@@ -66,7 +66,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
-                    id: created_message.ocl_id.clone(),
+                    id: created_message.ocl_id.to_string(),
                     doc: project_document,
                 }],
             )
@@ -91,7 +91,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
-                    id: disabled_message.ocl_id.clone(),
+                    id: disabled_message.ocl_id.to_string(),
                     doc: partial_update,
                 }],
             )
@@ -116,7 +116,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
-                    id: reenabled_message.ocl_id.clone(),
+                    id: reenabled_message.ocl_id.to_string(),
                     doc: partial_update,
                 }],
             )

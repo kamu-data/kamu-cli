@@ -10,6 +10,8 @@
 use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 
+use crate::{OclId, Symbol};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const MOLECULE_PROJECT_MESSAGE_OUTBOX_VERSION: u32 = 1;
@@ -37,8 +39,8 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
-        symbol: String,
+        ocl_id: OclId,
+        symbol: Symbol,
     ) -> Self {
         Self::Created(MoleculeProjectMessageCreated {
             event_time,
@@ -55,8 +57,8 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
-        symbol: String,
+        ocl_id: OclId,
+        symbol: Symbol,
     ) -> Self {
         Self::Disabled(MoleculeProjectMessageDisabled {
             event_time,
@@ -73,8 +75,8 @@ impl MoleculeProjectMessage {
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
         project_account_id: odf::AccountID,
-        ocl_id: String,
-        symbol: String,
+        ocl_id: OclId,
+        symbol: Symbol,
     ) -> Self {
         Self::Reenabled(MoleculeProjectMessageReenabled {
             event_time,
@@ -110,7 +112,7 @@ impl MoleculeProjectMessage {
         }
     }
 
-    pub fn ocl_id(&self) -> &str {
+    pub fn ocl_id(&self) -> &OclId {
         match self {
             MoleculeProjectMessage::Created(msg) => &msg.ocl_id,
             MoleculeProjectMessage::Disabled(msg) => &msg.ocl_id,
@@ -134,8 +136,8 @@ pub struct MoleculeProjectMessageCreated {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
-    pub symbol: String,
+    pub ocl_id: OclId,
+    pub symbol: Symbol,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,8 +149,8 @@ pub struct MoleculeProjectMessageDisabled {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
-    pub symbol: String,
+    pub ocl_id: OclId,
+    pub symbol: Symbol,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +162,8 @@ pub struct MoleculeProjectMessageReenabled {
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
     pub project_account_id: odf::AccountID,
-    pub ocl_id: String,
-    pub symbol: String,
+    pub ocl_id: OclId,
+    pub symbol: Symbol,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

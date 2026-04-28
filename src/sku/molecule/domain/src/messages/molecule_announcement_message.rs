@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 
-use crate::MoleculeAnnouncementPayloadRecord;
+use crate::{MoleculeAnnouncementPayloadRecord, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +31,7 @@ impl MoleculeAnnouncementMessage {
         event_time: DateTime<Utc>,
         system_time: DateTime<Utc>,
         molecule_account_id: odf::AccountID,
-        ocl_id: String,
+        ocl_id: OclId,
         announcement_record: MoleculeAnnouncementPayloadRecord,
     ) -> Self {
         Self::Published(MoleculeAnnouncementMessagePublished {
@@ -59,7 +59,7 @@ pub struct MoleculeAnnouncementMessagePublished {
     pub event_time: DateTime<Utc>,
     pub system_time: DateTime<Utc>,
     pub molecule_account_id: odf::AccountID,
-    pub ocl_id: String,
+    pub ocl_id: OclId,
     pub announcement_record: MoleculeAnnouncementPayloadRecord,
 }
 
