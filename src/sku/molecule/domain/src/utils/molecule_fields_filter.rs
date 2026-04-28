@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn normalize_access_level_rules_dedups_and_merges_by_ocl_id() {
-        let ocl_id = "Ox0000000000000000000000000000000000000000000000000000000000000000"
+        let ocl_id = "0x0000000000000000000000000000000000000000000000000000000000000000"
             .parse::<OclId>()
             .unwrap();
         let rules = normalize_access_level_rules(

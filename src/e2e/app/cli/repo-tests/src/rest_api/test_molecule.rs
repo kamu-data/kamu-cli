@@ -17,6 +17,10 @@ use tokio_retry::strategy::FixedInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const OCL_ID: &str = "0x7f3a9c2e1b84d056f2a731c9e40b8d5f6a2c9e1d7b3f8a04c52e9d1b6f3a7c01";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub const MULTITENANT_MOLECULE_CONFIG: &str = indoc::indoc!(
     r#"
     kind: CLIConfig
@@ -96,7 +100,6 @@ pub async fn test_molecule_data_room_quota_exceeded(
         .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
-    const OCL_ID: &str = "ocl-quota-room-e2e";
     let create_project_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
@@ -161,7 +164,6 @@ pub async fn test_molecule_announcements_quota_exceeded(
         .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
-    const OCL_ID: &str = "ocl-quota-announce-e2e";
     let create_project_res = kamu_api_server_client
         .graphql_api_call_ex(
             Request::new(CREATE_PROJECT).variables(Variables::from_json(json!({
@@ -231,7 +233,6 @@ pub async fn test_molecule_activity_change_by_for_remove(
     const USER_PASSWORD: &str = "molecule.dev";
     const USER_DID: &str = "did:ethr:0xE2eActivityUser";
     const ADMIN_DID: &str = "did:ethr:0xE2eActivityAdmin";
-    const OCL_ID: &str = "ocl-activity-remove-e2e";
 
     let path = "/activity-entry.txt";
     let tag = "e2e-activity-tag";

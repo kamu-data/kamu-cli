@@ -8647,7 +8647,6 @@ dependencies = [
  "kamu-search",
  "messaging-outbox",
  "nonempty",
- "num-bigint",
  "opendatafabric",
  "serde_json",
  "thiserror 2.0.18",

@@ -80,6 +80,7 @@ impl MoleculeMutV3 {
         let (time_source, disable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeDisableProjectUseCase);
 
+        let ocl_id: kamu_molecule_domain::OclId = ocl_id.into();
         let project = disable_project_uc
             .execute(&molecule_subject, Some(time_source.now()), ocl_id.clone())
             .await
@@ -102,6 +103,7 @@ impl MoleculeMutV3 {
         let (time_source, enable_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeEnableProjectUseCase);
 
+        let ocl_id: kamu_molecule_domain::OclId = ocl_id.into();
         let project = enable_project_uc
             .execute(&molecule_subject, Some(time_source.now()), ocl_id.clone())
             .await
@@ -186,7 +188,10 @@ impl CreateProjectErrorConflict {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_disable_error(err: MoleculeDisableProjectError, ocl_id: &str) -> GqlError {
+fn map_disable_error(
+    err: MoleculeDisableProjectError,
+    ocl_id: &kamu_molecule_domain::OclId,
+) -> GqlError {
     match err {
         MoleculeDisableProjectError::ProjectNotFound(_) => {
             GqlError::gql(format!("Project [{ocl_id}] not found"))
@@ -197,7 +202,10 @@ fn map_disable_error(err: MoleculeDisableProjectError, ocl_id: &str) -> GqlError
     }
 }
 
-fn map_enable_error(err: MoleculeEnableProjectError, ocl_id: &str) -> GqlError {
+fn map_enable_error(
+    err: MoleculeEnableProjectError,
+    ocl_id: &kamu_molecule_domain::OclId,
+) -> GqlError {
     match err {
         MoleculeEnableProjectError::ProjectNotFound(_) => {
             GqlError::gql(format!("No historical entries for project [{ocl_id}]"))

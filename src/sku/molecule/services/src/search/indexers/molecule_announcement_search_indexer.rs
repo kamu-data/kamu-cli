@@ -59,7 +59,7 @@ impl MoleculeAnnouncementIndexingHelper<'_> {
             molecule_schema::fields::CATEGORIES: global_announcement.announcement.categories,
             molecule_schema::fields::TAGS: global_announcement.announcement.tags,
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id ],
+            kamu_search::fields::PRINCIPAL_IDS: [molecule_account_id],
         });
 
         self.attach_embeddings(

@@ -797,7 +797,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         }),
     );
 
-    // Read back the project entry by `oclId``
+    // Read back the project entry by `oclId`
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -983,14 +983,10 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         .unwrap();
 
     let ocl_id = OCL_ID_1.parse::<OclId>().unwrap();
+    let symbol = Symbol::try_new("VITAFAST").unwrap();
 
     create_project_uc
-        .execute(
-            &molecule_subject,
-            Some(Utc::now()),
-            ocl_id.clone(),
-            Symbol::try_new("VITAFAST").unwrap(),
-        )
+        .execute(&molecule_subject, Some(Utc::now()), ocl_id.clone(), symbol)
         .await
         .unwrap();
 

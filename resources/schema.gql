@@ -3177,7 +3177,7 @@ type Molecule {
 }
 
 input MoleculeAccessLevelRuleInput {
-	oclId: String!
+	oclId: OclId!
 	accessLevels: [String!]!
 }
 
@@ -3224,7 +3224,7 @@ type MoleculeAnnouncementEntry {
 	project: MoleculeProject!
 	systemTime: DateTime!
 	eventTime: DateTime!
-	id: String!
+	id: MoleculeAnnouncementId!
 	headline: String!
 	body: String!
 	attachments: [MoleculeDataRoomEntry!]!
@@ -3254,13 +3254,15 @@ type MoleculeAnnouncementEntryEdge {
 	node: MoleculeAnnouncementEntry!
 }
 
+scalar MoleculeAnnouncementId
+
 type MoleculeAnnouncements {
 	"""
 	Access the underlying core Dataset
 	"""
 	dataset: Dataset!
 	tail(page: Int, perPage: Int, filters: MoleculeAnnouncementsFilters): MoleculeAnnouncementEntryConnection!
-	byId(id: String!): MoleculeAnnouncementEntry
+	byId(id: MoleculeAnnouncementId!): MoleculeAnnouncementEntry
 }
 
 type MoleculeAnnouncementsDatasetMut {
@@ -3504,19 +3506,19 @@ type MoleculeMut {
 }
 
 type MoleculeMutV3 {
-	createProject(oclId: String!, symbol: String!): CreateProjectResult!
+	createProject(oclId: OclId!, symbol: Symbol!): CreateProjectResult!
 	"""
 	Retracts a project from the `projects` dataset.
 	History of this project existing will be preserved,
 	its symbol will remain reserved, data will remain intact,
 	but the project will no longer appear in the listing.
 	"""
-	disableProject(oclId: String!): MoleculeProjectMutationResult!
-	enableProject(oclId: String!): MoleculeProjectMutationResult!
+	disableProject(oclId: OclId!): MoleculeProjectMutationResult!
+	enableProject(oclId: OclId!): MoleculeProjectMutationResult!
 	"""
 	Looks up the project
 	"""
-	project(oclId: String!): MoleculeProjectMut
+	project(oclId: OclId!): MoleculeProjectMut
 }
 
 type MoleculeProject {
@@ -3531,11 +3533,11 @@ type MoleculeProject {
 	"""
 	Unique ID: OCL (On-Chain Labs)
 	"""
-	oclId: String!
+	oclId: OclId!
 	"""
 	Symbolic name of the project
 	"""
-	symbol: String!
+	symbol: Symbol!
 	"""
 	Project's organizational account
 	"""
@@ -3658,7 +3660,7 @@ type MoleculeV3 {
 	"""
 	Looks up the project
 	"""
-	project(oclId: String!): MoleculeProject
+	project(oclId: OclId!): MoleculeProject
 	"""
 	List the registered projects
 	"""
@@ -3810,6 +3812,8 @@ type NoChanges implements CommitResult & UpdateReadmeResult {
 	message: String!
 	isSuccess: Boolean!
 }
+
+scalar OclId
 
 type OdataProtocolDesc {
 	serviceUrl: String!
@@ -4708,6 +4712,8 @@ type StartUploadVersionSuccess implements StartUploadVersionResult {
 	isSuccess: Boolean!
 	message: String!
 }
+
+scalar Symbol
 
 type Task {
 	"""

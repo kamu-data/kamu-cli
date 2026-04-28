@@ -28,12 +28,12 @@ pub struct Symbol(String);
 static OCL_ID_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^0x[0-9a-f]{64}$").unwrap());
 
-/// Unique OCL (On-Chain Labs) ID.
+/// OCL (On-Chain Labs) ID.
 ///
 /// Format: bytes32 hex (0x-prefixed, 64 lowercase hex chars).
 #[nutype::nutype(
     validate(regex = OCL_ID_REGEX),
-    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)
+    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, FromStr)
 )]
 pub struct OclId(String);
 
