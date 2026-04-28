@@ -1563,7 +1563,7 @@ implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
 #[serde(remote = "ReadStepCsv")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepCsvDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub separator: Option<String>,
     pub encoding: Option<String>,
     pub quote: Option<String>,
@@ -1573,6 +1573,9 @@ pub struct ReadStepCsvDef {
     pub null_value: Option<String>,
     pub date_format: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
@@ -1588,8 +1591,11 @@ implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
 #[serde(remote = "ReadStepEsriShapefile")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepEsriShapefileDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub sub_path: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(
@@ -1609,7 +1615,10 @@ implement_serde_as!(
 #[serde(remote = "ReadStepGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepGeoJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
@@ -1626,10 +1635,13 @@ implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepJsonDef {
     pub sub_path: Option<String>,
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub date_format: Option<String>,
     pub encoding: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
@@ -1645,7 +1657,10 @@ implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
 #[serde(remote = "ReadStepNdGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdGeoJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(
@@ -1665,10 +1680,13 @@ implement_serde_as!(
 #[serde(remote = "ReadStepNdJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub date_format: Option<String>,
     pub encoding: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
@@ -1684,7 +1702,10 @@ implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
 #[serde(remote = "ReadStepParquet")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepParquetDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
 implement_serde_as!(ReadStepParquet, ReadStepParquetDef, "ReadStepParquetDef");

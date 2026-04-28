@@ -192,7 +192,7 @@ impl Default for DatasetVocabulary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReadStep {
-    pub fn schema(&self) -> Option<&Vec<String>> {
+    pub fn schema(&self) -> Option<&DataSchema> {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
             ReadStep::Json(v) => v.schema.as_ref(),
@@ -213,6 +213,7 @@ impl Default for ReadStepCsv {
     fn default() -> Self {
         Self {
             schema: None,
+            ddl_schema: None,
             separator: None,
             encoding: None,
             quote: None,
@@ -235,6 +236,7 @@ impl Default for ReadStepJson {
         Self {
             sub_path: None,
             schema: None,
+            ddl_schema: None,
             date_format: None,
             encoding: None,
             timestamp_format: None,
@@ -250,9 +252,23 @@ impl Default for ReadStepNdJson {
     fn default() -> Self {
         Self {
             schema: None,
+            ddl_schema: None,
             date_format: None,
             encoding: None,
             timestamp_format: None,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepGeoJson
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Default for ReadStepGeoJson {
+    fn default() -> Self {
+        Self {
+            schema: None,
+            ddl_schema: None,
         }
     }
 }
@@ -281,6 +297,7 @@ impl Default for ReadStepEsriShapefile {
     fn default() -> Self {
         Self {
             schema: None,
+            ddl_schema: None,
             sub_path: None,
         }
     }

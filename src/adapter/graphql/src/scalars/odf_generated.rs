@@ -1323,12 +1323,12 @@ impl From<odf::metadata::ReadStep> for ReadStep {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepCsv {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
     ///
     /// Examples:
     /// - ["date TIMESTAMP","city STRING","population INT"]
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets a single character as a separator for each field and value.
     ///
     /// Defaults to: ","
@@ -1372,12 +1372,16 @@ pub struct ReadStepCsv {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
     fn from(v: odf::metadata::ReadStepCsv) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
             separator: v.separator.map(Into::into),
             encoding: v.encoding.map(Into::into),
             quote: v.quote.map(Into::into),
@@ -1387,6 +1391,7 @@ impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
             null_value: v.null_value.map(Into::into),
             date_format: v.date_format.map(Into::into),
             timestamp_format: v.timestamp_format.map(Into::into),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1398,20 +1403,25 @@ impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepEsriShapefile {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// If the ZIP archive contains multiple shapefiles use this field to
     /// specify a sub-path to the desired `.shp` file. Can contain glob patterns
     /// to act as a filter.
     pub sub_path: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
     fn from(v: odf::metadata::ReadStepEsriShapefile) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
             sub_path: v.sub_path.map(Into::into),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1426,15 +1436,20 @@ impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
     fn from(v: odf::metadata::ReadStepGeoJson) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1450,9 +1465,9 @@ pub struct ReadStepJson {
     /// that is an array or objects. If not specified it is assumed that the
     /// root element is an array.
     pub sub_path: Option<String>,
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1468,16 +1483,21 @@ pub struct ReadStepJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepJson> for ReadStepJson {
     fn from(v: odf::metadata::ReadStepJson) -> Self {
         Self {
             sub_path: v.sub_path.map(Into::into),
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
             date_format: v.date_format.map(Into::into),
             encoding: v.encoding.map(Into::into),
             timestamp_format: v.timestamp_format.map(Into::into),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1491,15 +1511,20 @@ impl From<odf::metadata::ReadStepJson> for ReadStepJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepNdGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
     fn from(v: odf::metadata::ReadStepNdGeoJson) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1512,9 +1537,9 @@ impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepNdJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1530,15 +1555,20 @@ pub struct ReadStepNdJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
     fn from(v: odf::metadata::ReadStepNdJson) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
             date_format: v.date_format.map(Into::into),
             encoding: v.encoding.map(Into::into),
             timestamp_format: v.timestamp_format.map(Into::into),
+            schema: v.schema.map(Into::into),
         }
     }
 }
@@ -1550,15 +1580,20 @@ impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ReadStepParquet {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
     fn from(v: odf::metadata::ReadStepParquet) -> Self {
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema: v
+                .ddl_schema
+                .map(|v| v.into_iter().map(Into::into).collect()),
+            schema: v.schema.map(Into::into),
         }
     }
 }

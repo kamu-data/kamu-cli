@@ -126,377 +126,6 @@ union ReadStep {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepCsv
-// Reader for comma-separated files.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepCsv {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  //
-  // Examples:
-  // - ["date TIMESTAMP","city STRING","population INT"]
-  schema: [string];
-  // Sets a single character as a separator for each field and value.
-  //
-  // Defaults to: ","
-  separator: string;
-  // Decodes the CSV files by the given encoding type.
-  //
-  // Defaults to: "utf8"
-  encoding: string;
-  // Sets a single character used for escaping quoted values where the separator can be part of the value. Set an empty string to turn off quotations.
-  //
-  // Defaults to: "\""
-  quote: string;
-  // Sets a single character used for escaping quotes inside an already quoted value.
-  //
-  // Defaults to: "\\"
-  escape: string;
-  // Use the first line as names of columns.
-  //
-  // Defaults to: false
-  header: bool = null;
-  // Infers the input schema automatically from data. It requires one extra pass over the data.
-  //
-  // Defaults to: false
-  infer_schema: bool = null;
-  // Sets the string representation of a null value.
-  //
-  // Defaults to: ""
-  null_value: string;
-  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  date_format: string;
-  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  timestamp_format: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepGeoJson
-// Reader for GeoJSON files. It expects one `FeatureCollection` object in the root and will create a record per each `Feature` inside it extracting the properties into individual columns and leaving the feature geometry in its own column.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepGeoJson {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepEsriShapefile
-// Reader for ESRI Shapefile format.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepEsriShapefile {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-  // If the ZIP archive contains multiple shapefiles use this field to specify a sub-path to the desired `.shp` file. Can contain glob patterns to act as a filter.
-  sub_path: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepParquet
-// Reader for Apache Parquet format.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepParquet {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepJson
-// Reader for JSON files that contain an array of objects within them.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepJson {
-  // Path in the form of `a.b.c` to a sub-element of the root JSON object that is an array or objects. If not specified it is assumed that the root element is an array.
-  sub_path: string;
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  date_format: string;
-  // Allows to forcibly set one of standard basic or extended encodings.
-  //
-  // Defaults to: "utf8"
-  encoding: string;
-  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  timestamp_format: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepNdJson
-// Reader for files containing multiple newline-delimited JSON objects with the same schema.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepNdJson {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  date_format: string;
-  // Allows to forcibly set one of standard basic or extended encodings.
-  //
-  // Defaults to: "utf8"
-  encoding: string;
-  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
-  //
-  // Defaults to: "rfc3339"
-  timestamp_format: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepNdGeoJson
-// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson` format but instead of `FeatureCollection` object in the root it expects every individual feature object to appear on its own line.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepNdGeoJson {
-  // A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
-  schema: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Transform
-// Engine-specific processing queries that shape the resulting data.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-union Transform {
-  TransformSql,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SqlQueryStep
-// Defines a query in a multi-step SQL transformation.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table SqlQueryStep {
-  // Name of the temporary view that will be created from result of the query. Step without this alias will be treated as an output of the transformation.
-  alias: string;
-  // SQL query the result of which will be exposed under the alias.
-  query: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TemporalTable
-// Temporary Flink-specific extension for creating temporal tables from streams.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table TemporalTable {
-  // Name of the dataset to be converted into a temporal table.
-  name: string;
-  // Column names used as the primary key for creating a table.
-  primary_key: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TransformSql
-// Transform using one of the SQL dialects.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformsql-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table TransformSql {
-  // Identifier of the engine used for this transformation.
-  engine: string;
-  // Version of the engine to use.
-  version: string;
-  // SQL query the result of which will be used as an output. This is a convenience property meant only for defining queries by hand. When stored in the metadata this property will never be set and instead will be converted into a single-iter `queries` array.
-  query: string;
-  // Specifies multi-step SQL transformations. Each step acts as a shorthand for `CREATE TEMPORARY VIEW <alias> AS (<query>)`. Last query in the array should have no alias and will be treated as an output.
-  queries: [SqlQueryStep];
-  // Temporary Flink-specific extension for creating temporal tables from streams.
-  temporal_tables: [TemporalTable];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategy
-// Merge strategy determines how newly ingested data should be combined with the data that already exists in the dataset.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-union MergeStrategy {
-  MergeStrategyAppend,
-  MergeStrategyLedger,
-  MergeStrategySnapshot,
-  MergeStrategyChangelogStream,
-  MergeStrategyUpsertStream,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategyAppend
-// Append merge strategy.
-// 
-// Under this strategy new data will be appended to the dataset in its entirety, without any deduplication.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategyAppend {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategyLedger
-// Ledger merge strategy.
-// 
-// This strategy should be used for data sources containing ledgers of events. Currently this strategy will only perform deduplication of events using user-specified primary key columns. This means that the source data can contain partially overlapping set of records and only those records that were not previously seen will be appended.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyledger-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategyLedger {
-  // Names of the columns that uniquely identify the record throughout its lifetime
-  primary_key: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategySnapshot
-// Snapshot merge strategy.
-// 
-// This strategy can be used for data state snapshots that are taken periodically and contain only the latest state of the observed entity or system. Over time such snapshots can have new rows added, and old rows either removed or modified.
-// 
-// This strategy transforms snapshot data into an append-only event stream where data already added is immutable. It does so by performing Change Data Capture - essentially diffing the current state of data against the reconstructed previous state and recording differences as retractions or corrections. The Operation Type "op" column will contain:
-//   - append (`+A`) when a row appears for the first time
-//   - retraction (`-D`) when row disappears
-//   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of the row and `+C` carrying the new value.
-// 
-// To correctly associate rows between old and new snapshots this strategy relies on user-specified primary key columns.
-// 
-// To identify whether a row has changed this strategy will compare all other columns one by one. If the data contains a column that is guaranteed to change whenever any of the data columns changes (for example a last modification timestamp, an incremental version, or a data hash), then it can be specified in `compareColumns` property to speed up the detection of modified rows.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategysnapshot-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategySnapshot {
-  // Names of the columns that uniquely identify the record throughout its lifetime.
-  primary_key: [string];
-  // Names of the columns to compared to determine if a row has changed between two snapshots.
-  compare_columns: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategyChangelogStream
-// Changelog stream merge strategy.
-// 
-// This is the native stream format for ODF that accurately describes the evolution of all event records including appends, retractions, and corrections as per RFC-015. No pre-processing except for format validation is done.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategyChangelogStream {
-  // Names of the columns that uniquely identify the record throughout its lifetime
-  primary_key: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MergeStrategyUpsertStream
-// Upsert stream merge strategy.
-// 
-// This strategy should be used for data sources containing ledgers of insert-or-update and delete events. Unlike ChangelogStream the insert-or-update events only carry the new values, so this strategy will use primary key to re-classify the events into an append or a correction from/to pair, looking up the previous values.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategyUpsertStream {
-  // Names of the columns that uniquely identify the record throughout its lifetime
-  primary_key: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AddPushSource
-// Describes how to ingest data into a root dataset from a certain logical source.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AddPushSource {
-  // Identifies the source within this dataset.
-  source_name: string;
-  // Defines how data is read into structured format.
-  read: ReadStep;
-  // Pre-processing query that shapes the data.
-  preprocess: Transform;
-  // Determines how newly-ingested data should be merged with existing history.
-  merge: MergeStrategy;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AttachmentEmbedded
-// Embedded attachment item.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AttachmentEmbedded {
-  // Path to an attachment if it was materialized into a file.
-  path: string;
-  // Content of the attachment.
-  content: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Attachments
-// Defines the source of attachment files.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-union Attachments {
-  AttachmentsEmbedded,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AttachmentsEmbedded
-// For attachments that are specified inline and are embedded in the metadata.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentsembedded-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AttachmentsEmbedded {
-  // List of embedded items.
-  items: [AttachmentEmbedded];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// CompressionFormat
-// Defines a compression algorithm.
-//
-// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum CompressionFormat: int32 {
-  Gzip,
-  Zip,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataType
 // Defines a logical type of the field. Logical type determines the semantics and boudaries of a type and how it can be operated on, without a concern about encoding and physical layout of the data in chunks.
 //
@@ -851,6 +480,391 @@ table DataSchema {
   fields: [DataField];
   // ODF extensions
   extra: ExtraAttributes;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepCsv
+// Reader for comma-separated files.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepCsv {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  //
+  // Examples:
+  // - ["date TIMESTAMP","city STRING","population INT"]
+  ddl_schema: [string];
+  // Sets a single character as a separator for each field and value.
+  //
+  // Defaults to: ","
+  separator: string;
+  // Decodes the CSV files by the given encoding type.
+  //
+  // Defaults to: "utf8"
+  encoding: string;
+  // Sets a single character used for escaping quoted values where the separator can be part of the value. Set an empty string to turn off quotations.
+  //
+  // Defaults to: "\""
+  quote: string;
+  // Sets a single character used for escaping quotes inside an already quoted value.
+  //
+  // Defaults to: "\\"
+  escape: string;
+  // Use the first line as names of columns.
+  //
+  // Defaults to: false
+  header: bool = null;
+  // Infers the input schema automatically from data. It requires one extra pass over the data.
+  //
+  // Defaults to: false
+  infer_schema: bool = null;
+  // Sets the string representation of a null value.
+  //
+  // Defaults to: ""
+  null_value: string;
+  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  date_format: string;
+  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  timestamp_format: string;
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepGeoJson
+// Reader for GeoJSON files. It expects one `FeatureCollection` object in the root and will create a record per each `Feature` inside it extracting the properties into individual columns and leaving the feature geometry in its own column.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepGeoJson {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepEsriShapefile
+// Reader for ESRI Shapefile format.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepEsriShapefile {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // If the ZIP archive contains multiple shapefiles use this field to specify a sub-path to the desired `.shp` file. Can contain glob patterns to act as a filter.
+  sub_path: string;
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepParquet
+// Reader for Apache Parquet format.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepParquet {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepJson
+// Reader for JSON files that contain an array of objects within them.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepJson {
+  // Path in the form of `a.b.c` to a sub-element of the root JSON object that is an array or objects. If not specified it is assumed that the root element is an array.
+  sub_path: string;
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  date_format: string;
+  // Allows to forcibly set one of standard basic or extended encodings.
+  //
+  // Defaults to: "utf8"
+  encoding: string;
+  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  timestamp_format: string;
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepNdJson
+// Reader for files containing multiple newline-delimited JSON objects with the same schema.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepNdJson {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // Sets the string that indicates a date format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  date_format: string;
+  // Allows to forcibly set one of standard basic or extended encodings.
+  //
+  // Defaults to: "utf8"
+  encoding: string;
+  // Sets the string that indicates a timestamp format. The `rfc3339` is the only required format, the other format strings are implementation-specific.
+  //
+  // Defaults to: "rfc3339"
+  timestamp_format: string;
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ReadStepNdGeoJson
+// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson` format but instead of `FeatureCollection` object in the root it expects every individual feature object to appear on its own line.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepNdGeoJson {
+  // DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+  ddl_schema: [string];
+  // Schema used to coerce values into more appropriate data types.
+  schema: DataSchema;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Transform
+// Engine-specific processing queries that shape the resulting data.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union Transform {
+  TransformSql,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// Defines a query in a multi-step SQL transformation.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SqlQueryStep {
+  // Name of the temporary view that will be created from result of the query. Step without this alias will be treated as an output of the transformation.
+  alias: string;
+  // SQL query the result of which will be exposed under the alias.
+  query: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// Temporary Flink-specific extension for creating temporal tables from streams.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TemporalTable {
+  // Name of the dataset to be converted into a temporal table.
+  name: string;
+  // Column names used as the primary key for creating a table.
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TransformSql
+// Transform using one of the SQL dialects.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformsql-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TransformSql {
+  // Identifier of the engine used for this transformation.
+  engine: string;
+  // Version of the engine to use.
+  version: string;
+  // SQL query the result of which will be used as an output. This is a convenience property meant only for defining queries by hand. When stored in the metadata this property will never be set and instead will be converted into a single-iter `queries` array.
+  query: string;
+  // Specifies multi-step SQL transformations. Each step acts as a shorthand for `CREATE TEMPORARY VIEW <alias> AS (<query>)`. Last query in the array should have no alias and will be treated as an output.
+  queries: [SqlQueryStep];
+  // Temporary Flink-specific extension for creating temporal tables from streams.
+  temporal_tables: [TemporalTable];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategy
+// Merge strategy determines how newly ingested data should be combined with the data that already exists in the dataset.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union MergeStrategy {
+  MergeStrategyAppend,
+  MergeStrategyLedger,
+  MergeStrategySnapshot,
+  MergeStrategyChangelogStream,
+  MergeStrategyUpsertStream,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyAppend
+// Append merge strategy.
+// 
+// Under this strategy new data will be appended to the dataset in its entirety, without any deduplication.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyAppend {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyLedger
+// Ledger merge strategy.
+// 
+// This strategy should be used for data sources containing ledgers of events. Currently this strategy will only perform deduplication of events using user-specified primary key columns. This means that the source data can contain partially overlapping set of records and only those records that were not previously seen will be appended.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyledger-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyLedger {
+  // Names of the columns that uniquely identify the record throughout its lifetime
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategySnapshot
+// Snapshot merge strategy.
+// 
+// This strategy can be used for data state snapshots that are taken periodically and contain only the latest state of the observed entity or system. Over time such snapshots can have new rows added, and old rows either removed or modified.
+// 
+// This strategy transforms snapshot data into an append-only event stream where data already added is immutable. It does so by performing Change Data Capture - essentially diffing the current state of data against the reconstructed previous state and recording differences as retractions or corrections. The Operation Type "op" column will contain:
+//   - append (`+A`) when a row appears for the first time
+//   - retraction (`-D`) when row disappears
+//   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of the row and `+C` carrying the new value.
+// 
+// To correctly associate rows between old and new snapshots this strategy relies on user-specified primary key columns.
+// 
+// To identify whether a row has changed this strategy will compare all other columns one by one. If the data contains a column that is guaranteed to change whenever any of the data columns changes (for example a last modification timestamp, an incremental version, or a data hash), then it can be specified in `compareColumns` property to speed up the detection of modified rows.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategysnapshot-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategySnapshot {
+  // Names of the columns that uniquely identify the record throughout its lifetime.
+  primary_key: [string];
+  // Names of the columns to compared to determine if a row has changed between two snapshots.
+  compare_columns: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyChangelogStream
+// Changelog stream merge strategy.
+// 
+// This is the native stream format for ODF that accurately describes the evolution of all event records including appends, retractions, and corrections as per RFC-015. No pre-processing except for format validation is done.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyChangelogStream {
+  // Names of the columns that uniquely identify the record throughout its lifetime
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyUpsertStream
+// Upsert stream merge strategy.
+// 
+// This strategy should be used for data sources containing ledgers of insert-or-update and delete events. Unlike ChangelogStream the insert-or-update events only carry the new values, so this strategy will use primary key to re-classify the events into an append or a correction from/to pair, looking up the previous values.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyUpsertStream {
+  // Names of the columns that uniquely identify the record throughout its lifetime
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// Describes how to ingest data into a root dataset from a certain logical source.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AddPushSource {
+  // Identifies the source within this dataset.
+  source_name: string;
+  // Defines how data is read into structured format.
+  read: ReadStep;
+  // Pre-processing query that shapes the data.
+  preprocess: Transform;
+  // Determines how newly-ingested data should be merged with existing history.
+  merge: MergeStrategy;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// Embedded attachment item.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AttachmentEmbedded {
+  // Path to an attachment if it was materialized into a file.
+  path: string;
+  // Content of the attachment.
+  content: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// Defines the source of attachment files.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union Attachments {
+  AttachmentsEmbedded,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AttachmentsEmbedded
+// For attachments that are specified inline and are embedded in the metadata.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentsembedded-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AttachmentsEmbedded {
+  // List of embedded items.
+  items: [AttachmentEmbedded];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CompressionFormat
+// Defines a compression algorithm.
+//
+// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum CompressionFormat: int32 {
+  Gzip,
+  Zip,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

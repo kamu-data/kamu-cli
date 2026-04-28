@@ -389,6 +389,7 @@ fn serde_dataset_snapshot_root() {
             })]),
             read: ReadStep::Csv(ReadStepCsv {
                 schema: None,
+                ddl_schema: None,
                 separator: None,
                 encoding: None,
                 quote: None,

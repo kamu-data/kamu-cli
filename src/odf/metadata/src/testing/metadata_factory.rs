@@ -249,7 +249,7 @@ impl SetPollingSourceBuilder {
                     headers: None,
                 }),
                 prepare: None,
-                read: ReadStep::GeoJson(ReadStepGeoJson { schema: None }),
+                read: ReadStep::GeoJson(ReadStepGeoJson::default()),
                 preprocess: None,
                 merge: MergeStrategy::Append(MergeStrategyAppend {}),
             },
@@ -344,10 +344,10 @@ impl AddPushSourceBuilder {
 
     pub fn some_read(self) -> Self {
         self.read(ReadStepNdJson {
-            schema: Some(vec![
-                "city STRING".to_string(),
-                "population BIGINT".to_string(),
-            ]),
+            schema: Some(DataSchema::new(vec![
+                DataField::string("city"),
+                DataField::i64("population"),
+            ])),
             ..Default::default()
         })
     }

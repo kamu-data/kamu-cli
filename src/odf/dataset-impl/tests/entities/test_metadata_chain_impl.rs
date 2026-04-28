@@ -1516,7 +1516,7 @@ async fn test_append_push_source_evolution() {
             MetadataFactory::metadata_block(AddPushSource {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(DataSchema::new(vec![DataField::string("foo")])),
                     ..Default::default()
                 }
                 .into(),

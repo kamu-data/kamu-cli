@@ -1229,12 +1229,12 @@ impl_enum_variant!(ReadStep::NdGeoJson(ReadStepNdGeoJson));
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepCsv {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
     ///
     /// Examples:
     /// - ["date TIMESTAMP","city STRING","population INT"]
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets a single character as a separator for each field and value.
     ///
     /// Defaults to: ","
@@ -1278,6 +1278,8 @@ pub struct ReadStepCsv {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1287,13 +1289,15 @@ pub struct ReadStepCsv {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepEsriShapefile {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// If the ZIP archive contains multiple shapefiles use this field to
     /// specify a sub-path to the desired `.shp` file. Can contain glob patterns
     /// to act as a filter.
     pub sub_path: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1306,9 +1310,11 @@ pub struct ReadStepEsriShapefile {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1322,9 +1328,9 @@ pub struct ReadStepJson {
     /// that is an array or objects. If not specified it is assumed that the
     /// root element is an array.
     pub sub_path: Option<String>,
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1340,6 +1346,8 @@ pub struct ReadStepJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1351,9 +1359,11 @@ pub struct ReadStepJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1364,9 +1374,9 @@ pub struct ReadStepNdGeoJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1382,6 +1392,8 @@ pub struct ReadStepNdJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1391,9 +1403,11 @@ pub struct ReadStepNdJson {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepParquet {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+    /// Schema used to coerce values into more appropriate data types.
+    pub schema: Option<DataSchema>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
