@@ -24,7 +24,13 @@ doctest = false
 [features]
 default = []
 
-ingest-evm = ["dep:alloy", "dep:datafusion-ethers"]
+ingest-evm = [
+    "dep:alloy",
+    "dep:alloy-provider",
+    "dep:alloy-rpc-client",
+    "dep:alloy-transport-http",
+    "dep:datafusion-ethers",
+]
 ingest-ftp = ["dep:curl", "dep:curl-sys"]
 ingest-mqtt = ["dep:rumqttc"]
 query-extensions-json = ["dep:datafusion-functions-json"]
@@ -138,14 +144,23 @@ tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
-kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
+kamu-datasets-services = { optional = true, workspace = true, features = [
+    "testing",
+] }
 
-alloy = { optional = true, version = "=1.7.3", default-features = false, features = [
+# TODO: Unpin after upgrade to `reqwests 0.13`
+# See: https://github.com/kamu-data/kamu-cli/issues/1607
+alloy = { optional = true, version = "~1.7.3", default-features = false, features = [
     "std",
     "provider-http",
     "provider-ws",
     "reqwest-rustls-tls",
 ] }
+# TODO: Remove these pins
+alloy-provider = { optional = true, version = "~1.7.3", default-features = false }
+alloy-rpc-client = { optional = true, version = "~1.7.3", default-features = false }
+alloy-transport-http = { optional = true, version = "~1.7.3", default-features = false }
+
 bon = { optional = true, version = "3", default-features = false }
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
@@ -185,7 +200,9 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.8", features = ["async_tokio"] }
-datafusion = { version = "53", default-features = false, features = ["parquet"] }
+datafusion = { version = "53", default-features = false, features = [
+    "parquet",
+] }
 filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }

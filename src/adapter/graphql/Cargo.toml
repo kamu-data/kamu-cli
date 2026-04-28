@@ -75,7 +75,7 @@ humansize = { version = "2", default-features = false }
 indoc = "2"
 itertools = { version = "0.14", default-features = false }
 jsonschema = { version = "0.46", default-features = false }
-nutype = { version = "0.6", default-features = false }
+nutype = { version = "0.7", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"

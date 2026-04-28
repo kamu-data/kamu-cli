@@ -51,7 +51,7 @@ jsonwebtoken = { version = "10", default-features = false, features = [
     "rust_crypto",
 ] }
 mockall = { optional = true, version = "0.14" }
-nutype = { version = "0.6", default-features = false, features = [
+nutype = { version = "0.7", default-features = false, features = [
     "new_unchecked",
     "serde",
 ] }
