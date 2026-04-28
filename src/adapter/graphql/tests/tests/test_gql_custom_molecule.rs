@@ -25,7 +25,7 @@ use kamu_datasets::{
     DatasetRegistryExt,
 };
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
-use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use kamu_molecule_domain::{MoleculeCreateProjectUseCase, OclId, Symbol};
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
@@ -68,6 +68,8 @@ macro_rules! test_gql_custom_molecule {
 
 const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
 const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
+const OCL_ID_1: &str = "0x7f3a9c2e1b84d056f2a731c9e40b8d5f6a2c9e1d7b3f8a04c52e9d1b6f3a7c01";
+const OCL_ID_2: &str = "0x7f3a9c2e1b84d056f2a731c9e40b8d5f6a2c9e1d7b3f8a04c52e9d1b6f3a7c02";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -510,7 +512,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
-    const PROJECT_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
@@ -528,7 +530,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
             .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
                 async_graphql::Variables::from_json(json!({
                     "symbol": "VITAFAST",
-                    "oclId": PROJECT_OCL_ID,
+                    "oclId": OCL_ID,
                 })),
             ))
             .await;
@@ -567,7 +569,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
         let data = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_OCL_ID,
+                "oclId": OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -596,7 +598,7 @@ async fn test_molecule_dump_dataset_snapshots_src() {
     GraphQLQueryRequest::new(
         CREATE_ANNOUNCEMENT,
         async_graphql::Variables::from_value(value!({
-            "oclId": PROJECT_OCL_ID,
+            "oclId": OCL_ID,
             "headline": "Test announcement",
             "body": "Blah blah",
             "attachments": [],
@@ -750,7 +752,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "VITAFAST",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
@@ -778,7 +780,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                     "id": project_account_id,
                     "accountName": project_account_name,
                 },
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
                 "dataRoom": {
                     "dataset": {
                         "id": data_room_did,
@@ -814,7 +816,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
@@ -828,7 +830,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "accountName": project_account_name,
             },
             "symbol": "vitafast",
-            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "oclId": OCL_ID_1,
         }),
     );
 
@@ -851,7 +853,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
@@ -865,7 +867,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
                 "accountName": project_account_name,
             },
             "symbol": "vitafast",
-            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "oclId": OCL_ID_1,
         }),
     );
 
@@ -879,7 +881,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
             "symbol": "vitafast",
-            "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "oclId": OCL_ID_1,
         }]),
     );
 
@@ -888,7 +890,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitaslow",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
@@ -898,7 +900,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
@@ -908,7 +910,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
@@ -918,7 +920,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
@@ -929,7 +931,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitaslow",
-                "oclId": r#"0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912"#,
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
@@ -951,11 +953,11 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!([
             {
                 "symbol": "vitafast",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             },
             {
                 "symbol": "vitaslow",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
+                "oclId": OCL_ID_2,
             }
         ]),
     );
@@ -964,8 +966,6 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -982,12 +982,14 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         .get_one::<dyn MoleculeCreateProjectUseCase>()
         .unwrap();
 
+    let ocl_id = OCL_ID_1.parse::<OclId>().unwrap();
+
     create_project_uc
         .execute(
             &molecule_subject,
             Some(Utc::now()),
-            ocl_id.to_string(),
-            "VITAFAST".to_string(),
+            ocl_id.clone(),
+            Symbol::try_new("VITAFAST").unwrap(),
         )
         .await
         .unwrap();
@@ -1001,7 +1003,10 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         .projects_metadata_chain_len(&projects_dataset_alias)
         .await;
 
-    async fn query_project(harness: &GraphQLMoleculeHarness, uid: &str) -> async_graphql::Response {
+    async fn query_project(
+        harness: &GraphQLMoleculeHarness,
+        ocl_id: &OclId,
+    ) -> async_graphql::Response {
         GraphQLQueryRequest::new(
             indoc!(
                 r#"
@@ -1017,7 +1022,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
                 }
                 "#
             ),
-            async_graphql::Variables::from_json(json!({ "oclId": uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -1072,7 +1077,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     );
 
     // Querying by OCL ID returns None
-    let res = query_project(&harness, ocl_id).await;
+    let res = query_project(&harness, &ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["project"],
@@ -1126,7 +1131,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         }]),
     );
 
-    let res = query_project(&harness, ocl_id).await;
+    let res = query_project(&harness, &ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["v3"]["project"],
@@ -1150,11 +1155,11 @@ async fn test_molecule_disable_enable_project_errors(
 
     harness.create_projects_dataset().await;
 
-    let missing_ocl_id = "foo";
+    const MISSING_OCL_ID: &str = OCL_ID_1;
 
     let res = GraphQLQueryRequest::new(
         DISABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "oclId": missing_ocl_id })),
+        async_graphql::Variables::from_json(json!({ "oclId": MISSING_OCL_ID })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
@@ -1164,12 +1169,12 @@ async fn test_molecule_disable_enable_project_errors(
     assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
     pretty_assertions::assert_eq!(
         disable_error,
-        format!("Project [{missing_ocl_id}] not found")
+        format!("Project [{MISSING_OCL_ID}] not found")
     );
 
     let res = GraphQLQueryRequest::new(
         ENABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "oclId": missing_ocl_id })),
+        async_graphql::Variables::from_json(json!({ "oclId": MISSING_OCL_ID })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
@@ -1179,7 +1184,7 @@ async fn test_molecule_disable_enable_project_errors(
     assert!(res_json["molecule"]["v3"]["enableProject"].is_null());
     pretty_assertions::assert_eq!(
         enable_error,
-        format!("No historical entries for project [{missing_ocl_id}]")
+        format!("No historical entries for project [{MISSING_OCL_ID}]")
     );
 }
 
@@ -1196,14 +1201,12 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
 
     harness.create_projects_dataset().await;
 
-    let original_ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
     // Create project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": original_ocl_id,
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
@@ -1216,7 +1219,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "oclId": original_ocl_id })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -1226,7 +1229,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
@@ -1236,7 +1239,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
         res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
@@ -1247,7 +1250,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
 async fn test_molecule_data_room_quota_exceeded(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -1264,7 +1267,7 @@ async fn test_molecule_data_room_quota_exceeded(
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "quota-room",
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -1327,7 +1330,7 @@ async fn test_molecule_data_room_quota_exceeded(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/quota.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             }))),
@@ -1346,7 +1349,7 @@ async fn test_molecule_data_room_quota_exceeded(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarnessSearchVariant) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -1359,7 +1362,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -1481,7 +1484,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let res = GraphQLQueryRequest::new(
         UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
         async_graphql::Variables::from_value(value!({
-            "oclId": ocl_id,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -1563,7 +1566,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello 2"),
                 "contentType": "application/octet-stream",
@@ -1600,7 +1603,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                                 "message": "Path is occupied",
                                 "byEntry": {
                                     "project": {
-                                        "oclId": ocl_id,
+                                        "oclId": OCL_ID,
                                     },
                                     "ref": file_1_did,
                                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
@@ -1677,7 +1680,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -1758,7 +1761,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -1877,7 +1880,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -1958,7 +1961,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/baz.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -2061,7 +2064,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2116,7 +2119,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_ENTRIES_QUERY).variables(
             async_graphql::Variables::from_json(json!({
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         ))
@@ -2245,7 +2248,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_FILE_BY_REF_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "ref": random_ref,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye -- random ref"),
                 "contentType": "application/octet-stream",
@@ -2283,7 +2286,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         .execute_authorized_query(
             async_graphql::Request::new(UPDATE_FILE_BY_REF_QUERY).variables(
                 async_graphql::Variables::from_json(json!({
-                    "oclId": ocl_id,
+                    "oclId": OCL_ID,
                     "ref": file_1_did,
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
                     "contentType": "text/plain",
@@ -2417,7 +2420,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2483,7 +2486,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
@@ -2573,7 +2576,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "oclId": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
@@ -2611,7 +2614,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "fromPath": "/non-existent-path.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2641,7 +2644,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/baz.txt",
                 "changeBy": USER_1,
@@ -2671,7 +2674,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2749,7 +2752,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2833,7 +2836,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2858,7 +2861,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2876,7 +2879,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": null,
@@ -2944,7 +2947,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag1"],
                     "byCategories": null,
@@ -3012,7 +3015,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -3080,7 +3083,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -3148,7 +3151,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -3216,7 +3219,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-3", "test-category-1"],
@@ -3284,7 +3287,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3352,7 +3355,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3420,7 +3423,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3443,7 +3446,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": ["test-category-1"],
@@ -3515,7 +3518,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/non-existent-path.txt",
                 "changeBy": USER_1,
             })),
@@ -3544,7 +3547,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "path": "/baz.txt",
                 "changeBy": USER_1,
             })),
@@ -3574,7 +3577,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -3698,7 +3701,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -3774,7 +3777,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "ref": random_dataset_id.to_string(),
                 "expectedHead": null,
                 "accessLevel": "holder",
@@ -3810,7 +3813,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "ref": file_1_did,
                 "expectedHead": null,
                 "accessLevel": "holders",
@@ -3844,7 +3847,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
     let cas_failure_res = GraphQLQueryRequest::new(
         UPDATE_METADATA_QUERY,
         async_graphql::Variables::from_json(json!({
-            "oclId": ocl_id,
+            "oclId": OCL_ID,
             "ref": file_1_did,
             "expectedHead": cas_expected_head.to_string(),
             "accessLevel": "holders",
@@ -3897,7 +3900,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -4064,7 +4067,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -4094,7 +4097,7 @@ async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarne
 async fn test_molecule_data_room_as_of_block_hash(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4106,7 +4109,7 @@ async fn test_molecule_data_room_as_of_block_hash(
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -4130,7 +4133,7 @@ async fn test_molecule_data_room_as_of_block_hash(
     let upload_1_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "oclId": ocl_id,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4202,7 +4205,7 @@ async fn test_molecule_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "ref": file_1_did,
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -4265,7 +4268,7 @@ async fn test_molecule_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             PROJECT_DATA_ROOM_LATEST_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -4298,7 +4301,7 @@ async fn test_molecule_data_room_as_of_block_hash(
     let upload_2_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "oclId": ocl_id,
+            "oclId": OCL_ID,
             "path": "/bar.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
             "contentType": "text/plain",
@@ -4390,7 +4393,7 @@ async fn test_molecule_data_room_as_of_block_hash(
 async fn test_molecule_alternative_encryption_metadata(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4403,7 +4406,7 @@ async fn test_molecule_alternative_encryption_metadata(
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "vitafast",
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -4494,7 +4497,7 @@ async fn test_molecule_alternative_encryption_metadata(
     let res = GraphQLQueryRequest::new(
         UPLOAD_FILE,
         async_graphql::Variables::from_value(value!({
-            "oclId": ocl_id,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4576,7 +4579,7 @@ async fn test_molecule_alternative_encryption_metadata(
 async fn test_molecule_announcements_quota_exceeded(
     search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ocl_id = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
+    const OCL_ID: &str = OCL_ID_1;
 
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
@@ -4593,7 +4596,7 @@ async fn test_molecule_announcements_quota_exceeded(
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "symbol": "quota-announce",
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -4623,7 +4626,7 @@ async fn test_molecule_announcements_quota_exceeded(
     let announcement_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
             async_graphql::Variables::from_json(json!({
-                "oclId": ocl_id,
+                "oclId": OCL_ID,
                 "headline": "Quota limited",
                 "body": "This should fail",
                 "attachments": [],
@@ -4655,15 +4658,13 @@ async fn test_molecule_announcements_operations(
         .await;
 
     // Create the first project
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitafast",
-                    "oclId": PROJECT_1_OCL_ID,
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -4713,7 +4714,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -4741,7 +4742,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -4795,7 +4796,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -4850,7 +4851,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -4891,7 +4892,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [project_1_file_1_dataset_id],
@@ -4932,7 +4933,7 @@ async fn test_molecule_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 3",
                 "body": "Blah blah 3",
                 "attachments": [
@@ -4976,7 +4977,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 4",
                 "body": "Blah blah 4",
                 "attachments": [
@@ -5063,7 +5064,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -5208,7 +5209,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -5233,7 +5234,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5265,7 +5266,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": null,
@@ -5342,7 +5343,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag3"],
                     "byCategories": null,
@@ -5419,7 +5420,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -5496,7 +5497,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -5573,7 +5574,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -5650,7 +5651,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -5727,7 +5728,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5804,7 +5805,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5881,7 +5882,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5959,7 +5960,7 @@ async fn test_molecule_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag2"],
                     "byCategories": ["test-category-2"],
@@ -6041,18 +6042,13 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         .build()
         .await;
 
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitafast",
-                    "oclId": PROJECT_1_OCL_ID,
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -6092,7 +6088,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6113,7 +6109,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -6166,7 +6162,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -6262,7 +6258,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6309,7 +6305,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -6340,7 +6336,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -6432,7 +6428,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6453,7 +6449,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -6551,7 +6547,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6572,7 +6568,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -6721,7 +6717,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6744,7 +6740,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo [2]"),
                 "changeBy": USER_1,
@@ -6894,7 +6890,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6917,7 +6913,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -7074,7 +7070,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -7101,7 +7097,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitaslow",
-                    "oclId": PROJECT_2_OCL_ID,
+                    "oclId": OCL_ID_2,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -7120,7 +7116,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [],
@@ -7162,7 +7158,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
                 "filters": null,
             })),
         )
@@ -7725,7 +7721,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -7754,7 +7750,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -7785,7 +7781,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byKinds": ["FILE"],
                 },
@@ -7812,7 +7808,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byKinds": ["ANNOUNCEMENT"],
                 },
@@ -7843,7 +7839,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": [],
@@ -7987,7 +7983,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": [],
@@ -8118,7 +8114,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": [],
@@ -8249,7 +8245,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-1"],
@@ -8373,7 +8369,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2"],
@@ -8489,7 +8485,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -8620,7 +8616,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8751,7 +8747,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8867,7 +8863,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8900,7 +8896,7 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": ["test-category-1"],
@@ -10356,10 +10352,7 @@ async fn test_molecule_activity_access_level_rules_filters(
         .build()
         .await;
 
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
-    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
-
-    for (uid, token_id) in [(PROJECT_1_OCL_ID, 201), (PROJECT_2_OCL_ID, 202)] {
+    for (uid, token_id) in [(OCL_ID_1, 201), (OCL_ID_2, 202)] {
         assert_eq!(
             {
                 let res_json = GraphQLQueryRequest::new(
@@ -10417,12 +10410,9 @@ async fn test_molecule_activity_access_level_rules_filters(
             .to_owned()
     }
 
-    let project_1_public =
-        create_file(&harness, PROJECT_1_OCL_ID, "/p1-public.txt", "public").await;
-    let project_1_holders =
-        create_file(&harness, PROJECT_1_OCL_ID, "/p1-holders.txt", "holders").await;
-    let project_2_private =
-        create_file(&harness, PROJECT_2_OCL_ID, "/p2-private.txt", "private").await;
+    let project_1_public = create_file(&harness, OCL_ID_1, "/p1-public.txt", "public").await;
+    let project_1_holders = create_file(&harness, OCL_ID_1, "/p1-holders.txt", "holders").await;
+    let project_2_private = create_file(&harness, OCL_ID_2, "/p2-private.txt", "private").await;
 
     harness.synchronize_agents().await;
 
@@ -10434,8 +10424,8 @@ async fn test_molecule_activity_access_level_rules_filters(
             async_graphql::Variables::from_json(json!({
                 "filters": {
                     "byAccessLevelRules": [
-                        { "oclId": PROJECT_1_OCL_ID, "accessLevels": ["holders", "public"] },
-                        { "oclId": PROJECT_2_OCL_ID, "accessLevels": ["private"] }
+                        { "oclId": OCL_ID_1, "accessLevels": ["holders", "public"] },
+                        { "oclId": OCL_ID_2, "accessLevels": ["private"] }
                     ]
                 },
             })),
@@ -10499,18 +10489,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         .build()
         .await;
 
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitafast",
-                    "oclId": PROJECT_1_OCL_ID,
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10529,7 +10514,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -10582,7 +10567,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -10664,7 +10649,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -10696,7 +10681,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -10730,7 +10715,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -10760,7 +10745,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1 text",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -10801,7 +10786,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -10834,7 +10819,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitaslow",
-                    "oclId": PROJECT_2_OCL_ID,
+                    "oclId": OCL_ID_2,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10853,7 +10838,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2 text",
                 "attachments": [],
@@ -10894,7 +10879,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                 "contentType": "text/plain",
@@ -10965,7 +10950,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "changeBy": USER_1,
             "path": "/foo_renamed.txt",
             "project": {
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -10990,7 +10975,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
             },
             "tags": ["test-tag1", "test-tag2"]
         }
@@ -11006,7 +10991,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "headline": "Test announcement 2",
             "id": project_2_announcement_1_id,
             "project": {
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
             },
             "tags": ["test-tag2"]
         }
@@ -11035,7 +11020,7 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
             "changeBy": USER_2,
             "path": "/foo.txt",
             "project": {
-                "oclId": PROJECT_2_OCL_ID,
+                "oclId": OCL_ID_2,
             },
             "ref": project_2_file_1_dataset_id,
         }
@@ -11131,13 +11116,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byOclIds: [PROJECT_1_OCL_ID]
+    // Filters: byOclIds: [OCL_ID_1]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
                 Some(json!({
-                    "byOclIds": [PROJECT_1_OCL_ID],
+                    "byOclIds": [OCL_ID_1],
                 }))
             )
             .await,
@@ -11152,13 +11137,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byOclIds: [PROJECT_2_OCL_ID]
+    // Filters: byOclIds: [OCL_ID_2]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
                 Some(json!({
-                    "byOclIds": [PROJECT_2_OCL_ID],
+                    "byOclIds": [OCL_ID_2],
                 }))
             )
             .await,
@@ -11173,13 +11158,13 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
         })
     );
 
-    // Filters: byOclIds: [PROJECT_2_OCL_ID, PROJECT_1_OCL_ID]
+    // Filters: byOclIds: [OCL_ID_2, OCL_ID_1]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
                 Some(json!({
-                    "byOclIds": [PROJECT_2_OCL_ID, PROJECT_1_OCL_ID],
+                    "byOclIds": [OCL_ID_2, OCL_ID_1],
                 }))
             )
             .await,
@@ -11482,17 +11467,13 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .build()
         .await;
 
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitafast",
-                    "oclId": PROJECT_1_OCL_ID,
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11516,7 +11497,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11571,7 +11552,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -11694,16 +11675,13 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         .build()
         .await;
 
-    const PROJECT_1_OCL_ID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
                     "symbol": "vitafast",
-                    "oclId": PROJECT_1_OCL_ID,
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11722,7 +11700,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11777,7 +11755,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -11874,7 +11852,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
             },
             "tags": ["test-tag1", "test-tag2", "test-tag3"]
         }
@@ -11914,7 +11892,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
             "changeBy": USER_1,
             "path": "/foo.txt",
             "project": {
-                "oclId": PROJECT_1_OCL_ID,
+                "oclId": OCL_ID_1,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -11934,7 +11912,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "oclId": PROJECT_1_OCL_ID })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -11981,7 +11959,7 @@ async fn test_molecule_activity_announcements_search_disabled_projects(
     // Re-enable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "oclId": PROJECT_1_OCL_ID })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");

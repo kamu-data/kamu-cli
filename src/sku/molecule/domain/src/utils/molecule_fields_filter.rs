@@ -122,9 +122,13 @@ pub fn normalize_access_level_rules(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OclId;
 
     #[test]
     fn normalize_access_level_rules_dedups_and_merges_by_ocl_id() {
+        let ocl_id = "Ox0000000000000000000000000000000000000000000000000000000000000000"
+            .parse::<OclId>()
+            .unwrap();
         let rules = normalize_access_level_rules(
             Some(vec!["public".to_string(), "public".to_string()]),
             Some(vec![
@@ -133,11 +137,11 @@ mod tests {
                     access_levels: vec!["private".to_string(), "public".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ocl_id: Some("ocl-1".to_string()),
+                    ocl_id: Some(ocl_id.clone()),
                     access_levels: vec!["project".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ocl_id: Some("ocl-1".to_string()),
+                    ocl_id: Some(ocl_id.clone()),
                     access_levels: vec!["team".to_string(), "project".to_string()],
                 },
             ]),
@@ -151,10 +155,12 @@ mod tests {
                     access_levels: vec!["public".to_string(), "private".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ocl_id: Some("ocl-1".to_string()),
+                    ocl_id: Some(ocl_id),
                     access_levels: vec!["project".to_string(), "team".to_string()],
                 }
             ]
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
