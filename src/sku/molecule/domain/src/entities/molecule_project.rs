@@ -15,6 +15,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[nutype::nutype(
+    sanitize(lowercase),
     validate(len_char_min = 2),
     derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq)
 )]
@@ -22,7 +23,7 @@ pub struct Symbol(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: store as [u8; 32]?
+// TODO: Molecule: Phase 3: store as [u8; 32]?
 
 static OCL_ID_REGEX: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^0x[0-9a-f]{64}$").unwrap());

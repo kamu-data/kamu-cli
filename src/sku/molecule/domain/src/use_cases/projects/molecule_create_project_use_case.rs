@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProject, OclId};
+use crate::{MoleculeGetDatasetError, MoleculeProject, OclId, Symbol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +22,7 @@ pub trait MoleculeCreateProjectUseCase: Send + Sync {
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
         ocl_id: OclId,
-        symbol: String,
+        symbol: Symbol,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError>;
 }
 

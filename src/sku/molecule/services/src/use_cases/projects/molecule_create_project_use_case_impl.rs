@@ -56,7 +56,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
         ocl_id: OclId,
-        mut symbol: String,
+        symbol: Symbol,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
         // Gain write access to projects dataset
         let projects_writer = self
@@ -74,17 +74,13 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         use datafusion::prelude::*;
 
-        // Normalize symbol to lowercase
-        symbol.make_ascii_lowercase();
-        let lowercase_symbol = symbol;
-
         // Check for conflicts
         if let Some(df) = maybe_raw_ledger_df {
             let df = df
                 .filter(
                     col("ocl_id")
                         .eq(lit(ocl_id.as_ref()))
-                        .or(lower(col("symbol")).eq(lit(&lowercase_symbol))),
+                        .or(lower(col("symbol")).eq(lit(symbol.as_ref()))),
                 )
                 .int_err()?
                 .sort(vec![col("offset").sort(false, false)])
@@ -109,7 +105,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("{}.{lowercase_symbol}", molecule_account.account_name)
+            format!("{}.{symbol}", molecule_account.account_name)
                 .parse()
                 .int_err()?;
 
@@ -191,7 +187,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         // Add project entry
         let project_payload = MoleculeProjectPayloadRecord {
             ocl_id: ocl_id.clone(),
-            symbol: lowercase_symbol.clone(),
+            symbol: symbol.clone(),
             odf_account_id: project_account.id.clone(),
             odf_data_room_dataset_id: data_room_create_res.dataset_handle.id,
             odf_announcements_dataset_id: announcements_create_res.dataset_handle.id,
@@ -228,7 +224,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                             molecule_subject.account_id.clone(),
                             project_account.id,
                             ocl_id,
-                            lowercase_symbol,
+                            symbol,
                         ),
                     )
                     .await
