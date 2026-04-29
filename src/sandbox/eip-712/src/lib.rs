@@ -204,10 +204,9 @@ mod tests {
 
         // 4.2) Struct hash
         {
-            let expected_hash = Ok(b256!(
-                "0x1150be8b733f893e4d086fd0a993433dd43c8d1d056e5a1539221b359dbbf041"
-            ));
-            let actual_hash = typed_data.hash_struct();
+            let expected_hash =
+                b256!("0x1150be8b733f893e4d086fd0a993433dd43c8d1d056e5a1539221b359dbbf041");
+            let actual_hash = typed_data.hash_struct()?;
 
             assert_eq!(expected_hash, actual_hash);
         }
@@ -223,10 +222,9 @@ mod tests {
 
         // 4.4) EIP-712 digest
         {
-            let expected_signing_hash = Ok(b256!(
-                "0xfc67633d930b129099d4600295c3676b35c191d90dd4b59274fb2dfd70396c9c"
-            ));
-            let actual_signing_hash = typed_data.eip712_signing_hash();
+            let expected_signing_hash =
+                b256!("0xfc67633d930b129099d4600295c3676b35c191d90dd4b59274fb2dfd70396c9c");
+            let actual_signing_hash = typed_data.eip712_signing_hash()?;
 
             assert_eq!(expected_signing_hash, actual_signing_hash);
         }
