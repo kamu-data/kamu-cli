@@ -57,7 +57,7 @@ datafusion = { version = "53", default-features = false, features = ["nested_exp
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
-nutype = { version = "0.6", default-features = false }
+nutype = { version = "0.7", default-features = false }
 petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }

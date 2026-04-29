@@ -367,13 +367,14 @@ With these ideas in mind:
 ### Test Groups
 We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate to organize tests in groups. The complete set of groups is:
 - `containerized` - for tests that spawn Docker/Podman containers
+- `database` - for tests that involve any database interaction, subsequently grouped by:
+  - `mysql` - tests that use MySQL/MariaDB
+  - `postgres` - tests that use PostreSQL
 - `engine` - for tests that involve any data engine or data framework (query, ingest, or transform paths), subsequently grouped by:
   - `datafusion` - tests that use Apache DataFusion
   - `spark` - tests that use Apache Spark
   - `flink` - tests that use Apache Flink
-- `database` - for tests that involve any database interaction, subsequently grouped by:
-  - `mysql` - tests that use MySQL/MariaDB
-  - `postgres` - tests that use PostreSQL
+- `examples` - tests the pipelines in `examples/` directory. Currently requires `kamu` to be available on the `PATH`
 - `ingest` - tests that test data ingestion path
 - `transform` - tests that test data transformation path
 - `query` - tests that test data query path
@@ -438,7 +439,7 @@ Our Jupyter demo at https://demo.kamu.dev includes a special Jupyter notebook im
 ### Major Dependencies Update
 1. (Optional) Start by upgrading your local tools: `cargo install-update -a`
 2. Run `cargo update` to pull in any minor releases first
-3. Run `cargo upgrade --dry-run` and see which packages have major upgrades
+3. Run `cargo upgrade --dry-run --incompatible` and see which packages have major upgrades
 4. To perform major upgrades You can go crate by crate or all at once - it's up to you
 5. The tricky part is usually `arrow` and `datafusion` family of crates, to upgrade them you need to:
    1. See what is the latest version of `datafusion`
