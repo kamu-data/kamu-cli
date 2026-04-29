@@ -135,7 +135,9 @@ fn to_typed_data(req: SignRequest) -> eyre::Result<TypedData> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::b256;
+    use std::str::FromStr;
+
+    use alloy::primitives::{b256, keccak256};
     use alloy::signers::k256::ecdsa::SigningKey;
     use alloy::signers::local::LocalSigner;
     use alloy::signers::{Signature, SignerSync};
@@ -146,12 +148,18 @@ mod tests {
 
     #[test]
     fn test_typed_data_signed_correctly() -> eyre::Result<()> {
+        // Adapted from:
+        // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md
+
+        const DID: &str = "did:odf:ed25519:z6MkhaXgBZDvotAccount";
+
         let req = SignRequest {
             domain: DomainInput {
                 name: "MoleculeOclDidRegistry".to_string(),
                 version: "1".to_string(),
-                chain_id: 1,
-                verifying_contract: Some("0x1234567890123456789012345678901234567890".to_string()),
+                chain_id: 8453,
+                // Molecule's note: synthetic — see note in fixtures doc §2
+                verifying_contract: Some("0x00000000000000000000000000000000DeaDBeeF".to_string()),
             },
             primary_type: "LinkDidRequest".to_string(),
             types: HashMap::from([(
@@ -167,12 +175,15 @@ mod tests {
             )]),
             message: {
                 let json_obj = json!({
-                    "oclId": "0x1234567890123456789012345678901234567890",
-                    "provider": "0x1234567890123456789012345678901234567890",
-                    "subject": "0x1234567890123456789012345678901234567890",
-                    "did": "did:molecule:0x1234567890123456789012345678901234567890",
-                    "requestId": "0x1234567890123456789012345678901234567890",
-                    "deadline": "1000000000000000000",
+                    "oclId": "0x0101000000000000000000000000000000000000000000000000000000000042",
+                    // keccak256("odf")
+                    "provider": "0xd025eab60676ea26fe9a9a945c991e6d0f3f06e3a940bb5123899345a9b2a413",
+                    // keccak256("account")
+                    "subject": "0xd844bb55167ab332117049e2ccd3d8863d241bcc80f46302310a6d942a90e851",
+                    "did": DID,
+                    "requestId": "0xad68a4a8b76681274554d59f863c35d7abcef09a798c99e9717a2582037764a5",
+                    // 2030-01-01T00:00:00Z
+                    "deadline": "1893456000",
                 });
                 let serde_json::Value::Object(json_map) = json_obj else {
                     unreachable!();
@@ -182,28 +193,54 @@ mod tests {
         };
         let typed_data = to_typed_data(req)?;
 
+        // 4.1) keccak256(bytes(did))
+        {
+            let expected_hash =
+                b256!("0xb6ed9810fd59a66adb2e17dd7f6142732ea24fd24c9a805d7b5d1eb606750a32");
+            let actual_hash = keccak256(DID);
+
+            assert_eq!(expected_hash, actual_hash);
+        }
+
+        // 4.2) Struct hash
         {
             let expected_hash = Ok(b256!(
-                "0x6e366a386b5a566cd7252056fab0dcee73fa85a28b6b4be48910acbaeff104f8"
+                "0x1150be8b733f893e4d086fd0a993433dd43c8d1d056e5a1539221b359dbbf041"
             ));
             let actual_hash = typed_data.hash_struct();
 
             assert_eq!(expected_hash, actual_hash);
         }
 
+        // 4.3) Domain separator
+        {
+            let expected_hash =
+                b256!("0x9d056bc714b1d8ad38256fe8ba99f3e343766ceff53a0e9eb8c31b93295d1e7e");
+            let actual_hash = typed_data.domain.separator();
+
+            assert_eq!(expected_hash, actual_hash);
+        }
+
+        // 4.4) EIP-712 digest
+        {
+            let expected_signing_hash = Ok(b256!(
+                "0xfc67633d930b129099d4600295c3676b35c191d90dd4b59274fb2dfd70396c9c"
+            ));
+            let actual_signing_hash = typed_data.eip712_signing_hash();
+
+            assert_eq!(expected_signing_hash, actual_signing_hash);
+        }
+
+        // 5) Test private key + expected signature
         {
             let signer: LocalSigner<SigningKey> =
-                "0000000000000000000000000000000000000000000000000000000000000001".parse()?;
-            let expected_signature = Signature::new(
-                "3947742182129489675771646903630550663162458215065625123408019227496657409676"
-                    .parse()?,
-                "14123466426607808506833502959344684099943903139190352731783630576333407444976"
-                    .parse()?,
-                true,
-            );
+                "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601".parse()?;
+            let expected_signature = Signature::from_str(
+                "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c",
+            )?;
             let actual_signature = signer.sign_dynamic_typed_data_sync(&typed_data)?;
 
-            assert_eq!(expected_signature, actual_signature);
+            assert_eq!(expected_signature.to_string(), actual_signature.to_string());
         }
 
         Ok(())
