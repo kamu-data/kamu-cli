@@ -25,13 +25,12 @@ use kamu_datasets::{
     DatasetRegistryExt,
 };
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
-use kamu_molecule_domain::MoleculeCreateProjectUseCase;
+use kamu_molecule_domain::{MoleculeCreateProjectUseCase, OclId, Symbol};
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
 use kamu_search_elasticsearch::testing::{ElasticsearchBaseHarness, ElasticsearchTestContext};
 use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider};
-use num_bigint::BigInt;
 use odf::dataset::MetadataChainExt;
 use serde_json::json;
 use time_source::SystemTimeSourceProvider;
@@ -52,13 +51,13 @@ macro_rules! test_gql_custom_molecule {
             #[::test_group::group(elasticsearch)]
             #[::test_log::test(::kamu_search_elasticsearch::test)]
             async fn [<$test_name "_es">](es_ctx: Arc<ElasticsearchTestContext>) {
-                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx);
+                let search_variant = GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(es_ctx);
                 $test_name(search_variant).await;
             }
 
             #[::test_log::test(::tokio::test)]
             async fn [<$test_name "_src">]() {
-                let search_variant = GraphQLMoleculeV2HarnessSearchVariant::SourceBased;
+                let search_variant = GraphQLMoleculeHarnessSearchVariant::SourceBased;
                 $test_name(search_variant).await;
             }
         }
@@ -69,19 +68,19 @@ macro_rules! test_gql_custom_molecule {
 
 const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
 const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
+const OCL_ID_1: &str = "0x7f3a9c2e1b84d056f2a731c9e40b8d5f6a2c9e1d7b3f8a04c52e9d1b6f3a7c01";
+const OCL_ID_2: &str = "0x7f3a9c2e1b84d056f2a731c9e40b8d5f6a2c9e1d7b3f8a04c52e9d1b6f3a7c02";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const CREATE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftSymbol: String!, $ipnftUid: String!, $ipnftAddress: String!, $ipnftTokenId: Int!) {
+    mutation ($symbol: String!, $oclId: String!) {
       molecule {
-        v2 {
+        v3 {
           createProject(
-            ipnftSymbol: $ipnftSymbol
-            ipnftUid: $ipnftUid
-            ipnftAddress: $ipnftAddress
-            ipnftTokenId: $ipnftTokenId
+            symbol: $symbol
+            oclId: $oclId
           ) {
             isSuccess
             message
@@ -92,7 +91,7 @@ const CREATE_PROJECT: &str = indoc!(
                   id
                   accountName
                 }
-                ipnftUid
+                oclId
                 dataRoom {
                   dataset {
                     id
@@ -116,10 +115,10 @@ const CREATE_PROJECT: &str = indoc!(
 
 const DISABLE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!) {
+    mutation ($oclId: String!) {
         molecule {
-            v2 {
-                disableProject(ipnftUid: $ipnftUid) {
+            v3 {
+                disableProject(oclId: $oclId) {
                     project { __typename }
                 }
             }
@@ -130,10 +129,10 @@ const DISABLE_PROJECT: &str = indoc!(
 
 const ENABLE_PROJECT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!) {
+    mutation ($oclId: String!) {
         molecule {
-            v2 {
-                enableProject(ipnftUid: $ipnftUid) {
+            v3 {
+                enableProject(oclId: $oclId) {
                     project { __typename }
                 }
             }
@@ -147,10 +146,10 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
     r#"
     query ($filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
+        v3 {
           activity(filters: $filters) {
             nodes {
-              ... on MoleculeActivityFileAddedV2 {
+              ... on MoleculeActivityFileAdded {
                 __typename
                 entry {
                   path
@@ -159,7 +158,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileUpdatedV2 {
+              ... on MoleculeActivityFileUpdated {
                 __typename
                 entry {
                   path
@@ -168,7 +167,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityFileRemovedV2 {
+              ... on MoleculeActivityFileRemoved {
                 __typename
                 entry {
                   path
@@ -177,7 +176,7 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
                   changeBy
                 }
               }
-              ... on MoleculeActivityAnnouncementV2 {
+              ... on MoleculeActivityAnnouncement {
                 __typename
                 announcement {
                   id
@@ -211,13 +210,13 @@ const LIST_GLOBAL_ACTIVITY_QUERY: &str = indoc!(
 // TODO: find a way to output tags/categories
 const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     r#"
-    query ($ipnftUid: String!, $filters: MoleculeProjectActivityFilters) {
+    query ($oclId: String!, $filters: MoleculeProjectActivityFilters) {
       molecule {
-        v2 {
-          project(ipnftUid: $ipnftUid) {
+        v3 {
+          project(oclId: $oclId) {
             activity(filters: $filters) {
               nodes {
-                ... on MoleculeActivityFileAddedV2 {
+                ... on MoleculeActivityFileAdded {
                   __typename
                   entry {
                     path
@@ -226,7 +225,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileUpdatedV2 {
+                ... on MoleculeActivityFileUpdated {
                   __typename
                   entry {
                     path
@@ -235,7 +234,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityFileRemovedV2 {
+                ... on MoleculeActivityFileRemoved {
                   __typename
                   entry {
                     path
@@ -244,7 +243,7 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
                     changeBy
                   }
                 }
-                ... on MoleculeActivityAnnouncementV2 {
+                ... on MoleculeActivityAnnouncement {
                   __typename
                   announcement {
                     id
@@ -278,10 +277,10 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
 );
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
       molecule {
-        v2 {
-          project(ipnftUid: $ipnftUid) {
+        v3 {
+          project(oclId: $oclId) {
             dataRoom {
               uploadFile(
                 path: $path
@@ -312,10 +311,10 @@ const CREATE_VERSIONED_FILE: &str = indoc!(
 );
 const MOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
+    mutation ($oclId: String!, $fromPath: CollectionPathV2!, $toPath: CollectionPathV2!, $changeBy: String!) {
       molecule {
-        v2 {
-          project(ipnftUid: $ipnftUid) {
+        v3 {
+          project(oclId: $oclId) {
             dataRoom {
               moveEntry(fromPath: $fromPath, toPath: $toPath, changeBy: $changeBy) {
                 isSuccess
@@ -330,10 +329,10 @@ const MOVE_ENTRY_QUERY: &str = indoc!(
 );
 const CREATE_ANNOUNCEMENT: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
+    mutation ($oclId: String!, $headline: String!, $body: String!, $attachments: [DatasetID!], $accessLevel: String!, $changeBy: String!, $categories: [String!]!, $tags: [String!]!) {
       molecule {
-        v2 {
-          project(ipnftUid: $ipnftUid) {
+        v3 {
+          project(oclId: $oclId) {
             announcements {
               create(
                 headline: $headline
@@ -360,10 +359,10 @@ const CREATE_ANNOUNCEMENT: &str = indoc!(
 );
 const REMOVE_ENTRY_QUERY: &str = indoc!(
     r#"
-    mutation ($ipnftUid: String!, $path: CollectionPathV2!, $changeBy: String!) {
+    mutation ($oclId: String!, $path: CollectionPathV2!, $changeBy: String!) {
       molecule {
-        v2 {
-          project(ipnftUid: $ipnftUid) {
+        v3 {
+          project(oclId: $oclId) {
             dataRoom {
               removeEntry(path: $path, changeBy: $changeBy) {
                 isSuccess
@@ -380,7 +379,7 @@ const SEARCH_QUERY: &str = indoc!(
     r#"
     query ($prompt: String!, $filters: MoleculeSemanticSearchFilters) {
       molecule {
-        v2 {
+        v3 {
           search(prompt: $prompt, filters: $filters) {
             totalCount
             nodes {
@@ -388,7 +387,7 @@ const SEARCH_QUERY: &str = indoc!(
                 __typename
                 entry {
                   project {
-                    ipnftUid
+                    oclId
                   }
                   asDataset {
                     id
@@ -427,7 +426,7 @@ const SEARCH_QUERY: &str = indoc!(
                 __typename
                 announcement {
                   project {
-                    ipnftUid
+                    oclId
                   }
                   id
                   headline
@@ -454,69 +453,69 @@ const SEARCH_QUERY: &str = indoc!(
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_provision_project);
+test_gql_custom_molecule!(test_molecule_provision_project);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_disable_enable_project);
+test_gql_custom_molecule!(test_molecule_disable_enable_project);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_disable_enable_project_errors);
+test_gql_custom_molecule!(test_molecule_disable_enable_project_errors);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol);
+test_gql_custom_molecule!(test_molecule_cannot_recreate_disabled_project_with_same_symbol);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_quota_exceeded);
+test_gql_custom_molecule!(test_molecule_data_room_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_operations);
+test_gql_custom_molecule!(test_molecule_data_room_operations);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_data_room_as_of_block_hash);
+test_gql_custom_molecule!(test_molecule_data_room_as_of_block_hash);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_alternative_encryption_metadata);
+test_gql_custom_molecule!(test_molecule_alternative_encryption_metadata);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_announcements_quota_exceeded);
+test_gql_custom_molecule!(test_molecule_announcements_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_announcements_operations);
+test_gql_custom_molecule!(test_molecule_announcements_operations);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity);
+test_gql_custom_molecule!(test_molecule_activity);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity_access_level_rules_filters);
+test_gql_custom_molecule!(test_molecule_activity_access_level_rules_filters);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_search);
+test_gql_custom_molecule!(test_molecule_search);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]
-async fn test_molecule_v2_dump_dataset_snapshots_src() {
+async fn test_molecule_dump_dataset_snapshots_src() {
     // NOTE: Instead of dumping the source snapshots of datasets here we create
     // datasets all and scan their metadata chains to dump events exactly how they
     // appear in real datasets
 
-    const PROJECT_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
-        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
@@ -530,10 +529,8 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let res = harness
             .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
                 async_graphql::Variables::from_json(json!({
-                    "ipnftSymbol": "VITAFAST",
-                    "ipnftUid": PROJECT_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "VITAFAST",
+                    "oclId": OCL_ID,
                 })),
             ))
             .await;
@@ -543,7 +540,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let data_room_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["dataRoom"]["dataset"]["id"]
+                    data["molecule"]["v3"]["createProject"]["project"]["dataRoom"]["dataset"]["id"]
                         .as_str()
                         .unwrap(),
                 )
@@ -555,7 +552,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let announcements_dataset = dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["createProject"]["project"]["announcements"]["dataset"]
+                    data["molecule"]["v3"]["createProject"]["project"]["announcements"]["dataset"]
                         ["id"]
                         .as_str()
                         .unwrap(),
@@ -572,7 +569,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         let data = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_UID,
+                "oclId": OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -587,7 +584,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
         dataset_reg
             .get_dataset_by_id(
                 &odf::DatasetID::from_did_str(
-                    data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
+                    data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]["ref"]
                         .as_str()
                         .unwrap(),
                 )
@@ -601,7 +598,7 @@ async fn test_molecule_v2_dump_dataset_snapshots_src() {
     GraphQLQueryRequest::new(
         CREATE_ANNOUNCEMENT,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": PROJECT_UID,
+            "oclId": OCL_ID,
             "headline": "Test announcement",
             "body": "Blah blah",
             "attachments": [],
@@ -712,8 +709,8 @@ async fn dump_snapshot(
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -727,11 +724,11 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
         r#"
         query {
             molecule {
-                v2 {
+                v3 {
                     projects(page: 0, perPage: 100) {
                         nodes {
-                            ipnftSymbol
-                            ipnftUid
+                            symbol
+                            oclId
                         }
                     }
                 }
@@ -746,7 +743,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([]),
     );
 
@@ -754,16 +751,14 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "VITAFAST",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "VITAFAST",
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let res = &res.data.into_json().unwrap()["molecule"]["v2"]["createProject"];
+    let res = &res.data.into_json().unwrap()["molecule"]["v3"]["createProject"];
     let project_account_id = res["project"]["account"]["id"].as_str().unwrap();
     let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
     let data_room_did = res["project"]["dataRoom"]["dataset"]["id"]
@@ -785,7 +780,7 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                     "id": project_account_id,
                     "accountName": project_account_name,
                 },
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
                 "dataRoom": {
                     "dataset": {
                         "id": data_room_did,
@@ -802,20 +797,18 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
         }),
     );
 
-    // Read back the project entry by `ipnftUid``
+    // Read back the project entry by `oclId`
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
+                        v3 {
+                            project(oclId: $oclId) {
                                 account { id accountName }
-                                ipnftSymbol
-                                ipnftUid
-                                ipnftAddress
-                                ipnftTokenId
+                                symbol
+                                oclId
                             }
                         }
                     }
@@ -823,40 +816,36 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
             "account": {
                 "id": project_account_id,
                 "accountName": project_account_name,
             },
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": "9",
+            "symbol": "vitafast",
+            "oclId": OCL_ID_1,
         }),
     );
 
-    // Read back the project entry by `ipnftUid`` with modified character casing
+    // Read back the project entry by `oclId` again
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
+                        v3 {
+                            project(oclId: $oclId) {
                                 account { id accountName }
-                                ipnftSymbol
-                                ipnftUid
-                                ipnftAddress
-                                ipnftTokenId
+                                symbol
+                                oclId
                             }
                         }
                     }
@@ -864,23 +853,21 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcad88677cA87a7815728C72D74B4ff4982d54fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
             "account": {
                 "id": project_account_id,
                 "accountName": project_account_name,
             },
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": "9",
+            "symbol": "vitafast",
+            "oclId": OCL_ID_1,
         }),
     );
 
@@ -891,73 +878,67 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
-            "ipnftSymbol": "vitafast",
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            "symbol": "vitafast",
+            "oclId": OCL_ID_1,
         }]),
     );
 
-    // Ensure errors on ipnftUid collision
+    // Ensure errors on oclId collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitaslow",
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
 
-    // Ensure errors on ipnftSymbol collision
+    // Ensure errors on symbol collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "1",
+                "symbol": "vitafast",
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
 
     // Create another project
-    // Ensure errors on ipnftUid collision
+    // Ensure errors on oclId collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": r#"0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912"#,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "108494037067113761580099112583860151730516105403483528465874625006707409835912",
+                "symbol": "vitaslow",
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -968,15 +949,15 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([
             {
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "symbol": "vitafast",
+                "oclId": OCL_ID_1,
             },
             {
-                "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
+                "symbol": "vitaslow",
+                "oclId": OCL_ID_2,
             }
         ]),
     );
@@ -984,12 +965,8 @@ async fn test_molecule_v2_provision_project(search_variant: GraphQLMoleculeV2Har
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_disable_enable_project(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
-) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
-    let harness = GraphQLMoleculeV2Harness::builder()
+async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1005,15 +982,11 @@ async fn test_molecule_v2_disable_enable_project(
         .get_one::<dyn MoleculeCreateProjectUseCase>()
         .unwrap();
 
+    let ocl_id = OCL_ID_1.parse::<OclId>().unwrap();
+    let symbol = Symbol::try_new("VITAFAST").unwrap();
+
     create_project_uc
-        .execute(
-            &molecule_subject,
-            Some(Utc::now()),
-            "VITAFAST".to_string(),
-            ipnft_uid.to_string(),
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1".to_string(),
-            BigInt::from(9u32),
-        )
+        .execute(&molecule_subject, Some(Utc::now()), ocl_id.clone(), symbol)
         .await
         .unwrap();
 
@@ -1027,25 +1000,25 @@ async fn test_molecule_v2_disable_enable_project(
         .await;
 
     async fn query_project(
-        harness: &GraphQLMoleculeV2Harness,
-        uid: &str,
+        harness: &GraphQLMoleculeHarness,
+        ocl_id: &OclId,
     ) -> async_graphql::Response {
         GraphQLQueryRequest::new(
             indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                     molecule {
-                        v2 {
-                            project(ipnftUid: $ipnftUid) {
-                                ipnftUid
-                                ipnftSymbol
+                        v3 {
+                            project(oclId: $oclId) {
+                                oclId
+                                symbol
                             }
                         }
                     }
                 }
                 "#
             ),
-            async_graphql::Variables::from_json(json!({ "ipnftUid": uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
@@ -1054,26 +1027,26 @@ async fn test_molecule_v2_disable_enable_project(
     // Disable project multiple times to test idempotence
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
     let disable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        disable_res["molecule"]["v2"]["disableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        disable_res["molecule"]["v3"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     // Trying to disable disabled account will return error
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
         ))
         .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
-    pretty_assertions::assert_eq!(disable_error, format!("Project {ipnft_uid} not found"));
+    assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
+    pretty_assertions::assert_eq!(disable_error, format!("Project [{ocl_id}] not found"));
 
     // Project is no longer visible in the listing
     let res = GraphQLQueryRequest::new(
@@ -1081,9 +1054,9 @@ async fn test_molecule_v2_disable_enable_project(
             r#"
             query {
                 molecule {
-                    v2 {
+                    v3 {
                         projects(page: 0, perPage: 100) {
-                            nodes { ipnftUid }
+                            nodes { oclId }
                         }
                     }
                 }
@@ -1095,15 +1068,15 @@ async fn test_molecule_v2_disable_enable_project(
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([]),
     );
 
-    // Querying by UID returns None
-    let res = query_project(&harness, ipnft_uid).await;
+    // Querying by OCL ID returns None
+    let res = query_project(&harness, &ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!(null),
     );
 
@@ -1111,14 +1084,14 @@ async fn test_molecule_v2_disable_enable_project(
     for _ in 0..2 {
         let res = harness
             .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-                async_graphql::Variables::from_json(json!({ "ipnftUid": ipnft_uid })),
+                async_graphql::Variables::from_json(json!({ "oclId": ocl_id })),
             ))
             .await;
         assert!(res.is_ok(), "{res:#?}");
         let enable_res = res.data.into_json().unwrap();
         pretty_assertions::assert_eq!(
-            enable_res["molecule"]["v2"]["enableProject"]["project"],
-            json!({ "__typename": "MoleculeProjectMutV2" }),
+            enable_res["molecule"]["v3"]["enableProject"]["project"],
+            json!({ "__typename": "MoleculeProjectMut" }),
         );
     }
 
@@ -1134,9 +1107,9 @@ async fn test_molecule_v2_disable_enable_project(
             r#"
             query {
                 molecule {
-                    v2 {
+                    v3 {
                         projects(page: 0, perPage: 100) {
-                            nodes { ipnftUid }
+                            nodes { oclId }
                         }
                     }
                 }
@@ -1148,29 +1121,29 @@ async fn test_molecule_v2_disable_enable_project(
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["projects"]["nodes"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["projects"]["nodes"],
         json!([{
-            "ipnftUid": ipnft_uid,
+            "oclId": ocl_id,
         }]),
     );
 
-    let res = query_project(&harness, ipnft_uid).await;
+    let res = query_project(&harness, &ocl_id).await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"],
         json!({
-            "ipnftUid": ipnft_uid,
-            "ipnftSymbol": "vitafast",
+            "oclId": ocl_id,
+            "symbol": "vitafast",
         }),
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_disable_enable_project_errors(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_disable_enable_project_errors(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1178,42 +1151,45 @@ async fn test_molecule_v2_disable_enable_project_errors(
 
     harness.create_projects_dataset().await;
 
-    let missing_uid = "foo";
+    const MISSING_OCL_ID: &str = OCL_ID_1;
 
     let res = GraphQLQueryRequest::new(
         DISABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        async_graphql::Variables::from_json(json!({ "oclId": MISSING_OCL_ID })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     let disable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["disableProject"].is_null());
-    pretty_assertions::assert_eq!(disable_error, format!("Project {missing_uid} not found"));
+    assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
+    pretty_assertions::assert_eq!(
+        disable_error,
+        format!("Project [{MISSING_OCL_ID}] not found")
+    );
 
     let res = GraphQLQueryRequest::new(
         ENABLE_PROJECT,
-        async_graphql::Variables::from_json(json!({ "ipnftUid": missing_uid })),
+        async_graphql::Variables::from_json(json!({ "oclId": MISSING_OCL_ID })),
     )
     .expect_error()
     .execute(&harness.schema, &harness.catalog_authorized)
     .await;
     let enable_error = res.errors[0].message.clone();
     let res_json = res.data.into_json().unwrap();
-    assert!(res_json["molecule"]["v2"]["enableProject"].is_null());
+    assert!(res_json["molecule"]["v3"]["enableProject"].is_null());
     pretty_assertions::assert_eq!(
         enable_error,
-        format!("No historical entries for project {missing_uid}")
+        format!("No historical entries for project [{MISSING_OCL_ID}]")
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1221,29 +1197,25 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
 
     harness.create_projects_dataset().await;
 
-    let original_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
     // Create project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": original_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": OCL_ID_1,
             })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": original_uid })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
@@ -1252,20 +1224,18 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "10",
+                "symbol": "vitafast",
+                "oclId": OCL_ID_2,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
+            "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
     );
@@ -1273,12 +1243,12 @@ async fn test_molecule_v2_cannot_recreate_disabled_project_with_same_symbol(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_quota_exceeded(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_data_room_quota_exceeded(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
@@ -1292,10 +1262,8 @@ async fn test_molecule_v2_data_room_quota_exceeded(
     let create_project_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "quota-room",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "901",
+                "symbol": "quota-room",
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -1329,10 +1297,10 @@ async fn test_molecule_v2_data_room_quota_exceeded(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPath!, $content: Base64Usnp!) {
+                mutation ($oclId: String!, $path: CollectionPath!, $content: Base64Usnp!) {
                   molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
+                    v3 {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1358,14 +1326,14 @@ async fn test_molecule_v2_data_room_quota_exceeded(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/quota.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             }))),
         )
         .await;
 
-    let payload = upload_res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]
+    let payload = upload_res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]
         ["uploadFile"]
         .clone();
     pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
@@ -1376,12 +1344,10 @@ async fn test_molecule_v2_data_room_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_operations(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
-) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+async fn test_molecule_data_room_operations(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -1391,17 +1357,15 @@ async fn test_molecule_v2_data_room_operations(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": OCL_ID,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
@@ -1414,10 +1378,10 @@ async fn test_molecule_v2_data_room_operations(
     // to the data room entry.
     const UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
+        mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!]!, $tags: [String!]!, $contentText: String!, $encryptionMetadata: MoleculeEncryptionMetadataInput!) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     path: $path
@@ -1471,7 +1435,7 @@ async fn test_molecule_v2_data_room_operations(
                     ... on MoleculeDataRoomPathOccupied {
                       byEntry {
                         project {
-                          ipnftUid
+                          oclId
                         }
                         ref
                         changeBy
@@ -1516,7 +1480,7 @@ async fn test_molecule_v2_data_room_operations(
     let res = GraphQLQueryRequest::new(
         UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -1544,16 +1508,16 @@ async fn test_molecule_v2_data_room_operations(
 
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
             "isSuccess": true,
@@ -1598,7 +1562,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             UPLOAD_WITH_ALL_METHOD_ARGUMENTS_PROVIDED,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello 2"),
                 "contentType": "application/octet-stream",
@@ -1626,7 +1590,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -1635,7 +1599,7 @@ async fn test_molecule_v2_data_room_operations(
                                 "message": "Path is occupied",
                                 "byEntry": {
                                     "project": {
-                                        "ipnftUid": ipnft_uid,
+                                        "oclId": OCL_ID,
                                     },
                                     "ref": file_1_did,
                                     "changeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
@@ -1681,7 +1645,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -1704,7 +1668,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -1712,7 +1676,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -1721,7 +1685,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -1734,10 +1698,10 @@ async fn test_molecule_v2_data_room_operations(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
+                    v3 {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1793,7 +1757,7 @@ async fn test_molecule_v2_data_room_operations(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -1821,16 +1785,16 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_2_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_2_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -1872,7 +1836,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -1881,7 +1845,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -1904,7 +1868,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -1912,7 +1876,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -1921,7 +1885,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -1934,10 +1898,10 @@ async fn test_molecule_v2_data_room_operations(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($ipnftUid: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+                mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
                   molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
+                    v3 {
+                      project(oclId: $oclId) {
                         dataRoom {
                           uploadFile(
                             path: $path
@@ -1993,7 +1957,7 @@ async fn test_molecule_v2_data_room_operations(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/baz.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
                 "contentType": "text/plain",
@@ -2006,16 +1970,16 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_3_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_3_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -2047,7 +2011,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2056,7 +2020,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2065,7 +2029,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2088,7 +2052,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2096,7 +2060,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2105,7 +2069,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2115,10 +2079,10 @@ async fn test_molecule_v2_data_room_operations(
     // List data room entries and denormalized file fields
     const LIST_ENTRIES_QUERY: &str = indoc!(
         r#"
-        query ($ipnftUid: String!, $filters: MoleculeDataRoomEntriesFilters) {
+        query ($oclId: String!, $filters: MoleculeDataRoomEntriesFilters) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   latest {
                     entries(filters: $filters) {
@@ -2151,7 +2115,7 @@ async fn test_molecule_v2_data_room_operations(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_ENTRIES_QUERY).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         ))
@@ -2159,7 +2123,7 @@ async fn test_molecule_v2_data_room_operations(
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": [
@@ -2216,10 +2180,10 @@ async fn test_molecule_v2_data_room_operations(
 
     const UPDATE_FILE_BY_REF_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -2280,7 +2244,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             UPDATE_FILE_BY_REF_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "ref": random_ref,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye -- random ref"),
                 "contentType": "application/octet-stream",
@@ -2298,7 +2262,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -2318,7 +2282,7 @@ async fn test_molecule_v2_data_room_operations(
         .execute_authorized_query(
             async_graphql::Request::new(UPDATE_FILE_BY_REF_QUERY).variables(
                 async_graphql::Variables::from_json(json!({
-                    "ipnftUid": ipnft_uid,
+                    "oclId": OCL_ID,
                     "ref": file_1_did,
                     "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye"),
                     "contentType": "text/plain",
@@ -2347,12 +2311,12 @@ async fn test_molecule_v2_data_room_operations(
     assert!(res.is_ok(), "{res:#?}");
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "isSuccess": true,
             "message": "",
@@ -2394,7 +2358,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2403,7 +2367,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2412,7 +2376,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2421,7 +2385,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2444,7 +2408,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2452,7 +2416,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2461,7 +2425,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2473,10 +2437,10 @@ async fn test_molecule_v2_data_room_operations(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                   molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
+                    v3 {
+                      project(oclId: $oclId) {
                         dataRoom {
                           latest {
                             entry(path: "/foo.txt") {
@@ -2518,14 +2482,14 @@ async fn test_molecule_v2_data_room_operations(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/foo.txt",
             "ref": file_1_did,
@@ -2563,10 +2527,10 @@ async fn test_molecule_v2_data_room_operations(
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                query ($ipnftUid: String!) {
+                query ($oclId: String!) {
                   molecule {
-                    v2 {
-                      project(ipnftUid: $ipnftUid) {
+                    v3 {
+                      project(oclId: $oclId) {
                         dataRoom {
                           latest {
                             entry(path: "/baz.txt") {
@@ -2608,14 +2572,14 @@ async fn test_molecule_v2_data_room_operations(
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "oclId": OCL_ID_1,
             }))),
         )
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entry"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entry"],
         json!({
             "path": "/baz.txt",
             "ref": file_3_did,
@@ -2646,7 +2610,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "fromPath": "/non-existent-path.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2657,7 +2621,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2676,7 +2640,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/baz.txt",
                 "changeBy": USER_1,
@@ -2687,7 +2651,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2706,7 +2670,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "fromPath": "/foo.txt",
                 "toPath": "/2025/foo.txt",
                 "changeBy": USER_1,
@@ -2717,7 +2681,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -2784,13 +2748,13 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2801,7 +2765,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -2810,7 +2774,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2819,7 +2783,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -2828,7 +2792,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -2837,7 +2801,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -2860,7 +2824,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -2868,7 +2832,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -2877,7 +2841,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -2893,13 +2857,13 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -2911,7 +2875,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": null,
@@ -2921,7 +2885,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -2979,7 +2943,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag1"],
                     "byCategories": null,
@@ -2989,7 +2953,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3047,7 +3011,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -3057,7 +3021,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3115,7 +3079,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -3125,7 +3089,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3183,7 +3147,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -3193,7 +3157,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3251,7 +3215,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-3", "test-category-1"],
@@ -3261,7 +3225,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3319,7 +3283,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3329,7 +3293,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3387,7 +3351,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3397,7 +3361,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3455,7 +3419,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -3465,7 +3429,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 3,
             "nodes": all_entries_nodes,
@@ -3478,7 +3442,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": {
                     "byTags": ["test-tag4"],
                     "byCategories": ["test-category-1"],
@@ -3488,7 +3452,7 @@ async fn test_molecule_v2_data_room_operations(
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 1,
             "nodes": [
@@ -3550,7 +3514,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/non-existent-path.txt",
                 "changeBy": USER_1,
             })),
@@ -3560,7 +3524,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -3579,7 +3543,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "path": "/baz.txt",
                 "changeBy": USER_1,
             })),
@@ -3589,7 +3553,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -3609,13 +3573,13 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -3657,7 +3621,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -3666,7 +3630,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -3675,7 +3639,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -3684,7 +3648,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -3693,7 +3657,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -3702,7 +3666,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -3725,7 +3689,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -3733,7 +3697,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -3742,7 +3706,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -3754,10 +3718,10 @@ async fn test_molecule_v2_data_room_operations(
     ////////////////////////
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+        mutation ($oclId: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
@@ -3809,7 +3773,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "ref": random_dataset_id.to_string(),
                 "expectedHead": null,
                 "accessLevel": "holder",
@@ -3825,7 +3789,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -3845,7 +3809,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "ref": file_1_did,
                 "expectedHead": null,
                 "accessLevel": "holders",
@@ -3861,7 +3825,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -3879,7 +3843,7 @@ async fn test_molecule_v2_data_room_operations(
     let cas_failure_res = GraphQLQueryRequest::new(
         UPDATE_METADATA_QUERY,
         async_graphql::Variables::from_json(json!({
-            "ipnftUid": ipnft_uid,
+            "oclId": OCL_ID,
             "ref": file_1_did,
             "expectedHead": cas_expected_head.to_string(),
             "accessLevel": "holders",
@@ -3908,7 +3872,7 @@ async fn test_molecule_v2_data_room_operations(
     .unwrap();
 
     let cas_failure_payload =
-        &cas_failure_res["molecule"]["v2"]["project"]["dataRoom"]["updateFileMetadata"];
+        &cas_failure_res["molecule"]["v3"]["project"]["dataRoom"]["updateFileMetadata"];
     pretty_assertions::assert_eq!(
         cas_failure_payload["__typename"],
         "UpdateVersionErrorCasFailed"
@@ -3932,13 +3896,13 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_ENTRIES_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
         .await
-        .into_json_data()["molecule"]["v2"]["project"]["dataRoom"]["latest"]["entries"],
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"],
         json!({
             "totalCount": 2,
             "nodes": [
@@ -4014,7 +3978,7 @@ async fn test_molecule_v2_data_room_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -4023,7 +3987,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -4032,7 +3996,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/2025/foo.txt",
                         "ref": file_1_did,
@@ -4041,7 +4005,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -4050,7 +4014,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/baz.txt",
                         "ref": file_3_did,
@@ -4059,7 +4023,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": file_2_did,
@@ -4068,7 +4032,7 @@ async fn test_molecule_v2_data_room_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": file_1_did,
@@ -4091,7 +4055,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -4099,7 +4063,7 @@ async fn test_molecule_v2_data_room_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "filters": null,
             })),
         )
@@ -4108,7 +4072,7 @@ async fn test_molecule_v2_data_room_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -4126,12 +4090,12 @@ async fn test_molecule_v2_data_room_operations(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_data_room_as_of_block_hash(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_data_room_as_of_block_hash(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_901";
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -4140,16 +4104,14 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     let create_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "901",
+                "symbol": "vitafast",
+                "oclId": OCL_ID,
             })),
         ))
         .await;
     assert!(create_res.is_ok(), "{create_res:#?}");
 
-    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]
+    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]
         ["project"]["dataRoom"]["dataset"]["id"]
         .as_str()
         .unwrap()
@@ -4167,7 +4129,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     let upload_1_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4182,10 +4144,10 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     .await;
     let upload_1_data = upload_1_res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        upload_1_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did = upload_1_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did = upload_1_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
@@ -4209,10 +4171,10 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
 
     const UPDATE_METADATA_QUERY: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
+        mutation ($oclId: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   updateFileMetadata(
                     ref: $ref
@@ -4239,7 +4201,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             UPDATE_METADATA_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "ref": file_1_did,
                 "accessLevel": "public",
                 "changeBy": USER_1,
@@ -4254,7 +4216,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "updateFileMetadata": {
@@ -4273,10 +4235,10 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
 
     const PROJECT_DATA_ROOM_LATEST_QUERY: &str = indoc!(
         r#"
-        query ($ipnftUid: String!) {
+        query ($oclId: String!) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   latest {
                     entries {
@@ -4302,7 +4264,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         GraphQLQueryRequest::new(
             PROJECT_DATA_ROOM_LATEST_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
             })),
         )
         .execute(&harness.schema, &harness.catalog_authorized)
@@ -4310,7 +4272,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "latest": {
@@ -4335,7 +4297,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     let upload_2_res = GraphQLQueryRequest::new(
         CREATE_VERSIONED_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": OCL_ID,
             "path": "/bar.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
             "contentType": "text/plain",
@@ -4347,7 +4309,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
     .await;
     let upload_2_data = upload_2_res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        upload_2_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        upload_2_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
 
@@ -4357,7 +4319,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         r#"
         query ($dataRoomBlockHash: Multihash!, $fileBlockHash: Multihash!) {
           molecule {
-            v2 {
+            v3 {
               projects(page: 0, perPage: 100) {
                 nodes {
                   dataRoom {
@@ -4396,7 +4358,7 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "projects": {
                         "nodes": [{
                             "dataRoom": {
@@ -4424,12 +4386,12 @@ async fn test_molecule_v2_data_room_as_of_block_hash(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_alternative_encryption_metadata(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_alternative_encryption_metadata(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -4439,24 +4401,22 @@ async fn test_molecule_v2_alternative_encryption_metadata(
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "vitafast",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "9",
+                "symbol": "vitafast",
+                "oclId": OCL_ID,
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["v2"]["createProject"]["isSuccess"],
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
         json!(true),
     );
 
     const UPLOAD_FILE: &str = indoc!(
         r#"
         mutation (
-            $ipnftUid: String!,
+            $oclId: String!,
             $path: CollectionPathV2!,
             $content: Base64Usnp!,
             $contentType: String!,
@@ -4469,8 +4429,8 @@ async fn test_molecule_v2_alternative_encryption_metadata(
             $encryptionMetadata: MoleculeEncryptionMetadataInput!,
         ) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     path: $path
@@ -4533,7 +4493,7 @@ async fn test_molecule_v2_alternative_encryption_metadata(
     let res = GraphQLQueryRequest::new(
         UPLOAD_FILE,
         async_graphql::Variables::from_value(value!({
-            "ipnftUid": ipnft_uid,
+            "oclId": OCL_ID,
             "path": "/foo.txt",
             "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
             "contentType": "text/plain",
@@ -4560,16 +4520,16 @@ async fn test_molecule_v2_alternative_encryption_metadata(
 
     let res_data = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["isSuccess"],
         json!(true),
     );
-    let file_1_did: &str = res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"]["entry"]
+    let file_1_did: &str = res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"]["entry"]
         ["ref"]
         .as_str()
         .unwrap();
 
     pretty_assertions::assert_eq!(
-        res_data["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"],
+        res_data["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"],
         json!({
             "__typename": "MoleculeDataRoomFinishUploadFileResultSuccess",
             "isSuccess": true,
@@ -4612,12 +4572,12 @@ async fn test_molecule_v2_alternative_encryption_metadata(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_announcements_quota_exceeded(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_announcements_quota_exceeded(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let ipnft_uid = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_902";
+    const OCL_ID: &str = OCL_ID_1;
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .predefined_account_opts(PredefinedAccountOpts {
@@ -4631,10 +4591,8 @@ async fn test_molecule_v2_announcements_quota_exceeded(
     let create_project_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftSymbol": "quota-announce",
-                "ipnftUid": ipnft_uid,
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": "902",
+                "symbol": "quota-announce",
+                "oclId": OCL_ID,
             })),
         ))
         .await;
@@ -4664,7 +4622,7 @@ async fn test_molecule_v2_announcements_quota_exceeded(
     let announcement_res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": ipnft_uid,
+                "oclId": OCL_ID,
                 "headline": "Quota limited",
                 "body": "This should fail",
                 "attachments": [],
@@ -4676,7 +4634,7 @@ async fn test_molecule_v2_announcements_quota_exceeded(
         ))
         .await;
 
-    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v2"]["project"]
+    let payload = announcement_res.data.into_json().unwrap()["molecule"]["v3"]["project"]
         ["announcements"]["create"]
         .clone();
     pretty_assertions::assert_eq!(payload["isSuccess"], json!(false));
@@ -4686,27 +4644,23 @@ async fn test_molecule_v2_announcements_quota_exceeded(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_announcements_operations(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_announcements_operations(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
 
     // Create the first project
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -4715,7 +4669,7 @@ async fn test_molecule_v2_announcements_operations(
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -4723,10 +4677,10 @@ async fn test_molecule_v2_announcements_operations(
     // Announcements are empty
     const LIST_ANNOUNCEMENTS: &str = indoc!(
         r#"
-        query ($ipnftUid: String!, $filters: MoleculeAnnouncementsFilters) {
+        query ($oclId: String!, $filters: MoleculeAnnouncementsFilters) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 announcements {
                   tail(filters: $filters) {
                     totalCount
@@ -4756,7 +4710,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -4765,7 +4719,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -4784,7 +4738,7 @@ async fn test_molecule_v2_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -4812,7 +4766,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -4838,7 +4792,7 @@ async fn test_molecule_v2_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -4866,7 +4820,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -4893,7 +4847,7 @@ async fn test_molecule_v2_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -4908,7 +4862,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -4934,7 +4888,7 @@ async fn test_molecule_v2_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [project_1_file_1_dataset_id],
@@ -4949,7 +4903,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -4975,7 +4929,7 @@ async fn test_molecule_v2_announcements_operations(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 3",
                 "body": "Blah blah 3",
                 "attachments": [
@@ -4993,7 +4947,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -5019,7 +4973,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 4",
                 "body": "Blah blah 4",
                 "attachments": [
@@ -5038,7 +4992,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "create": {
@@ -5106,7 +5060,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -5115,7 +5069,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5133,7 +5087,7 @@ async fn test_molecule_v2_announcements_operations(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_3_id,
                         "headline": "Test announcement 3",
@@ -5171,7 +5125,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_2_id,
                         "headline": "Test announcement 2",
@@ -5197,7 +5151,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -5210,7 +5164,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -5219,7 +5173,7 @@ async fn test_molecule_v2_announcements_operations(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -5243,7 +5197,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -5251,7 +5205,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -5260,7 +5214,7 @@ async fn test_molecule_v2_announcements_operations(
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -5276,7 +5230,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5289,7 +5243,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5308,7 +5262,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": null,
@@ -5321,7 +5275,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5385,7 +5339,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag3"],
                     "byCategories": null,
@@ -5398,7 +5352,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5462,7 +5416,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": null,
@@ -5475,7 +5429,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5539,7 +5493,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-1"],
@@ -5552,7 +5506,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5616,7 +5570,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2"],
@@ -5629,7 +5583,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5693,7 +5647,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -5706,7 +5660,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5770,7 +5724,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5783,7 +5737,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5847,7 +5801,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5860,7 +5814,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -5924,7 +5878,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -5937,7 +5891,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -6002,7 +5956,7 @@ async fn test_molecule_v2_announcements_operations(
         GraphQLQueryRequest::new(
             LIST_ANNOUNCEMENTS,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1", "test-tag2"],
                     "byCategories": ["test-category-2"],
@@ -6015,7 +5969,7 @@ async fn test_molecule_v2_announcements_operations(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "announcements": {
                             "tail": {
@@ -6077,34 +6031,27 @@ async fn test_molecule_v2_announcements_operations(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVariant) {
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
-
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
             .await
             .into_json_data();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -6129,7 +6076,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6137,7 +6084,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6146,7 +6093,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6158,7 +6105,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -6186,7 +6133,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -6211,7 +6158,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -6239,7 +6186,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -6267,7 +6214,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6276,7 +6223,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6299,7 +6246,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6307,7 +6254,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6316,7 +6263,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6326,10 +6273,10 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $categories: [String!], $tags: [String!]) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $categories: [String!], $tags: [String!]) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -6354,7 +6301,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -6368,7 +6315,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6385,7 +6332,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -6399,7 +6346,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6419,7 +6366,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6428,7 +6375,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6437,7 +6384,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6446,7 +6393,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6469,7 +6416,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6477,7 +6424,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6486,7 +6433,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6498,7 +6445,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -6509,7 +6456,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -6529,7 +6476,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6538,7 +6485,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6547,7 +6494,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6556,7 +6503,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6565,7 +6512,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6588,7 +6535,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6596,7 +6543,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6605,7 +6552,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6617,7 +6564,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -6632,7 +6579,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -6659,7 +6606,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -6697,7 +6644,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6706,7 +6653,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6715,7 +6662,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6724,7 +6671,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6733,7 +6680,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6758,7 +6705,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6766,7 +6713,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6777,7 +6724,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6789,7 +6736,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo [2]"),
                 "changeBy": USER_1,
@@ -6803,7 +6750,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -6823,7 +6770,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6832,7 +6779,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -6870,7 +6817,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6879,7 +6826,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6888,7 +6835,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6897,7 +6844,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -6906,7 +6853,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -6931,7 +6878,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -6939,7 +6886,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -6950,7 +6897,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -6962,7 +6909,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -6972,7 +6919,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -6994,7 +6941,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityFileRemovedV2",
+                    "__typename": "MoleculeActivityFileRemoved",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7003,7 +6950,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7012,7 +6959,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -7050,7 +6997,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo_renamed.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7059,7 +7006,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7068,7 +7015,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileUpdatedV2",
+                    "__typename": "MoleculeActivityFileUpdated",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7077,7 +7024,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/bar.txt",
                         "ref": project_1_file_2_dataset_id,
@@ -7086,7 +7033,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -7111,7 +7058,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -7119,7 +7066,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": null,
             })),
         )
@@ -7130,7 +7077,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": expected_activity_node
                 }
             }
@@ -7145,10 +7092,8 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitaslow",
-                    "ipnftUid": PROJECT_2_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                    "ipnftTokenId": "10",
+                    "symbol": "vitaslow",
+                    "oclId": OCL_ID_2,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -7157,7 +7102,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -7167,7 +7112,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2",
                 "attachments": [],
@@ -7182,7 +7127,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -7209,7 +7154,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
                 "filters": null,
             })),
         )
@@ -7218,12 +7163,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_2_announcement_1_id,
                                         "headline": "Test announcement 2",
@@ -7246,7 +7191,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
     // Check global activity events
     let expected_all_global_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
@@ -7259,7 +7204,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7268,7 +7213,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7277,7 +7222,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7315,7 +7260,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7324,7 +7269,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7333,7 +7278,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7342,7 +7287,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7351,7 +7296,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7374,7 +7319,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                     }
@@ -7385,7 +7330,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_global_file_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7394,7 +7339,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7403,7 +7348,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7412,7 +7357,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7421,7 +7366,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7430,7 +7375,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7439,7 +7384,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7451,7 +7396,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_global_announcement_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_2_announcement_1_id,
                 "headline": "Test announcement 2",
@@ -7464,7 +7409,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7518,7 +7463,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_global_file_activity_nodes
                     }
@@ -7544,7 +7489,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_global_announcement_activity_nodes
                     }
@@ -7559,7 +7504,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_all_project_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7568,7 +7513,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7577,7 +7522,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7615,7 +7560,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7624,7 +7569,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7633,7 +7578,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7642,7 +7587,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7651,7 +7596,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7663,7 +7608,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_project_file_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityFileRemovedV2",
+            "__typename": "MoleculeActivityFileRemoved",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7672,7 +7617,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7681,7 +7626,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo_renamed.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7690,7 +7635,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7699,7 +7644,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileUpdatedV2",
+            "__typename": "MoleculeActivityFileUpdated",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7708,7 +7653,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/bar.txt",
                 "ref": project_1_file_2_dataset_id,
@@ -7717,7 +7662,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
             }
         },
         {
-            "__typename": "MoleculeActivityFileAddedV2",
+            "__typename": "MoleculeActivityFileAdded",
             "entry": {
                 "path": "/foo.txt",
                 "ref": project_1_file_1_dataset_id,
@@ -7729,7 +7674,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
     let expected_project_announcement_activity_nodes = value!([
         {
-            "__typename": "MoleculeActivityAnnouncementV2",
+            "__typename": "MoleculeActivityAnnouncement",
             "announcement": {
                 "id": project_1_announcement_1_id,
                 "headline": "Test announcement 1",
@@ -7772,7 +7717,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": null,
                     "byCategories": null,
@@ -7787,7 +7732,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -7801,7 +7746,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -7816,7 +7761,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -7832,7 +7777,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byKinds": ["FILE"],
                 },
@@ -7843,7 +7788,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_project_file_activity_nodes
@@ -7859,7 +7804,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byKinds": ["ANNOUNCEMENT"],
                 },
@@ -7872,7 +7817,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_project_announcement_activity_nodes
@@ -7890,7 +7835,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": [],
@@ -7903,12 +7848,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_2_announcement_1_id,
                                 //         "headline": "Test announcement 2",
@@ -7921,7 +7866,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -7930,7 +7875,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -7939,7 +7884,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -7977,7 +7922,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -7986,7 +7931,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -7995,7 +7940,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8004,7 +7949,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8013,7 +7958,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8034,7 +7979,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2"],
                     "byCategories": [],
@@ -8047,12 +7992,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8061,7 +8006,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8070,7 +8015,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8108,7 +8053,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8117,7 +8062,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8126,7 +8071,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8135,7 +8080,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8144,7 +8089,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8165,7 +8110,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag2", "test-tag1"],
                     "byCategories": [],
@@ -8178,12 +8123,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8192,7 +8137,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8201,7 +8146,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8239,7 +8184,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8248,7 +8193,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8257,7 +8202,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8266,7 +8211,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8275,7 +8220,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8296,7 +8241,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-1"],
@@ -8309,12 +8254,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8322,7 +8267,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8330,7 +8275,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8368,7 +8313,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8376,7 +8321,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8384,7 +8329,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8392,7 +8337,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8400,7 +8345,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8420,7 +8365,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2"],
@@ -8433,12 +8378,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8447,7 +8392,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8456,7 +8401,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_1_announcement_1_id,
                                 //         "headline": "Test announcement 1",
@@ -8479,7 +8424,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8488,7 +8433,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8497,7 +8442,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8506,7 +8451,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8515,7 +8460,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8536,7 +8481,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": ["test-category-2", "test-category-1"],
@@ -8549,12 +8494,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8563,7 +8508,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8572,7 +8517,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8610,7 +8555,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                      }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8619,7 +8564,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8628,7 +8573,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8637,7 +8582,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8646,7 +8591,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8667,7 +8612,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8680,12 +8625,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8694,7 +8639,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8703,7 +8648,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -8741,7 +8686,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo_renamed.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8750,7 +8695,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8759,7 +8704,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8768,7 +8713,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8777,7 +8722,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/foo.txt",
                                         "ref": project_1_file_1_dataset_id,
@@ -8798,7 +8743,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8811,12 +8756,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 {
-                                    "__typename": "MoleculeActivityFileRemovedV2",
+                                    "__typename": "MoleculeActivityFileRemoved",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8825,7 +8770,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8834,7 +8779,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityAnnouncementV2",
+                                //     "__typename": "MoleculeActivityAnnouncement",
                                 //     "announcement": {
                                 //         "id": project_1_announcement_1_id,
                                 //         "headline": "Test announcement 1",
@@ -8857,7 +8802,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8866,7 +8811,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileUpdatedV2",
+                                    "__typename": "MoleculeActivityFileUpdated",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8875,7 +8820,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8884,7 +8829,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityFileAddedV2",
+                                    "__typename": "MoleculeActivityFileAdded",
                                     "entry": {
                                         "path": "/bar.txt",
                                         "ref": project_1_file_2_dataset_id,
@@ -8893,7 +8838,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8914,7 +8859,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": [],
                     "byCategories": [],
@@ -8929,7 +8874,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": expected_all_project_activity_nodes
@@ -8947,7 +8892,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         GraphQLQueryRequest::new(
             LIST_PROJECT_ACTIVITY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "filters": {
                     "byTags": ["test-tag1"],
                     "byCategories": ["test-category-1"],
@@ -8960,12 +8905,12 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "activity": {
                             "nodes": [
                                 // {
-                                //     "__typename": "MoleculeActivityFileRemovedV2",
+                                //     "__typename": "MoleculeActivityFileRemoved",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -8974,7 +8919,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -8983,7 +8928,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 {
-                                    "__typename": "MoleculeActivityAnnouncementV2",
+                                    "__typename": "MoleculeActivityAnnouncement",
                                     "announcement": {
                                         "id": project_1_announcement_1_id,
                                         "headline": "Test announcement 1",
@@ -9021,7 +8966,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                     }
                                 },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo_renamed.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9030,7 +8975,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -9039,7 +8984,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileUpdatedV2",
+                                //     "__typename": "MoleculeActivityFileUpdated",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9048,7 +8993,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/bar.txt",
                                 //         "ref": project_1_file_2_dataset_id,
@@ -9057,7 +9002,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 //     }
                                 // },
                                 // {
-                                //     "__typename": "MoleculeActivityFileAddedV2",
+                                //     "__typename": "MoleculeActivityFileAdded",
                                 //     "entry": {
                                 //         "path": "/foo.txt",
                                 //         "ref": project_1_file_1_dataset_id,
@@ -9096,7 +9041,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .clone()
@@ -9125,7 +9070,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .clone()
@@ -9154,11 +9099,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_2_announcement_1_id,
                             //         "headline": "Test announcement 2",
@@ -9171,7 +9116,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9180,7 +9125,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9189,7 +9134,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9227,7 +9172,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9236,7 +9181,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9245,7 +9190,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9254,7 +9199,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9263,7 +9208,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9295,11 +9240,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9312,7 +9257,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9321,7 +9266,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9330,7 +9275,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9368,7 +9313,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9377,7 +9322,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9386,7 +9331,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9395,7 +9340,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9404,7 +9349,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9436,11 +9381,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                 "__typename": "MoleculeActivityAnnouncementV2",
+                                 "__typename": "MoleculeActivityAnnouncement",
                                  "announcement": {
                                      "id": project_2_announcement_1_id,
                                      "headline": "Test announcement 2",
@@ -9453,7 +9398,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9462,7 +9407,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9471,7 +9416,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9509,7 +9454,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9518,7 +9463,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9527,7 +9472,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9536,7 +9481,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9545,7 +9490,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -9577,11 +9522,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9594,7 +9539,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9603,7 +9548,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9612,7 +9557,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9650,7 +9595,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9659,7 +9604,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9668,7 +9613,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9677,7 +9622,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -9686,7 +9631,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9718,11 +9663,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9735,7 +9680,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileRemovedV2",
+                                "__typename": "MoleculeActivityFileRemoved",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9744,7 +9689,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9753,7 +9698,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -9776,7 +9721,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9785,7 +9730,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9794,7 +9739,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9803,7 +9748,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -9812,7 +9757,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9844,11 +9789,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -9861,7 +9806,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                 "__typename": "MoleculeActivityFileRemovedV2",
+                                 "__typename": "MoleculeActivityFileRemoved",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9870,7 +9815,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9879,7 +9824,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -9917,7 +9862,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9926,7 +9871,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                 "__typename": "MoleculeActivityFileUpdatedV2",
+                                 "__typename": "MoleculeActivityFileUpdated",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9935,7 +9880,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9944,7 +9889,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                 "__typename": "MoleculeActivityFileAddedV2",
+                                 "__typename": "MoleculeActivityFileAdded",
                                  "entry": {
                                      "path": "/bar.txt",
                                      "ref": project_1_file_2_dataset_id,
@@ -9953,7 +9898,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                  }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -9985,11 +9930,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_2_announcement_1_id,
                             //         "headline": "Test announcement 2",
@@ -10002,7 +9947,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10011,7 +9956,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10020,7 +9965,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_1_announcement_1_id,
                                     "headline": "Test announcement 1",
@@ -10058,7 +10003,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo_renamed.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10067,7 +10012,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10076,7 +10021,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10085,7 +10030,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10094,7 +10039,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/foo.txt",
                                     "ref": project_1_file_1_dataset_id,
@@ -10126,11 +10071,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -10143,7 +10088,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileRemovedV2",
+                                "__typename": "MoleculeActivityFileRemoved",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10152,7 +10097,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10161,7 +10106,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -10184,7 +10129,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10193,7 +10138,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileUpdatedV2",
+                                "__typename": "MoleculeActivityFileUpdated",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10202,7 +10147,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10211,7 +10156,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/bar.txt",
                                     "ref": project_1_file_2_dataset_id,
@@ -10220,7 +10165,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10254,7 +10199,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .into_json_data(),
         json!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": expected_all_global_activity_nodes
                             .into_json()
@@ -10282,11 +10227,11 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityAnnouncementV2",
+                                "__typename": "MoleculeActivityAnnouncement",
                                 "announcement": {
                                     "id": project_2_announcement_1_id,
                                     "headline": "Test announcement 2",
@@ -10299,7 +10244,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                                 }
                             },
                             // {
-                            //     "__typename": "MoleculeActivityFileRemovedV2",
+                            //     "__typename": "MoleculeActivityFileRemoved",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10308,7 +10253,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10317,7 +10262,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityAnnouncementV2",
+                            //     "__typename": "MoleculeActivityAnnouncement",
                             //     "announcement": {
                             //         "id": project_1_announcement_1_id,
                             //         "headline": "Test announcement 1",
@@ -10340,7 +10285,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo_renamed.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10349,7 +10294,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10358,7 +10303,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileUpdatedV2",
+                            //     "__typename": "MoleculeActivityFileUpdated",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10367,7 +10312,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/bar.txt",
                             //         "ref": project_1_file_2_dataset_id,
@@ -10376,7 +10321,7 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
                             //     }
                             // },
                             // {
-                            //     "__typename": "MoleculeActivityFileAddedV2",
+                            //     "__typename": "MoleculeActivityFileAdded",
                             //     "entry": {
                             //         "path": "/foo.txt",
                             //         "ref": project_1_file_1_dataset_id,
@@ -10394,40 +10339,23 @@ async fn test_molecule_v2_activity(search_variant: GraphQLMoleculeV2HarnessSearc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity_access_level_rules_filters(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_activity_access_level_rules_filters(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
 
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_201";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9_202";
-
-    for (uid, addr, token_id) in [
-        (
-            PROJECT_1_UID,
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
-            201,
-        ),
-        (
-            PROJECT_2_UID,
-            "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc9",
-            202,
-        ),
-    ] {
-        let token_id_str = token_id.to_string();
+    for (uid, token_id) in [(OCL_ID_1, 201), (OCL_ID_2, 202)] {
         assert_eq!(
             {
                 let res_json = GraphQLQueryRequest::new(
                     CREATE_PROJECT,
                     async_graphql::Variables::from_value(value!({
-                        "ipnftSymbol": format!("sym{token_id}"),
-                        "ipnftUid": uid,
-                        "ipnftAddress": addr,
-                        "ipnftTokenId": token_id_str,
+                        "symbol": format!("sym{token_id}"),
+                        "oclId": uid,
                     })),
                 )
                 .execute(&harness.schema, &harness.catalog_authorized)
@@ -10436,22 +10364,22 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                 .into_json()
                 .unwrap();
 
-                res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+                res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
             },
             Some(true),
         );
     }
 
     async fn create_file(
-        harness: &GraphQLMoleculeV2Harness,
-        ipnft_uid: &str,
+        harness: &GraphQLMoleculeHarness,
+        ocl_id: &str,
         path: &str,
         access_level: &str,
     ) -> String {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": ipnft_uid,
+                "oclId": ocl_id,
                 "path": path,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"payload"),
                 "contentType": "text/plain",
@@ -10469,7 +10397,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
 
         upload_file_node["entry"]["ref"]
             .take()
@@ -10478,11 +10406,9 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
             .to_owned()
     }
 
-    let project_1_public = create_file(&harness, PROJECT_1_UID, "/p1-public.txt", "public").await;
-    let project_1_holders =
-        create_file(&harness, PROJECT_1_UID, "/p1-holders.txt", "holders").await;
-    let project_2_private =
-        create_file(&harness, PROJECT_2_UID, "/p2-private.txt", "private").await;
+    let project_1_public = create_file(&harness, OCL_ID_1, "/p1-public.txt", "public").await;
+    let project_1_holders = create_file(&harness, OCL_ID_1, "/p1-holders.txt", "holders").await;
+    let project_2_private = create_file(&harness, OCL_ID_2, "/p2-private.txt", "private").await;
 
     harness.synchronize_agents().await;
 
@@ -10494,8 +10420,8 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
             async_graphql::Variables::from_json(json!({
                 "filters": {
                     "byAccessLevelRules": [
-                        { "ipnftUid": PROJECT_1_UID, "accessLevels": ["holders", "public"] },
-                        { "ipnftUid": PROJECT_2_UID, "accessLevels": ["private"] }
+                        { "oclId": OCL_ID_1, "accessLevels": ["holders", "public"] },
+                        { "oclId": OCL_ID_2, "accessLevels": ["private"] }
                     ]
                 },
             })),
@@ -10505,11 +10431,11 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": [
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p2-private.txt",
                                     "ref": project_2_private,
@@ -10518,7 +10444,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p1-holders.txt",
                                     "ref": project_1_holders,
@@ -10527,7 +10453,7 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
                                 }
                             },
                             {
-                                "__typename": "MoleculeActivityFileAddedV2",
+                                "__typename": "MoleculeActivityFileAdded",
                                 "entry": {
                                     "path": "/p1-public.txt",
                                     "ref": project_1_public,
@@ -10545,34 +10471,27 @@ async fn test_molecule_v2_activity_access_level_rules_filters(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchVariant) {
+async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVariant) {
     // NOTE: In this test, we allow different orderings in some places where the
     //       sequence of results may vary.
     let elasticsearch_backed = match &search_variant {
-        GraphQLMoleculeV2HarnessSearchVariant::SourceBased => false,
-        GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(_) => true,
+        GraphQLMoleculeHarnessSearchVariant::SourceBased => false,
+        GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(_) => true,
     };
 
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
-
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const PROJECT_2_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2_10";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10581,7 +10500,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -10591,7 +10510,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -10619,7 +10538,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -10644,7 +10563,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -10672,7 +10591,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -10697,10 +10616,10 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
     // Upload new file versions
     const UPLOAD_NEW_VERSION: &str = indoc!(
         r#"
-        mutation ($ipnftUid: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
+        mutation ($oclId: String!, $ref: DatasetID!, $content: Base64Usnp!, $changeBy: String!, $accessLevel: String!, $description: String!, $categories: [String!], $tags: [String!]) {
           molecule {
-            v2 {
-              project(ipnftUid: $ipnftUid) {
+            v3 {
+              project(oclId: $oclId) {
                 dataRoom {
                   uploadFile(
                     ref: $ref
@@ -10726,7 +10645,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_1_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye foo"),
                 "changeBy": USER_1,
@@ -10741,7 +10660,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -10758,7 +10677,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         GraphQLQueryRequest::new(
             UPLOAD_NEW_VERSION,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "ref": project_1_file_2_dataset_id,
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"bye bar"),
                 "changeBy": USER_2,
@@ -10773,7 +10692,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "uploadFile": {
@@ -10792,7 +10711,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         GraphQLQueryRequest::new(
             MOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "fromPath": "/foo.txt",
                 "toPath": "/foo_renamed.txt",
                 "changeBy": USER_1,
@@ -10803,7 +10722,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "moveEntry": {
@@ -10822,7 +10741,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1 text",
                 "attachments": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
@@ -10837,7 +10756,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -10863,7 +10782,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         GraphQLQueryRequest::new(
             REMOVE_ENTRY_QUERY,
             async_graphql::Variables::from_json(json!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "changeBy": USER_2,
             })),
@@ -10873,7 +10792,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .data,
         value!({
             "molecule": {
-                "v2": {
+                "v3": {
                     "project": {
                         "dataRoom": {
                             "removeEntry": {
@@ -10895,10 +10814,8 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitaslow",
-                    "ipnftUid": PROJECT_2_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                    "ipnftTokenId": "10",
+                    "symbol": "vitaslow",
+                    "oclId": OCL_ID_2,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -10907,7 +10824,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -10917,7 +10834,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
                 "headline": "Test announcement 2",
                 "body": "Blah blah 2 text",
                 "attachments": [],
@@ -10932,7 +10849,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -10958,7 +10875,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello baz"),
                 "contentType": "text/plain",
@@ -10976,7 +10893,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11029,7 +10946,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             "changeBy": USER_1,
             "path": "/foo_renamed.txt",
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -11054,7 +10971,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
             },
             "tags": ["test-tag1", "test-tag2"]
         }
@@ -11070,7 +10987,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             "headline": "Test announcement 2",
             "id": project_2_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
             },
             "tags": ["test-tag2"]
         }
@@ -11099,7 +11016,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
             "changeBy": USER_2,
             "path": "/foo.txt",
             "project": {
-                "ipnftUid": PROJECT_2_UID,
+                "oclId": OCL_ID_2,
             },
             "ref": project_2_file_1_dataset_id,
         }
@@ -11195,13 +11112,13 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_1_UID]
+    // Filters: byOclIds: [OCL_ID_1]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_1_UID],
+                Some(json!({
+                    "byOclIds": [OCL_ID_1],
                 }))
             )
             .await,
@@ -11216,13 +11133,13 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_2_UID]
+    // Filters: byOclIds: [OCL_ID_2]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_2_UID],
+                Some(json!({
+                    "byOclIds": [OCL_ID_2],
                 }))
             )
             .await,
@@ -11237,13 +11154,13 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         })
     );
 
-    // Filters: byIpnftUids: [PROJECT_2_UID, PROJECT_1_UID]
+    // Filters: byOclIds: [OCL_ID_2, OCL_ID_1]
     pretty_assertions::assert_eq!(
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
-                    "byIpnftUids": [PROJECT_2_UID, PROJECT_1_UID],
+                Some(json!({
+                    "byOclIds": [OCL_ID_2, OCL_ID_1],
                 }))
             )
             .await,
@@ -11263,7 +11180,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["FILE"],
                 }))
             )
@@ -11284,7 +11201,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["ANNOUNCEMENT"],
                 }))
             )
@@ -11305,7 +11222,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byKinds": ["ANNOUNCEMENT", "FILE"],
                 }))
             )
@@ -11326,7 +11243,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag1"],
                 })),
             )
@@ -11347,7 +11264,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2"],
                 })),
             )
@@ -11368,7 +11285,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2", "test-tag1"],
                 })),
             )
@@ -11389,7 +11306,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-1"],
                 })),
             )
@@ -11410,7 +11327,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-2"],
                 })),
             )
@@ -11431,7 +11348,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byCategories": ["test-category-2", "test-category-1"],
                 })),
             )
@@ -11452,7 +11369,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["public"],
                 })),
             )
@@ -11473,7 +11390,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["holders"],
                 })),
             )
@@ -11494,7 +11411,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "",
-                Some(serde_json::json!({
+                Some(json!({
                     "byAccessLevels": ["holders", "public"],
                 })),
             )
@@ -11516,7 +11433,7 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
         harness
             .execute_search_query(
                 "blah blah 1",
-                Some(serde_json::json!({
+                Some(json!({
                     "byTags": ["test-tag2"],
                     "byCategories": ["test-category-1"],
                     "byAccessLevels": ["public"],
@@ -11540,25 +11457,19 @@ async fn test_molecule_v2_search(search_variant: GraphQLMoleculeV2HarnessSearchV
 
 #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 8))]
 async fn test_competitive_writing_of_global_activities_src_multi_thread() {
-    let harness = GraphQLMoleculeV2Harness::builder()
-        .search_variant(GraphQLMoleculeV2HarnessSearchVariant::SourceBased)
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(GraphQLMoleculeHarnessSearchVariant::SourceBased)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
-
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
-    const USER_2: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD";
 
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11567,7 +11478,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -11582,7 +11493,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11610,7 +11521,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11637,7 +11548,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/bar.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello bar"),
                 "contentType": "text/plain",
@@ -11665,7 +11576,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11706,7 +11617,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
             .into_json()
             .unwrap();
 
-            let mut nodes = res_json["molecule"]["v2"]["activity"]["nodes"].take();
+            let mut nodes = res_json["molecule"]["v3"]["activity"]["nodes"].take();
 
             use serde_json::Value;
 
@@ -11724,7 +11635,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
         },
         json!([
             {
-                "__typename": "MoleculeActivityFileAddedV2",
+                "__typename": "MoleculeActivityFileAdded",
                 "entry": {
                     "path": "/bar.txt",
                     "ref": project_1_file_2_dataset_id,
@@ -11733,7 +11644,7 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
                 }
             },
             {
-                "__typename": "MoleculeActivityFileAddedV2",
+                "__typename": "MoleculeActivityFileAdded",
                 "entry": {
                     "path": "/foo.txt",
                     "ref": project_1_file_1_dataset_id,
@@ -11747,31 +11658,26 @@ async fn test_competitive_writing_of_global_activities_src_multi_thread() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_gql_custom_molecule!(test_molecule_v2_activity_announcements_search_disabled_projects);
+test_gql_custom_molecule!(test_molecule_activity_announcements_search_disabled_projects);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_molecule_v2_activity_announcements_search_disabled_projects(
-    search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+async fn test_molecule_activity_announcements_search_disabled_projects(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
 ) {
-    let harness = GraphQLMoleculeV2Harness::builder()
+    let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
         .await;
-
-    const PROJECT_1_UID: &str = "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9";
-    const USER_1: &str = "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC";
 
     pretty_assertions::assert_eq!(
         {
             let res_json = GraphQLQueryRequest::new(
                 CREATE_PROJECT,
                 async_graphql::Variables::from_value(value!({
-                    "ipnftSymbol": "vitafast",
-                    "ipnftUid": PROJECT_1_UID,
-                    "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                    "ipnftTokenId": "9",
+                    "symbol": "vitafast",
+                    "oclId": OCL_ID_1,
                 })),
             )
             .execute(&harness.schema, &harness.catalog_authorized)
@@ -11780,7 +11686,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
             .into_json()
             .unwrap();
 
-            res_json["molecule"]["v2"]["createProject"]["isSuccess"].as_bool()
+            res_json["molecule"]["v3"]["createProject"]["isSuccess"].as_bool()
         },
         Some(true),
     );
@@ -11790,7 +11696,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_VERSIONED_FILE,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "path": "/foo.txt",
                 "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello foo"),
                 "contentType": "text/plain",
@@ -11818,7 +11724,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .into_json_data();
 
         let mut upload_file_node =
-            res_json["molecule"]["v2"]["project"]["dataRoom"]["uploadFile"].take();
+            res_json["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"].take();
         // Extract node for simpler comparison
         let file_dataset_id = upload_file_node["entry"]["ref"]
             .take()
@@ -11845,7 +11751,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         let mut res_json = GraphQLQueryRequest::new(
             CREATE_ANNOUNCEMENT,
             async_graphql::Variables::from_value(value!({
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
                 "headline": "Test announcement 1",
                 "body": "Blah blah 1",
                 "attachments": [],
@@ -11860,7 +11766,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .into_json_data();
 
         let mut announcement_create_node =
-            res_json["molecule"]["v2"]["project"]["announcements"]["create"].take();
+            res_json["molecule"]["v3"]["project"]["announcements"]["create"].take();
         // Extract node for simpler comparison
         let new_announcement_id = announcement_create_node["announcementId"]
             .take()
@@ -11888,7 +11794,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         "activity": {
             "nodes": [
                 {
-                    "__typename": "MoleculeActivityAnnouncementV2",
+                    "__typename": "MoleculeActivityAnnouncement",
                     "announcement": {
                         "id": project_1_announcement_1_id,
                         "headline": "Test announcement 1",
@@ -11901,7 +11807,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
                     }
                 },
                 {
-                    "__typename": "MoleculeActivityFileAddedV2",
+                    "__typename": "MoleculeActivityFileAdded",
                     "entry": {
                         "path": "/foo.txt",
                         "ref": project_1_file_1_dataset_id,
@@ -11924,7 +11830,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -11942,7 +11848,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
             "headline": "Test announcement 1",
             "id": project_1_announcement_1_id,
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
             },
             "tags": ["test-tag1", "test-tag2", "test-tag3"]
         }
@@ -11982,7 +11888,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
             "changeBy": USER_1,
             "path": "/foo.txt",
             "project": {
-                "ipnftUid": PROJECT_1_UID,
+                "oclId": OCL_ID_1,
             },
             "ref": project_1_file_1_dataset_id,
         }
@@ -12002,14 +11908,14 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
     // Disable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(DISABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
     let disable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        disable_res["molecule"]["v2"]["disableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        disable_res["molecule"]["v3"]["disableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     harness.synchronize_agents().await;
@@ -12028,7 +11934,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         value!({
             "molecule": {
 
-                "v2": {
+                "v3": {
                     "activity": {
                         "nodes": []
                     }
@@ -12049,14 +11955,14 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
     // Re-enable project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(ENABLE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({ "ipnftUid": PROJECT_1_UID })),
+            async_graphql::Variables::from_json(json!({ "oclId": OCL_ID_1 })),
         ))
         .await;
     assert!(res.is_ok(), "{res:#?}");
     let enable_res = res.data.into_json().unwrap();
     pretty_assertions::assert_eq!(
-        enable_res["molecule"]["v2"]["enableProject"]["project"],
-        json!({ "__typename": "MoleculeProjectMutV2" }),
+        enable_res["molecule"]["v3"]["enableProject"]["project"],
+        json!({ "__typename": "MoleculeProjectMut" }),
     );
 
     harness.synchronize_agents().await;
@@ -12074,7 +11980,7 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
         .data,
         value!({
             "molecule": {
-                "v2": expected_activity_node
+                "v3": expected_activity_node
             }
         })
     );
@@ -12096,13 +12002,13 @@ async fn test_molecule_v2_activity_announcements_search_disabled_projects(
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum GraphQLMoleculeV2HarnessSearchVariant {
+enum GraphQLMoleculeHarnessSearchVariant {
     SourceBased,
     ElasticsearchBased(Arc<ElasticsearchTestContext>),
 }
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct GraphQLMoleculeV2Harness {
+struct GraphQLMoleculeHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     maybe_es_base_harness: Option<ElasticsearchBaseHarness>,
     schema: kamu_adapter_graphql::Schema,
@@ -12112,10 +12018,10 @@ struct GraphQLMoleculeV2Harness {
 }
 
 #[bon]
-impl GraphQLMoleculeV2Harness {
+impl GraphQLMoleculeHarness {
     #[builder]
     async fn new(
-        search_variant: GraphQLMoleculeV2HarnessSearchVariant,
+        search_variant: GraphQLMoleculeHarnessSearchVariant,
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
         #[builder(default = PredefinedAccountOpts {
@@ -12125,8 +12031,8 @@ impl GraphQLMoleculeV2Harness {
         predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let maybe_es_base_harness = match search_variant {
-            GraphQLMoleculeV2HarnessSearchVariant::SourceBased => None,
-            GraphQLMoleculeV2HarnessSearchVariant::ElasticsearchBased(es_ctx) => Some(
+            GraphQLMoleculeHarnessSearchVariant::SourceBased => None,
+            GraphQLMoleculeHarnessSearchVariant::ElasticsearchBased(es_ctx) => Some(
                 ElasticsearchBaseHarness::new(es_ctx, SystemTimeSourceProvider::Default),
             ),
         };
@@ -12313,7 +12219,7 @@ impl GraphQLMoleculeV2Harness {
         .data;
 
         let json_value = gql_value.into_json().unwrap();
-        json_value["molecule"]["v2"]["search"].clone()
+        json_value["molecule"]["v3"]["search"].clone()
     }
 
     async fn synchronize_agents(&self) {

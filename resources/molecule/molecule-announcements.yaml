@@ -23,7 +23,7 @@ content:
           kind: Timestamp
           unit: Millisecond
           timezone: UTC
-      - name: ipnft_uid
+      - name: ocl_id
         type:
           kind: String
       - name: announcement_id
@@ -63,7 +63,7 @@ content:
       schema:
       - op INT NOT NULL
       - event_time TIMESTAMP
-      - ipnft_uid STRING NOT NULL
+      - ocl_id STRING NOT NULL
       - announcement_id STRING NOT NULL
       - headline STRING NOT NULL
       - body STRING NOT NULL

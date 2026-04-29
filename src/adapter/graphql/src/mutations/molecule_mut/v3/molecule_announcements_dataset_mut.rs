@@ -14,25 +14,25 @@ use time_source::SystemTimeSource;
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeAccessLevel, MoleculeProjectV2};
+use crate::queries::molecule::v3::{MoleculeAccessLevel, MoleculeProject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeAnnouncementsDatasetMutV2 {
-    project: Arc<MoleculeProjectV2>,
+pub struct MoleculeAnnouncementsDatasetMut {
+    project: Arc<MoleculeProject>,
 }
 
-impl MoleculeAnnouncementsDatasetMutV2 {
-    pub fn new(project: Arc<MoleculeProjectV2>) -> Self {
+impl MoleculeAnnouncementsDatasetMut {
+    pub fn new(project: Arc<MoleculeProject>) -> Self {
         Self { project }
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeAnnouncementsDatasetMutV2 {
+impl MoleculeAnnouncementsDatasetMut {
     /// Creates an announcement record for the project.
-    #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMutV2_create, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeAnnouncementsDatasetMut_create, skip_all)]
     async fn create(
         &self,
         ctx: &Context<'_>,

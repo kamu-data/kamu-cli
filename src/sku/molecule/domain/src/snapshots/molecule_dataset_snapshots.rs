@@ -28,13 +28,11 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("account_id"),
-                DataField::string("ipnft_symbol"),
-                DataField::string("ipnft_uid"),
-                DataField::string("ipnft_address"),
-                DataField::string("ipnft_token_id"),
-                DataField::string("data_room_dataset_id"),
-                DataField::string("announcements_dataset_id"),
+                DataField::string("ocl_id"),
+                DataField::string("symbol"),
+                DataField::string("odf_account_id"),
+                DataField::string("odf_data_room_dataset_id"),
+                DataField::string("odf_announcements_dataset_id"),
             ])
             .build()
             .expect("Schema is always valid as there are no user inputs");
@@ -50,13 +48,11 @@ impl MoleculeDatasetSnapshots {
                         schema: Some(
                             [
                                 "op INT NOT NULL",
-                                "account_id STRING NOT NULL",
-                                "ipnft_symbol STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
-                                "ipnft_address STRING NOT NULL",
-                                "ipnft_token_id STRING NOT NULL",
-                                "data_room_dataset_id STRING NOT NULL",
-                                "announcements_dataset_id STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
+                                "symbol STRING NOT NULL",
+                                "odf_account_id STRING NOT NULL",
+                                "odf_data_room_dataset_id STRING NOT NULL",
+                                "odf_announcements_dataset_id STRING NOT NULL",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -67,7 +63,7 @@ impl MoleculeDatasetSnapshots {
                     .into(),
                     preprocess: None,
                     merge: odf::metadata::MergeStrategyChangelogStream {
-                        primary_key: vec!["account_id".to_string()],
+                        primary_key: vec!["ocl_id".to_string()],
                     }
                     .into(),
                 }
@@ -110,7 +106,7 @@ impl MoleculeDatasetSnapshots {
         }
     }
 
-    pub fn data_room_v2(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn data_room(molecule_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "data-room";
         // Extra columns
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -149,7 +145,7 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn versioned_file_v2(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
+    pub fn versioned_file(alias: odf::DatasetAlias) -> odf::DatasetSnapshot {
         // Extra columns
         const COLUMN_NAME_ACCESS_LEVEL: &str = "molecule_access_level";
         const COLUMN_NAME_CHANGE_BY: &str = "molecule_change_by";
@@ -182,7 +178,7 @@ impl MoleculeDatasetSnapshots {
         .expect("Schema is always valid as there are no user inputs")
     }
 
-    pub fn announcements_v2(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
+    pub fn announcements(project_account_name: odf::AccountName) -> odf::DatasetSnapshot {
         const DATASET_NAME: &str = "announcements";
 
         let alias = odf::DatasetAlias::new(
@@ -295,7 +291,7 @@ impl MoleculeDatasetSnapshots {
         let schema = DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("announcement_id"),
                 DataField::string("headline"),
                 DataField::string("body"),
@@ -321,7 +317,7 @@ impl MoleculeDatasetSnapshots {
                             [
                                 "op INT NOT NULL",
                                 "event_time TIMESTAMP",
-                                "ipnft_uid STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
                                 "announcement_id STRING NOT NULL",
                                 "headline STRING NOT NULL",
                                 "body STRING NOT NULL",
@@ -396,7 +392,7 @@ impl MoleculeDatasetSnapshots {
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
                 DataField::string("activity_type"),
-                DataField::string("ipnft_uid"),
+                DataField::string("ocl_id"),
                 DataField::string("path"),
                 DataField::string("ref"),
                 DataField::u32("version"),
@@ -424,7 +420,7 @@ impl MoleculeDatasetSnapshots {
                             [
                                 "event_time TIMESTAMP",
                                 "activity_type STRING NOT NULL",
-                                "ipnft_uid STRING NOT NULL",
+                                "ocl_id STRING NOT NULL",
                                 "path STRING NOT NULL",
                                 "ref STRING NOT NULL",
                                 "version INT UNSIGNED NOT NULL",

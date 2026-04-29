@@ -23,14 +23,14 @@ use kamu_molecule_domain::{
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
 use crate::queries::Dataset;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevel,
     MoleculeAccessLevelRuleInput,
     MoleculeAnnouncementId,
     MoleculeCategory,
     MoleculeChangeBy,
     MoleculeDataRoomEntry,
-    MoleculeProjectV2,
+    MoleculeProject,
     MoleculeTag,
 };
 
@@ -38,7 +38,7 @@ use crate::queries::molecule::v2::{
 
 pub struct MoleculeAnnouncements {
     pub dataset: Dataset,
-    pub project: Arc<MoleculeProjectV2>,
+    pub project: Arc<MoleculeProject>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
@@ -106,16 +106,13 @@ impl MoleculeAnnouncements {
     async fn by_id(
         &self,
         ctx: &Context<'_>,
-        id: MoleculeAnnouncementId,
+        id: MoleculeAnnouncementId<'_>,
     ) -> Result<Option<MoleculeAnnouncementEntry>> {
         let find_project_announcement_uc =
             from_catalog_n!(ctx, dyn MoleculeFindProjectAnnouncementUseCase);
 
-        // TODO: scalar validation
-        let id = uuid::Uuid::parse_str(&id).int_err()?;
-
         let maybe_announcement = find_project_announcement_uc
-            .execute(&self.project.entity, id)
+            .execute(&self.project.entity, id.into())
             .await
             .map_err(|e| {
                 use MoleculeFindProjectAnnouncementError as E;
@@ -136,12 +133,12 @@ impl MoleculeAnnouncements {
 
 pub struct MoleculeAnnouncementEntry {
     pub entity: kamu_molecule_domain::MoleculeAnnouncement,
-    pub project: Arc<MoleculeProjectV2>,
+    pub project: Arc<MoleculeProject>,
 }
 
 impl MoleculeAnnouncementEntry {
     pub fn new_from_global_announcement(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         global_entity: kamu_molecule_domain::MoleculeGlobalAnnouncement,
     ) -> Self {
         Self {
@@ -151,7 +148,7 @@ impl MoleculeAnnouncementEntry {
     }
 
     pub fn new_from_announcement(
-        project: &Arc<MoleculeProjectV2>,
+        project: &Arc<MoleculeProject>,
         entity: kamu_molecule_domain::MoleculeAnnouncement,
     ) -> Self {
         Self {
@@ -164,7 +161,7 @@ impl MoleculeAnnouncementEntry {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeAnnouncementEntry {
-    async fn project(&self) -> &MoleculeProjectV2 {
+    async fn project(&self) -> &MoleculeProject {
         self.project.as_ref()
     }
 
@@ -176,8 +173,8 @@ impl MoleculeAnnouncementEntry {
         self.entity.event_time
     }
 
-    async fn id(&self) -> MoleculeAnnouncementId {
-        self.entity.announcement_id.to_string()
+    async fn id(&self) -> MoleculeAnnouncementId<'_> {
+        (&self.entity.announcement_id).into()
     }
 
     async fn headline(&self) -> &str {

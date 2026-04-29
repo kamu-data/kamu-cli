@@ -26,7 +26,7 @@ content:
       - name: activity_type
         type:
           kind: String
-      - name: ipnft_uid
+      - name: ocl_id
         type:
           kind: String
       - name: path
@@ -77,7 +77,7 @@ content:
       schema:
       - event_time TIMESTAMP
       - activity_type STRING NOT NULL
-      - ipnft_uid STRING NOT NULL
+      - ocl_id STRING NOT NULL
       - path STRING NOT NULL
       - ref STRING NOT NULL
       - version INT UNSIGNED NOT NULL

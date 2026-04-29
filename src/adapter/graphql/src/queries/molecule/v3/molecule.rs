@@ -29,24 +29,26 @@ use kamu_molecule_domain::{
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevelRuleInput,
-    MoleculeActivityEventV2,
-    MoleculeActivityEventV2Connection,
+    MoleculeActivityEvent,
+    MoleculeActivityEventConnection,
     MoleculeAnnouncementEntry,
     MoleculeDataRoomEntry,
+    MoleculeProject,
     MoleculeProjectActivityFilters,
-    MoleculeProjectV2,
-    MoleculeProjectV2Connection,
+    MoleculeProjectConnection,
+    OclId,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeV2;
+// NOTE: A top-level type already takes Molecule GQL name
+pub struct MoleculeV3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MoleculeV2 {
+impl MoleculeV3 {
     async fn get_molecule_projects_listing(
         ctx: &Context<'_>,
         pagination: Option<PaginationOpts>,
@@ -70,7 +72,7 @@ impl MoleculeV2 {
     async fn get_molecule_projects_mapping(
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
-    ) -> Result<HashMap<String, Arc<MoleculeProjectV2>>, GqlError> {
+    ) -> Result<HashMap<kamu_molecule_domain::OclId, Arc<MoleculeProject>>, GqlError> {
         let listing = molecule_view_projects_uc
             .execute(molecule_subject, None)
             .await
@@ -87,8 +89,8 @@ impl MoleculeV2 {
             .into_iter()
             .map(|project| {
                 (
-                    project.ipnft_uid.clone(),
-                    Arc::new(MoleculeProjectV2::new(project)),
+                    project.ocl_id.clone(),
+                    Arc::new(MoleculeProject::new(project)),
                 )
             })
             .collect();
@@ -101,24 +103,24 @@ impl MoleculeV2 {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeV2 {
+impl MoleculeV3 {
     const DEFAULT_PROJECTS_PER_PAGE: usize = 15;
     const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
     const DEFAULT_SEARCH_RESULTS_PER_PAGE: usize = 15;
 
     /// Looks up the project
-    #[tracing::instrument(level = "info", name = MoleculeV2_project, skip_all, fields(?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeV3_project, skip_all, fields(?ocl_id))]
     async fn project(
         &self,
         ctx: &Context<'_>,
-        ipnft_uid: String,
-    ) -> Result<Option<MoleculeProjectV2>> {
+        ocl_id: OclId<'_>,
+    ) -> Result<Option<MoleculeProject>> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ipnft_uid)
+            .execute(&molecule_subject, ocl_id.into())
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -126,17 +128,17 @@ impl MoleculeV2 {
                 e @ MoleculeFindProjectError::Internal(_) => e.int_err().into(),
             })?;
 
-        Ok(maybe_project_entity.map(MoleculeProjectV2::new))
+        Ok(maybe_project_entity.map(MoleculeProject::new))
     }
 
     /// List the registered projects
-    #[tracing::instrument(level = "info", name = MoleculeV2_projects, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeV3_projects, skip_all)]
     async fn projects(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<MoleculeProjectV2Connection> {
+    ) -> Result<MoleculeProjectConnection> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
@@ -149,13 +151,9 @@ impl MoleculeV2 {
         )
         .await?;
 
-        let nodes = listing
-            .list
-            .into_iter()
-            .map(MoleculeProjectV2::new)
-            .collect();
+        let nodes = listing.list.into_iter().map(MoleculeProject::new).collect();
 
-        Ok(MoleculeProjectV2Connection::new(
+        Ok(MoleculeProjectConnection::new(
             nodes,
             page,
             per_page,
@@ -165,14 +163,14 @@ impl MoleculeV2 {
 
     /// Latest activity events across all projects in reverse chronological
     /// order
-    #[tracing::instrument(level = "info", name = MoleculeV2_activity, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeV3_activity, skip_all)]
     async fn activity(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
         filters: Option<MoleculeProjectActivityFilters>,
-    ) -> Result<MoleculeActivityEventV2Connection> {
+    ) -> Result<MoleculeActivityEventConnection> {
         let molecule_subject = molecule_subject(ctx)?;
 
         let (view_global_activities_uc, molecule_view_projects_uc, molecule_config) = from_catalog_n!(
@@ -211,12 +209,12 @@ impl MoleculeV2 {
             .list
             .into_iter()
             .filter_map(|activity| {
-                let ipnft_uid = activity.ipnft_uid();
-                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                let ocl_id = activity.ocl_id();
+                if let Some(project) = projects_mapping.get(ocl_id) {
                     Some((activity, project))
                 } else {
                     tracing::warn!(
-                        "Project [{ipnft_uid}] not found for activity, skipping the activity event"
+                        "Project [{ocl_id}] not found for activity, skipping the activity event"
                     );
                     None
                 }
@@ -232,9 +230,9 @@ impl MoleculeV2 {
                     use MoleculeDataRoomFileActivityType as Type;
 
                     match activity_type {
-                        Type::Added => MoleculeActivityEventV2::file_added(entry),
-                        Type::Updated => MoleculeActivityEventV2::file_updated(entry),
-                        Type::Removed => MoleculeActivityEventV2::file_removed(entry),
+                        Type::Added => MoleculeActivityEvent::file_added(entry),
+                        Type::Updated => MoleculeActivityEvent::file_updated(entry),
+                        Type::Removed => MoleculeActivityEvent::file_removed(entry),
                     }
                 }
                 MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
@@ -242,14 +240,12 @@ impl MoleculeV2 {
                         project,
                         announcement_activity_entity,
                     );
-                    MoleculeActivityEventV2::announcement(entry)
+                    MoleculeActivityEvent::announcement(entry)
                 }
             })
             .collect();
 
-        Ok(MoleculeActivityEventV2Connection::new(
-            nodes, page, per_page,
-        ))
+        Ok(MoleculeActivityEventConnection::new(nodes, page, per_page))
     }
 
     /// Performs a semantic search
@@ -257,7 +253,7 @@ impl MoleculeV2 {
     /// - a specific set of projects
     /// - specific categories and tags
     /// - only returning files or announcements
-    #[tracing::instrument(level = "info", name = MoleculeV2_search, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeV3_search, skip_all)]
     async fn search(
         &self,
         ctx: &Context<'_>,
@@ -307,11 +303,11 @@ impl MoleculeV2 {
             .list
             .into_iter()
             .filter_map(|search_hit| {
-                let ipnft_uid = search_hit.entity.ipnft_uid();
-                if let Some(project) = projects_mapping.get(ipnft_uid) {
+                let ocl_id = search_hit.entity.ocl_id();
+                if let Some(project) = projects_mapping.get(ocl_id) {
                     Some((search_hit, project))
                 } else {
-                    tracing::warn!("Project [{ipnft_uid}] not found, skipping the search hit");
+                    tracing::warn!("Project [{ocl_id}] not found, skipping the search hit");
                     None
                 }
             })
@@ -354,7 +350,7 @@ impl MoleculeV2 {
 
 #[derive(InputObject)]
 pub struct MoleculeSemanticSearchFilters {
-    by_ipnft_uids: Option<Vec<String>>,
+    by_ocl_ids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
     by_access_levels: Option<Vec<String>>,
@@ -365,7 +361,7 @@ pub struct MoleculeSemanticSearchFilters {
 impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearchFilters {
     fn from(value: MoleculeSemanticSearchFilters) -> Self {
         kamu_molecule_domain::MoleculeSearchFilters {
-            by_ipnft_uids: value.by_ipnft_uids,
+            by_ocl_ids: value.by_ocl_ids,
             by_tags: value.by_tags,
             by_categories: value.by_categories,
             by_access_levels: value.by_access_levels,
