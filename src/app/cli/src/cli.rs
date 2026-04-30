@@ -101,7 +101,7 @@ pub enum Command {
     Complete(Complete),
     Completions(Completions),
     Config(Config),
-    Ctx(Ctx),
+    Context(Context),
     Delete(Delete),
     Export(Export),
     Get(Get),
@@ -289,8 +289,8 @@ impl Cli {
     pub fn tabular_output_format(&self) -> Option<OutputFormat> {
         match &self.command {
             Command::List(c) => c.output_format,
-            Command::Ctx(c) => match &c.subcommand {
-                Some(CtxSubCommand::List(sc)) => sc.output_format,
+            Command::Context(c) => match &c.subcommand {
+                Some(ContextSubCommand::List(sc)) => sc.output_format,
                 _ => None,
             },
             Command::Repo(c) => match &c.subcommand {
@@ -318,6 +318,7 @@ impl Cli {
 
 /// Manage resource contexts
 #[derive(Debug, clap::Args)]
+#[command(visible_alias = "ctx")]
 #[command(after_help = r#"
 Contexts determine which workspace future resource commands will target.
 
@@ -330,40 +331,40 @@ workspace or in the user home scope.
 
 Show current context:
 
-    kamu ctx
+    kamu context
 
 List configured contexts:
 
-    kamu ctx ls
+    kamu context ls
 
 Test a remote context:
 
-    kamu ctx test demo
+    kamu context test demo
 
 Refresh cached status for all remote contexts:
 
-    kamu ctx test --all
+    kamu context test --all
 
 Switch to a context:
 
-    kamu ctx prod
+    kamu context prod
 
 Switch back to the local workspace context:
 
-    kamu ctx local
+    kamu context local
 
 Register a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://api.kamu.dev
+    kamu context add prod --url https://api.kamu.dev
 
 Register a user-scoped remote context:
 
-    kamu ctx add prod --url https://api.kamu.dev --user
+    kamu context add prod --url https://api.kamu.dev --user
 "#)]
 #[command(args_conflicts_with_subcommands = true)]
-pub struct Ctx {
+pub struct Context {
     #[command(subcommand)]
-    pub subcommand: Option<CtxSubCommand>,
+    pub subcommand: Option<ContextSubCommand>,
 
     /// Context name to switch to
     #[arg()]
@@ -371,14 +372,14 @@ pub struct Ctx {
 }
 
 #[derive(Debug, clap::Subcommand)]
-pub enum CtxSubCommand {
-    Add(CtxAdd),
+pub enum ContextSubCommand {
+    Add(ContextAdd),
     #[command(visible_alias = "ls")]
-    List(CtxList),
+    List(ContextList),
     #[command(visible_alias = "rm")]
-    Remove(CtxRemove),
-    Test(CtxTest),
-    Use(CtxUse),
+    Remove(ContextRemove),
+    Test(ContextTest),
+    Use(ContextUse),
 }
 
 /// Register a new remote resource context
@@ -396,13 +397,13 @@ registered explicitly.
 
 Add a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://example.com
+    kamu context add prod --url https://example.com
 
 Add a user-scoped remote context:
 
-    kamu ctx add prod --url https://example.com --user
+    kamu context add prod --url https://example.com --user
 "#)]
-pub struct CtxAdd {
+pub struct ContextAdd {
     /// Store context in the user home folder rather than in the workspace
     #[arg(long)]
     pub user: bool,
@@ -427,13 +428,13 @@ When running inside a workspace, the implicit `local` context is also included.
 
 List contexts:
 
-    kamu ctx ls
+    kamu context ls
 
 List contexts in JSON:
 
-    kamu ctx ls -o json
+    kamu context ls -o json
 "#)]
-pub struct CtxList {
+pub struct ContextList {
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,
@@ -454,17 +455,17 @@ The name `local` is reserved and cannot be removed.
 
 Remove a workspace-scoped context:
 
-    kamu ctx rm prod
+    kamu context rm prod
 
 Remove a user-scoped context:
 
-    kamu ctx rm prod --user
+    kamu context rm prod --user
 
 Remove all workspace-scoped remote contexts:
 
-    kamu ctx rm --all
+    kamu context rm --all
 "#)]
-pub struct CtxRemove {
+pub struct ContextRemove {
     /// Remove context from the user home folder rather than in the workspace
     #[arg(long)]
     pub user: bool,
@@ -490,17 +491,17 @@ Use `--all` to refresh cached status for all configured remote contexts.
 
 Test a named context:
 
-    kamu ctx test demo
+    kamu context test demo
 
 Test the current context:
 
-    kamu ctx test
+    kamu context test
 
 Test all remote contexts:
 
-    kamu ctx test --all
+    kamu context test --all
 "#)]
-pub struct CtxTest {
+pub struct ContextTest {
     /// Test all effective remote contexts
     #[arg(long)]
     pub all: bool,
@@ -515,7 +516,7 @@ pub struct CtxTest {
 #[command(after_help = r#"
 Switches the current resource context to the specified named remote context.
 
-This is the explicit form of `kamu ctx <name>`.
+This is the explicit form of `kamu context <name>`.
 
 The special name `local` refers to the current workspace when one is available.
 
@@ -523,13 +524,13 @@ The special name `local` refers to the current workspace when one is available.
 
 Switch to a context:
 
-    kamu ctx use prod
+    kamu context use prod
 
 Switch to the local workspace context:
 
-    kamu ctx use local
+    kamu context use local
 "#)]
-pub struct CtxUse {
+pub struct ContextUse {
     /// Context name
     #[arg()]
     pub name: String,

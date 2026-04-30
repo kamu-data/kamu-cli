@@ -16,7 +16,7 @@ To regenerate this schema from existing code, use the following command:
 * `api-resources` — List supported resource kinds in the active context
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
-* `ctx` — Manage resource contexts
+* `context [ctx]` — Manage resource contexts
 * `delete [rm]` — Delete datasets or resources
 * `export` — Exports a dataset
 * `get` — Returns canonical manifest representation of a resource
@@ -437,12 +437,12 @@ Set or unset configuration value
 
 
 
-## `kamu ctx`
+## `kamu context`
 
 Manage resource contexts
 
-**Usage:** `kamu ctx [NAME]
-       ctx <COMMAND>`
+**Usage:** `kamu context [NAME]
+       context <COMMAND>`
 
 **Subcommands:**
 
@@ -467,44 +467,44 @@ workspace or in the user home scope.
 
 Show current context:
 
-    kamu ctx
+    kamu context
 
 List configured contexts:
 
-    kamu ctx ls
+    kamu context ls
 
 Test a remote context:
 
-    kamu ctx test demo
+    kamu context test demo
 
 Refresh cached status for all remote contexts:
 
-    kamu ctx test --all
+    kamu context test --all
 
 Switch to a context:
 
-    kamu ctx prod
+    kamu context prod
 
 Switch back to the local workspace context:
 
-    kamu ctx local
+    kamu context local
 
 Register a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://api.kamu.dev
+    kamu context add prod --url https://api.kamu.dev
 
 Register a user-scoped remote context:
 
-    kamu ctx add prod --url https://api.kamu.dev --user
+    kamu context add prod --url https://api.kamu.dev --user
 
 
 
 
-## `kamu ctx add`
+## `kamu context add`
 
 Register a new remote resource context
 
-**Usage:** `kamu ctx add [OPTIONS] --url <URL> <NAME>`
+**Usage:** `kamu context add [OPTIONS] --url <URL> <NAME>`
 
 **Arguments:**
 
@@ -527,20 +527,20 @@ registered explicitly.
 
 Add a workspace-scoped remote context:
 
-    kamu ctx add prod --url https://example.com
+    kamu context add prod --url https://example.com
 
 Add a user-scoped remote context:
 
-    kamu ctx add prod --url https://example.com --user
+    kamu context add prod --url https://example.com --user
 
 
 
 
-## `kamu ctx list`
+## `kamu context list`
 
 List configured resource contexts
 
-**Usage:** `kamu ctx list [OPTIONS]`
+**Usage:** `kamu context list [OPTIONS]`
 
 **Options:**
 
@@ -571,20 +571,20 @@ When running inside a workspace, the implicit `local` context is also included.
 
 List contexts:
 
-    kamu ctx ls
+    kamu context ls
 
 List contexts in JSON:
 
-    kamu ctx ls -o json
+    kamu context ls -o json
 
 
 
 
-## `kamu ctx remove`
+## `kamu context remove`
 
 Remove a remote resource context
 
-**Usage:** `kamu ctx remove [OPTIONS] [NAME]`
+**Usage:** `kamu context remove [OPTIONS] [NAME]`
 
 **Arguments:**
 
@@ -607,24 +607,24 @@ The name `local` is reserved and cannot be removed.
 
 Remove a workspace-scoped context:
 
-    kamu ctx rm prod
+    kamu context rm prod
 
 Remove a user-scoped context:
 
-    kamu ctx rm prod --user
+    kamu context rm prod --user
 
 Remove all workspace-scoped remote contexts:
 
-    kamu ctx rm --all
+    kamu context rm --all
 
 
 
 
-## `kamu ctx test`
+## `kamu context test`
 
 Test connectivity and authorization for a remote resource context
 
-**Usage:** `kamu ctx test [OPTIONS] [NAME]`
+**Usage:** `kamu context test [OPTIONS] [NAME]`
 
 **Arguments:**
 
@@ -643,24 +643,24 @@ Use `--all` to refresh cached status for all configured remote contexts.
 
 Test a named context:
 
-    kamu ctx test demo
+    kamu context test demo
 
 Test the current context:
 
-    kamu ctx test
+    kamu context test
 
 Test all remote contexts:
 
-    kamu ctx test --all
+    kamu context test --all
 
 
 
 
-## `kamu ctx use`
+## `kamu context use`
 
 Switch the current resource context
 
-**Usage:** `kamu ctx use <NAME>`
+**Usage:** `kamu context use <NAME>`
 
 **Arguments:**
 
@@ -668,7 +668,7 @@ Switch the current resource context
 
 Switches the current resource context to the specified named remote context.
 
-This is the explicit form of `kamu ctx <name>`.
+This is the explicit form of `kamu context <name>`.
 
 The special name `local` refers to the current workspace when one is available.
 
@@ -676,11 +676,11 @@ The special name `local` refers to the current workspace when one is available.
 
 Switch to a context:
 
-    kamu ctx use prod
+    kamu context use prod
 
 Switch to the local workspace context:
 
-    kamu ctx use local
+    kamu context use local
 
 
 

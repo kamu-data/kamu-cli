@@ -104,8 +104,8 @@ pub fn get_command(
             ),
         },
 
-        cli::Command::Ctx(c) => match c.subcommand {
-            Some(cli::CtxSubCommand::Add(sc)) => Box::new(
+        cli::Command::Context(c) => match c.subcommand {
+            Some(cli::ContextSubCommand::Add(sc)) => Box::new(
                 ContextAddCommand::builder(
                     sc.name,
                     sc.url.into(),
@@ -117,8 +117,8 @@ pub fn get_command(
                 )
                 .cast(),
             ),
-            Some(cli::CtxSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
-            Some(cli::CtxSubCommand::Remove(sc)) => Box::new(
+            Some(cli::ContextSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
+            Some(cli::ContextSubCommand::Remove(sc)) => Box::new(
                 ContextRemoveCommand::builder(
                     sc.name,
                     sc.all,
@@ -130,10 +130,10 @@ pub fn get_command(
                 )
                 .cast(),
             ),
-            Some(cli::CtxSubCommand::Test(sc)) => {
+            Some(cli::ContextSubCommand::Test(sc)) => {
                 Box::new(ContextTestCommand::builder(sc.name, sc.all).cast())
             }
-            Some(cli::CtxSubCommand::Use(sc)) => {
+            Some(cli::ContextSubCommand::Use(sc)) => {
                 Box::new(ContextUseCommand::builder(sc.name).cast())
             }
             None => {
@@ -575,7 +575,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         },
         // False for set_watermark option
         cli::Command::Pull(c) => c.set_watermark.is_some(),
-        cli::Command::Ctx(_)
+        cli::Command::Context(_)
         | cli::Command::Ui(_)
         | cli::Command::Login(_)
         | cli::Command::Push(_) => false,
@@ -601,7 +601,7 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
-        | cli::Command::Ctx(_)
+        | cli::Command::Context(_)
         | cli::Command::ApiResources(_)
         | cli::Command::New(_)
         | cli::Command::Sql(_)
@@ -616,7 +616,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
-        | cli::Command::Ctx(_)
+        | cli::Command::Context(_)
         | cli::Command::ApiResources(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
