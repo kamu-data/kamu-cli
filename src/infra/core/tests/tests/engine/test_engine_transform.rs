@@ -714,9 +714,7 @@ async fn test_transform_with_engine_datafusion() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// See: https://github.com/kamu-data/kamu-cli/issues/599
 #[test_group::group(containerized, engine, transform, risingwave)]
-#[ignore = "#599 Disabled for disk space issues reason"]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_risingwave() {
     test_transform_common(
