@@ -3427,14 +3427,16 @@ Defines how raw data should be read into the structured form.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
 """
-union ReadStep = ReadStepCsv | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
+interface ReadStep {
+	schema(format: DataSchemaFormat): DataSchema
+}
 
 """
 Reader for comma-separated files.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
 """
-type ReadStepCsv {
+type ReadStepCsv implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3507,7 +3509,7 @@ type ReadStepCsv {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3515,7 +3517,7 @@ Reader for ESRI Shapefile format.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
 """
-type ReadStepEsriShapefile {
+type ReadStepEsriShapefile implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3530,7 +3532,7 @@ type ReadStepEsriShapefile {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3541,7 +3543,7 @@ own column.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
 """
-type ReadStepGeoJson {
+type ReadStepGeoJson implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3550,7 +3552,7 @@ type ReadStepGeoJson {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3558,7 +3560,7 @@ Reader for JSON files that contain an array of objects within them.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
 """
-type ReadStepJson {
+type ReadStepJson implements ReadStep {
 	"""
 	Path in the form of `a.b.c` to a sub-element of the root JSON object
 	that is an array or objects. If not specified it is assumed that the
@@ -3594,7 +3596,7 @@ type ReadStepJson {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3604,7 +3606,7 @@ every individual feature object to appear on its own line.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
 """
-type ReadStepNdGeoJson {
+type ReadStepNdGeoJson implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3613,7 +3615,7 @@ type ReadStepNdGeoJson {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3622,7 +3624,7 @@ same schema.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
 """
-type ReadStepNdJson {
+type ReadStepNdJson implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3652,7 +3654,7 @@ type ReadStepNdJson {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -3660,7 +3662,7 @@ Reader for Apache Parquet format.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
 """
-type ReadStepParquet {
+type ReadStepParquet implements ReadStep {
 	"""
 	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
 	into more appropriate data types.
@@ -3669,7 +3671,7 @@ type ReadStepParquet {
 	"""
 	Schema used to coerce values into more appropriate data types.
 	"""
-	schema: DataSchema
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 interface RemoveWebhookSubscriptionResult {

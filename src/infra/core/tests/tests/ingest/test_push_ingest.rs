@@ -1214,6 +1214,108 @@ async fn test_ingest_push_schema_and_source_evolution() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_deprecated_ddl_schema() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(odf::DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(odf::metadata::ReadStepCsv {
+                    header: Some(true),
+                    ddl_schema: Some(vec![
+                        "date TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..odf::metadata::ReadStepCsv::default()
+                })
+                .merge(odf::metadata::MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .push_event(odf::metadata::SetVocab {
+            event_time_column: Some("date".to_string()),
+            ..Default::default()
+        })
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    // Round 1
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness
+        .ingest_from(
+            target.clone(),
+            None,
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
+            PushIngestOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  REQUIRED INT64 offset;
+                  REQUIRED INT32 op;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
+
+    assert_eq!(
+        data_helper
+            .get_last_data_block()
+            .await
+            .event
+            .new_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2020-01-01T00:00:00+00:00".to_string())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,

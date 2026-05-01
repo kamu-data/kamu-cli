@@ -166,6 +166,18 @@ impl Default for DatasetVocabulary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReadStep {
+    pub fn ddl_schema(&self) -> Option<&Vec<String>> {
+        match self {
+            ReadStep::Csv(v) => v.ddl_schema.as_ref(),
+            ReadStep::Json(v) => v.ddl_schema.as_ref(),
+            ReadStep::NdJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::GeoJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::NdGeoJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::EsriShapefile(v) => v.ddl_schema.as_ref(),
+            ReadStep::Parquet(v) => v.ddl_schema.as_ref(),
+        }
+    }
+
     pub fn schema(&self) -> Option<&DataSchema> {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
@@ -175,6 +187,39 @@ impl ReadStep {
             ReadStep::NdGeoJson(v) => v.schema.as_ref(),
             ReadStep::EsriShapefile(v) => v.schema.as_ref(),
             ReadStep::Parquet(v) => v.schema.as_ref(),
+        }
+    }
+
+    pub fn set_schema(&mut self, schema: DataSchema) {
+        match self {
+            ReadStep::Csv(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::Json(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::NdJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::GeoJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::NdGeoJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::EsriShapefile(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::Parquet(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
         }
     }
 }

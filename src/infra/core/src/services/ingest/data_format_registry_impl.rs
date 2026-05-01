@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use file_utils::{MediaType, MediaTypeRef};
+use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::ReadStep;
@@ -105,10 +106,17 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
     async fn get_reader(
         &self,
         ctx: SessionContext,
-        conf: ReadStep,
+        mut conf: ReadStep,
         to_arrow_settings: odf::schema::ToArrowSettings,
         temp_path: PathBuf,
     ) -> Result<Arc<dyn Reader>, ReadError> {
+        // Convert deprecate DDL schema into ODF if specified
+        if let Some(ddl_schema) = conf.ddl_schema() {
+            let ddl = ddl_schema.join(", ");
+            let odf_schema = odf::utils::schema::parse::parse_ddl_to_odf_schema(&ddl).int_err()?;
+            conf.set_schema(odf_schema);
+        }
+
         let reader: Arc<dyn Reader> = match conf {
             ReadStep::Csv(conf) => Arc::new(ReaderCsv::new(ctx, conf, &to_arrow_settings)?),
             ReadStep::Json(conf) => {
