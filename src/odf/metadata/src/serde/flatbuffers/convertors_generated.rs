@@ -1054,7 +1054,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTime {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let mut builder = fb::DataTypeTimeBuilder::new(fb);
-        builder.add_unit(self.unit.into());
+        self.unit.map(|v| builder.add_unit(v.into()));
         builder.finish()
     }
 }
@@ -1062,7 +1062,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTime {
 impl<'fb> FlatbuffersDeserializable<fb::DataTypeTime<'fb>> for odf::DataTypeTime {
     fn deserialize(proxy: fb::DataTypeTime<'fb>) -> Self {
         odf::DataTypeTime {
-            unit: proxy.unit().into(),
+            unit: proxy.unit().map(|v| v.into()),
         }
     }
 }
@@ -1078,7 +1078,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTimestamp {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let timezone_offset = self.timezone.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::DataTypeTimestampBuilder::new(fb);
-        builder.add_unit(self.unit.into());
+        self.unit.map(|v| builder.add_unit(v.into()));
         timezone_offset.map(|off| builder.add_timezone(off));
         builder.finish()
     }
@@ -1087,7 +1087,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeTimestamp {
 impl<'fb> FlatbuffersDeserializable<fb::DataTypeTimestamp<'fb>> for odf::DataTypeTimestamp {
     fn deserialize(proxy: fb::DataTypeTimestamp<'fb>) -> Self {
         odf::DataTypeTimestamp {
-            unit: proxy.unit().into(),
+            unit: proxy.unit().map(|v| v.into()),
             timezone: proxy.timezone().map(|v| v.to_owned()),
         }
     }

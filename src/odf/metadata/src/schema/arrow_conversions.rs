@@ -161,7 +161,7 @@ impl DataType {
             ArrowDataType::Float64 => (DataType::Float64(DataTypeFloat64 {}), None),
             ArrowDataType::Timestamp(time_unit, tz) => (
                 DataType::Timestamp(DataTypeTimestamp {
-                    unit: (*time_unit).into(),
+                    unit: Some((*time_unit).into()),
                     timezone: tz.as_ref().map(std::string::ToString::to_string),
                 }),
                 None,
@@ -178,7 +178,7 @@ impl DataType {
             ),
             ArrowDataType::Time32(time_unit) | ArrowDataType::Time64(time_unit) => (
                 DataType::Time(DataTypeTime {
-                    unit: (*time_unit).into(),
+                    unit: Some((*time_unit).into()),
                 }),
                 None,
             ),
@@ -642,18 +642,21 @@ impl DataType {
                         .collect::<Result<_, _>>()?;
                     ArrowDataType::Struct(arrow::datatypes::Fields::from(fields))
                 }
+                DataType::Time(DataTypeTime { unit: None }) => {
+                    ArrowDataType::Time32(TimeUnit::Millisecond.into())
+                }
                 DataType::Time(DataTypeTime {
-                    unit: unit @ (TimeUnit::Second | TimeUnit::Millisecond),
+                    unit: Some(unit @ (TimeUnit::Second | TimeUnit::Millisecond)),
                 }) => ArrowDataType::Time32((*unit).into()),
                 DataType::Time(DataTypeTime {
-                    unit: unit @ (TimeUnit::Microsecond | TimeUnit::Nanosecond),
+                    unit: Some(unit @ (TimeUnit::Microsecond | TimeUnit::Nanosecond)),
                 }) => ArrowDataType::Time64((*unit).into()),
-                DataType::Timestamp(DataTypeTimestamp { unit, timezone }) => {
-                    ArrowDataType::Timestamp(
-                        (*unit).into(),
-                        timezone.as_ref().map(|s| s.as_str().into()),
-                    )
-                }
+                DataType::Timestamp(
+                    ts @ DataTypeTimestamp {
+                        unit: _,
+                        timezone: _,
+                    },
+                ) => ArrowDataType::Timestamp(ts.unit().into(), Some(ts.timezone().into())),
                 DataType::String(DataTypeString {}) => ArrowDataType::Utf8,
                 DataType::Option(_) => unreachable!(),
             },

@@ -8167,20 +8167,18 @@ impl<'a> DataTypeTime<'a> {
         args: &'args DataTypeTimeArgs,
     ) -> flatbuffers::WIPOffset<DataTypeTime<'bldr>> {
         let mut builder = DataTypeTimeBuilder::new(_fbb);
-        builder.add_unit(args.unit);
+        if let Some(x) = args.unit {
+            builder.add_unit(x);
+        }
         builder.finish()
     }
 
     #[inline]
-    pub fn unit(&self) -> TimeUnit {
+    pub fn unit(&self) -> Option<TimeUnit> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<TimeUnit>(DataTypeTime::VT_UNIT, Some(TimeUnit::Second))
-                .unwrap()
-        }
+        unsafe { self._tab.get::<TimeUnit>(DataTypeTime::VT_UNIT, None) }
     }
 }
 
@@ -8198,14 +8196,12 @@ impl flatbuffers::Verifiable for DataTypeTime<'_> {
     }
 }
 pub struct DataTypeTimeArgs {
-    pub unit: TimeUnit,
+    pub unit: Option<TimeUnit>,
 }
 impl<'a> Default for DataTypeTimeArgs {
     #[inline]
     fn default() -> Self {
-        DataTypeTimeArgs {
-            unit: TimeUnit::Second,
-        }
+        DataTypeTimeArgs { unit: None }
     }
 }
 
@@ -8217,7 +8213,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeTimeBuilder<'a, 'b, A> 
     #[inline]
     pub fn add_unit(&mut self, unit: TimeUnit) {
         self.fbb_
-            .push_slot::<TimeUnit>(DataTypeTime::VT_UNIT, unit, TimeUnit::Second);
+            .push_slot_always::<TimeUnit>(DataTypeTime::VT_UNIT, unit);
     }
     #[inline]
     pub fn new(
@@ -8278,20 +8274,18 @@ impl<'a> DataTypeTimestamp<'a> {
         if let Some(x) = args.timezone {
             builder.add_timezone(x);
         }
-        builder.add_unit(args.unit);
+        if let Some(x) = args.unit {
+            builder.add_unit(x);
+        }
         builder.finish()
     }
 
     #[inline]
-    pub fn unit(&self) -> TimeUnit {
+    pub fn unit(&self) -> Option<TimeUnit> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<TimeUnit>(DataTypeTimestamp::VT_UNIT, Some(TimeUnit::Second))
-                .unwrap()
-        }
+        unsafe { self._tab.get::<TimeUnit>(DataTypeTimestamp::VT_UNIT, None) }
     }
     #[inline]
     pub fn timezone(&self) -> Option<&'a str> {
@@ -8324,14 +8318,14 @@ impl flatbuffers::Verifiable for DataTypeTimestamp<'_> {
     }
 }
 pub struct DataTypeTimestampArgs<'a> {
-    pub unit: TimeUnit,
+    pub unit: Option<TimeUnit>,
     pub timezone: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for DataTypeTimestampArgs<'a> {
     #[inline]
     fn default() -> Self {
         DataTypeTimestampArgs {
-            unit: TimeUnit::Second,
+            unit: None,
             timezone: None,
         }
     }
@@ -8345,7 +8339,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeTimestampBuilder<'a, 'b
     #[inline]
     pub fn add_unit(&mut self, unit: TimeUnit) {
         self.fbb_
-            .push_slot::<TimeUnit>(DataTypeTimestamp::VT_UNIT, unit, TimeUnit::Second);
+            .push_slot_always::<TimeUnit>(DataTypeTimestamp::VT_UNIT, unit);
     }
     #[inline]
     pub fn add_timezone(&mut self, timezone: flatbuffers::WIPOffset<&'b str>) {

@@ -70,17 +70,17 @@ impl Reader for ReaderNdJson {
     #[tracing::instrument(level = "info", name = "ReaderNdJson::read", skip_all)]
     async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: Move this to reader construction phase
-        match self.conf.encoding.as_deref() {
-            None | Some("utf8") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported NdJson.encoding: {}", v)),
+        match self.conf.encoding() {
+            "utf8" => Ok(()),
+            v => Err(unsupported!("Unsupported NdJson.encoding: {}", v)),
         }?;
-        match self.conf.date_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported NdJson.dateFormat: {}", v)),
+        match self.conf.date_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported NdJson.dateFormat: {}", v)),
         }?;
-        match self.conf.timestamp_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported NdJson.timestampFormat: {}", v)),
+        match self.conf.timestamp_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported NdJson.timestampFormat: {}", v)),
         }?;
 
         let options = JsonReadOptions {

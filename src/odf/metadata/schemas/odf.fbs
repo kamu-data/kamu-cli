@@ -416,19 +416,23 @@ table DataTypeStruct {
 
 table DataTypeTime {
   // The unit of the time value.
-  unit: TimeUnit;
+  //
+  // Defaults to: "Millisecond"
+  unit: TimeUnit = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeTimestamp
-// A point in time, represented as an offset from the Unix epoch, with optional timezone.
+// A point in time, represented as an offset from the Unix epoch in a specific timezone.
 //
 // See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DataTypeTimestamp {
   // The unit of the timestamp value that determines its precision.
-  unit: TimeUnit;
+  //
+  // Defaults to: "Millisecond"
+  unit: TimeUnit = null;
   // The timezone is an optional string indicating the name of a timezone
   // one of
   // 
@@ -436,9 +440,8 @@ table DataTypeTimestamp {
   //   "tzdata"), such as "America/New_York".
   // * An absolute timezone offset of the form "+XX:XX" or "-XX:XX",
   //   such as "+07:30".
-  // 
-  // Whether a timezone string is present indicates different semantics about
-  // the data (see above).
+  //
+  // Defaults to: "UTC"
   timezone: string;
 }
 

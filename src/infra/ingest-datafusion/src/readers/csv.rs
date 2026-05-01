@@ -70,58 +70,42 @@ impl Reader for ReaderCsv {
     #[tracing::instrument(level = "info", name = "ReaderCsv::read", skip_all)]
     async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: Move this to reader construction phase
-        let delimiter = match &self.conf.separator {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    return Err("Csv.separator supports only single-character ascii values"
-                        .int_err()
-                        .into());
-                }
-                v.as_bytes()[0]
-            }
-            _ => b',',
-        };
-        let quote = match &self.conf.quote {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    Err(unsupported!(
-                        "Csv.quote supports only single-character ascii values, got: {}",
-                        v
-                    ))
-                } else {
-                    Ok(v.as_bytes()[0])
-                }
-            }
-            _ => Ok(b'"'),
+        let delimiter = match self.conf.separator() {
+            v if v.len() == 1 => Ok(v.as_bytes()[0]),
+            _ => Err(unsupported!(
+                "Csv.separator supports only single-character ascii values"
+            )),
         }?;
-        let escape = match &self.conf.escape {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    Err(unsupported!(
-                        "Csv.escape supports only single-character ascii values, got: {}",
-                        v
-                    ))
-                } else {
-                    Ok(Some(v.as_bytes()[0]))
-                }
-            }
-            _ => Ok(None),
+        let quote = match self.conf.quote() {
+            v if v.len() == 1 => Ok(v.as_bytes()[0]),
+            v => Err(unsupported!(
+                "Csv.quote supports only single-character ascii values, got: {}",
+                v
+            )),
         }?;
-        match self.conf.encoding.as_deref() {
-            None | Some("utf8") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
+        let escape = match self.conf.escape() {
+            "" => Ok(None),
+            v if v.len() == 1 => Ok(Some(v.as_bytes()[0])),
+            v => Err(unsupported!(
+                "Csv.escape supports only single-character ascii values, got: {}",
+                v
+            )),
         }?;
-        match self.conf.null_value.as_deref() {
-            None | Some("") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
+        match self.conf.encoding() {
+            "utf8" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
-        match self.conf.date_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
+        match self.conf.null_value() {
+            "" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
         }?;
-        match self.conf.timestamp_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
+        match self.conf.date_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
+        }?;
+        match self.conf.timestamp_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
         }?;
 
         let options = CsvReadOptions {

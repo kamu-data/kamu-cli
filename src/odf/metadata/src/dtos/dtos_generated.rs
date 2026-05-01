@@ -30,7 +30,7 @@ use crate::identity::*;
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub prev_checkpoint: Option<Multihash>,
@@ -250,7 +250,7 @@ impl_enum_variant!(DataType::String(DataTypeString));
 /// A sequence of bytes. Used for arbitrary binary data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebinary-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeBinary {
     /// Number of bytes per value for fixed-size binary. If omitted, the binary
     /// is variable-length.
@@ -262,7 +262,7 @@ pub struct DataTypeBinary {
 /// A boolean value representing true or false.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypebool-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeBool {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -270,7 +270,7 @@ pub struct DataTypeBool {}
 /// A calendar date.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypedate-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeDate {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -307,7 +307,7 @@ pub struct DataTypeDuration {
 /// A floating-point number.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat16-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeFloat16 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -315,7 +315,7 @@ pub struct DataTypeFloat16 {}
 /// A floating-point number.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat32-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeFloat32 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,7 +323,7 @@ pub struct DataTypeFloat32 {}
 /// A floating-point number.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypefloat64-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeFloat64 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,7 +331,7 @@ pub struct DataTypeFloat64 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint16-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeInt16 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -339,7 +339,7 @@ pub struct DataTypeInt16 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint32-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeInt32 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -347,7 +347,7 @@ pub struct DataTypeInt32 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint64-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeInt64 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -355,7 +355,7 @@ pub struct DataTypeInt64 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeint8-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeInt8 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -393,7 +393,7 @@ pub struct DataTypeMap {
 /// A type representing the absence of a value (null).
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypenull-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeNull {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,7 +412,7 @@ pub struct DataTypeOption {
 /// A Unicode string.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypestring-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeString {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -431,22 +431,35 @@ pub struct DataTypeStruct {
 /// A time of day value, without a date, with a specified unit of granularity.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetime-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeTime {
     /// The unit of the time value.
-    pub unit: TimeUnit,
+    ///
+    /// Defaults to: "Millisecond"
+    pub unit: Option<TimeUnit>,
+}
+
+impl DataTypeTime {
+    pub fn default_unit() -> TimeUnit {
+        TimeUnit::Millisecond
+    }
+    pub fn unit(&self) -> TimeUnit {
+        self.unit.unwrap_or(Self::default_unit())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A point in time, represented as an offset from the Unix epoch, with optional
+/// A point in time, represented as an offset from the Unix epoch in a specific
 /// timezone.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypetimestamp-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeTimestamp {
     /// The unit of the timestamp value that determines its precision.
-    pub unit: TimeUnit,
+    ///
+    /// Defaults to: "Millisecond"
+    pub unit: Option<TimeUnit>,
     /// The timezone is an optional string indicating the name of a timezone
     /// one of
     ///
@@ -455,9 +468,23 @@ pub struct DataTypeTimestamp {
     /// * An absolute timezone offset of the form "+XX:XX" or "-XX:XX", such as
     ///   "+07:30".
     ///
-    /// Whether a timezone string is present indicates different semantics about
-    /// the data (see above).
+    /// Defaults to: "UTC"
     pub timezone: Option<String>,
+}
+
+impl DataTypeTimestamp {
+    pub fn default_unit() -> TimeUnit {
+        TimeUnit::Millisecond
+    }
+    pub fn unit(&self) -> TimeUnit {
+        self.unit.unwrap_or(Self::default_unit())
+    }
+    pub fn default_timezone() -> &'static str {
+        "UTC"
+    }
+    pub fn timezone(&self) -> &str {
+        self.timezone.as_deref().unwrap_or(Self::default_timezone())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -465,7 +492,7 @@ pub struct DataTypeTimestamp {
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint16-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeUInt16 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,7 +500,7 @@ pub struct DataTypeUInt16 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint32-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeUInt32 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -481,7 +508,7 @@ pub struct DataTypeUInt32 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint64-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeUInt64 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -489,7 +516,7 @@ pub struct DataTypeUInt64 {}
 /// An integer value.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datatypeuint8-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DataTypeUInt8 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -544,7 +571,7 @@ pub struct DatasetVocabulary {
 /// Disables the previously defined polling source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct DisablePollingSource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -595,7 +622,7 @@ impl_enum_variant!(EventTimeSource::FromSystemTime(
 /// Extracts event time from the source's metadata.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrommetadata-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromMetadata {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -616,7 +643,7 @@ pub struct EventTimeSourceFromPath {
 /// Assigns event time from the system time source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefromsystemtime-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromSystemTime {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -740,7 +767,7 @@ pub struct FetchStepContainer {
 /// Connects to an Ethereum node to stream transaction logs.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepethereumlogs-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepEthereumLogs {
     /// Identifier of the chain to scan logs from. This parameter may be used
     /// for RPC endpoint lookup as well as asserting that provided `nodeUrl`
@@ -846,7 +873,7 @@ impl_enum_variant!(MergeStrategy::UpsertStream(MergeStrategyUpsertStream));
 /// entirety, without any deduplication.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyAppend {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1063,6 +1090,15 @@ pub struct MqttTopicSubscription {
     pub qos: Option<MqttQos>,
 }
 
+impl MqttTopicSubscription {
+    pub fn default_qos() -> MqttQos {
+        MqttQos::AtMostOnce
+    }
+    pub fn qos(&self) -> MqttQos {
+        self.qos.unwrap_or(Self::default_qos())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Describes a range of data as a closed arithmetic interval of offsets
@@ -1183,7 +1219,7 @@ pub struct RawQueryResponseInvalidQuery {
 /// Reports query progress
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponseprogress-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct RawQueryResponseProgress {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1227,7 +1263,7 @@ impl_enum_variant!(ReadStep::NdGeoJson(ReadStepNdGeoJson));
 /// Reader for comma-separated files.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepCsv {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1282,12 +1318,77 @@ pub struct ReadStepCsv {
     pub schema: Option<DataSchema>,
 }
 
+impl ReadStepCsv {
+    pub fn default_separator() -> &'static str {
+        ","
+    }
+    pub fn separator(&self) -> &str {
+        self.separator
+            .as_deref()
+            .unwrap_or(Self::default_separator())
+    }
+    pub fn default_encoding() -> &'static str {
+        "utf8"
+    }
+    pub fn encoding(&self) -> &str {
+        self.encoding.as_deref().unwrap_or(Self::default_encoding())
+    }
+    pub fn default_quote() -> &'static str {
+        "\""
+    }
+    pub fn quote(&self) -> &str {
+        self.quote.as_deref().unwrap_or(Self::default_quote())
+    }
+    pub fn default_escape() -> &'static str {
+        "\\"
+    }
+    pub fn escape(&self) -> &str {
+        self.escape.as_deref().unwrap_or(Self::default_escape())
+    }
+    pub fn default_header() -> bool {
+        false
+    }
+    pub fn header(&self) -> bool {
+        self.header.unwrap_or(Self::default_header())
+    }
+    pub fn default_infer_schema() -> bool {
+        false
+    }
+    pub fn infer_schema(&self) -> bool {
+        self.infer_schema.unwrap_or(Self::default_infer_schema())
+    }
+    pub fn default_null_value() -> &'static str {
+        ""
+    }
+    pub fn null_value(&self) -> &str {
+        self.null_value
+            .as_deref()
+            .unwrap_or(Self::default_null_value())
+    }
+    pub fn default_date_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn date_format(&self) -> &str {
+        self.date_format
+            .as_deref()
+            .unwrap_or(Self::default_date_format())
+    }
+    pub fn default_timestamp_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn timestamp_format(&self) -> &str {
+        self.timestamp_format
+            .as_deref()
+            .unwrap_or(Self::default_timestamp_format())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Reader for ESRI Shapefile format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepEsriShapefile {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1308,7 +1409,7 @@ pub struct ReadStepEsriShapefile {
 /// own column.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1322,7 +1423,7 @@ pub struct ReadStepGeoJson {
 /// Reader for JSON files that contain an array of objects within them.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepJson {
     /// Path in the form of `a.b.c` to a sub-element of the root JSON object
     /// that is an array or objects. If not specified it is assumed that the
@@ -1350,6 +1451,31 @@ pub struct ReadStepJson {
     pub schema: Option<DataSchema>,
 }
 
+impl ReadStepJson {
+    pub fn default_date_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn date_format(&self) -> &str {
+        self.date_format
+            .as_deref()
+            .unwrap_or(Self::default_date_format())
+    }
+    pub fn default_encoding() -> &'static str {
+        "utf8"
+    }
+    pub fn encoding(&self) -> &str {
+        self.encoding.as_deref().unwrap_or(Self::default_encoding())
+    }
+    pub fn default_timestamp_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn timestamp_format(&self) -> &str {
+        self.timestamp_format
+            .as_deref()
+            .unwrap_or(Self::default_timestamp_format())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson`
@@ -1357,7 +1483,7 @@ pub struct ReadStepJson {
 /// every individual feature object to appear on its own line.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdGeoJson {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1372,7 +1498,7 @@ pub struct ReadStepNdGeoJson {
 /// same schema.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdJson {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1396,12 +1522,37 @@ pub struct ReadStepNdJson {
     pub schema: Option<DataSchema>,
 }
 
+impl ReadStepNdJson {
+    pub fn default_date_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn date_format(&self) -> &str {
+        self.date_format
+            .as_deref()
+            .unwrap_or(Self::default_date_format())
+    }
+    pub fn default_encoding() -> &'static str {
+        "utf8"
+    }
+    pub fn encoding(&self) -> &str {
+        self.encoding.as_deref().unwrap_or(Self::default_encoding())
+    }
+    pub fn default_timestamp_format() -> &'static str {
+        "rfc3339"
+    }
+    pub fn timestamp_format(&self) -> &str {
+        self.timestamp_format
+            .as_deref()
+            .unwrap_or(Self::default_timestamp_format())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Reader for Apache Parquet format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepParquet {
     /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
     /// into more appropriate data types.
@@ -1454,7 +1605,7 @@ pub struct SetAttachments {
 /// this event.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct SetDataSchema {
     /// DEPRECATED: Apache Arrow schema encoded in its native flatbuffers
     /// representation.
@@ -1469,7 +1620,7 @@ pub struct SetDataSchema {
 /// Provides basic human-readable information about a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct SetInfo {
     /// Brief single-sentence summary of a dataset.
     pub description: Option<String>,
@@ -1533,7 +1684,7 @@ pub struct SetTransform {
 /// Lets you manipulate names of the system columns to avoid conflicts.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct SetVocab {
     /// Name of the offset column.
     pub offset_column: Option<String>,
@@ -1563,7 +1714,7 @@ impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
 /// After source was processed once it will never be ingested again.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecachingforever-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct SourceCachingForever {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1803,7 +1954,7 @@ pub struct TransformResponseInvalidQuery {
 /// Reports query progress
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponseprogress-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseProgress {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1811,7 +1962,7 @@ pub struct TransformResponseProgress {}
 /// Query executed successfully
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponsesuccess-schema
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct TransformResponseSuccess {
     /// Data slice produced by the transaction, if any.
     pub new_offset_interval: Option<OffsetInterval>,

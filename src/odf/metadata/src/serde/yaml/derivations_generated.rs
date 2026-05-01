@@ -608,8 +608,9 @@ implement_serde_as!(DataTypeStruct, DataTypeStructDef, "DataTypeStructDef");
 #[serde(remote = "DataTypeTime")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimeDef {
-    #[serde_as(as = "TimeUnitDef")]
-    pub unit: TimeUnit,
+    #[serde_as(as = "Option<TimeUnitDef>")]
+    #[serde(default)]
+    pub unit: Option<TimeUnit>,
 }
 
 implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
@@ -625,8 +626,9 @@ implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
 #[serde(remote = "DataTypeTimestamp")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimestampDef {
-    #[serde_as(as = "TimeUnitDef")]
-    pub unit: TimeUnit,
+    #[serde_as(as = "Option<TimeUnitDef>")]
+    #[serde(default)]
+    pub unit: Option<TimeUnit>,
     pub timezone: Option<String>,
 }
 

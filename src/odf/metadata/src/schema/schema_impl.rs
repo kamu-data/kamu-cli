@@ -345,12 +345,12 @@ impl DataType {
     }
     pub fn time_millis() -> Self {
         Self::Time(DataTypeTime {
-            unit: TimeUnit::Millisecond,
+            unit: Some(TimeUnit::Millisecond),
         })
     }
     pub fn timestamp_millis_utc() -> Self {
         Self::Timestamp(DataTypeTimestamp {
-            unit: TimeUnit::Millisecond,
+            unit: Some(TimeUnit::Millisecond),
             timezone: Some("UTC".into()),
         })
     }
