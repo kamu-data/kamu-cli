@@ -1047,6 +1047,8 @@ enum DataSchemaFormat {
 	PARQUET_JSON
 }
 
+scalar DataSchemaInput
+
 """
 Describes a slice of data added to a dataset or produced via transformation
 
@@ -1731,9 +1733,13 @@ type DatasetsMut {
 		"""
 		datasetAlias: DatasetAlias!,
 		"""
-		Additional user-defined columns
+		DEPRECATED: Additional user-defined columns
 		"""
 		extraColumns: [ColumnInput!],
+		"""
+		User-defined schema that will be merged with base
+		"""
+		extraSchema: DataSchemaInput,
 		"""
 		Extra metadata events (e.g. to populate readme)
 		"""
@@ -1758,9 +1764,13 @@ type DatasetsMut {
 		"""
 		datasetAlias: DatasetAlias!,
 		"""
-		Additional user-defined columns
+		DEPRECATED Additional user-defined columns
 		"""
 		extraColumns: [ColumnInput!],
+		"""
+		User-defined schema that will be merged with base
+		"""
+		extraSchema: DataSchemaInput,
 		"""
 		Extra metadata events (e.g. to populate readme)
 		"""

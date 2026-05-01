@@ -300,17 +300,19 @@ async fn test_collection_extra_data() {
     let did = harness
         .create_collection(
             "x",
-            Some(json!([{
-                "name": "foo",
-                "type": {
-                    "ddl": "string",
-                }
-            }, {
-                "name": "bar",
-                "type": {
-                    "ddl": "int",
-                }
-            }])),
+            Some(json!({
+                "fields": [{
+                    "name": "foo",
+                    "type": {
+                        "kind": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "kind": "int32",
+                    }
+                }]
+            })),
         )
         .await;
 
@@ -422,6 +424,98 @@ async fn test_collection_extra_data() {
         .await;
 
     assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_collection_extra_data_legacy_ddl() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    // Create empty datasets to link to
+    let linked = harness.create_root_dataset("foo").await.dataset_handle.id;
+
+    // Create collection dataset
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                    mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                        datasets {
+                            createCollection(
+                                datasetAlias: $datasetAlias,
+                                extraColumns: $extraColumns,
+                                datasetVisibility: PRIVATE,
+                            ) {
+                                message
+                                ... on CreateDatasetResultSuccess {
+                                    dataset {
+                                        id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetAlias": "x",
+                "extraColumns": [{
+                    "name": "foo",
+                    "type": {
+                        "ddl": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "ddl": "int",
+                    }
+                }],
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let id = res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let did = odf::DatasetID::from_did_str(&id).unwrap();
+
+    // Entries are empty
+    assert_eq!(harness.list_entries(&did).await, json!([]));
+
+    // Add first entry
+    harness
+        .update_entries(
+            &did,
+            json![{
+                "add": {
+                    "entry": {
+                        "path": "/foo",
+                        "ref": linked,
+                        "extraData": {"foo": "aaa", "bar": 111},
+                    }
+                }
+            }],
+        )
+        .await;
+
+    assert_eq!(
+        harness.list_entries(&did).await,
+        json!([{
+            "path": "/foo",
+            "ref": linked,
+            "extraData": {"foo": "aaa", "bar": 111}
+        }])
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -991,17 +1085,17 @@ impl GraphQLDatasetsHarness {
     pub async fn create_collection(
         &self,
         alias: &str,
-        extra_columns: Option<serde_json::Value>,
+        extra_schema: Option<serde_json::Value>,
     ) -> odf::DatasetID {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
                     r#"
-                    mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                    mutation ($datasetAlias: DatasetAlias!, $extraSchema: DataSchemaInput) {
                         datasets {
                             createCollection(
                                 datasetAlias: $datasetAlias,
-                                extraColumns: $extraColumns,
+                                extraSchema: $extraSchema,
                                 datasetVisibility: PRIVATE,
                             ) {
                                 message
@@ -1017,7 +1111,7 @@ impl GraphQLDatasetsHarness {
                 ))
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetAlias": alias,
-                    "extraColumns": extra_columns,
+                    "extraSchema": extra_schema,
                 }))),
             )
             .await;
