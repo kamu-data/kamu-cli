@@ -24,6 +24,8 @@ pub struct ResourceContextRegistryService {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component(pub)]
 impl ResourceContextRegistryService {
     pub fn new(store: Arc<dyn resource_context::ResourceContextStore>) -> Self {
@@ -69,12 +71,14 @@ impl ResourceContextRegistryService {
             .map(|context| resource_context::ScopedResourceContextRecord {
                 scope: resource_context::ResourceContextStoreScope::Workspace,
                 context,
+                last_test_result: None,
             })
             .or_else(|| {
                 self.get_context_in_scope(resource_context::ResourceContextStoreScope::User, name)
                     .map(|context| resource_context::ScopedResourceContextRecord {
                         scope: resource_context::ResourceContextStoreScope::User,
                         context,
+                        last_test_result: None,
                     })
             })
     }
@@ -97,18 +101,28 @@ impl ResourceContextRegistryService {
             .user_registry
             .lock()
             .expect("Could not lock resource context registry");
+        let workspace_runtime_state = self
+            .store
+            .read_context_runtime_state(resource_context::ResourceContextStoreScope::Workspace)
+            .unwrap();
+        let user_runtime_state = self
+            .store
+            .read_context_runtime_state(resource_context::ResourceContextStoreScope::User)
+            .unwrap();
 
         let mut seen = HashSet::new();
         let mut contexts = Vec::new();
 
-        for (scope, registry) in [
+        for (scope, registry, runtime_state) in [
             (
                 resource_context::ResourceContextStoreScope::Workspace,
                 &*workspace_registry,
+                &workspace_runtime_state,
             ),
             (
                 resource_context::ResourceContextStoreScope::User,
                 &*user_registry,
+                &user_runtime_state,
             ),
         ] {
             for ctx in registry {
@@ -116,6 +130,7 @@ impl ResourceContextRegistryService {
                     contexts.push(resource_context::ScopedResourceContextRecord {
                         scope,
                         context: ctx.clone(),
+                        last_test_result: runtime_state.contexts.get(&ctx.name).cloned(),
                     });
                 }
             }
@@ -159,26 +174,60 @@ impl ResourceContextRegistryService {
         name: &str,
         last_test_result: resource_context::ResourceContextLastTestResult,
     ) -> Result<bool, InternalError> {
-        let mut registry = self.lock_registry_for_scope(scope);
-
-        let position = if let Some(position) =
-            registry.iter().position(|existing| existing.name == name)
         {
-            position
-        } else {
-            *registry = self.store.read_context_registry(scope)?;
+            let mut registry = self.lock_registry_for_scope(scope);
 
-            let Some(position) = registry.iter().position(|existing| existing.name == name) else {
-                return Ok(false);
-            };
+            if !registry.iter().any(|existing| existing.name == name) {
+                *registry = self.store.read_context_registry(scope)?;
 
-            position
-        };
+                if !registry.iter().any(|existing| existing.name == name) {
+                    return Ok(false);
+                }
+            }
+        }
 
-        registry[position].last_test_result = Some(last_test_result);
-        self.store.write_context_registry(scope, &registry)?;
+        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
+        runtime_state
+            .contexts
+            .insert(name.to_string(), last_test_result);
+        self.store
+            .write_context_runtime_state(scope, &runtime_state)?;
 
         Ok(true)
+    }
+
+    pub fn remove_context_last_test_result(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        name: &str,
+    ) -> Result<bool, InternalError> {
+        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
+
+        if runtime_state.contexts.remove(name).is_none() {
+            return Ok(false);
+        }
+
+        self.store
+            .write_context_runtime_state(scope, &runtime_state)?;
+
+        Ok(true)
+    }
+
+    pub fn remove_all_context_last_test_results(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Result<(), InternalError> {
+        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
+
+        if runtime_state.contexts.is_empty() {
+            return Ok(());
+        }
+
+        runtime_state.contexts.clear();
+        self.store
+            .write_context_runtime_state(scope, &runtime_state)?;
+
+        Ok(())
     }
 
     pub fn set_effective_context_last_test_result(
@@ -217,6 +266,7 @@ impl ResourceContextRegistryService {
 
         registry.remove(position);
         self.store.write_context_registry(scope, &registry)?;
+        self.remove_context_last_test_result(scope, name)?;
 
         Ok(true)
     }
@@ -234,6 +284,7 @@ impl ResourceContextRegistryService {
 
         registry.clear();
         self.store.write_context_registry(scope, &registry)?;
+        self.remove_all_context_last_test_results(scope)?;
 
         Ok(removed)
     }

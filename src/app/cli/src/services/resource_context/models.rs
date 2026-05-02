@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -27,12 +29,10 @@ pub enum ResourceContextStoreScope {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceContextRecord {
     pub name: String,
     pub backend_url: Url,
-    #[serde(default)]
-    pub last_test_result: Option<ResourceContextLastTestResult>,
 }
 
 impl ResourceContextRecord {
@@ -40,7 +40,6 @@ impl ResourceContextRecord {
         Self {
             name: name.into(),
             backend_url,
-            last_test_result: None,
         }
     }
 }
@@ -55,6 +54,7 @@ pub type ResourceContextRegistry = Vec<ResourceContextRecord>;
 pub struct ScopedResourceContextRecord {
     pub scope: ResourceContextStoreScope,
     pub context: ResourceContextRecord,
+    pub last_test_result: Option<ResourceContextLastTestResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,13 +68,22 @@ pub struct CurrentResourceContextState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceContextsState {
+    #[serde(default)]
+    pub contexts: ResourceContextRegistry,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ResourceContextsRuntimeState {
     #[serde(default)]
     pub current_context_name: Option<String>,
 
     #[serde(default)]
-    pub contexts: ResourceContextRegistry,
+    pub contexts: BTreeMap<String, ResourceContextLastTestResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

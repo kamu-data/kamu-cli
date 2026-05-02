@@ -17,8 +17,11 @@ use crate::{NotInWorkspace, WorkspaceLayout, resource_context};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const KAMU_CONTEXTS_STORE: &str = ".kamucontexts";
+const KAMU_CONTEXTS_STATE_STORE: &str = ".kamucontexts.state";
 const KAMU_CONTEXTS_STORE_VERSION: i32 = 1;
 const KAMU_CONTEXTS_STORE_MANIFEST_KIND: &str = "KamuResourceContexts";
+const KAMU_CONTEXTS_STATE_STORE_VERSION: i32 = 1;
+const KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND: &str = "KamuResourceContextsState";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +35,17 @@ pub trait ResourceContextStore: Send + Sync {
         &self,
         scope: resource_context::ResourceContextStoreScope,
         registry: &resource_context::ResourceContextRegistry,
+    ) -> Result<(), InternalError>;
+
+    fn read_context_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Result<resource_context::ResourceContextsRuntimeState, InternalError>;
+
+    fn write_context_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        state: &resource_context::ResourceContextsRuntimeState,
     ) -> Result<(), InternalError>;
 
     fn read_current_context_state(
@@ -50,7 +64,9 @@ pub trait ResourceContextStore: Send + Sync {
 
 pub struct CLIResourceContextStore {
     user_contexts_path: PathBuf,
+    user_contexts_state_path: PathBuf,
     workspace_contexts_path: PathBuf,
+    workspace_contexts_state_path: PathBuf,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +79,11 @@ impl CLIResourceContextStore {
 
         Self {
             user_contexts_path: home_dir.join(KAMU_CONTEXTS_STORE),
+            user_contexts_state_path: home_dir.join(KAMU_CONTEXTS_STATE_STORE),
             workspace_contexts_path: workspace_layout.root_dir.join(KAMU_CONTEXTS_STORE),
+            workspace_contexts_state_path: workspace_layout
+                .root_dir
+                .join(KAMU_CONTEXTS_STATE_STORE),
         }
     }
 
@@ -74,6 +94,18 @@ impl CLIResourceContextStore {
         match scope {
             resource_context::ResourceContextStoreScope::Workspace => &self.workspace_contexts_path,
             resource_context::ResourceContextStoreScope::User => &self.user_contexts_path,
+        }
+    }
+
+    fn runtime_state_store_path_for_scope(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> &PathBuf {
+        match scope {
+            resource_context::ResourceContextStoreScope::Workspace => {
+                &self.workspace_contexts_state_path
+            }
+            resource_context::ResourceContextStoreScope::User => &self.user_contexts_state_path,
         }
     }
 
@@ -90,7 +122,7 @@ impl CLIResourceContextStore {
         Ok(())
     }
 
-    fn read_state(
+    fn read_config_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
     ) -> Result<resource_context::ResourceContextsState, InternalError> {
@@ -113,7 +145,7 @@ impl CLIResourceContextStore {
         Ok(manifest.content)
     }
 
-    fn write_state(
+    fn write_config_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
         state: &resource_context::ResourceContextsState,
@@ -136,6 +168,53 @@ impl CLIResourceContextStore {
 
         serde_yaml::to_writer(file, &manifest).int_err()
     }
+
+    fn read_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Result<resource_context::ResourceContextsRuntimeState, InternalError> {
+        let store_path = self.runtime_state_store_path_for_scope(scope);
+        if !store_path.exists() {
+            return Ok(resource_context::ResourceContextsRuntimeState::default());
+        }
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(store_path)
+            .int_err()?;
+
+        let manifest: Manifest<resource_context::ResourceContextsRuntimeState> =
+            serde_yaml::from_reader(file).int_err()?;
+
+        assert_eq!(manifest.kind, KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND);
+        assert_eq!(manifest.version, KAMU_CONTEXTS_STATE_STORE_VERSION);
+
+        Ok(manifest.content)
+    }
+
+    fn write_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        state: &resource_context::ResourceContextsRuntimeState,
+    ) -> Result<(), InternalError> {
+        self.ensure_scope_writable(scope)?;
+
+        let store_path = self.runtime_state_store_path_for_scope(scope);
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(store_path)
+            .int_err()?;
+
+        let manifest = Manifest {
+            kind: KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND.to_owned(),
+            version: KAMU_CONTEXTS_STATE_STORE_VERSION,
+            content: state,
+        };
+
+        serde_yaml::to_writer(file, &manifest).int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +224,7 @@ impl ResourceContextStore for CLIResourceContextStore {
         &self,
         scope: resource_context::ResourceContextStoreScope,
     ) -> Result<resource_context::ResourceContextRegistry, InternalError> {
-        self.read_state(scope).map(|state| state.contexts)
+        self.read_config_state(scope).map(|state| state.contexts)
     }
 
     fn write_context_registry(
@@ -153,16 +232,31 @@ impl ResourceContextStore for CLIResourceContextStore {
         scope: resource_context::ResourceContextStoreScope,
         registry: &resource_context::ResourceContextRegistry,
     ) -> Result<(), InternalError> {
-        let mut state = self.read_state(scope)?;
+        let mut state = self.read_config_state(scope)?;
         state.contexts.clone_from(registry);
-        self.write_state(scope, &state)
+        self.write_config_state(scope, &state)
+    }
+
+    fn read_context_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+    ) -> Result<resource_context::ResourceContextsRuntimeState, InternalError> {
+        self.read_runtime_state(scope)
+    }
+
+    fn write_context_runtime_state(
+        &self,
+        scope: resource_context::ResourceContextStoreScope,
+        state: &resource_context::ResourceContextsRuntimeState,
+    ) -> Result<(), InternalError> {
+        self.write_runtime_state(scope, state)
     }
 
     fn read_current_context_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
     ) -> Result<resource_context::CurrentResourceContextState, InternalError> {
-        self.read_state(scope)
+        self.read_runtime_state(scope)
             .map(|state| resource_context::CurrentResourceContextState {
                 current_context_name: state.current_context_name,
             })
@@ -173,11 +267,11 @@ impl ResourceContextStore for CLIResourceContextStore {
         scope: resource_context::ResourceContextStoreScope,
         state: &resource_context::CurrentResourceContextState,
     ) -> Result<(), InternalError> {
-        let mut stored_state = self.read_state(scope)?;
+        let mut stored_state = self.read_runtime_state(scope)?;
         stored_state
             .current_context_name
             .clone_from(&state.current_context_name);
-        self.write_state(scope, &stored_state)
+        self.write_runtime_state(scope, &stored_state)
     }
 }
 

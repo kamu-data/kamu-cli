@@ -19,9 +19,11 @@ use crate::output::*;
 use crate::resource_context::{
     LOCAL_CONTEXT_NAME,
     ResolvedResourceContext,
+    ResourceContextLastTestResult,
     ResourceContextRegistryService,
     ResourceContextResolver,
     ResourceContextStoreScope,
+    ScopedResourceContextRecord,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +68,7 @@ impl ContextListCommand {
         }
 
         for scoped_context in contexts {
-            let status = Self::status_label(&scoped_context.context).to_string();
+            let status = Self::status_label(&scoped_context).to_string();
             let resolved_context = ResolvedResourceContext::RemoteWorkspace {
                 name: scoped_context.context.name.clone(),
                 backend_url: scoped_context.context.backend_url.clone(),
@@ -111,11 +113,11 @@ impl ContextListCommand {
         }
     }
 
-    fn status_label(context: &crate::resource_context::ResourceContextRecord) -> &str {
+    fn status_label(context: &ScopedResourceContextRecord) -> &str {
         context
             .last_test_result
             .as_ref()
-            .map(crate::resource_context::ResourceContextLastTestResult::label)
+            .map(ResourceContextLastTestResult::label)
             .unwrap_or("Unknown")
     }
 }
