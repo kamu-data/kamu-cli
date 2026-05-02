@@ -337,13 +337,13 @@ List configured contexts:
 
     kamu context ls
 
-Test a remote context:
+Check a remote context:
 
-    kamu context test demo
+    kamu context check demo
 
 Refresh cached status for all remote contexts:
 
-    kamu context test --all
+    kamu context check --all
 
 Switch to a context:
 
@@ -378,7 +378,7 @@ pub enum ContextSubCommand {
     List(ContextList),
     #[command(visible_alias = "rm")]
     Remove(ContextRemove),
-    Test(ContextTest),
+    Check(ContextCheck),
     Use(ContextUse),
 }
 
@@ -479,30 +479,30 @@ pub struct ContextRemove {
     pub name: Option<String>,
 }
 
-/// Test connectivity and authorization for a remote resource context
+/// Check connectivity and authorization for a remote resource context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Tests backend reachability and access token validity for a context.
+Checks backend reachability and access token validity for a context.
 
-If no context name is provided, the effective current context is tested.
+If no context name is provided, the effective current context is checked.
 Use `--all` to refresh cached status for all configured remote contexts.
 
 **Examples:**
 
-Test a named context:
+Check a named context:
 
-    kamu context test demo
+    kamu context check demo
 
-Test the current context:
+Check the current context:
 
-    kamu context test
+    kamu context check
 
-Test all remote contexts:
+Check all remote contexts:
 
-    kamu context test --all
+    kamu context check --all
 "#)]
-pub struct ContextTest {
-    /// Test all effective remote contexts
+pub struct ContextCheck {
+    /// Check all effective remote contexts
     #[arg(long)]
     pub all: bool,
 

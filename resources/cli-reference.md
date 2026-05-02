@@ -449,7 +449,7 @@ Manage resource contexts
 * `add` — Register a new remote resource context
 * `list [ls]` — List configured resource contexts
 * `remove [rm]` — Remove a remote resource context
-* `test` — Test connectivity and authorization for a remote resource context
+* `check` — Check connectivity and authorization for a remote resource context
 * `use` — Switch the current resource context
 
 **Arguments:**
@@ -473,13 +473,13 @@ List configured contexts:
 
     kamu context ls
 
-Test a remote context:
+Check a remote context:
 
-    kamu context test demo
+    kamu context check demo
 
 Refresh cached status for all remote contexts:
 
-    kamu context test --all
+    kamu context check --all
 
 Switch to a context:
 
@@ -620,11 +620,11 @@ Remove all workspace-scoped remote contexts:
 
 
 
-## `kamu context test`
+## `kamu context check`
 
-Test connectivity and authorization for a remote resource context
+Check connectivity and authorization for a remote resource context
 
-**Usage:** `kamu context test [OPTIONS] [NAME]`
+**Usage:** `kamu context check [OPTIONS] [NAME]`
 
 **Arguments:**
 
@@ -632,26 +632,26 @@ Test connectivity and authorization for a remote resource context
 
 **Options:**
 
-* `--all` — Test all effective remote contexts
+* `--all` — Check all effective remote contexts
 
-Tests backend reachability and access token validity for a context.
+Checks backend reachability and access token validity for a context.
 
-If no context name is provided, the effective current context is tested.
+If no context name is provided, the effective current context is checked.
 Use `--all` to refresh cached status for all configured remote contexts.
 
 **Examples:**
 
-Test a named context:
+Check a named context:
 
-    kamu context test demo
+    kamu context check demo
 
-Test the current context:
+Check the current context:
 
-    kamu context test
+    kamu context check
 
-Test all remote contexts:
+Check all remote contexts:
 
-    kamu context test --all
+    kamu context check --all
 
 
 

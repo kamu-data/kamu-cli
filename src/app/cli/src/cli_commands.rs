@@ -130,8 +130,8 @@ pub fn get_command(
                 )
                 .cast(),
             ),
-            Some(cli::ContextSubCommand::Test(sc)) => {
-                Box::new(ContextTestCommand::builder(sc.name, sc.all).cast())
+            Some(cli::ContextSubCommand::Check(sc)) => {
+                Box::new(ContextCheckCommand::builder(sc.name, sc.all).cast())
             }
             Some(cli::ContextSubCommand::Use(sc)) => {
                 Box::new(ContextUseCommand::builder(sc.name).cast())

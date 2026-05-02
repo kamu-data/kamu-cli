@@ -16,7 +16,7 @@ use crate::resource_context::{ResourceContextRegistryService, ResourceContextTes
 
 #[dill::component]
 #[dill::interface(dyn Command)]
-pub struct ContextTestCommand {
+pub struct ContextCheckCommand {
     resource_context_registry_service: Arc<ResourceContextRegistryService>,
     resource_context_test_service: Arc<ResourceContextTestService>,
 
@@ -30,7 +30,7 @@ pub struct ContextTestCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-impl Command for ContextTestCommand {
+impl Command for ContextCheckCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
         if self.all && self.name.is_some() {
             return Err(CLIError::usage_error(
@@ -68,7 +68,7 @@ impl Command for ContextTestCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ContextTestCommand {
+impl ContextCheckCommand {
     async fn run_all(&self) -> Result<(), CLIError> {
         let contexts = self
             .resource_context_registry_service
