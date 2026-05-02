@@ -51,7 +51,7 @@ pub struct GetResourceCommand {
     output_format: crate::cli::ResourceManifestFormat,
 
     #[dill::component(explicit)]
-    canonical: bool,
+    spec: bool,
 
     #[dill::component(explicit)]
     ignore_not_found: bool,
@@ -168,7 +168,7 @@ impl GetResourceCommand {
         Ok(())
     }
 
-    async fn run_canonical(
+    async fn run_spec_view(
         &self,
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
@@ -239,8 +239,8 @@ impl Command for GetResourceCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        if self.canonical {
-            self.run_canonical(
+        if self.spec {
+            self.run_spec_view(
                 resource_facade.as_ref(),
                 kind_descriptor,
                 self.resource_ref().await?,

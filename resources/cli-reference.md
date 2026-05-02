@@ -19,7 +19,7 @@ To regenerate this schema from existing code, use the following command:
 * `context [ctx]` — Manage resource contexts
 * `delete [rm]` — Delete datasets or resources
 * `export` — Exports a dataset
-* `get` — Returns canonical manifest representation of a resource
+* `get` — Returns manifest representation of a resource
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
@@ -773,7 +773,7 @@ In all other cases a path is considered as a directory. Examples:
 
 ## `kamu get`
 
-Returns canonical manifest representation of a resource
+Returns manifest representation of a resource
 
 **Usage:** `kamu get [OPTIONS] <RESOURCE> <NAME_OR_ID>`
 
@@ -791,7 +791,7 @@ Returns canonical manifest representation of a resource
 
   Possible values: `json`, `yaml`
 
-* `--canonical` — Return an apply-compatible canonical manifest instead of the full resource view
+* `--spec` — Return an apply-compatible spec manifest instead of the full resource view
 * `--ignore-not-found` — Exit successfully when the resource does not exist
 
 Returns the current state of a single resource as YAML or JSON.
@@ -800,7 +800,7 @@ Only real resource kinds supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
 
 By default this command returns the full resource view, including status.
-Use `--canonical` to return the apply-compatible canonical manifest instead.
+Use `--spec` to return the apply-compatible spec manifest instead.
 
 **Examples:**
 
@@ -812,9 +812,9 @@ Get the same resource in JSON:
 
     kamu get vs my-vars -o json
 
-Get the canonical apply-compatible manifest:
+Get the apply-compatible spec manifest:
 
-    kamu get vs my-vars --canonical
+    kamu get vs my-vars --spec
 
 Get a resource by UUID:
 
