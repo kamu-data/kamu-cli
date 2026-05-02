@@ -59,17 +59,6 @@ pub fn get_command(
             .cast(),
         ),
 
-        cli::Command::ApiResources(c) => match c.subcommand {
-            Some(cli::ApiResourcesSubCommand::Kinds(_)) => {
-                Box::new(ApiResourcesKindsCommand::builder(c.resource_context.context).cast())
-            }
-            Some(cli::ApiResourcesSubCommand::Summary(sc)) => Box::new(
-                ApiResourcesSummaryCommand::builder(c.resource_context.context, sc.output_format)
-                    .cast(),
-            ),
-            None => Box::new(ApiResourcesKindsCommand::builder(c.resource_context.context).cast()),
-        },
-
         cli::Command::Complete(c) => Box::new(CompleteCommand::builder(c.input, c.current).cast()),
 
         cli::Command::Completions(c) => Box::new(CompletionsCommand::builder(c.shell).cast()),
@@ -132,6 +121,9 @@ pub fn get_command(
             ),
             Some(cli::ContextSubCommand::Check(sc)) => {
                 Box::new(ContextCheckCommand::builder(sc.name, sc.all).cast())
+            }
+            Some(cli::ContextSubCommand::ApiResources(sc)) => {
+                Box::new(ContextApiResourcesCommand::builder(sc.resource_context.context).cast())
             }
             Some(cli::ContextSubCommand::Use(sc)) => {
                 Box::new(ContextUseCommand::builder(sc.name).cast())
@@ -453,6 +445,10 @@ pub fn get_command(
             ),
         },
 
+        cli::Command::Summary(c) => {
+            Box::new(SummaryCommand::builder(c.resource_context.context, c.output_format).cast())
+        }
+
         cli::Command::System(c) => match c.subcommand {
             cli::SystemSubCommand::ApiServer(sc) => match sc.subcommand {
                 None => Box::new(
@@ -602,9 +598,9 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Context(_)
-        | cli::Command::ApiResources(_)
         | cli::Command::New(_)
         | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
         | cli::Command::Version(_)
         | cli::Command::Notebook(_) => false,
         _ => true,
@@ -617,9 +613,9 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::Context(_)
-        | cli::Command::ApiResources(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
+        | cli::Command::Summary(_)
         | cli::Command::Version(_) => false,
 
         cli::Command::System(s) => match &s.subcommand {

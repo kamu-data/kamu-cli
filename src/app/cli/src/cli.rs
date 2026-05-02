@@ -97,7 +97,6 @@ pub enum PasswordHashingMode {
 pub enum Command {
     Add(Add),
     Apply(Apply),
-    ApiResources(ApiResources),
     Complete(Complete),
     Completions(Completions),
     Config(Config),
@@ -121,6 +120,7 @@ pub enum Command {
     Repo(Repo),
     Search(Search),
     Sql(Sql),
+    Summary(Summary),
     System(System),
     Tail(Tail),
     Ui(Ui),
@@ -198,10 +198,10 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// List supported resource kinds in the active context
+/// Show resource summary for the active context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Resource API commands for the active context.
+Shows resource counts by kind and reconciliation phase for the active context.
 
 If the active context is `local`, commands target the current workspace. If the
 active context points to a remote server, commands target that remote GraphQL
@@ -211,67 +211,34 @@ Use `--context` to override the current context for this invocation only.
 
 **Examples:**
 
-List supported resource kinds in the active context:
+Show summary from the active context:
 
-    kamu api-resources
-
-List supported resource kinds explicitly:
-
-    kamu api-resources kinds
+    kamu summary
 
 Show summary from a specific context:
 
-    kamu api-resources summary --context prod
+    kamu summary --context prod
 
 Show summary in YAML:
 
-    kamu api-resources summary -o yaml
+    kamu summary -o yaml
 "#)]
-pub struct ApiResources {
+pub struct Summary {
     #[command(flatten)]
     pub resource_context: ResourceContextArgs,
 
-    /// Format to display the results in when using the default `kinds` action
-    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
-    pub output_format: Option<OutputFormat>,
-
-    #[command(subcommand)]
-    pub subcommand: Option<ApiResourcesSubCommand>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, clap::Subcommand)]
-pub enum ApiResourcesSubCommand {
-    Kinds(ApiResourcesKinds),
-    Summary(ApiResourcesSummary),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, clap::Args)]
-pub struct ApiResourcesKinds {
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
-    pub output_format: Option<OutputFormat>,
+    pub output_format: Option<SummaryOutputFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum ApiResourcesSummaryOutputFormat {
+pub enum SummaryOutputFormat {
     Table,
     Json,
     Yaml,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, clap::Args)]
-pub struct ApiResourcesSummary {
-    /// Format to display the results in
-    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
-    pub output_format: Option<ApiResourcesSummaryOutputFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,6 +258,7 @@ impl Cli {
             Command::List(c) => c.output_format,
             Command::Context(c) => match &c.subcommand {
                 Some(ContextSubCommand::List(sc)) => sc.output_format,
+                Some(ContextSubCommand::ApiResources(sc)) => sc.output_format,
                 _ => None,
             },
             Command::Repo(c) => match &c.subcommand {
@@ -304,11 +272,6 @@ impl Cli {
             Command::Search(c) => c.output_format,
             Command::Sql(c) => c.output_format,
             Command::Tail(c) => c.output_format,
-            Command::ApiResources(c) => match &c.subcommand {
-                Some(ApiResourcesSubCommand::Kinds(sc)) => sc.output_format.or(c.output_format),
-                Some(ApiResourcesSubCommand::Summary(_)) => None,
-                None => c.output_format,
-            },
             _ => None,
         }
     }
@@ -360,6 +323,14 @@ Register a workspace-scoped remote context:
 Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
+
+List supported resource kinds in the active context:
+
+    kamu ctx api-resources
+
+List supported resource kinds from a specific context:
+
+    kamu ctx api-resources --context prod
 "#)]
 #[command(args_conflicts_with_subcommands = true)]
 pub struct Context {
@@ -379,8 +350,44 @@ pub enum ContextSubCommand {
     #[command(visible_alias = "rm")]
     Remove(ContextRemove),
     Check(ContextCheck),
+    ApiResources(ContextApiResources),
     Use(ContextUse),
 }
+
+/// List supported resource kinds in the active context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Lists resource kinds supported by the active context.
+
+If the active context is `local`, this targets the current workspace. If the
+active context points to a remote server, this targets that remote GraphQL API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+List supported resource kinds in the active context:
+
+    kamu ctx api-resources
+
+List supported resource kinds from a specific context:
+
+    kamu ctx api-resources --context prod
+
+List supported resource kinds in JSON:
+
+    kamu ctx api-resources -o json
+"#)]
+pub struct ContextApiResources {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Register a new remote resource context
 #[derive(Debug, clap::Args)]

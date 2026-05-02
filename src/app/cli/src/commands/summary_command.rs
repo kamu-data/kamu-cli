@@ -13,7 +13,7 @@ use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
 use super::{CLIError, Command};
-use crate::cli::ApiResourcesSummaryOutputFormat;
+use crate::cli::SummaryOutputFormat;
 use crate::output::*;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{ResourceSummaryService, ResourceSummaryView};
@@ -22,7 +22,7 @@ use crate::resources::{ResourceSummaryService, ResourceSummaryView};
 
 #[dill::component]
 #[dill::interface(dyn Command)]
-pub struct ApiResourcesSummaryCommand {
+pub struct SummaryCommand {
     resource_summary_service: Arc<dyn ResourceSummaryService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
@@ -32,15 +32,14 @@ pub struct ApiResourcesSummaryCommand {
     explicit_context_name: Option<String>,
 
     #[dill::component(explicit)]
-    output_format: Option<ApiResourcesSummaryOutputFormat>,
+    output_format: Option<SummaryOutputFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ApiResourcesSummaryCommand {
-    fn effective_output_format(&self) -> ApiResourcesSummaryOutputFormat {
-        self.output_format
-            .unwrap_or(ApiResourcesSummaryOutputFormat::Table)
+impl SummaryCommand {
+    fn effective_output_format(&self) -> SummaryOutputFormat {
+        self.output_format.unwrap_or(SummaryOutputFormat::Table)
     }
 
     fn render_table(&self, summary: &ResourceSummaryView) -> Result<(), CLIError> {
@@ -172,13 +171,13 @@ impl ApiResourcesSummaryCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-impl Command for ApiResourcesSummaryCommand {
+impl Command for SummaryCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let resolved_context = self
             .resource_context_resolver
             .resolve(self.explicit_context_name.as_deref())?;
 
-        if self.effective_output_format() == ApiResourcesSummaryOutputFormat::Table {
+        if self.effective_output_format() == SummaryOutputFormat::Table {
             self.resource_context_reporter
                 .report_usage("Fetching resource summary from context", &resolved_context);
         }
@@ -189,9 +188,9 @@ impl Command for ApiResourcesSummaryCommand {
             .await?;
 
         match self.effective_output_format() {
-            ApiResourcesSummaryOutputFormat::Table => self.render_table(&summary)?,
-            ApiResourcesSummaryOutputFormat::Json => self.render_json(&summary)?,
-            ApiResourcesSummaryOutputFormat::Yaml => self.render_yaml(&summary)?,
+            SummaryOutputFormat::Table => self.render_table(&summary)?,
+            SummaryOutputFormat::Json => self.render_json(&summary)?,
+            SummaryOutputFormat::Yaml => self.render_yaml(&summary)?,
         }
 
         Ok(())

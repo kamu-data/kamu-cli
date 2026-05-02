@@ -21,7 +21,7 @@ use crate::resources::ResourceFacadeFactory;
 
 #[dill::component]
 #[dill::interface(dyn Command)]
-pub struct ApiResourcesKindsCommand {
+pub struct ContextApiResourcesCommand {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
@@ -33,7 +33,7 @@ pub struct ApiResourcesKindsCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ApiResourcesKindsCommand {
+impl ContextApiResourcesCommand {
     async fn record_batch(&self) -> Result<RecordBatch, CLIError> {
         let resource_facade = self
             .resource_facade_factory
@@ -71,7 +71,7 @@ impl ApiResourcesKindsCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-impl Command for ApiResourcesKindsCommand {
+impl Command for ContextApiResourcesCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let resolved_context = self
             .resource_context_resolver
@@ -96,7 +96,7 @@ impl Command for ApiResourcesKindsCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl OutputWriter for ApiResourcesKindsCommand {
+impl OutputWriter for ContextApiResourcesCommand {
     fn records_format(&self) -> RecordsFormat {
         RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default())

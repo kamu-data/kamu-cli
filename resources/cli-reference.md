@@ -13,7 +13,6 @@ To regenerate this schema from existing code, use the following command:
 
 * `add` — Add a new dataset or modify an existing one
 * `apply` — Create or update resources from manifest files
-* `api-resources` — List supported resource kinds in the active context
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `context [ctx]` — Manage resource contexts
@@ -36,6 +35,7 @@ To regenerate this schema from existing code, use the following command:
 * `repo` — Manage set of tracked repositories
 * `search` — Searches for datasets in the registered repositories
 * `sql` — Executes an SQL query or drops you into an SQL shell
+* `summary` — Show resource summary for the active context
 * `system` — Command group for system-level functionality
 * `tail` — Displays a sample of most recent records in a dataset
 * `ui` — Opens web interface
@@ -152,108 +152,6 @@ Apply multiple files in the given order:
 Force JSON parsing regardless of file extension:
 
     kamu apply -f generated.resource --format json
-
-
-
-
-## `kamu api-resources`
-
-List supported resource kinds in the active context
-
-**Usage:** `kamu api-resources [OPTIONS] [COMMAND]`
-
-**Subcommands:**
-
-* `kinds` — 
-* `summary` — 
-
-**Options:**
-
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
-* `-o`, `--output-format <FMT>` — Format to display the results in when using the default `kinds` action
-
-  Possible values:
-  - `csv`:
-    Comma-separated values
-  - `json`:
-    Array of Structures format
-  - `ndjson`:
-    One Json object per line - easily splittable format
-  - `json-soa`:
-    Structure of arrays - more compact and efficient format for encoding entire dataframe
-  - `json-aoa`:
-    Array of arrays - compact and efficient and preserves column order
-  - `table`:
-    A pretty human-readable table
-  - `parquet`:
-    Parquet columnar storage. Only available when exporting to file(s)
-
-
-Resource API commands for the active context.
-
-If the active context is `local`, commands target the current workspace. If the
-active context points to a remote server, commands target that remote GraphQL
-API.
-
-Use `--context` to override the current context for this invocation only.
-
-**Examples:**
-
-List supported resource kinds in the active context:
-
-    kamu api-resources
-
-List supported resource kinds explicitly:
-
-    kamu api-resources kinds
-
-Show summary from a specific context:
-
-    kamu api-resources summary --context prod
-
-Show summary in YAML:
-
-    kamu api-resources summary -o yaml
-
-
-
-
-## `kamu api-resources kinds`
-
-**Usage:** `kamu api-resources kinds [OPTIONS]`
-
-**Options:**
-
-* `-o`, `--output-format <FMT>` — Format to display the results in
-
-  Possible values:
-  - `csv`:
-    Comma-separated values
-  - `json`:
-    Array of Structures format
-  - `ndjson`:
-    One Json object per line - easily splittable format
-  - `json-soa`:
-    Structure of arrays - more compact and efficient format for encoding entire dataframe
-  - `json-aoa`:
-    Array of arrays - compact and efficient and preserves column order
-  - `table`:
-    A pretty human-readable table
-  - `parquet`:
-    Parquet columnar storage. Only available when exporting to file(s)
-
-
-
-
-## `kamu api-resources summary`
-
-**Usage:** `kamu api-resources summary [OPTIONS]`
-
-**Options:**
-
-* `-o`, `--output-format <FMT>` — Format to display the results in
-
-  Possible values: `table`, `json`, `yaml`
 
 
 
@@ -450,6 +348,7 @@ Manage resource contexts
 * `list [ls]` — List configured resource contexts
 * `remove [rm]` — Remove a remote resource context
 * `check` — Check connectivity and authorization for a remote resource context
+* `api-resources` — List supported resource kinds in the active context
 * `use` — Switch the current resource context
 
 **Arguments:**
@@ -496,6 +395,14 @@ Register a workspace-scoped remote context:
 Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
+
+List supported resource kinds in the active context:
+
+    kamu ctx api-resources
+
+List supported resource kinds from a specific context:
+
+    kamu ctx api-resources --context prod
 
 
 
@@ -652,6 +559,58 @@ Check the current context:
 Check all remote contexts:
 
     kamu context check --all
+
+
+
+
+## `kamu context api-resources`
+
+List supported resource kinds in the active context
+
+**Usage:** `kamu context api-resources [OPTIONS]`
+
+**Options:**
+
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
+
+Lists resource kinds supported by the active context.
+
+If the active context is `local`, this targets the current workspace. If the
+active context points to a remote server, this targets that remote GraphQL API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+List supported resource kinds in the active context:
+
+    kamu ctx api-resources
+
+List supported resource kinds from a specific context:
+
+    kamu ctx api-resources --context prod
+
+List supported resource kinds in JSON:
+
+    kamu ctx api-resources -o json
 
 
 
@@ -1752,6 +1711,45 @@ To run with Spark engine:
 By default Spark runs with JDBC protocol, to instead run with Livy HTTP gateway:
 
     kamu sql server --engine spark --livy
+
+
+
+
+## `kamu summary`
+
+Show resource summary for the active context
+
+**Usage:** `kamu summary [OPTIONS]`
+
+**Options:**
+
+* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values: `table`, `json`, `yaml`
+
+
+Shows resource counts by kind and reconciliation phase for the active context.
+
+If the active context is `local`, commands target the current workspace. If the
+active context points to a remote server, commands target that remote GraphQL
+API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+Show summary from the active context:
+
+    kamu summary
+
+Show summary from a specific context:
+
+    kamu summary --context prod
+
+Show summary in YAML:
+
+    kamu summary -o yaml
 
 
 
