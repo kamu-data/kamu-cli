@@ -744,3 +744,88 @@ fn serde_transform() {
 
     assert_eq!(serde_yaml::to_string(&Helper(actual)).unwrap(), data);
 }
+
+#[test]
+fn serde_enum_short_form() {
+    let data = indoc!(
+        "
+        fields:
+        - name: long
+          type:
+            kind: Timestamp
+        - name: short
+          type: Timestamp
+        - name: full
+          type:
+            kind: Timestamp
+            unit: Nanosecond
+            timezone: UTC
+        "
+    );
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Helper(#[serde(with = "DataSchemaDef")] DataSchema);
+
+    // Deserializes fine
+    let hlp: Helper = serde_yaml::from_str(data).unwrap();
+    let actual = hlp.0;
+
+    let expected = DataSchema::new(vec![
+        DataField::new(
+            "long",
+            DataTypeTimestamp {
+                unit: None,
+                timezone: None,
+            },
+        ),
+        DataField::new(
+            "short",
+            DataTypeTimestamp {
+                unit: None,
+                timezone: None,
+            },
+        ),
+        DataField::new(
+            "full",
+            DataTypeTimestamp {
+                unit: Some(TimeUnit::Nanosecond),
+                timezone: Some("UTC".to_owned()),
+            },
+        ),
+    ]);
+
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // Serialization expands to long form, but does not include defaults
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&Helper(actual)).unwrap(),
+        indoc!(
+            "
+            fields:
+            - name: long
+              type:
+                kind: Timestamp
+            - name: short
+              type:
+                kind: Timestamp
+            - name: full
+              type:
+                kind: Timestamp
+                unit: Nanosecond
+                timezone: UTC
+            "
+        )
+    );
+
+    // Short form correctly handles invalid types
+    let data = indoc!(
+        "
+        fields:
+        - name: short
+          type: Invalid
+        "
+    );
+
+    let res = serde_yaml::from_str::<Helper>(data);
+    assert_matches!(res, Err(e) if e.to_string().contains("unknown variant `Invalid`"));
+}

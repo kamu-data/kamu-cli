@@ -184,7 +184,7 @@ impl DataType {
             ),
             ArrowDataType::Duration(time_unit) => (
                 DataType::Duration(DataTypeDuration {
-                    unit: (*time_unit).into(),
+                    unit: Some((*time_unit).into()),
                 }),
                 None,
             ),
@@ -576,8 +576,8 @@ impl DataType {
                         )));
                     }
                 }
-                DataType::Duration(DataTypeDuration { unit }) => {
-                    ArrowDataType::Duration((*unit).into())
+                DataType::Duration(v @ DataTypeDuration { unit: _ }) => {
+                    ArrowDataType::Duration(v.unit().into())
                 }
                 DataType::Float16(DataTypeFloat16 {}) => ArrowDataType::Float16,
                 DataType::Float32(DataTypeFloat32 {}) => ArrowDataType::Float32,

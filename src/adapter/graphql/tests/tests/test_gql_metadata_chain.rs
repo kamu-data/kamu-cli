@@ -233,8 +233,6 @@ async fn test_metadata_chain_events() {
                    "name": "date",
                    "type": {
                        "kind": "Timestamp",
-                       "timezone": "UTC",
-                       "unit": "Millisecond",
                    },
                },
                {

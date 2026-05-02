@@ -3549,20 +3549,18 @@ impl<'a> DataTypeDuration<'a> {
         args: &'args DataTypeDurationArgs,
     ) -> flatbuffers::WIPOffset<DataTypeDuration<'bldr>> {
         let mut builder = DataTypeDurationBuilder::new(_fbb);
-        builder.add_unit(args.unit);
+        if let Some(x) = args.unit {
+            builder.add_unit(x);
+        }
         builder.finish()
     }
 
     #[inline]
-    pub fn unit(&self) -> TimeUnit {
+    pub fn unit(&self) -> Option<TimeUnit> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<TimeUnit>(DataTypeDuration::VT_UNIT, Some(TimeUnit::Second))
-                .unwrap()
-        }
+        unsafe { self._tab.get::<TimeUnit>(DataTypeDuration::VT_UNIT, None) }
     }
 }
 
@@ -3580,14 +3578,12 @@ impl flatbuffers::Verifiable for DataTypeDuration<'_> {
     }
 }
 pub struct DataTypeDurationArgs {
-    pub unit: TimeUnit,
+    pub unit: Option<TimeUnit>,
 }
 impl<'a> Default for DataTypeDurationArgs {
     #[inline]
     fn default() -> Self {
-        DataTypeDurationArgs {
-            unit: TimeUnit::Second,
-        }
+        DataTypeDurationArgs { unit: None }
     }
 }
 
@@ -3599,7 +3595,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DataTypeDurationBuilder<'a, 'b,
     #[inline]
     pub fn add_unit(&mut self, unit: TimeUnit) {
         self.fbb_
-            .push_slot::<TimeUnit>(DataTypeDuration::VT_UNIT, unit, TimeUnit::Second);
+            .push_slot_always::<TimeUnit>(DataTypeDuration::VT_UNIT, unit);
     }
     #[inline]
     pub fn new(

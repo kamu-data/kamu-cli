@@ -5,15 +5,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!--
-Recommendation: for ease of reading, use the following order:
-- Added
-- Changed
-- Fixed
+Recommendation: for ease of reading, use the following format:
+
+## Unreleased
+### Added
+### Changed
+### Fixed
 -->
 
 ## Unreleased
 ### Added
+- **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format
+  - DDL source schema can still be specified via `read.ddlSchema` but we recommend upgrading your datasets
+  - GQL endpoints support reading ODF source schema
+  - GQL `createCollection` and `createVersionedFile` endpoints now support `extraSchema` field that accepts ODF schema, the `extraColumns` field was deprecated in its favor
 - GQL `Collection::entries` now support `maxDepth` for navigating entries as directory hierarchy
+### Changed
+- Added support for "short form" unions in ODF manifests:
+  ```yaml
+  fields:
+    - name: foo
+      type:
+        kind: String
+  
+  # Is equivalent to
+  fields:
+    - name: foo
+      type: String
+  ```
+- The `Timestamp`, `Time`, `Duration` ODF types now default to `Millisecond` precision and `UTC` time zone
+- GQL `ReadStep` union is now an `interface`, providing easy access to `schema`
+- GQL `SetDataSchema::schema` now defaults to `ODF_JSON` format instead of `PARQUET_JSON`
 
 ## [0.262.0] - 2026-04-22
 ### Changed

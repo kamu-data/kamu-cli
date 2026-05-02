@@ -495,7 +495,7 @@ Displays the schema of the dataset. Note that dataset schemas can evolve over ti
 
 **Examples:**
 
-Show logical schema of a dataset in the DDL format:
+Show logical schema of a dataset in the ODF format:
 
     kamu inspect schema my.dataset
 

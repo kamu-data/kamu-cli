@@ -513,6 +513,28 @@ mod test {
             DataSchemaCmp::Identical
         );
 
+        // Identical: types differ in explicit defaults
+        assert_matches!(
+            DataSchema::compare(
+                &DataSchema::new(vec![DataField::new(
+                    "foo",
+                    DataTypeTimestamp {
+                        unit: None,
+                        timezone: None
+                    }
+                )]),
+                &DataSchema::new(vec![DataField::new(
+                    "foo",
+                    DataTypeTimestamp {
+                        unit: Some(DataTypeTimestamp::default_unit()),
+                        timezone: Some(DataTypeTimestamp::default_timezone().into()),
+                    }
+                )]),
+                DataSchemaCmpOptions::default(),
+            ),
+            DataSchemaCmp::Identical
+        );
+
         // Different: types
         assert_matches!(
             DataSchema::compare(

@@ -45,14 +45,14 @@ impl NewDatasetCommand {
                       # See: https://docs.kamu.dev/cli/ingest/
                       kind: Root
                       # List of metadata events that get dataset into its initial state
-                      # See: https://docs.kamu.dev/odf/reference/#metadataevent
+                      # See: https://docs.kamu.dev/odf/schemas#metadataevent
                       metadata:
                         # Specifies the source of data that can be periodically polled to refresh the dataset
-                        # See: https://docs.kamu.dev/odf/reference/#setpollingsource
+                        # See: https://docs.kamu.dev/odf/schemas#setpollingsource
                         - kind: SetPollingSource
                           # Where to fetch the data from.
                           # Includes source URL, a protocol to use, cache control
-                          # See: https://docs.kamu.dev/odf/reference/#fetchstep
+                          # See: https://docs.kamu.dev/odf/schemas#fetchstep
                           fetch:
                             kind: Url
                             url: https://example.com/city_populations_over_time.zip
@@ -63,24 +63,19 @@ impl NewDatasetCommand {
                               format: Zip
                           # How to interpret the data.
                           # Includes data format, schema to apply, error handling
-                          # See: https://docs.kamu.dev/odf/reference/#readstep
+                          # See: https://docs.kamu.dev/odf/schemas#readstep
+                          # See: https://docs.kamu.dev/odf/schemas#data-schema
                           read:
                             kind: Csv
                             header: true
-                            timestampFormat: yyyy-M-d
                             schema:
                               fields:
                                 - name: date
-                                  type:
-                                    kind: Timestamp
-                                    unit: Millisecond
-                                    timezone: UTC
+                                  type: Timestamp
                                 - name: city
-                                  type:
-                                    kind: String
+                                  type: String
                                 - name: population
-                                  type:
-                                    kind: String
+                                  type: String
                           # OPTIONAL: Pre-processing query that shapes the data.
                           # Useful for converting text data read from CSVs into strict types
                           # See: https://docs.kamu.dev/odf/reference/#transform
@@ -97,7 +92,7 @@ impl NewDatasetCommand {
                                 cast(replace(population, ",", "") as bigint)
                               from input
                           # How to combine data ingested in the past with the new data.
-                          # See: https://docs.kamu.dev/odf/reference/#mergestrategy
+                          # See: https://docs.kamu.dev/odf/schemas#mergestrategy
                           merge:
                             kind: Ledger
                             primaryKey:
@@ -105,7 +100,7 @@ impl NewDatasetCommand {
                               - city
                           # Lets you manipulate names of the system columns to avoid conflicts
                           # or use names better suited for your data.
-                          # See: https://docs.kamu.dev/odf/reference/#setvocab
+                          # See: https://docs.kamu.dev/odf/schemas#setvocab
                         - kind: SetVocab
                           eventTimeColumn: date
                     "#

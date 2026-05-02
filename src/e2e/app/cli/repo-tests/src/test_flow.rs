@@ -802,16 +802,11 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
                 schema:
                   fields:
                     - name: event_time
-                      type:
-                        kind: Timestamp
-                        unit: Millisecond
-                        timezone: UTC
+                      type: Timestamp
                     - name: city
-                      type:
-                        kind: String
+                      type: String
                     - name: population
-                      type:
-                        kind: Int64
+                      type: Int64
               merge:
                 kind: Ledger
                 primaryKey:
@@ -1360,16 +1355,11 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
             schema:
               fields:
               - name: event_time
-                type:
-                  kind: Timestamp
-                  unit: Millisecond
-                  timezone: UTC
+                type: Timestamp
               - name: city
-                type:
-                  kind: String
+                type: String
               - name: population
-                type:
-                  kind: Int64
+                type: Int64
           merge:
             kind: Ledger
             primaryKey:

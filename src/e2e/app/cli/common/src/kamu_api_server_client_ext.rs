@@ -55,19 +55,13 @@ pub const DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR: &str = indoc::indoc!(
             schema:
               fields:
                 - name: match_time
-                  type:
-                    kind: Timestamp
-                    unit: Millisecond
-                    timezone: UTC
+                  type: Timestamp
                 - name: match_id
-                  type:
-                    kind: int64
+                  type: Int64
                 - name: player_id
-                  type:
-                    kind: string
+                  type: String
                 - name: score
-                  type:
-                    kind: int64
+                  type: Int64
           merge:
             kind: Ledger
             primaryKey:

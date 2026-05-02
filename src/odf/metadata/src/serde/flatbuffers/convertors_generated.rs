@@ -726,7 +726,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeDuration {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let mut builder = fb::DataTypeDurationBuilder::new(fb);
-        builder.add_unit(self.unit.into());
+        self.unit.map(|v| builder.add_unit(v.into()));
         builder.finish()
     }
 }
@@ -734,7 +734,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataTypeDuration {
 impl<'fb> FlatbuffersDeserializable<fb::DataTypeDuration<'fb>> for odf::DataTypeDuration {
     fn deserialize(proxy: fb::DataTypeDuration<'fb>) -> Self {
         odf::DataTypeDuration {
-            unit: proxy.unit().into(),
+            unit: proxy.unit().map(|v| v.into()),
         }
     }
 }
