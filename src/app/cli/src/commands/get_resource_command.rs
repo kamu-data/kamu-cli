@@ -18,10 +18,11 @@ use kamu_resources_facade::{
     RenderResourceManifestError,
     RenderResourceManifestRequest,
     ResourceFacade,
-    ResourceManifestFormat,
+    ResourceManifestFormat as FacadeResourceManifestFormat,
 };
 
 use super::{CLIError, Command, common};
+use crate::cli::ResourceManifestFormat;
 use crate::resources::{
     ResourceFacadeFactory,
     ResourceKindLookupErrorOptions,
@@ -48,7 +49,7 @@ pub struct GetResourceCommand {
     name_or_id: String,
 
     #[dill::component(explicit)]
-    output_format: crate::cli::ResourceManifestFormat,
+    output_format: ResourceManifestFormat,
 
     #[dill::component(explicit)]
     spec: bool,
@@ -60,10 +61,10 @@ pub struct GetResourceCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl GetResourceCommand {
-    fn manifest_format(&self) -> ResourceManifestFormat {
+    fn manifest_format(&self) -> FacadeResourceManifestFormat {
         match self.output_format {
-            crate::cli::ResourceManifestFormat::Json => ResourceManifestFormat::Json,
-            crate::cli::ResourceManifestFormat::Yaml => ResourceManifestFormat::Yaml,
+            ResourceManifestFormat::Json => FacadeResourceManifestFormat::Json,
+            ResourceManifestFormat::Yaml => FacadeResourceManifestFormat::Yaml,
         }
     }
 
@@ -136,7 +137,7 @@ impl GetResourceCommand {
         }
 
         match self.output_format {
-            crate::cli::ResourceManifestFormat::Json => {
+            ResourceManifestFormat::Json => {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
                     api_version: &resource.api_version,
                     kind: &resource.kind,
@@ -148,17 +149,15 @@ impl GetResourceCommand {
                 .map_err(CLIError::critical)
             }
 
-            crate::cli::ResourceManifestFormat::Yaml => {
-                serde_yaml::to_string(&RenderedResourceViewYaml {
-                    api_version: &resource.api_version,
-                    kind: &resource.kind,
-                    metadata: RenderedResourceViewMetadata::new(resource),
-                    last_reconciled_at: &resource.last_reconciled_at,
-                    spec: common::json_to_yaml_value(&resource.spec),
-                    status: resource.status.as_ref().map(common::json_to_yaml_value),
-                })
-                .map_err(CLIError::critical)
-            }
+            ResourceManifestFormat::Yaml => serde_yaml::to_string(&RenderedResourceViewYaml {
+                api_version: &resource.api_version,
+                kind: &resource.kind,
+                metadata: RenderedResourceViewMetadata::new(resource),
+                last_reconciled_at: &resource.last_reconciled_at,
+                spec: common::json_to_yaml_value(&resource.spec),
+                status: resource.status.as_ref().map(common::json_to_yaml_value),
+            })
+            .map_err(CLIError::critical),
         }
     }
 

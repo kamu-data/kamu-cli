@@ -145,31 +145,35 @@ Use `--dry-run` to preview the accepted changes without applying them.
 
 Apply a single manifest:
 
-    kamu apply -f my-resource.yaml
+    kamu apply my-resource.yaml
 
 Preview changes without applying them:
 
-    kamu apply -f my-resource.yaml --dry-run
+    kamu apply my-resource.yaml --dry-run
 
 Apply all manifests in a directory recursively:
 
-    kamu apply -f manifests/ --recursive
+    kamu apply manifests/ --recursive
 
 Apply multiple files in the given order:
 
-    kamu apply -f a.yaml -f b.json
+    kamu apply a.yaml b.json
+
+Apply a manifest from standard input:
+
+    cat my-resource.yaml | kamu apply --stdin
 
 Force JSON parsing regardless of file extension:
 
-    kamu apply -f generated.resource --format json
+    kamu apply generated.resource --format json
 "#)]
 pub struct Apply {
     #[command(flatten)]
     pub resource_context: ResourceContextArgs,
 
-    /// Manifest file or directory path
-    #[arg(long, short = 'f', value_name = "PATH", required = true)]
-    pub file: Vec<PathBuf>,
+    /// Manifest file or directory path(s)
+    #[arg(value_name = "PATH")]
+    pub manifest: Vec<PathBuf>,
 
     /// Preview the accepted changes without applying them
     #[arg(long)]
@@ -182,6 +186,10 @@ pub struct Apply {
     /// Recursively scan directories for manifests
     #[arg(long, short = 'r')]
     pub recursive: bool,
+
+    /// Read manifest from standard input
+    #[arg(long)]
+    pub stdin: bool,
 
     /// Continue processing after per-manifest failures
     #[arg(long)]

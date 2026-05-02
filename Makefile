@@ -586,6 +586,11 @@ resources:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
+.PHONY: codegen-cli-reference
+codegen-cli-reference:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
+
+
 ###############################################################################
 # Codegen
 ###############################################################################

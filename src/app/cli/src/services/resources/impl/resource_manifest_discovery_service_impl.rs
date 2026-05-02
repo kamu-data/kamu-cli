@@ -16,6 +16,7 @@ use crate::resources::{
     DiscoverResourceManifestError,
     DiscoverResourceManifestsResult,
     DiscoveredResourceManifest,
+    DiscoveredResourceManifestSource,
     ResourceManifestDiscoveryService,
 };
 
@@ -65,7 +66,7 @@ impl ResourceManifestDiscoveryServiceImpl {
                 .map(|source| {
                     Ok(DiscoveredResourceManifest {
                         format: Self::resolve_manifest_format(&source, format)?,
-                        source,
+                        source: DiscoveredResourceManifestSource::File(source),
                     })
                 })
                 .collect();
@@ -74,7 +75,7 @@ impl ResourceManifestDiscoveryServiceImpl {
         if metadata.is_file() {
             return Ok(vec![DiscoveredResourceManifest {
                 format: Self::resolve_manifest_format(input, format)?,
-                source: input.to_path_buf(),
+                source: DiscoveredResourceManifestSource::File(input.to_path_buf()),
             }]);
         }
 

@@ -50,9 +50,10 @@ pub fn get_command(
         cli::Command::Apply(c) => Box::new(
             ApplyCommand::builder(
                 c.resource_context.context,
-                c.file,
+                c.manifest,
                 c.recursive,
                 c.dry_run,
+                c.stdin,
                 c.continue_on_error,
                 c.format,
             )

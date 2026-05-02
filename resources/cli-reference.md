@@ -109,18 +109,22 @@ To add dataset from a repository see `kamu pull` command.
 
 Create or update resources from manifest files
 
-**Usage:** `kamu apply [OPTIONS] --file <PATH>`
+**Usage:** `kamu apply [OPTIONS] [PATH]...`
+
+**Arguments:**
+
+* `<PATH>` — Manifest file or directory path(s)
 
 **Options:**
 
 * `-c`, `--context <NAME>` — Override the current resource context for this invocation
-* `-f`, `--file <PATH>` — Manifest file or directory path
 * `--dry-run` — Preview the accepted changes without applying them
 * `--format <FMT>` — Parse all selected files using the specified manifest format
 
   Possible values: `json`, `yaml`
 
 * `-r`, `--recursive` — Recursively scan directories for manifests
+* `--stdin` — Read manifest from standard input
 * `--continue-on-error` — Continue processing after per-manifest failures
 
 Applies one or more resource manifests to the active resource context.
@@ -135,23 +139,27 @@ Use `--dry-run` to preview the accepted changes without applying them.
 
 Apply a single manifest:
 
-    kamu apply -f my-resource.yaml
+    kamu apply my-resource.yaml
 
 Preview changes without applying them:
 
-    kamu apply -f my-resource.yaml --dry-run
+    kamu apply my-resource.yaml --dry-run
 
 Apply all manifests in a directory recursively:
 
-    kamu apply -f manifests/ --recursive
+    kamu apply manifests/ --recursive
 
 Apply multiple files in the given order:
 
-    kamu apply -f a.yaml -f b.json
+    kamu apply a.yaml b.json
+
+Apply a manifest from standard input:
+
+    cat my-resource.yaml | kamu apply --stdin
 
 Force JSON parsing regardless of file extension:
 
-    kamu apply -f generated.resource --format json
+    kamu apply generated.resource --format json
 
 
 

@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use std::io::Read as _;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use internal_error::BoxedError;
+use internal_error::{BoxedError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
     ApplyManifestRejection,
@@ -18,15 +19,20 @@ use kamu_resources::{
     ResourceView,
     ResourceWarning,
 };
-use kamu_resources_facade::ResourceFacade;
+use kamu_resources_facade::{
+    ResourceFacade,
+    ResourceManifestFormat as FacadeResourceManifestFormat,
+};
 use thiserror::Error;
 
 use super::{BatchError, CLIError, Command, common};
+use crate::cli::ResourceManifestFormat;
 use crate::output::{ApplyMultiProgress, OutputConfig};
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     DiscoverResourceManifestsResult,
     DiscoveredResourceManifest,
+    DiscoveredResourceManifestSource,
     ExecuteResourceManifestOutcome,
     ExecutedResourceManifestResult,
     ResourceFacadeFactory,
@@ -59,21 +65,45 @@ pub struct ApplyCommand {
     dry_run: bool,
 
     #[dill::component(explicit)]
+    stdin: bool,
+
+    #[dill::component(explicit)]
     continue_on_error: bool,
 
     #[dill::component(explicit)]
-    format: Option<crate::cli::ResourceManifestFormat>,
+    format: Option<ResourceManifestFormat>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ApplyCommand {
+    fn stdin_manifest_format(&self) -> FacadeResourceManifestFormat {
+        match self.format.unwrap_or(ResourceManifestFormat::Yaml) {
+            ResourceManifestFormat::Json => FacadeResourceManifestFormat::Json,
+            ResourceManifestFormat::Yaml => FacadeResourceManifestFormat::Yaml,
+        }
+    }
+
+    fn read_stdin_manifest(&self) -> Result<Vec<DiscoveredResourceManifest>, CLIError> {
+        let mut content = String::new();
+        std::io::stdin().read_to_string(&mut content).int_err()?;
+
+        Ok(vec![DiscoveredResourceManifest {
+            source: DiscoveredResourceManifestSource::Stdin(content),
+            format: self.stdin_manifest_format(),
+        }])
+    }
+
     fn discover_manifests_phase(
         &self,
         printer: &ApplyPrinter,
         summary: &mut ApplySummary,
         errors: &mut Vec<(BoxedError, String)>,
     ) -> Result<Vec<DiscoveredResourceManifest>, CLIError> {
+        if self.stdin {
+            return self.read_stdin_manifest();
+        }
+
         let DiscoverResourceManifestsResult {
             manifests,
             errors: discovery_errors,
@@ -84,12 +114,13 @@ impl ApplyCommand {
         );
 
         for (input, err) in discovery_errors {
+            let input = input.display().to_string();
             summary.record_failed();
             printer.print_discovery_error(&input, err.to_string());
 
             errors.push((
                 Box::<dyn std::error::Error + Send + Sync>::from(err),
-                format!("Failed to process input {}", input.display()),
+                format!("Failed to process input {input}"),
             ));
 
             if !self.continue_on_error {
@@ -114,7 +145,8 @@ impl ApplyCommand {
         errors: &mut Vec<(BoxedError, String)>,
     ) -> Result<(), CLIError> {
         for manifest in manifests {
-            let item_progress = printer.start_item(maybe_progress, &manifest.source);
+            let source = manifest.source.to_string();
+            let item_progress = printer.start_item(maybe_progress, &source);
 
             match self
                 .resource_manifest_execution_service
@@ -123,26 +155,17 @@ impl ApplyCommand {
             {
                 Ok(ExecuteResourceManifestOutcome::Accepted(result)) => {
                     summary.record_accepted(&result);
-                    printer.print_accepted(
-                        item_progress,
-                        &manifest.source,
-                        &result,
-                        self.dry_run,
-                    )?;
+                    printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
                 }
                 Ok(ExecuteResourceManifestOutcome::Rejected(rejection)) => {
                     summary.record_rejected();
-                    printer.print_rejected(
-                        item_progress,
-                        &manifest.source,
-                        rejection.message.clone(),
-                    );
+                    printer.print_rejected(item_progress, &source, rejection.message.clone());
 
                     errors.push((
                         Box::<dyn std::error::Error + Send + Sync>::from(ApplyRejectedError::from(
                             rejection,
                         )),
-                        format!("Manifest {} was rejected", manifest.source.display()),
+                        format!("Manifest {source} was rejected"),
                     ));
 
                     if !self.continue_on_error {
@@ -151,14 +174,14 @@ impl ApplyCommand {
                 }
                 Err(err) => {
                     summary.record_failed();
-                    printer.print_failed(item_progress, &manifest.source, err.to_string());
+                    printer.print_failed(item_progress, &source, err.to_string());
 
                     errors.push((
                         Box::<dyn std::error::Error + Send + Sync>::from(err),
                         format!(
                             "Failed to {} manifest {}",
                             if self.dry_run { "plan" } else { "apply" },
-                            manifest.source.display()
+                            source
                         ),
                     ));
 
@@ -178,10 +201,14 @@ impl ApplyCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ApplyCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
-        if self.files.is_empty() {
+        if self.stdin && !self.files.is_empty() {
             return Err(CLIError::usage_error(
-                "Specify at least one manifest path using -f",
+                "Cannot specify --stdin and positional arguments at the same time",
             ));
+        }
+
+        if !self.stdin && self.files.is_empty() {
+            return Err(CLIError::usage_error("No manifest paths were provided"));
         }
 
         Ok(())
@@ -346,7 +373,7 @@ impl<'a> ApplyPrinter<'a> {
     fn start_item<'b>(
         &self,
         maybe_progress: Option<&'b ApplyMultiProgress>,
-        source: &Path,
+        source: &str,
     ) -> ApplyItemProgress<'b> {
         self.begin_item(maybe_progress, source)
     }
@@ -377,7 +404,7 @@ impl<'a> ApplyPrinter<'a> {
         )
     }
 
-    fn print_discovery_error(&self, source: &Path, message: String) {
+    fn print_discovery_error(&self, source: &str, message: String) {
         self.print_line(None, self.error_status_line(source, "Failed"));
         self.print_error_detail(None, source, message);
     }
@@ -385,7 +412,7 @@ impl<'a> ApplyPrinter<'a> {
     fn print_accepted(
         &self,
         item_progress: ApplyItemProgress<'_>,
-        source: &Path,
+        source: &str,
         result: &ExecutedResourceManifestResult,
         dry_run: bool,
     ) -> Result<(), CLIError> {
@@ -411,7 +438,7 @@ impl<'a> ApplyPrinter<'a> {
         Ok(())
     }
 
-    fn print_rejected(&self, item_progress: ApplyItemProgress<'_>, source: &Path, message: String) {
+    fn print_rejected(&self, item_progress: ApplyItemProgress<'_>, source: &str, message: String) {
         let progress = self.finish_item(
             item_progress,
             self.error_status_line(source, "Rejected"),
@@ -421,7 +448,7 @@ impl<'a> ApplyPrinter<'a> {
         self.print_error_detail(progress, source, message);
     }
 
-    fn print_failed(&self, item_progress: ApplyItemProgress<'_>, source: &Path, message: String) {
+    fn print_failed(&self, item_progress: ApplyItemProgress<'_>, source: &str, message: String) {
         let progress = self.finish_item(
             item_progress,
             self.error_status_line(source, "Failed"),
@@ -463,12 +490,12 @@ impl ApplyPrinter<'_> {
     fn begin_item<'a>(
         &self,
         progress: Option<&'a ApplyMultiProgress>,
-        source: &Path,
+        source: &str,
     ) -> ApplyItemProgress<'a> {
         if let Some(progress) = progress {
             return ApplyItemProgress {
                 progress: Some(progress),
-                item: Some(progress.begin(source.display().to_string())),
+                item: Some(progress.begin(source.to_string())),
             };
         }
 
@@ -489,7 +516,7 @@ impl ApplyPrinter<'_> {
     fn print_warning_lines(
         &self,
         progress: Option<&ApplyMultiProgress>,
-        source: &Path,
+        source: &str,
         warnings: &[ResourceWarning],
     ) {
         for warning in warnings {
@@ -509,7 +536,7 @@ impl ApplyPrinter<'_> {
     fn print_change_lines(
         &self,
         progress: Option<&ApplyMultiProgress>,
-        source: &Path,
+        source: &str,
         changes: &[ApplyManifestChange],
     ) {
         for change in changes {
@@ -638,7 +665,7 @@ impl ApplyPrinter<'_> {
 
     fn accepted_status_line(
         &self,
-        source: &Path,
+        source: &str,
         result: &ExecutedResourceManifestResult,
     ) -> String {
         let label = result.outcome.label(self.dry_run);
@@ -651,31 +678,24 @@ impl ApplyPrinter<'_> {
 
         format!(
             "{}: {} -> {}/{}",
-            style,
-            source.display(),
-            result.resource.kind,
-            result.resource.metadata.name
+            style, source, result.resource.kind, result.resource.metadata.name
         )
     }
 
-    fn error_status_line(&self, source: &Path, label: &str) -> String {
+    fn error_status_line(&self, source: impl std::fmt::Display, label: &str) -> String {
         let label = if self.dry_run {
             format!("{label} (dry-run)")
         } else {
             label.to_string()
         };
 
-        format!(
-            "{}: {}",
-            console::style(label).red().bold(),
-            source.display(),
-        )
+        format!("{}: {}", console::style(label).red().bold(), source)
     }
 
     fn print_error_detail(
         &self,
         progress: Option<&ApplyMultiProgress>,
-        source: &Path,
+        source: impl std::fmt::Display,
         message: impl Into<String>,
     ) {
         self.print_line(
@@ -683,7 +703,7 @@ impl ApplyPrinter<'_> {
             format!(
                 "  {} {} {}",
                 console::style("error").red().bold(),
-                source.display(),
+                source,
                 message.into()
             ),
         );
@@ -755,15 +775,15 @@ impl ApplyPrinter<'_> {
             .join("\n")
     }
 
-    fn warning_target(source: &Path, warning: &ResourceWarning) -> String {
+    fn warning_target(source: &str, warning: &ResourceWarning) -> String {
         match warning.path.as_deref() {
-            Some(path) => format!("{} {}", source.display(), path),
-            None => source.display().to_string(),
+            Some(path) => format!("{source} {path}"),
+            None => source.to_string(),
         }
     }
 
-    fn change_target(source: &Path, change: &ApplyManifestChange) -> String {
-        format!("{} {}", source.display(), change.path)
+    fn change_target(source: &str, change: &ApplyManifestChange) -> String {
+        format!("{source} {}", change.path)
     }
 }
 

@@ -38,7 +38,9 @@ impl ResourceManifestExecutionService for ResourceManifestExecutionServiceImpl {
         manifest: &DiscoveredResourceManifest,
         dry_run: bool,
     ) -> Result<ExecuteResourceManifestOutcome, ExecuteResourceManifestError> {
-        let content = std::fs::read_to_string(&manifest.source)
+        let content = manifest
+            .source
+            .read_content()
             .map_err(ExecuteResourceManifestError::ReadManifest)?;
         let request = ApplyManifestRequest {
             format: manifest.format,

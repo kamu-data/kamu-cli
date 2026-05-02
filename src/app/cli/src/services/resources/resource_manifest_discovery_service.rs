@@ -36,8 +36,34 @@ pub struct DiscoverResourceManifestsResult {
 
 #[derive(Debug, Clone)]
 pub struct DiscoveredResourceManifest {
-    pub source: PathBuf,
+    pub source: DiscoveredResourceManifestSource,
     pub format: FacadeResourceManifestFormat,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub enum DiscoveredResourceManifestSource {
+    File(PathBuf),
+    Stdin(String),
+}
+
+impl DiscoveredResourceManifestSource {
+    pub fn read_content(&self) -> Result<String, std::io::Error> {
+        match self {
+            Self::File(path) => std::fs::read_to_string(path),
+            Self::Stdin(content) => Ok(content.clone()),
+        }
+    }
+}
+
+impl std::fmt::Display for DiscoveredResourceManifestSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File(path) => write!(f, "{}", path.display()),
+            Self::Stdin(_) => write!(f, "STDIN"),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
