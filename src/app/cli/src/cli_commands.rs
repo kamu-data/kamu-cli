@@ -572,10 +572,10 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         },
         // False for set_watermark option
         cli::Command::Pull(c) => c.set_watermark.is_some(),
-        cli::Command::Context(_)
-        | cli::Command::Ui(_)
-        | cli::Command::Login(_)
-        | cli::Command::Push(_) => false,
+        cli::Command::Context(c) => {
+            matches!(&c.subcommand, Some(cli::ContextSubCommand::ApiResources(_)))
+        }
+        cli::Command::Ui(_) | cli::Command::Login(_) | cli::Command::Push(_) => false,
         _ => true,
     }
 }
