@@ -356,7 +356,7 @@ pub enum ContextSubCommand {
     #[command(visible_alias = "ls")]
     List(ContextList),
     #[command(visible_alias = "rm")]
-    Remove(ContextRemove),
+    Delete(ContextDelete),
     Check(ContextCheck),
     ApiResources(ContextApiResources),
     Use(ContextUse),
@@ -455,37 +455,37 @@ pub struct ContextList {
     pub output_format: Option<OutputFormat>,
 }
 
-/// Remove a remote resource context
+/// Delete a remote resource context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Removes a previously registered remote context from the selected scope.
+Deletes a previously registered remote context from the selected scope.
 
-By default removal happens in the current workspace. Use `--user` to remove a
-user-scoped context instead. Use `--all` to remove all remote contexts from
+By default deletion happens in the current workspace. Use `--user` to delete a
+user-scoped context instead. Use `--all` to delete all remote contexts from
 the selected scope.
 
-The name `local` is reserved and cannot be removed.
+The name `local` is reserved and cannot be deleted.
 
 **Examples:**
 
-Remove a workspace-scoped context:
+Delete a workspace-scoped context:
 
-    kamu context rm prod
+    kamu context delete prod
 
-Remove a user-scoped context:
+Delete a user-scoped context:
 
-    kamu context rm prod --user
+    kamu context delete prod --user
 
-Remove all workspace-scoped remote contexts:
+Delete all workspace-scoped remote contexts:
 
     kamu context rm --all
 "#)]
-pub struct ContextRemove {
-    /// Remove context from the user home folder rather than in the workspace
+pub struct ContextDelete {
+    /// Delete context from the user home folder rather than in the workspace
     #[arg(long)]
     pub user: bool,
 
-    /// Remove all remote contexts in the selected scope
+    /// Delete all remote contexts in the selected scope
     #[arg(long)]
     pub all: bool,
 

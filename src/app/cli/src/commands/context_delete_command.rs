@@ -22,7 +22,7 @@ use crate::{ContextListCommand, Interact, WorkspaceService};
 
 #[dill::component]
 #[dill::interface(dyn Command)]
-pub struct ContextRemoveCommand {
+pub struct ContextDeleteCommand {
     resource_context_registry_service: Arc<ResourceContextRegistryService>,
     current_context_state_service: Arc<CurrentContextStateService>,
     interact: Arc<Interact>,
@@ -38,7 +38,7 @@ pub struct ContextRemoveCommand {
     scope: ResourceContextStoreScope,
 }
 
-impl ContextRemoveCommand {
+impl ContextDeleteCommand {
     fn report_current_context_switched(&self) {
         match self.current_context_state_service.get_current_context() {
             Some(name) => {
@@ -89,7 +89,7 @@ impl ContextRemoveCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-impl Command for ContextRemoveCommand {
+impl Command for ContextDeleteCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
         match (&self.name, self.all) {
             (None, false) => {
@@ -117,8 +117,8 @@ impl Command for ContextRemoveCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        let names = self.context_names_to_remove()?;
-        self.confirm_removal(&names)?;
+        let names = self.context_names_to_delete()?;
+        self.confirm_deletion(&names)?;
 
         let current_context_name = self
             .current_context_state_service
@@ -147,7 +147,7 @@ impl Command for ContextRemoveCommand {
                 .map_err(CLIError::critical)?;
         }
 
-        self.report_removed(&names);
+        self.report_deleted(&names);
 
         if was_current {
             self.report_current_context_switched();
@@ -159,8 +159,8 @@ impl Command for ContextRemoveCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ContextRemoveCommand {
-    fn context_names_to_remove(&self) -> Result<Vec<String>, CLIError> {
+impl ContextDeleteCommand {
+    fn context_names_to_delete(&self) -> Result<Vec<String>, CLIError> {
         if self.all {
             let mut names: Vec<_> = self
                 .resource_context_registry_service
@@ -197,7 +197,7 @@ impl ContextRemoveCommand {
         }
     }
 
-    fn confirm_removal(&self, names: &[String]) -> Result<(), CLIError> {
+    fn confirm_deletion(&self, names: &[String]) -> Result<(), CLIError> {
         let listed_contexts = names
             .iter()
             .map(|name| format!("  {name}"))
@@ -212,11 +212,11 @@ impl ContextRemoveCommand {
         ))
     }
 
-    fn report_removed(&self, names: &[String]) {
+    fn report_deleted(&self, names: &[String]) {
         if self.all {
             eprintln!(
                 "{} {} {} {}",
-                console::style("Removed").green().bold(),
+                console::style("Deleted").green().bold(),
                 names.len(),
                 console::style("contexts from").green().bold(),
                 ContextListCommand::scope_label(self.scope).to_lowercase(),
@@ -224,7 +224,7 @@ impl ContextRemoveCommand {
         } else {
             eprintln!(
                 "{} {} {} {}",
-                console::style("Removed").green().bold(),
+                console::style("Deleted").green().bold(),
                 names.first().unwrap(),
                 console::style("from").green().bold(),
                 ContextListCommand::scope_label(self.scope).to_lowercase(),

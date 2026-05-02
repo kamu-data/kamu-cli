@@ -108,8 +108,8 @@ pub fn get_command(
                 .cast(),
             ),
             Some(cli::ContextSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
-            Some(cli::ContextSubCommand::Remove(sc)) => Box::new(
-                ContextRemoveCommand::builder(
+            Some(cli::ContextSubCommand::Delete(sc)) => Box::new(
+                ContextDeleteCommand::builder(
                     sc.name,
                     sc.all,
                     if sc.user {

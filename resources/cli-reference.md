@@ -354,7 +354,7 @@ Manage resource contexts
 
 * `add` — Register a new remote resource context
 * `list [ls]` — List configured resource contexts
-* `remove [rm]` — Remove a remote resource context
+* `delete [rm]` — Delete a remote resource context
 * `check` — Check connectivity and authorization for a remote resource context
 * `api-resources` — List supported resource kinds in the active context
 * `use` — Switch the current resource context
@@ -495,11 +495,11 @@ List contexts in JSON:
 
 
 
-## `kamu context remove`
+## `kamu context delete`
 
-Remove a remote resource context
+Delete a remote resource context
 
-**Usage:** `kamu context remove [OPTIONS] [NAME]`
+**Usage:** `kamu context delete [OPTIONS] [NAME]`
 
 **Arguments:**
 
@@ -507,28 +507,28 @@ Remove a remote resource context
 
 **Options:**
 
-* `--user` — Remove context from the user home folder rather than in the workspace
-* `--all` — Remove all remote contexts in the selected scope
+* `--user` — Delete context from the user home folder rather than in the workspace
+* `--all` — Delete all remote contexts in the selected scope
 
-Removes a previously registered remote context from the selected scope.
+Deletes a previously registered remote context from the selected scope.
 
-By default removal happens in the current workspace. Use `--user` to remove a
-user-scoped context instead. Use `--all` to remove all remote contexts from
+By default deletion happens in the current workspace. Use `--user` to delete a
+user-scoped context instead. Use `--all` to delete all remote contexts from
 the selected scope.
 
-The name `local` is reserved and cannot be removed.
+The name `local` is reserved and cannot be deleted.
 
 **Examples:**
 
-Remove a workspace-scoped context:
+Delete a workspace-scoped context:
 
-    kamu context rm prod
+    kamu context delete prod
 
-Remove a user-scoped context:
+Delete a user-scoped context:
 
-    kamu context rm prod --user
+    kamu context delete prod --user
 
-Remove all workspace-scoped remote contexts:
+Delete all workspace-scoped remote contexts:
 
     kamu context rm --all
 
