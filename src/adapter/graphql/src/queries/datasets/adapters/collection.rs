@@ -124,7 +124,16 @@ impl CollectionProjection<'_> {
     pub async fn entries(
         &self,
         ctx: &Context<'_>,
+        #[graphql(desc = "Return only entries whose path starts with this prefix")]
         path_prefix: Option<CollectionPath<'static>>,
+        #[graphql(
+            desc = "Return only a single entry after reaching a certain path depth. For example \
+                    given enties `/a, /b, /dir/c, /dir/d` at depth 1 it will return `/a, /b`, \
+                    /dir/b` - the first two as actual entries at depth 1, and the last one as an \
+                    indicator that there is one or more entries under `/dir`. Using the \
+                    combination of `pathPrefix` and `maxDepth` you can walk entries as a \
+                    directory hierarchy."
+        )]
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,

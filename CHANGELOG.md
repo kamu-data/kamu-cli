@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## Unreleased
+### Added
+- GQL `Collection::entries` now support `maxDepth` for navigating entries as directory hierarchy
+
 ## [0.262.0] - 2026-04-22
 ### Changed
 - Updated default RisingWave engine image that fixes Parquet compatibility bug

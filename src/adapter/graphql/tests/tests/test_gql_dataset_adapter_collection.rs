@@ -449,7 +449,7 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/a",
+                            "path": "/0a",
                             "ref": linked,
                         }
                     }
@@ -457,7 +457,7 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/1/b",
+                            "path": "/0b/1a",
                             "ref": linked,
                         }
                     }
@@ -465,78 +465,156 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/1/2/c",
+                            "path": "/0b/1b/2a",
                             "ref": linked,
                         }
                     }
-                }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1b/2b",
+                            "ref": linked,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1c/2a",
+                            "ref": linked,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1c/2b",
+                            "ref": linked,
+                        }
+                    }
+                },
             ]),
         )
         .await;
 
+    let as_entries = |paths: &[&str]| -> serde_json::Value {
+        let entries = paths.iter().map(|p| {
+            json!({
+                "path": p,
+                "ref": linked,
+                "extraData": {},
+            })
+        });
+
+        serde_json::Value::Array(entries.collect())
+    };
+
+    // List all
     assert_eq!(
         harness.list_entries(&did).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/1/b",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/a",
-                "ref": linked,
-                "extraData": {},
-            },
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            "/0b/1b/2b",
+            "/0b/1c/2a",
+            "/0b/1c/2b",
         ])
     );
 
-    // With prefix
+    // Path prefix
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/1/b",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0b/"), None).await,
+        as_entries(&["/0b/1a", "/0b/1b/2a", "/0b/1b/2b", "/0b/1c/2a", "/0b/1c/2b"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0b/1b/"), None).await,
+        as_entries(&["/0b/1b/2a", "/0b/1b/2b"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/c"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0a"), None).await,
+        as_entries(&["/0a"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/3/"), None).await,
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/2a"), None)
+            .await,
+        as_entries(&["/0b/1b/2a"])
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/2a/"), None)
+            .await,
         json!([])
+    );
+
+    // Max depth limit
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(0)).await,
+        as_entries(&[
+            "/0a",
+            // "/0b/1a",
+            // "/0b/1b/2a",
+            // "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(1)).await,
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            // "/0b/1b/2a",
+            // "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(2)).await,
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            // "/0b/1b/2b",
+            "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    // Max depth AND prefix
+    assert_eq!(
+        harness.list_entries_ext(&did, Some("/0b/"), Some(2)).await,
+        as_entries(&[
+            // "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            // "/0b/1b/2b",
+            "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/"), Some(3))
+            .await,
+        as_entries(&[
+            // "/0a",
+            // "/0b/1a",
+            "/0b/1b/2a",
+            "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
     );
 }
 

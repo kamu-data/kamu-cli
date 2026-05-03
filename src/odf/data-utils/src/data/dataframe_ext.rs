@@ -41,6 +41,14 @@ impl From<DataFrame> for DataFrameExt {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataFrameExt {
+    pub fn aggregate(
+        self,
+        group_expr: Vec<Expr>,
+        aggr_expr: Vec<Expr>,
+    ) -> Result<Self, DataFusionError> {
+        self.0.aggregate(group_expr, aggr_expr).map(Self)
+    }
+
     #[tracing::instrument(level = "info", name = "DataFrame::cache", skip_all)]
     pub async fn cache(self) -> Result<Self, DataFusionError> {
         self.0.cache().await.map(Self)
