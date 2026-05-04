@@ -756,7 +756,7 @@ Returns manifest representation of a resource
 
   Default value: `yaml`
 
-  Possible values: `json`, `yaml`
+  Possible values: `json`, `name`, `yaml`
 
 * `--spec` — Return an apply-compatible spec manifest instead of the full resource view
 * `--ignore-not-found` — Exit successfully when the resource does not exist

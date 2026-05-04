@@ -206,6 +206,15 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum GetOutputFormat {
+    Json,
+    Name,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Show resource summary for the active context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
@@ -934,8 +943,8 @@ pub struct Get {
     pub resource_context: ResourceContextArgs,
 
     /// Serialization format of the returned object
-    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = ResourceManifestFormat::Yaml)]
-    pub output_format: ResourceManifestFormat,
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = GetOutputFormat::Yaml)]
+    pub output_format: GetOutputFormat,
 
     /// Return an apply-compatible spec manifest instead of the full resource
     /// view

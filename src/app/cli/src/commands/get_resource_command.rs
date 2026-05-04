@@ -22,7 +22,7 @@ use kamu_resources_facade::{
 };
 
 use super::{CLIError, Command, common};
-use crate::cli::ResourceManifestFormat;
+use crate::cli::GetOutputFormat;
 use crate::resources::{
     ResourceFacadeFactory,
     ResourceKindLookupErrorOptions,
@@ -49,7 +49,7 @@ pub struct GetResourceCommand {
     name_or_id: String,
 
     #[dill::component(explicit)]
-    output_format: ResourceManifestFormat,
+    output_format: GetOutputFormat,
 
     #[dill::component(explicit)]
     spec: bool,
@@ -60,11 +60,28 @@ pub struct GetResourceCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+enum GetRunMode {
+    Name,
+    Manifest {
+        format: FacadeResourceManifestFormat,
+        spec: bool,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl GetResourceCommand {
-    fn manifest_format(&self) -> FacadeResourceManifestFormat {
+    fn run_mode(&self) -> GetRunMode {
         match self.output_format {
-            ResourceManifestFormat::Json => FacadeResourceManifestFormat::Json,
-            ResourceManifestFormat::Yaml => FacadeResourceManifestFormat::Yaml,
+            GetOutputFormat::Name => GetRunMode::Name,
+            GetOutputFormat::Json => GetRunMode::Manifest {
+                format: FacadeResourceManifestFormat::Json,
+                spec: self.spec,
+            },
+            GetOutputFormat::Yaml => GetRunMode::Manifest {
+                format: FacadeResourceManifestFormat::Yaml,
+                spec: self.spec,
+            },
         }
     }
 
@@ -79,6 +96,7 @@ impl GetResourceCommand {
     fn render_full_resource(
         &self,
         resource: &kamu_resources::ResourceView,
+        format: FacadeResourceManifestFormat,
     ) -> Result<String, CLIError> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -136,8 +154,8 @@ impl GetResourceCommand {
             status: Option<serde_yaml::Value>,
         }
 
-        match self.output_format {
-            ResourceManifestFormat::Json => {
+        match format {
+            FacadeResourceManifestFormat::Json => {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
                     api_version: &resource.api_version,
                     kind: &resource.kind,
@@ -149,16 +167,28 @@ impl GetResourceCommand {
                 .map_err(CLIError::critical)
             }
 
-            ResourceManifestFormat::Yaml => serde_yaml::to_string(&RenderedResourceViewYaml {
-                api_version: &resource.api_version,
-                kind: &resource.kind,
-                metadata: RenderedResourceViewMetadata::new(resource),
-                last_reconciled_at: &resource.last_reconciled_at,
-                spec: common::json_to_yaml_value(&resource.spec),
-                status: resource.status.as_ref().map(common::json_to_yaml_value),
-            })
-            .map_err(CLIError::critical),
+            FacadeResourceManifestFormat::Yaml => {
+                serde_yaml::to_string(&RenderedResourceViewYaml {
+                    api_version: &resource.api_version,
+                    kind: &resource.kind,
+                    metadata: RenderedResourceViewMetadata::new(resource),
+                    last_reconciled_at: &resource.last_reconciled_at,
+                    spec: common::json_to_yaml_value(&resource.spec),
+                    status: resource.status.as_ref().map(common::json_to_yaml_value),
+                })
+                .map_err(CLIError::critical)
+            }
         }
+    }
+
+    fn print_name(
+        &self,
+        kind_name: &str,
+        resource: &kamu_resources::ResourceView,
+    ) -> Result<(), CLIError> {
+        let mut stdout = std::io::stdout();
+        writeln!(stdout, "{kind_name}/{}", resource.metadata.name).int_err()?;
+        Ok(())
     }
 
     fn write_stdout(&self, rendered: &str) -> Result<(), CLIError> {
@@ -167,11 +197,39 @@ impl GetResourceCommand {
         Ok(())
     }
 
+    async fn run_name_view(
+        &self,
+        resource_facade: &dyn ResourceFacade,
+        kind_descriptor: ResourceKindDescriptor,
+        resource_ref: GetResourceRef,
+    ) -> Result<(), CLIError> {
+        let kind_name = kind_descriptor.name.clone();
+        let resource = resource_facade
+            .get(kamu_resources_facade::GetResourceRequest {
+                kind: kind_descriptor.kind,
+                api_version: Some(kind_descriptor.api_version),
+                account: None,
+                resource_ref,
+            })
+            .await;
+
+        match resource {
+            Ok(resource) => self.print_name(&kind_name, &resource),
+            Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
+                if self.ignore_not_found =>
+            {
+                Ok(())
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
     async fn run_spec_view(
         &self,
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
         resource_ref: GetResourceRef,
+        format: FacadeResourceManifestFormat,
     ) -> Result<(), CLIError> {
         let rendered = resource_facade
             .render_manifest(RenderResourceManifestRequest {
@@ -179,7 +237,7 @@ impl GetResourceCommand {
                 api_version: Some(kind_descriptor.api_version),
                 account: None,
                 resource_ref,
-                format: self.manifest_format(),
+                format,
             })
             .await;
 
@@ -198,6 +256,7 @@ impl GetResourceCommand {
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
         resource_ref: GetResourceRef,
+        format: FacadeResourceManifestFormat,
     ) -> Result<(), CLIError> {
         let resource = resource_facade
             .get(kamu_resources_facade::GetResourceRequest {
@@ -209,7 +268,7 @@ impl GetResourceCommand {
             .await;
 
         match resource {
-            Ok(resource) => self.write_stdout(&self.render_full_resource(&resource)?),
+            Ok(resource) => self.write_stdout(&self.render_full_resource(&resource, format)?),
             Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
                 if self.ignore_not_found =>
             {
@@ -224,6 +283,15 @@ impl GetResourceCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for GetResourceCommand {
+    async fn validate_args(&self) -> Result<(), CLIError> {
+        if self.spec && self.output_format == GetOutputFormat::Name {
+            return Err(CLIError::usage_error(
+                "`--spec` cannot be used with `-o name`",
+            ));
+        }
+        Ok(())
+    }
+
     async fn run(&self) -> Result<(), CLIError> {
         let kind_descriptor = self
             .resource_kind_lookup_service
@@ -238,20 +306,34 @@ impl Command for GetResourceCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        if self.spec {
-            self.run_spec_view(
-                resource_facade.as_ref(),
-                kind_descriptor,
-                self.resource_ref().await?,
-            )
-            .await
-        } else {
-            self.run_full_view(
-                resource_facade.as_ref(),
-                kind_descriptor,
-                self.resource_ref().await?,
-            )
-            .await
+        let resource_ref = self.resource_ref().await?;
+
+        match self.run_mode() {
+            GetRunMode::Name => {
+                self.run_name_view(resource_facade.as_ref(), kind_descriptor, resource_ref)
+                    .await
+            }
+            GetRunMode::Manifest { format, spec: true } => {
+                self.run_spec_view(
+                    resource_facade.as_ref(),
+                    kind_descriptor,
+                    resource_ref,
+                    format,
+                )
+                .await
+            }
+            GetRunMode::Manifest {
+                format,
+                spec: false,
+            } => {
+                self.run_full_view(
+                    resource_facade.as_ref(),
+                    kind_descriptor,
+                    resource_ref,
+                    format,
+                )
+                .await
+            }
         }
     }
 }
