@@ -19,10 +19,12 @@ use domain::{
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
+    ResourceIdentityRow,
     ResourceIdentityView,
     ResourceKindDescriptor,
     ResourceManifest,
     ResourceMetadataInput,
+    ResourceName,
     ResourceNameNotFoundError,
     ResourcePresentationDispatcher,
     ResourceSnapshot,
@@ -42,6 +44,9 @@ use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_di
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
+    BatchGetResourceIdentitiesRequest,
+    BatchGetResourceIdentitiesResult,
+    BatchGetResourceIdentityProblem,
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
@@ -97,34 +102,30 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let resource_kind_descriptors = self.list_resource_kind_descriptors();
-        let descriptors_by_key: HashMap<_, _> = resource_kind_descriptors
+        let descriptors_by_key: HashMap<(String, String), String> = resource_kind_descriptors
             .into_iter()
-            .map(|descriptor| {
-                (
-                    (descriptor.kind.clone(), descriptor.api_version.clone()),
-                    descriptor,
-                )
-            })
+            .map(|descriptor| ((descriptor.kind, descriptor.api_version), descriptor.name))
             .collect();
 
         let resource_counts = self
             .generic_resource_query_service
-            .summarize_resources(target_account.id.clone())
+            .summarize_resources(target_account.id)
             .await?
             .into_iter()
             .map(|row| {
-                let descriptor = descriptors_by_key
+                let name = descriptors_by_key
                     .get(&(row.kind.clone(), row.api_version.clone()))
                     .ok_or_else(|| {
                         ResourcesSummaryError::Internal(InternalError::new(format!(
                             "No resource descriptor registered for {}/{}",
                             row.kind, row.api_version
                         )))
-                    })?;
+                    })?
+                    .clone();
 
                 Ok(ResourceTypeCountSummary {
                     kind: row.kind,
-                    name: descriptor.name.clone(),
+                    name,
                     api_version: row.api_version,
                     total_count: row.total_count,
                     phase_counts: row.phase_counts,
@@ -216,6 +217,42 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         self.resource_identity_from_snapshot(snapshot)
     }
 
+    async fn get_identities(
+        &self,
+        request: BatchGetResourceIdentitiesRequest,
+    ) -> Result<BatchGetResourceIdentitiesResult, GetResourceError> {
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        let mut groups = self.group_batch_identity_requests(request.requests).await;
+        let mut indexed_identities = Vec::new();
+
+        self.resolve_uid_identity_groups(
+            groups.uid_groups,
+            &descriptors_by_key,
+            &mut indexed_identities,
+            &mut groups.problems,
+        )
+        .await?;
+
+        self.resolve_name_identity_groups(
+            groups.name_groups,
+            &descriptors_by_key,
+            &mut indexed_identities,
+            &mut groups.problems,
+        )
+        .await?;
+
+        indexed_identities.sort_by_key(|identity| identity.request_index);
+        groups.problems.sort_by_key(|problem| problem.request_index);
+
+        Ok(BatchGetResourceIdentitiesResult {
+            identities: indexed_identities
+                .into_iter()
+                .map(|indexed_identity| indexed_identity.identity)
+                .collect(),
+            problems: groups.problems,
+        })
+    }
+
     async fn render_manifest(
         &self,
         request: RenderResourceManifestRequest,
@@ -254,7 +291,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         dispatcher
             .list(ResourceCrudDispatcherListRequest {
-                account_id: target_account.id.clone(),
+                account_id: target_account.id,
                 pagination: request.pagination,
             })
             .await
@@ -274,7 +311,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_kind(target_account.id.clone(), &request.kind, request.pagination)
+            .list_snapshots_by_kind(target_account.id, &request.kind, request.pagination)
             .await?;
 
         snapshots
@@ -297,7 +334,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.id.clone(), request.pagination)
+            .list_all_snapshots(target_account.id, request.pagination)
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
@@ -314,7 +351,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.id.clone(), request.pagination)
+            .list_all_snapshots(target_account.id, request.pagination)
             .await?;
 
         snapshots
@@ -446,7 +483,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         )?;
         dispatcher
             .delete(ResourceCrudDispatcherDeleteRequest {
-                account_id: target_account.id.clone(),
+                account_id: target_account.id,
                 uids: vec![uid],
             })
             .await?;
@@ -504,6 +541,160 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
+    fn resource_kind_names_by_key(&self) -> HashMap<(String, String), String> {
+        self.list_resource_kind_descriptors()
+            .into_iter()
+            .map(|descriptor| ((descriptor.kind, descriptor.api_version), descriptor.name))
+            .collect()
+    }
+
+    async fn group_batch_identity_requests(
+        &self,
+        requests: Vec<GetResourceRequest>,
+    ) -> BatchIdentityLookupGroups {
+        let mut uid_groups = HashMap::new();
+        let mut name_groups = HashMap::new();
+        let mut problems = Vec::new();
+
+        for (request_index, get_request) in requests.into_iter().enumerate() {
+            let target_account = match self
+                .resource_account_resolver
+                .resolve_target_account(get_request.account.as_ref())
+                .await
+            {
+                Ok(target_account) => target_account,
+                Err(error) => {
+                    problems.push(BatchGetResourceIdentityProblem {
+                        request_index,
+                        error: error.into(),
+                    });
+                    continue;
+                }
+            };
+
+            match &get_request.resource_ref {
+                ResourceRef::ById(uid) => {
+                    let uid = *uid;
+                    uid_groups
+                        .entry(target_account.id)
+                        .or_insert_with(Vec::new)
+                        .push((request_index, get_request, uid));
+                }
+                ResourceRef::ByName(name) => {
+                    let name = name.clone();
+                    name_groups
+                        .entry((target_account.id, get_request.kind.clone()))
+                        .or_insert_with(Vec::new)
+                        .push((request_index, get_request, name));
+                }
+            }
+        }
+
+        BatchIdentityLookupGroups {
+            uid_groups,
+            name_groups,
+            problems,
+        }
+    }
+
+    async fn resolve_uid_identity_groups(
+        &self,
+        uid_groups: BatchUidIdentityGroups,
+        descriptors_by_key: &HashMap<(String, String), String>,
+        identities: &mut Vec<IndexedResourceIdentity>,
+        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+    ) -> Result<(), GetResourceError> {
+        for (account_id, entries) in uid_groups {
+            let uids = entries.iter().map(|(_, _, uid)| *uid).collect::<Vec<_>>();
+
+            let rows_by_uid = self
+                .generic_resource_query_service
+                .find_resource_identities_by_uids(&account_id, &uids)
+                .await?
+                .into_iter()
+                .map(|row| (row.uid, row))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, get_request, uid) in entries {
+                Self::push_batch_identity_result(
+                    request_index,
+                    rows_by_uid.get(uid.as_ref()).cloned().ok_or_else(|| {
+                        GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid))
+                    }),
+                    &get_request,
+                    descriptors_by_key,
+                    identities,
+                    problems,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn resolve_name_identity_groups(
+        &self,
+        name_groups: BatchNameIdentityGroups,
+        descriptors_by_key: &HashMap<(String, String), String>,
+        identities: &mut Vec<IndexedResourceIdentity>,
+        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+    ) -> Result<(), GetResourceError> {
+        for ((account_id, kind), entries) in name_groups {
+            let names = entries
+                .iter()
+                .map(|(_, _, name)| name.clone())
+                .collect::<Vec<_>>();
+
+            let rows_by_name = self
+                .generic_resource_query_service
+                .find_resource_identities_by_names(&account_id, &kind, &names)
+                .await?
+                .into_iter()
+                .map(|row| (row.name.clone(), row))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, get_request, name) in entries {
+                Self::push_batch_identity_result(
+                    request_index,
+                    rows_by_name.get(&name).cloned().ok_or_else(|| {
+                        GetResourceError::NameNotFound(ResourceNameNotFoundError {
+                            kind: get_request.kind.clone(),
+                            name,
+                        })
+                    }),
+                    &get_request,
+                    descriptors_by_key,
+                    identities,
+                    problems,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn push_batch_identity_result(
+        request_index: usize,
+        row_result: Result<ResourceIdentityRow, GetResourceError>,
+        request: &GetResourceRequest,
+        descriptors_by_key: &HashMap<(String, String), String>,
+        identities: &mut Vec<IndexedResourceIdentity>,
+        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+    ) {
+        match row_result
+            .and_then(|row| Self::validate_identity_row(row, request, descriptors_by_key))
+        {
+            Ok(identity) => identities.push(IndexedResourceIdentity {
+                request_index,
+                identity,
+            }),
+            Err(error) => problems.push(BatchGetResourceIdentityProblem {
+                request_index,
+                error,
+            }),
+        }
+    }
+
     fn resource_identity_from_snapshot<E>(
         &self,
         snapshot: ResourceSnapshot,
@@ -530,6 +721,54 @@ impl LocalResourceFacadeImpl {
             uid: snapshot.uid,
             name: snapshot.metadata.name,
         })
+    }
+
+    fn resource_identity_from_row(
+        row: ResourceIdentityRow,
+        descriptors_by_key: &HashMap<(String, String), String>,
+    ) -> Result<ResourceIdentityView, GetResourceError> {
+        let canonical_kind_name = descriptors_by_key
+            .get(&(row.kind.clone(), row.api_version.clone()))
+            .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
+                kind: row.kind.clone(),
+                api_version: row.api_version.clone(),
+            })?
+            .clone();
+
+        Ok(ResourceIdentityView {
+            kind: row.kind,
+            api_version: row.api_version,
+            canonical_kind_name,
+            uid: ResourceUID::new(row.uid),
+            name: row.name,
+        })
+    }
+
+    fn validate_identity_row(
+        row: ResourceIdentityRow,
+        request: &GetResourceRequest,
+        descriptors_by_key: &HashMap<(String, String), String>,
+    ) -> Result<ResourceIdentityView, GetResourceError> {
+        if row.kind != request.kind {
+            return Err(ResourceKindMismatchError {
+                uid: ResourceUID::new(row.uid),
+                expected_kind: request.kind.clone(),
+                actual_kind: row.kind,
+            }
+            .into());
+        }
+
+        if let Some(expected_api_version) = request.api_version.as_ref()
+            && row.api_version != *expected_api_version
+        {
+            return Err(ResourceAPIVersionMismatchError {
+                expected_api_version: expected_api_version.clone(),
+                actual_api_version: row.api_version,
+            }
+            .into());
+        }
+
+        Self::resource_identity_from_row(row, descriptors_by_key)
     }
 
     async fn resolve_resource_uid<E>(
@@ -708,6 +947,24 @@ impl LocalResourceFacadeImpl {
 
         Ok(snapshot)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type BatchUidIdentityGroups =
+    HashMap<odf::AccountID, Vec<(usize, GetResourceRequest, ResourceUID)>>;
+type BatchNameIdentityGroups =
+    HashMap<(odf::AccountID, String), Vec<(usize, GetResourceRequest, ResourceName)>>;
+
+struct BatchIdentityLookupGroups {
+    uid_groups: BatchUidIdentityGroups,
+    name_groups: BatchNameIdentityGroups,
+    problems: Vec<BatchGetResourceIdentityProblem>,
+}
+
+struct IndexedResourceIdentity {
+    request_index: usize,
+    identity: ResourceIdentityView,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

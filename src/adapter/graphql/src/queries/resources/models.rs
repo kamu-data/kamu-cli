@@ -198,6 +198,75 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
+pub struct BatchResourceIdentitiesResult {
+    pub identities: Vec<ResourceIdentity>,
+    pub problems: Vec<BatchResourceIdentityProblem>,
+}
+
+impl From<kamu_resources_facade::BatchGetResourceIdentitiesResult>
+    for BatchResourceIdentitiesResult
+{
+    fn from(value: kamu_resources_facade::BatchGetResourceIdentitiesResult) -> Self {
+        Self {
+            identities: value.identities.into_iter().map(Into::into).collect(),
+            problems: value.problems.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct BatchResourceIdentityProblem {
+    pub request_index: usize,
+    pub code: BatchResourceIdentityProblemCode,
+    pub message: String,
+}
+
+impl From<kamu_resources_facade::BatchGetResourceIdentityProblem> for BatchResourceIdentityProblem {
+    fn from(value: kamu_resources_facade::BatchGetResourceIdentityProblem) -> Self {
+        let code = BatchResourceIdentityProblemCode::from_get_resource_error(&value.error);
+        Self {
+            request_index: value.request_index,
+            message: value.error.to_string(),
+            code,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchResourceIdentityProblemCode {
+    UidNotFound,
+    NameNotFound,
+    ApiVersionMismatch,
+    KindMismatch,
+    UnsupportedDescriptor,
+    BadAccount,
+    RemoteRequest,
+    Internal,
+}
+
+impl BatchResourceIdentityProblemCode {
+    fn from_get_resource_error(error: &kamu_resources_facade::GetResourceError) -> Self {
+        use kamu_resources_facade::GetResourceError as E;
+        match error {
+            E::UIDNotFound(_) => Self::UidNotFound,
+            E::NameNotFound(_) => Self::NameNotFound,
+            E::ApiVersionMismatch(_) => Self::ApiVersionMismatch,
+            E::KindMismatch(_) => Self::KindMismatch,
+            E::UnsupportedDescriptor(_) => Self::UnsupportedDescriptor,
+            E::BadAccount(_) => Self::BadAccount,
+            E::RemoteRequest(_) => Self::RemoteRequest,
+            E::Internal(_) => Self::Internal,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceMetadata {
     pub id: ResourceID,
     pub account_id: AccountID<'static>,

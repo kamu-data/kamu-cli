@@ -49,6 +49,27 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[crate::domain::ResourceUID],
+    ) -> Result<Vec<crate::domain::ResourceIdentityRow>, InternalError> {
+        self.resource_repository
+            .find_resource_identities_by_uids(account_id, uids)
+            .await
+    }
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[crate::domain::ResourceName],
+    ) -> Result<Vec<crate::domain::ResourceIdentityRow>, InternalError> {
+        self.resource_repository
+            .find_resource_identities_by_names(account_id, kind, names)
+            .await
+    }
+
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,

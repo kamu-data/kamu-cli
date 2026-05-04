@@ -17,6 +17,7 @@ use internal_error::InternalError;
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceIdentityRow,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -166,6 +167,58 @@ impl ResourceRepository for InMemoryResourceRepository {
             .and_then(|uid| guard.snapshots_by_id.get(uid))
             .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
             .map(|snapshot| snapshot.uid))
+    }
+
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(uids
+            .iter()
+            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter(|snapshot| {
+                snapshot.metadata.account == *account_id && snapshot.metadata.deleted_at.is_none()
+            })
+            .map(|snapshot| ResourceIdentityRow {
+                uid: *snapshot.uid.as_ref(),
+                kind: snapshot.kind.clone(),
+                api_version: snapshot.api_version.clone(),
+                name: snapshot.metadata.name.clone(),
+            })
+            .collect())
+    }
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(names
+            .iter()
+            .filter_map(|name| {
+                guard
+                    .ids_by_lookup_key
+                    .get(&ResourceLookupKey {
+                        account_id: account_id.clone(),
+                        kind: kind.to_owned(),
+                        name: name.clone(),
+                    })
+                    .and_then(|uid| guard.snapshots_by_id.get(uid))
+            })
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .map(|snapshot| ResourceIdentityRow {
+                uid: *snapshot.uid.as_ref(),
+                kind: snapshot.kind.clone(),
+                api_version: snapshot.api_version.clone(),
+                name: snapshot.metadata.name.clone(),
+            })
+            .collect())
     }
 
     async fn find_resource_snapshot(

@@ -30,6 +30,9 @@ use super::fragments;
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
+    BatchGetResourceIdentitiesRequest,
+    BatchGetResourceIdentitiesResult,
+    BatchGetResourceIdentityProblem,
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
@@ -86,6 +89,23 @@ impl RemoteGraphqlResourceFacadeImpl {
             uint64Value
             boolValue
           }
+        }
+    "#;
+
+    const BATCH_IDENTITY_FIELDS: &'static str = r#"
+        identities {
+          id
+          apiVersion
+          kind {
+            value
+          }
+          canonicalKindName
+          name
+        }
+        problems {
+          requestIndex
+          code
+          message
         }
     "#;
 
@@ -541,6 +561,47 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
+    fn selectors_input(requests: &[GetResourceRequest]) -> Result<String, InternalError> {
+        let selectors = requests
+            .iter()
+            .map(|request| {
+                Self::selector_input(
+                    &request.kind,
+                    request.api_version.as_deref(),
+                    &request.resource_ref,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .join(", ");
+
+        Ok(format!("[{selectors}]"))
+    }
+
+    fn common_target_account_id(
+        requests: &[GetResourceRequest],
+    ) -> Result<Option<odf::AccountID>, GetResourceError> {
+        let mut common_account_id = None;
+        let mut seen_first = false;
+
+        for request in requests {
+            let target_account_id =
+                Self::target_account_id::<GetResourceError>(request.account.as_ref())?;
+            if seen_first {
+                if target_account_id != common_account_id {
+                    return Err(InternalError::new(
+                        "Remote batch resource identity request cannot mix target accounts",
+                    )
+                    .into());
+                }
+            } else {
+                common_account_id = target_account_id;
+                seen_first = true;
+            }
+        }
+
+        Ok(common_account_id)
+    }
+
     fn get_resource_query(
         request: &GetResourceRequest,
         target_account_id: Option<&odf::AccountID>,
@@ -663,6 +724,43 @@ impl RemoteGraphqlResourceFacadeImpl {
                   }}
                 }}
                 "#
+            )
+        })
+    }
+
+    fn get_resource_identities_query(
+        requests: &[GetResourceRequest],
+    ) -> Result<String, GetResourceError> {
+        let target_account_id = Self::common_target_account_id(requests)?;
+        let selectors = Self::selectors_input(requests)?;
+
+        Ok(if let Some(target_account_id) = target_account_id {
+            format!(
+                r#"
+                query {{
+                  admin {{
+                    resources(accountId: "{target_account_id}") {{
+                      resourceIdentities(selectors: {selectors}) {{
+                        {fields}
+                      }}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::BATCH_IDENTITY_FIELDS,
+            )
+        } else {
+            format!(
+                r#"
+                query {{
+                  resources {{
+                    resourceIdentities(selectors: {selectors}) {{
+                      {fields}
+                    }}
+                  }}
+                }}
+                "#,
+                fields = Self::BATCH_IDENTITY_FIELDS,
             )
         })
     }
@@ -883,6 +981,40 @@ impl RemoteGraphqlResourceFacadeImpl {
             }
         }
     }
+
+    fn batch_problem_error(
+        problem: fragments::BatchResourceIdentityProblemFragment,
+        request: &GetResourceRequest,
+    ) -> GetResourceError {
+        use fragments::BatchResourceIdentityProblemCodeFragment as Code;
+        match problem.code {
+            Code::UidNotFound => match request.resource_ref {
+                ResourceRef::ById(uid) => {
+                    GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid))
+                }
+                ResourceRef::ByName(_) => {
+                    GetResourceError::Internal(InternalError::new(problem.message))
+                }
+            },
+            Code::NameNotFound => match &request.resource_ref {
+                ResourceRef::ByName(name) => {
+                    GetResourceError::NameNotFound(ResourceNameNotFoundError {
+                        kind: request.kind.clone(),
+                        name: name.clone(),
+                    })
+                }
+                ResourceRef::ById(_) => {
+                    GetResourceError::Internal(InternalError::new(problem.message))
+                }
+            },
+            Code::ApiVersionMismatch
+            | Code::KindMismatch
+            | Code::UnsupportedDescriptor
+            | Code::BadAccount
+            | Code::RemoteRequest
+            | Code::Internal => GetResourceError::Internal(InternalError::new(problem.message)),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1087,6 +1219,61 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         };
 
         Ok(identity.into())
+    }
+
+    async fn get_identities(
+        &self,
+        request: BatchGetResourceIdentitiesRequest,
+    ) -> Result<BatchGetResourceIdentitiesResult, GetResourceError> {
+        if request.requests.is_empty() {
+            return Ok(BatchGetResourceIdentitiesResult {
+                identities: Vec::new(),
+                problems: Vec::new(),
+            });
+        }
+
+        let maybe_target_account_id = Self::common_target_account_id(&request.requests)?;
+
+        let query = Self::get_resource_identities_query(&request.requests)?;
+
+        let batch_result = if maybe_target_account_id.is_some() {
+            let response: fragments::AdminBatchGetResourceIdentitiesQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.admin.resources.resource_identities
+        } else {
+            let response: fragments::BatchGetResourceIdentitiesQueryDataFragment =
+                self.execute_graphql(&query).await?;
+            response.resources.resource_identities
+        };
+
+        let identities = batch_result
+            .identities
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
+        let problems = batch_result
+            .problems
+            .into_iter()
+            .map(|problem| {
+                let request = request.requests.get(problem.request_index).ok_or_else(|| {
+                    GetResourceError::Internal(InternalError::new(format!(
+                        "Remote resource identity problem index {} is out of bounds",
+                        problem.request_index
+                    )))
+                })?;
+
+                Ok(BatchGetResourceIdentityProblem {
+                    request_index: problem.request_index,
+                    error: Self::batch_problem_error(problem, request),
+                })
+            })
+            .collect::<Result<Vec<_>, GetResourceError>>()?;
+
+        Ok(BatchGetResourceIdentitiesResult {
+            identities,
+            problems,
+        })
     }
 
     async fn render_manifest(

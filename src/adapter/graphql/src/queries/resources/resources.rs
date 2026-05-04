@@ -11,6 +11,7 @@ use super::helpers as resource_helpers;
 use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::{
+    BatchResourceIdentitiesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -67,6 +68,17 @@ impl Resources {
         selector: ResourceSelectorInput,
     ) -> Result<Option<ResourceIdentity>> {
         resource_helpers::get_resource_identity(ctx, selector, None /* current subject */).await
+    }
+
+    /// Returns resource identities by selectors
+    #[tracing::instrument(level = "info", name = Resources_resource_identities, skip_all, fields(selector_count = selectors.len()))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resource_identities(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+    ) -> Result<BatchResourceIdentitiesResult> {
+        resource_helpers::get_resource_identities(ctx, selectors, None /* current subject */).await
     }
 
     /// Returns resources of the specified kind

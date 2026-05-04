@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
+
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use event_sourcing::EventID;
 use futures::TryStreamExt;
@@ -16,6 +18,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceIdentityRow,
     ResourceMetadata,
     ResourceName,
     ResourcePhaseCounts,
@@ -222,6 +225,94 @@ impl ResourceRepository for SqliteResourceRepository {
         .int_err()?;
 
         Ok(maybe_resource_uid.map(ResourceUID::new))
+    }
+
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let uids_placeholders =
+            sqlite_generate_placeholders_list(uids.len(), NonZeroUsize::new(2).unwrap());
+
+        let query_str = format!(
+            r#"
+            SELECT
+                resource_uid as uid,
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = $1
+              AND resource_uid IN ({uids_placeholders})
+              AND deleted_at IS NULL
+            "#,
+        );
+
+        let mut query = sqlx::query_as::<_, ResourceIdentityRow>(&query_str).bind(account_id_str);
+        for uid in uids {
+            query = query.bind(*uid.as_ref());
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let names_placeholders =
+            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(3).unwrap());
+
+        let query_str = format!(
+            r#"
+            SELECT
+                resource_uid as uid,
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = $1
+              AND resource_kind = $2
+              AND resource_name IN ({names_placeholders})
+              AND deleted_at IS NULL
+            "#,
+        );
+
+        let mut query = sqlx::query_as::<_, ResourceIdentityRow>(&query_str)
+            .bind(account_id_str)
+            .bind(kind);
+        for name in names {
+            query = query.bind(name);
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(rows)
     }
 
     async fn find_resource_snapshot(

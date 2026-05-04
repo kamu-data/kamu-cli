@@ -10,7 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::{ResourceSnapshot, ResourceSummaryRow, ResourceUID};
+use crate::{ResourceIdentityRow, ResourceName, ResourceSnapshot, ResourceSummaryRow, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,8 +22,21 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         kind: &str,
-        name: &crate::ResourceName,
-    ) -> Result<Option<crate::ResourceUID>, InternalError>;
+        name: &ResourceName,
+    ) -> Result<Option<ResourceUID>, InternalError>;
+
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
     async fn find_owned_snapshot(
         &self,

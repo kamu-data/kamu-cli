@@ -57,6 +57,11 @@ pub trait ResourceFacade: Send + Sync {
         request: GetResourceRequest,
     ) -> Result<ResourceIdentityView, GetResourceError>;
 
+    async fn get_identities(
+        &self,
+        request: BatchGetResourceIdentitiesRequest,
+    ) -> Result<BatchGetResourceIdentitiesResult, GetResourceError>;
+
     async fn render_manifest(
         &self,
         request: RenderResourceManifestRequest,
@@ -123,6 +128,29 @@ pub struct GetResourceRequest {
     pub api_version: Option<String>,
     pub account: Option<ResourceManifestAccount>,
     pub resource_ref: ResourceRef,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct BatchGetResourceIdentitiesRequest {
+    pub requests: Vec<GetResourceRequest>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct BatchGetResourceIdentitiesResult {
+    pub identities: Vec<ResourceIdentityView>,
+    pub problems: Vec<BatchGetResourceIdentityProblem>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct BatchGetResourceIdentityProblem {
+    pub request_index: usize,
+    pub error: GetResourceError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,7 @@ use database_common::PaginationOpts;
 
 use crate::prelude::*;
 use crate::queries::{
+    BatchResourceIdentitiesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -178,6 +179,40 @@ pub(crate) async fn get_resource_identity(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn get_resource_identities(
+    ctx: &Context<'_>,
+    selectors: Vec<ResourceSelectorInput>,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<BatchResourceIdentitiesResult> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let requests = selectors
+        .into_iter()
+        .map(|selector| {
+            let ResourceSelectorInput {
+                kind,
+                api_version,
+                resource_ref,
+            } = selector;
+
+            kamu_resources_facade::GetResourceRequest {
+                kind: kind.into_resource_type(),
+                api_version,
+                account: account.clone(),
+                resource_ref: resource_ref.into(),
+            }
+        })
+        .collect();
+
+    resource_facade
+        .get_identities(kamu_resources_facade::BatchGetResourceIdentitiesRequest { requests })
+        .await
+        .map(Into::into)
+        .map_err(map_get_resource_error)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn list_resources_connection(
     ctx: &Context<'_>,
     kind: ResourceKindInput,
@@ -331,6 +366,21 @@ fn map_render_resource_manifest_error(
         E::NameNotFound(error) => GqlError::gql(error.to_string()),
         E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
         E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::RemoteRequest(error) => error.int_err().into(),
+        E::Internal(error) => error.into(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_get_resource_error(error: kamu_resources_facade::GetResourceError) -> GqlError {
+    use kamu_resources_facade::GetResourceError as E;
+    match error {
+        E::UIDNotFound(_) | E::NameNotFound(_) => GqlError::gql(error.to_string()),
+        E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
+        E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

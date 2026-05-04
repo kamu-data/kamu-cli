@@ -487,6 +487,10 @@ type AdminResources {
 	"""
 	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
 	"""
+	Returns resource identities by selectors from the target account
+	"""
+	resourceIdentities(selectors: [ResourceSelectorInput!]!): BatchResourceIdentitiesResult!
+	"""
 	Returns resources of the specified kind from the target account
 	"""
 	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
@@ -609,6 +613,28 @@ type AuthWeb3Mut {
 Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
+
+type BatchResourceIdentitiesResult {
+	identities: [ResourceIdentity!]!
+	problems: [BatchResourceIdentityProblem!]!
+}
+
+type BatchResourceIdentityProblem {
+	requestIndex: Int!
+	code: BatchResourceIdentityProblemCode!
+	message: String!
+}
+
+enum BatchResourceIdentityProblemCode {
+	UID_NOT_FOUND
+	NAME_NOT_FOUND
+	API_VERSION_MISMATCH
+	KIND_MISMATCH
+	UNSUPPORTED_DESCRIPTOR
+	BAD_ACCOUNT
+	REMOTE_REQUEST
+	INTERNAL
+}
 
 type BlockRef {
 	name: String!
@@ -3981,6 +4007,10 @@ type Resources {
 	Returns resource identity by selector, if found
 	"""
 	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
+	"""
+	Returns resource identities by selectors
+	"""
+	resourceIdentities(selectors: [ResourceSelectorInput!]!): BatchResourceIdentitiesResult!
 	"""
 	Returns resources of the specified kind
 	"""

@@ -46,6 +46,19 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceUID>, InternalError>;
 
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+
     async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
@@ -126,6 +139,17 @@ impl UpdateResourceError {
 pub struct ResourceDuplicateError {
     pub account_id: odf::AccountID,
     pub kind: String,
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+pub struct ResourceIdentityRow {
+    pub uid: uuid::Uuid,
+    pub kind: String,
+    pub api_version: String,
     pub name: ResourceName,
 }
 

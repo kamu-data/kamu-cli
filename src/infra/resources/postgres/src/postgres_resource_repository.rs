@@ -15,6 +15,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceIdentityRow,
     ResourceMetadata,
     ResourceName,
     ResourcePhaseCounts,
@@ -220,6 +221,84 @@ impl ResourceRepository for PostgresResourceRepository {
         .int_err()?;
 
         Ok(maybe_resource_uid.map(ResourceUID::new))
+    }
+
+    async fn find_resource_identities_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let uids = uids.iter().map(|uid| *uid.as_ref()).collect::<Vec<_>>();
+
+        let rows = sqlx::query_as!(
+            ResourceIdentityRow,
+            r#"
+            SELECT
+                resource_uid as "uid: uuid::Uuid",
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = $1
+              AND resource_uid = ANY($2)
+              AND deleted_at IS NULL
+            "#,
+            account_id_stack.as_str(),
+            &uids,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn find_resource_identities_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &str,
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+
+        let rows = sqlx::query_as!(
+            ResourceIdentityRow,
+            r#"
+            SELECT
+                resource_uid as "uid: uuid::Uuid",
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = $1
+              AND resource_kind = $2
+              AND resource_name = ANY($3)
+              AND deleted_at IS NULL
+            "#,
+            account_id_stack.as_str(),
+            kind,
+            names as _,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
     }
 
     async fn find_resource_snapshot(

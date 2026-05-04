@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 event-sourcing = { workspace = true }
-kamu-resources = { workspace = true }
+kamu-resources = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
 odf = { workspace = true, features = ["sqlx-postgres"] }
 

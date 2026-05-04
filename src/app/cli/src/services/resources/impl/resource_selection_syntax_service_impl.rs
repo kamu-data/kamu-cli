@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use kamu_resources::ResourceKindDescriptor;
+
 use crate::CLIError;
 use crate::resources::{
     ResourceExactSelector,
@@ -41,6 +43,11 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
     ) -> Result<ResourceSelectionSyntax, CLIError> {
         let parsed = Self::parse_syntax(args)?;
 
+        let supported_kinds = self
+            .resource_kind_lookup_service
+            .list_supported_kinds(explicit_context_name)
+            .await?;
+
         let mut items = Vec::new();
         let mut shadowed_selectors = Vec::new();
 
@@ -50,13 +57,11 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
 
                 for shadowed_input in shadowed_inputs {
                     if let Some(kind_str) = shadowed_input.kind_str {
-                        self.resource_kind_lookup_service
-                            .resolve_kind_descriptor(
-                                explicit_context_name,
-                                kind_str,
-                                ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                            )
-                            .await?;
+                        Self::resolve_kind_descriptor(
+                            &supported_kinds,
+                            kind_str,
+                            &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                        )?;
                     }
                     shadowed_selectors.push(ResourceShadowedSelector {
                         selector_input: shadowed_input.display.to_owned(),
@@ -68,14 +73,11 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
                 kind_str,
                 selector_inputs,
             } => {
-                let kind_descriptor = self
-                    .resource_kind_lookup_service
-                    .resolve_kind_descriptor(
-                        explicit_context_name,
-                        kind_str,
-                        ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                    )
-                    .await?;
+                let kind_descriptor = Self::resolve_kind_descriptor(
+                    &supported_kinds,
+                    kind_str,
+                    &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                )?;
 
                 if selector_inputs.contains(&ALL_SELECTOR) {
                     items.push(ResourceSelectionItem::AllByKind {
@@ -112,17 +114,15 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
                         (*selector_input == ALL_SELECTOR).then_some(*kind_str)
                     })
                     .collect();
+
                 let mut emitted_all_by_kind = std::collections::BTreeSet::new();
 
                 for (kind_str, selector_input) in pairs {
-                    let kind_descriptor = self
-                        .resource_kind_lookup_service
-                        .resolve_kind_descriptor(
-                            explicit_context_name,
-                            kind_str,
-                            ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                        )
-                        .await?;
+                    let kind_descriptor = Self::resolve_kind_descriptor(
+                        &supported_kinds,
+                        kind_str,
+                        &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                    )?;
 
                     if selector_input == ALL_SELECTOR {
                         if emitted_all_by_kind.insert(kind_str) {
@@ -185,6 +185,47 @@ struct ShadowedParsedInput<'a> {
 }
 
 impl ResourceSelectionSyntaxServiceImpl {
+    fn resolve_kind_descriptor(
+        supported_kinds: &[ResourceKindDescriptor],
+        target: &str,
+        error_options: &ResourceKindLookupErrorOptions,
+    ) -> Result<ResourceKindDescriptor, CLIError> {
+        supported_kinds
+            .iter()
+            .find(|descriptor| {
+                descriptor.name.eq_ignore_ascii_case(target)
+                    || descriptor
+                        .short_names
+                        .iter()
+                        .any(|short_name| short_name.eq_ignore_ascii_case(target))
+            })
+            .cloned()
+            .ok_or_else(|| {
+                CLIError::usage_error(format!(
+                    "{} '{target}'. Supported targets: {}",
+                    error_options.unsupported_prefix,
+                    Self::supported_targets(supported_kinds, &error_options.additional_targets)
+                        .join(", ")
+                ))
+            })
+    }
+
+    fn supported_targets(
+        supported_kinds: &[ResourceKindDescriptor],
+        additional_targets: &[String],
+    ) -> Vec<String> {
+        let mut targets = additional_targets.to_vec();
+
+        for descriptor in supported_kinds {
+            targets.push(descriptor.name.clone());
+            targets.extend(descriptor.short_names.iter().cloned());
+        }
+
+        targets.sort();
+        targets.dedup();
+        targets
+    }
+
     /// Parses raw CLI `args` into a [`ParsedSyntax`] variant.
     ///
     /// Accepted forms:

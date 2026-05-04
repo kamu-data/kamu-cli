@@ -10,6 +10,7 @@
 use super::helpers as resource_helpers;
 use crate::prelude::*;
 use crate::queries::{
+    BatchResourceIdentitiesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -66,6 +67,24 @@ impl AdminResources {
         resource_helpers::get_resource_identity(
             ctx,
             selector,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
+    }
+
+    /// Returns resource identities by selectors from the target account
+    #[tracing::instrument(level = "info", name = AdminResources_resource_identities, skip_all, fields(selector_count = selectors.len()))]
+    async fn resource_identities(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+    ) -> Result<BatchResourceIdentitiesResult> {
+        resource_helpers::get_resource_identities(
+            ctx,
+            selectors,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),
                 name: None,

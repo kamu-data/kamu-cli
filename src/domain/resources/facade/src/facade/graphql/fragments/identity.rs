@@ -41,6 +41,66 @@ pub(crate) struct AdminGetResourceIdentityRootFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct BatchGetResourceIdentitiesQueryDataFragment {
+    pub resources: BatchGetResourceIdentitiesFieldFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchGetResourceIdentitiesFieldFragment {
+    pub resource_identities: BatchResourceIdentitiesResultFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchGetResourceIdentitiesQueryDataFragment {
+    pub admin: AdminBatchGetResourceIdentitiesRootFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchGetResourceIdentitiesRootFragment {
+    pub resources: BatchGetResourceIdentitiesFieldFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceIdentitiesResultFragment {
+    pub identities: Vec<ResourceIdentityFragment>,
+    pub problems: Vec<BatchResourceIdentityProblemFragment>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceIdentityProblemFragment {
+    pub request_index: usize,
+    pub code: BatchResourceIdentityProblemCodeFragment,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub(crate) enum BatchResourceIdentityProblemCodeFragment {
+    UidNotFound,
+    NameNotFound,
+    ApiVersionMismatch,
+    KindMismatch,
+    UnsupportedDescriptor,
+    BadAccount,
+    RemoteRequest,
+    Internal,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ListIdentitiesByKindQueryDataFragment {
     pub resources: ListIdentitiesByKindResourcesFragment,
 }
