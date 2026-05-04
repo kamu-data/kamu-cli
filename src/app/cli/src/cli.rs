@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
@@ -961,6 +962,19 @@ pub struct Get {
     /// Exit successfully when the resource does not exist
     #[arg(long)]
     pub ignore_not_found: bool,
+
+    /// Maximum number of resources resolved by expanding selectors
+    #[arg(
+        long,
+        value_name = "N",
+        default_value = "100",
+        conflicts_with = "unbounded"
+    )]
+    pub max_results: NonZeroUsize,
+
+    /// Disable the limit for expanding selectors
+    #[arg(long)]
+    pub unbounded: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

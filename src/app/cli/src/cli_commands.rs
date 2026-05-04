@@ -171,6 +171,8 @@ pub fn get_command(
                 c.output_format,
                 c.spec,
                 c.ignore_not_found,
+                c.max_results,
+                c.unbounded,
             )
             .cast(),
         ),

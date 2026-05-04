@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::io::Write;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
@@ -24,6 +25,7 @@ use super::{CLIError, Command, common};
 use crate::cli::GetOutputFormat;
 use crate::resources::{
     ResourceFacadeFactory,
+    ResourceSelectionResolutionOptions,
     ResourceSelectionResolutionService,
     ResourceSelectionSyntaxService,
     ResourceTarget,
@@ -52,11 +54,28 @@ pub struct GetResourceCommand {
 
     #[dill::component(explicit)]
     ignore_not_found: bool,
+
+    #[dill::component(explicit)]
+    max_results: NonZeroUsize,
+
+    #[dill::component(explicit)]
+    unbounded: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl GetResourceCommand {
+    fn resolution_options(&self) -> ResourceSelectionResolutionOptions {
+        ResourceSelectionResolutionOptions {
+            ignore_not_found: self.ignore_not_found,
+            max_expanded_results: if self.unbounded {
+                None
+            } else {
+                Some(self.max_results.get())
+            },
+        }
+    }
+
     fn run_mode(&self) -> GetRunMode {
         match self.output_format {
             GetOutputFormat::Name => GetRunMode::Name,
@@ -303,7 +322,7 @@ impl Command for GetResourceCommand {
 
         let resolved_targets = self
             .resource_selection_resolution_service
-            .resolve(syntax, resource_facade.as_ref(), self.ignore_not_found)
+            .resolve(syntax, resource_facade.as_ref(), self.resolution_options())
             .await?;
 
         match self.run_mode() {

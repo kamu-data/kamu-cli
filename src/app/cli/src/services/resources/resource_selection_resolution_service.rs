@@ -21,8 +21,16 @@ pub trait ResourceSelectionResolutionService: Send + Sync {
         &self,
         selection: ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-        ignore_not_found: bool,
+        options: ResourceSelectionResolutionOptions,
     ) -> Result<ResourceSelectionResolution, CLIError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub struct ResourceSelectionResolutionOptions {
+    pub ignore_not_found: bool,
+    pub max_expanded_results: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

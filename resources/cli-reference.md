@@ -759,6 +759,10 @@ Returns manifest representation of a resource
 
 * `--spec` — Return an apply-compatible spec manifest instead of the full resource view
 * `--ignore-not-found` — Exit successfully when the resource does not exist
+* `--max-results <N>` — Maximum number of resources resolved by expanding selectors
+
+  Default value: `100`
+* `--unbounded` — Disable the limit for expanding selectors
 
 Returns the current state of one or more resources as YAML or JSON.
 
