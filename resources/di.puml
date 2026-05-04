@@ -144,6 +144,7 @@ interface "ResourcePersistenceService" <<i>>
 interface "ResourcePresentationDispatcher" <<i>>
 interface "ResourceRawEventStore" <<i>>
 interface "ResourceRepository" <<i>>
+interface "ResourceSelectionResolutionService" <<i>>
 interface "ResourceSelectionSyntaxService" <<i>>
 interface "ResourceSelectorResolutionService" <<i>>
 interface "ResourceSummaryService" <<i>>
@@ -359,6 +360,7 @@ class "ResourceLifecycleMessageConsumer"
 class "ResourceLoaderImpl"
 class "ResourceManifestDiscoveryServiceImpl"
 class "ResourceManifestExecutionServiceImpl"
+class "ResourceSelectionResolutionServiceImpl"
 class "ResourceSelectionSyntaxServiceImpl"
 class "ResourceSelectorResolutionServiceImpl"
 class "ResourceSummaryServiceImpl"
@@ -801,6 +803,7 @@ class "WsSmartTransferProtocolClient"
 "ResourceKindLookupServiceImpl"  --> "ResourceFacadeFactory"
 "ResourceManifestDiscoveryService" <|-- "ResourceManifestDiscoveryServiceImpl"
 "ResourceManifestExecutionService" <|-- "ResourceManifestExecutionServiceImpl"
+"ResourceSelectionResolutionService" <|-- "ResourceSelectionResolutionServiceImpl"
 "ResourceSelectionSyntaxService" <|-- "ResourceSelectionSyntaxServiceImpl"
 "ResourceSelectionSyntaxServiceImpl"  --> "ResourceKindLookupService"
 "ResourceSelectionSyntaxServiceImpl"  --> "ResourceSelectorResolutionService"

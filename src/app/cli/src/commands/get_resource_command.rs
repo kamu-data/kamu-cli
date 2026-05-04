@@ -11,7 +11,6 @@ use std::io::Write;
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu_resources::ResourceKindDescriptor;
 use kamu_resources_facade::{
     GetResourceError,
     RenderResourceManifestError,
@@ -23,7 +22,12 @@ use kamu_resources_facade::{
 
 use super::{CLIError, Command, common};
 use crate::cli::GetOutputFormat;
-use crate::resources::{ResourceFacadeFactory, ResourceSelectionSyntaxService};
+use crate::resources::{
+    ResourceFacadeFactory,
+    ResourceSelectionResolutionService,
+    ResourceSelectionSyntaxService,
+    ResourceTarget,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +36,7 @@ use crate::resources::{ResourceFacadeFactory, ResourceSelectionSyntaxService};
 pub struct GetResourceCommand {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
+    resource_selection_resolution_service: Arc<dyn ResourceSelectionResolutionService>,
 
     #[dill::component(explicit)]
     explicit_context_name: Option<String>,
@@ -47,16 +52,6 @@ pub struct GetResourceCommand {
 
     #[dill::component(explicit)]
     ignore_not_found: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum GetRunMode {
-    Name,
-    Manifest {
-        format: FacadeResourceManifestFormat,
-        spec: bool,
-    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,9 +159,9 @@ impl GetResourceCommand {
         }
     }
 
-    fn print_name(&self, identity: &kamu_resources::ResourceIdentityView) -> Result<(), CLIError> {
+    fn print_name(&self, target: &ResourceTarget) -> Result<(), CLIError> {
         let mut stdout = std::io::stdout();
-        writeln!(stdout, "{}/{}", identity.canonical_kind_name, identity.name).int_err()?;
+        writeln!(stdout, "{}/{}", target.kind_descriptor.name, target.name).int_err()?;
         Ok(())
     }
 
@@ -176,44 +171,18 @@ impl GetResourceCommand {
         Ok(())
     }
 
-    async fn run_name_view(
-        &self,
-        resource_facade: &dyn ResourceFacade,
-        kind_descriptor: ResourceKindDescriptor,
-        resource_ref: ResourceRef,
-    ) -> Result<(), CLIError> {
-        let identity = resource_facade
-            .get_identity(kamu_resources_facade::GetResourceRequest {
-                kind: kind_descriptor.kind,
-                api_version: Some(kind_descriptor.api_version),
-                account: None,
-                resource_ref,
-            })
-            .await;
-
-        match identity {
-            Ok(identity) => self.print_name(&identity)?,
-            Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
-                if self.ignore_not_found => {}
-            Err(error) => return Err(error.into()),
-        }
-
-        Ok(())
-    }
-
     async fn run_spec_view(
         &self,
         resource_facade: &dyn ResourceFacade,
-        kind_descriptor: ResourceKindDescriptor,
-        resource_ref: ResourceRef,
+        target: &ResourceTarget,
         format: FacadeResourceManifestFormat,
     ) -> Result<Option<String>, CLIError> {
         let rendered = resource_facade
             .render_manifest(RenderResourceManifestRequest {
-                kind: kind_descriptor.kind,
-                api_version: Some(kind_descriptor.api_version),
+                kind: target.kind_descriptor.kind.clone(),
+                api_version: Some(target.kind_descriptor.api_version.clone()),
                 account: None,
-                resource_ref,
+                resource_ref: ResourceRef::ById(target.uid),
                 format,
             })
             .await;
@@ -231,16 +200,15 @@ impl GetResourceCommand {
     async fn run_full_view(
         &self,
         resource_facade: &dyn ResourceFacade,
-        kind_descriptor: ResourceKindDescriptor,
-        resource_ref: ResourceRef,
+        target: &ResourceTarget,
         format: FacadeResourceManifestFormat,
     ) -> Result<Option<String>, CLIError> {
         let resource = resource_facade
             .get(kamu_resources_facade::GetResourceRequest {
-                kind: kind_descriptor.kind,
-                api_version: Some(kind_descriptor.api_version),
+                kind: target.kind_descriptor.kind.clone(),
+                api_version: Some(target.kind_descriptor.api_version.clone()),
                 account: None,
-                resource_ref,
+                resource_ref: ResourceRef::ById(target.uid),
             })
             .await;
 
@@ -323,37 +291,27 @@ impl Command for GetResourceCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
+        let resolved_targets = self
+            .resource_selection_resolution_service
+            .resolve(syntax, resource_facade.as_ref(), self.ignore_not_found)
+            .await?;
+
         match self.run_mode() {
             GetRunMode::Name => {
-                for selector in syntax.selectors {
-                    self.run_name_view(
-                        resource_facade.as_ref(),
-                        selector.kind_descriptor,
-                        selector.resource_ref,
-                    )
-                    .await?;
+                for target in resolved_targets.targets {
+                    self.print_name(&target)?;
                 }
                 Ok(())
             }
             GetRunMode::Manifest { format, spec } => {
                 let mut rendered_items: Vec<String> = Vec::new();
-                for selector in syntax.selectors {
+                for target in resolved_targets.targets {
                     let item = if spec {
-                        self.run_spec_view(
-                            resource_facade.as_ref(),
-                            selector.kind_descriptor,
-                            selector.resource_ref,
-                            format,
-                        )
-                        .await?
+                        self.run_spec_view(resource_facade.as_ref(), &target, format)
+                            .await?
                     } else {
-                        self.run_full_view(
-                            resource_facade.as_ref(),
-                            selector.kind_descriptor,
-                            selector.resource_ref,
-                            format,
-                        )
-                        .await?
+                        self.run_full_view(resource_facade.as_ref(), &target, format)
+                            .await?
                     };
                     if let Some(rendered) = item {
                         rendered_items.push(rendered);
@@ -363,6 +321,16 @@ impl Command for GetResourceCommand {
             }
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum GetRunMode {
+    Name,
+    Manifest {
+        format: FacadeResourceManifestFormat,
+        spec: bool,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
