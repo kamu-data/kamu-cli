@@ -167,8 +167,7 @@ pub fn get_command(
         cli::Command::Get(c) => Box::new(
             GetResourceCommand::builder(
                 c.resource_context.context,
-                c.resource,
-                c.name_or_id,
+                c.args,
                 c.output_format,
                 c.spec,
                 c.ignore_not_found,

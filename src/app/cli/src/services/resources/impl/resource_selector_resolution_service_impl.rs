@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources_facade::GetResourceRef;
+use kamu_resources_facade::ResourceRef;
 
 use crate::CLIError;
 use crate::resources::{ResolvedResourceSelector, ResourceSelectorResolutionService};
@@ -28,9 +28,9 @@ impl ResourceSelectorResolutionService for ResourceSelectorResolutionServiceImpl
     ) -> Result<ResolvedResourceSelector, CLIError> {
         let resource_ref = match uuid::Uuid::parse_str(selector) {
             Ok(uid) if uid.get_version() == Some(uuid::Version::Random) => {
-                GetResourceRef::ById(kamu_resources::ResourceUID::new(uid))
+                ResourceRef::ById(kamu_resources::ResourceUID::new(uid))
             }
-            _ => GetResourceRef::ByName(selector.to_owned()),
+            _ => ResourceRef::ByName(selector.to_owned()),
         };
 
         Ok(ResolvedResourceSelector {

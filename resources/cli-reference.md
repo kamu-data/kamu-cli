@@ -742,12 +742,11 @@ In all other cases a path is considered as a directory. Examples:
 
 Returns manifest representation of a resource
 
-**Usage:** `kamu get [OPTIONS] <RESOURCE> <NAME_OR_ID>`
+**Usage:** `kamu get [OPTIONS] [ARGS]...`
 
 **Arguments:**
 
-* `<RESOURCE>` — Resource kind selector such as `variablesets`, `vs`, `secretsets`, or `ss`
-* `<NAME_OR_ID>` — Exact resource name or UUID-v4 resource ID
+* `<ARGS>` — Resource selector(s) in `kind name` or `kind/name` form
 
 **Options:**
 

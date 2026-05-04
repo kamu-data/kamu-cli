@@ -106,7 +106,7 @@ pub struct GetResourceRequest {
     pub kind: String,
     pub api_version: Option<String>,
     pub account: Option<ResourceManifestAccount>,
-    pub resource_ref: GetResourceRef,
+    pub resource_ref: ResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,14 +116,14 @@ pub struct RenderResourceManifestRequest {
     pub kind: String,
     pub api_version: Option<String>,
     pub account: Option<ResourceManifestAccount>,
-    pub resource_ref: GetResourceRef,
+    pub resource_ref: ResourceRef,
     pub format: ResourceManifestFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub enum GetResourceRef {
+pub enum ResourceRef {
     ById(ResourceUID),
     ByName(ResourceName),
 }
@@ -151,7 +151,7 @@ pub struct ListAllResourcesRequest {
 pub struct DeleteResourceRequest {
     pub kind: String,
     pub account: Option<ResourceManifestAccount>,
-    pub resource_ref: GetResourceRef,
+    pub resource_ref: ResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -32,7 +32,6 @@ use crate::{
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
-    GetResourceRef,
     GetResourceRequest,
     ListAllResourcesError,
     ListAllResourcesRequest,
@@ -44,6 +43,7 @@ use crate::{
     RenderResourceManifestResult,
     ResourceFacade,
     ResourceKindMismatchError,
+    ResourceRef,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
 };
@@ -382,7 +382,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     fn selector_input(
         kind: &str,
         api_version: Option<&str>,
-        resource_ref: &GetResourceRef,
+        resource_ref: &ResourceRef,
     ) -> Result<String, InternalError> {
         let kind = serde_json::to_string(kind).int_err()?;
         let selector_ref = Self::resource_ref_input(resource_ref)?;
@@ -563,13 +563,13 @@ impl RemoteGraphqlResourceFacadeImpl {
         })
     }
 
-    fn resource_ref_input(resource_ref: &GetResourceRef) -> Result<String, InternalError> {
+    fn resource_ref_input(resource_ref: &ResourceRef) -> Result<String, InternalError> {
         match resource_ref {
-            GetResourceRef::ById(uid) => Ok(format!(
+            ResourceRef::ById(uid) => Ok(format!(
                 "{{ byId: {} }}",
                 serde_json::to_string(&uid).int_err()?
             )),
-            GetResourceRef::ByName(name) => Ok(format!(
+            ResourceRef::ByName(name) => Ok(format!(
                 "{{ byName: {{ name: {} }} }}",
                 serde_json::to_string(&name).int_err()?
             )),
@@ -581,7 +581,7 @@ impl RemoteGraphqlResourceFacadeImpl {
         message: &str,
     ) -> Option<DeleteResourceError> {
         match &request.resource_ref {
-            GetResourceRef::ById(uid) => {
+            ResourceRef::ById(uid) => {
                 let not_found = domain::ResourceUIDNotFoundError(*uid);
                 if message.contains(&not_found.to_string()) {
                     return Some(DeleteResourceError::UIDNotFound(not_found));
@@ -608,7 +608,7 @@ impl RemoteGraphqlResourceFacadeImpl {
 
                 None
             }
-            GetResourceRef::ByName(name) => {
+            ResourceRef::ByName(name) => {
                 let not_found = domain::ResourceNameNotFoundError {
                     kind: request.kind.clone(),
                     name: name.clone(),
@@ -644,13 +644,13 @@ impl RemoteGraphqlResourceFacadeImpl {
         message: &str,
     ) -> Option<RenderResourceManifestError> {
         match &request.resource_ref {
-            GetResourceRef::ById(uid) => {
+            ResourceRef::ById(uid) => {
                 let error = domain::ResourceUIDNotFoundError(*uid);
                 message
                     .contains(&error.to_string())
                     .then_some(RenderResourceManifestError::UIDNotFound(error))
             }
-            GetResourceRef::ByName(name) => {
+            ResourceRef::ByName(name) => {
                 let error = domain::ResourceNameNotFoundError {
                     kind: request.kind.clone(),
                     name: name.clone(),
@@ -685,10 +685,8 @@ impl RemoteGraphqlResourceFacadeImpl {
 
     fn not_found_error(request: &GetResourceRequest) -> GetResourceError {
         match &request.resource_ref {
-            GetResourceRef::ById(uid) => {
-                GetResourceError::UIDNotFound(ResourceUIDNotFoundError(*uid))
-            }
-            GetResourceRef::ByName(name) => {
+            ResourceRef::ById(uid) => GetResourceError::UIDNotFound(ResourceUIDNotFoundError(*uid)),
+            ResourceRef::ByName(name) => {
                 GetResourceError::NameNotFound(ResourceNameNotFoundError {
                     kind: request.kind.clone(),
                     name: name.clone(),

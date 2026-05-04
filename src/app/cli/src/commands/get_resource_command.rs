@@ -14,21 +14,16 @@ use internal_error::ResultIntoInternal;
 use kamu_resources::ResourceKindDescriptor;
 use kamu_resources_facade::{
     GetResourceError,
-    GetResourceRef,
     RenderResourceManifestError,
     RenderResourceManifestRequest,
     ResourceFacade,
     ResourceManifestFormat as FacadeResourceManifestFormat,
+    ResourceRef,
 };
 
 use super::{CLIError, Command, common};
 use crate::cli::GetOutputFormat;
-use crate::resources::{
-    ResourceFacadeFactory,
-    ResourceKindLookupErrorOptions,
-    ResourceKindLookupService,
-    ResourceSelectorResolutionService,
-};
+use crate::resources::{ResourceFacadeFactory, ResourceSelectionSyntaxService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,17 +31,13 @@ use crate::resources::{
 #[dill::interface(dyn Command)]
 pub struct GetResourceCommand {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
-    resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
-    resource_selector_resolution_service: Arc<dyn ResourceSelectorResolutionService>,
+    resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
 
     #[dill::component(explicit)]
     explicit_context_name: Option<String>,
 
     #[dill::component(explicit)]
-    resource: String,
-
-    #[dill::component(explicit)]
-    name_or_id: String,
+    args: Vec<String>,
 
     #[dill::component(explicit)]
     output_format: GetOutputFormat,
@@ -83,14 +74,6 @@ impl GetResourceCommand {
                 spec: self.spec,
             },
         }
-    }
-
-    async fn resource_ref(&self) -> Result<GetResourceRef, CLIError> {
-        Ok(self
-            .resource_selector_resolution_service
-            .resolve_single_selector(&self.name_or_id)
-            .await?
-            .resource_ref)
     }
 
     fn render_full_resource(
@@ -201,7 +184,7 @@ impl GetResourceCommand {
         &self,
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
-        resource_ref: GetResourceRef,
+        resource_ref: ResourceRef,
     ) -> Result<(), CLIError> {
         let kind_name = kind_descriptor.name.clone();
         let resource = resource_facade
@@ -228,7 +211,7 @@ impl GetResourceCommand {
         &self,
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
-        resource_ref: GetResourceRef,
+        resource_ref: ResourceRef,
         format: FacadeResourceManifestFormat,
     ) -> Result<(), CLIError> {
         let rendered = resource_facade
@@ -255,7 +238,7 @@ impl GetResourceCommand {
         &self,
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: ResourceKindDescriptor,
-        resource_ref: GetResourceRef,
+        resource_ref: ResourceRef,
         format: FacadeResourceManifestFormat,
     ) -> Result<(), CLIError> {
         let resource = resource_facade
@@ -293,20 +276,23 @@ impl Command for GetResourceCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        let kind_descriptor = self
-            .resource_kind_lookup_service
-            .resolve_kind_descriptor(
-                self.explicit_context_name.as_deref(),
-                &self.resource,
-                ResourceKindLookupErrorOptions::new("Unsupported get target"),
-            )
+        let mut syntax = self
+            .resource_selection_syntax_service
+            .parse_get_args(self.explicit_context_name.as_deref(), &self.args)
             .await?;
+        assert_eq!(
+            syntax.selectors.len(),
+            1,
+            "Expected exactly one resource selector"
+        );
+
+        let selector = syntax.selectors.remove(0);
+        let kind_descriptor = selector.kind_descriptor;
+        let resource_ref = selector.resource_ref;
 
         let resource_facade = self
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
-
-        let resource_ref = self.resource_ref().await?;
 
         match self.run_mode() {
             GetRunMode::Name => {

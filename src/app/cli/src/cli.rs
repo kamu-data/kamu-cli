@@ -932,12 +932,9 @@ Ignore a missing resource:
     kamu get secretsets missing --ignore-not-found
 "#)]
 pub struct Get {
-    /// Resource kind selector such as `variablesets`, `vs`, `secretsets`, or
-    /// `ss`
-    pub resource: String,
-
-    /// Exact resource name or UUID-v4 resource ID
-    pub name_or_id: String,
+    /// Resource selector(s) in `kind name` or `kind/name` form
+    #[arg(num_args = 1..)]
+    pub args: Vec<String>,
 
     #[command(flatten)]
     pub resource_context: ResourceContextArgs,

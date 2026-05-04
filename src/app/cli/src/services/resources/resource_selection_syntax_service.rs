@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_resources::ResourceKindDescriptor;
 use kamu_resources_facade::ResourceRef;
 
 use crate::CLIError;
@@ -14,18 +15,30 @@ use crate::CLIError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceSelectorResolutionService: Send + Sync {
-    async fn resolve_single_selector(
+pub trait ResourceSelectionSyntaxService: Send + Sync {
+    /// Parses positional CLI arguments into a normalized resource selection.
+    ///
+    /// Accepted forms (Phase 2):
+    /// - `kind name` — two positional args, neither contains `/`
+    /// - `kind/name` — one positional arg containing exactly one `/`
+    async fn parse_get_args(
         &self,
-        selector: &str,
-    ) -> Result<ResolvedResourceSelector, CLIError>;
+        explicit_context_name: Option<&str>,
+        args: &[String],
+    ) -> Result<ResourceSelectionSyntax, CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ResolvedResourceSelector {
-    pub input: String,
+pub struct ResourceSelectionSyntax {
+    pub selectors: Vec<ResolvedResourceSelectorByKind>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ResolvedResourceSelectorByKind {
+    pub kind_descriptor: ResourceKindDescriptor,
+    pub selector_input: String,
     pub resource_ref: ResourceRef,
 }
 

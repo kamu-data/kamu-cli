@@ -16,11 +16,11 @@ use kamu_resources_facade::{
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
-    GetResourceRef,
     GetResourceRequest,
     ListAllResourcesRequest,
     ListResourcesRequest,
     ResourceFacade,
+    ResourceRef,
 };
 
 use super::{BatchError, CLIError, Command};
@@ -251,7 +251,7 @@ impl DeleteResourcesCommand {
                 .delete(DeleteResourceRequest {
                     kind: target.kind.clone(),
                     account: None,
-                    resource_ref: GetResourceRef::ById(target.uid),
+                    resource_ref: ResourceRef::ById(target.uid),
                 })
                 .await
             {

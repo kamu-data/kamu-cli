@@ -72,7 +72,7 @@ pub enum ResourceRefInput {
     ByName(ResourceByNameSelectorInput),
 }
 
-impl From<ResourceRefInput> for kamu_resources_facade::GetResourceRef {
+impl From<ResourceRefInput> for kamu_resources_facade::ResourceRef {
     fn from(value: ResourceRefInput) -> Self {
         match value {
             ResourceRefInput::ById(uid) => Self::ById(uid.into()),

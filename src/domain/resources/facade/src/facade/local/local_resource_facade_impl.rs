@@ -43,7 +43,6 @@ use crate::{
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
-    GetResourceRef,
     GetResourceRequest,
     ListAllResourcesError,
     ListAllResourcesRequest,
@@ -59,6 +58,7 @@ use crate::{
     ResourceFacade,
     ResourceKindMismatchError,
     ResourceManifestFormat,
+    ResourceRef,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
 };
@@ -422,14 +422,14 @@ impl LocalResourceFacadeImpl {
         &self,
         kind: &str,
         account_id: &odf::AccountID,
-        resource_ref: &GetResourceRef,
+        resource_ref: &ResourceRef,
     ) -> Result<ResourceUID, E>
     where
         E: From<InternalError> + From<ResourceNameNotFoundError>,
     {
         match resource_ref {
-            GetResourceRef::ById(uid) => Ok(*uid),
-            GetResourceRef::ByName(name) => self
+            ResourceRef::ById(uid) => Ok(*uid),
+            ResourceRef::ByName(name) => self
                 .generic_resource_query_service
                 .find_resource_uid_by_name(account_id, kind, name)
                 .await?
