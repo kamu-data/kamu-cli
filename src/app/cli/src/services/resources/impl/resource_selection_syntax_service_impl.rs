@@ -139,7 +139,11 @@ impl ResourceSelectionSyntaxServiceImpl {
             let mut pairs = Vec::with_capacity(args.len());
             for arg in args {
                 let parts: Vec<&str> = arg.splitn(2, '/').collect();
-                if parts.len() == 2 && !parts[0].is_empty() && !parts[1].is_empty() {
+                if parts.len() == 2
+                    && !parts[0].is_empty()
+                    && !parts[1].is_empty()
+                    && !parts[1].contains('/')
+                {
                     pairs.push((parts[0], parts[1]));
                 } else {
                     return Err(CLIError::usage_error(format!(
@@ -245,6 +249,13 @@ mod tests {
     fn test_parse_syntax_slash_form_malformed_second_arg_is_error() {
         // First arg is valid but second is missing the name part
         let a = args(&["vs/vars-a", "ss/"]);
+        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
+    }
+
+    #[test]
+    fn test_parse_syntax_slash_form_extra_slash_is_error() {
+        // `vs/foo/bar` has two slashes — the selector part itself contains `/`
+        let a = args(&["vs/foo/bar"]);
         assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
     }
 
