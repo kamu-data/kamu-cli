@@ -11,12 +11,14 @@ use std::sync::Arc;
 
 use crate::CLIError;
 use crate::resources::{
-    ResolvedResourceSelectorByKind,
+    ResourceExactSelector,
     ResourceKindLookupErrorOptions,
     ResourceKindLookupService,
+    ResourceSelectionItem,
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
     ResourceSelectorResolutionService,
+    ResourceShadowedSelector,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +41,29 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
     ) -> Result<ResourceSelectionSyntax, CLIError> {
         let parsed = Self::parse_syntax(args)?;
 
-        let selectors = match parsed {
+        let mut items = Vec::new();
+        let mut shadowed_selectors = Vec::new();
+
+        match parsed {
+            ParsedSyntax::All { shadowed_inputs } => {
+                items.push(ResourceSelectionItem::All);
+
+                for shadowed_input in shadowed_inputs {
+                    if let Some(kind_str) = shadowed_input.kind_str {
+                        self.resource_kind_lookup_service
+                            .resolve_kind_descriptor(
+                                explicit_context_name,
+                                kind_str,
+                                ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                            )
+                            .await?;
+                    }
+                    shadowed_selectors.push(ResourceShadowedSelector {
+                        selector_input: shadowed_input.display.to_owned(),
+                    });
+                }
+            }
+
             ParsedSyntax::SameKind {
                 kind_str,
                 selector_inputs,
@@ -53,23 +77,43 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
                     )
                     .await?;
 
-                let mut selectors = Vec::with_capacity(selector_inputs.len());
-                for selector_input in selector_inputs {
-                    let resolved = self
-                        .resource_selector_resolution_service
-                        .resolve_single_selector(selector_input)
-                        .await?;
-                    selectors.push(ResolvedResourceSelectorByKind {
-                        kind_descriptor: kind_descriptor.clone(),
-                        selector_input: resolved.input,
-                        resource_ref: resolved.resource_ref,
+                if selector_inputs.contains(&ALL_SELECTOR) {
+                    items.push(ResourceSelectionItem::AllByKind {
+                        kind_descriptor,
+                        selector_input: ALL_SELECTOR.to_owned(),
                     });
+
+                    for selector_input in selector_inputs {
+                        if selector_input != ALL_SELECTOR {
+                            shadowed_selectors.push(ResourceShadowedSelector {
+                                selector_input: selector_input.to_owned(),
+                            });
+                        }
+                    }
+                } else {
+                    for selector_input in selector_inputs {
+                        let resolved = self
+                            .resource_selector_resolution_service
+                            .resolve_single_selector(selector_input)
+                            .await?;
+                        items.push(ResourceSelectionItem::Exact(ResourceExactSelector {
+                            kind_descriptor: kind_descriptor.clone(),
+                            selector_input: resolved.input,
+                            resource_ref: resolved.resource_ref,
+                        }));
+                    }
                 }
-                selectors
             }
 
             ParsedSyntax::RefForm { pairs } => {
-                let mut selectors = Vec::with_capacity(pairs.len());
+                let all_by_kind: std::collections::BTreeSet<&str> = pairs
+                    .iter()
+                    .filter_map(|(kind_str, selector_input)| {
+                        (*selector_input == ALL_SELECTOR).then_some(*kind_str)
+                    })
+                    .collect();
+                let mut emitted_all_by_kind = std::collections::BTreeSet::new();
+
                 for (kind_str, selector_input) in pairs {
                     let kind_descriptor = self
                         .resource_kind_lookup_service
@@ -79,28 +123,52 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
                             ResourceKindLookupErrorOptions::new("Unsupported get target"),
                         )
                         .await?;
-                    let resolved = self
-                        .resource_selector_resolution_service
-                        .resolve_single_selector(selector_input)
-                        .await?;
-                    selectors.push(ResolvedResourceSelectorByKind {
-                        kind_descriptor,
-                        selector_input: resolved.input,
-                        resource_ref: resolved.resource_ref,
-                    });
-                }
-                selectors
-            }
-        };
 
-        Ok(ResourceSelectionSyntax { selectors })
+                    if selector_input == ALL_SELECTOR {
+                        if emitted_all_by_kind.insert(kind_str) {
+                            items.push(ResourceSelectionItem::AllByKind {
+                                kind_descriptor,
+                                selector_input: selector_input.to_owned(),
+                            });
+                        }
+                    } else if all_by_kind.contains(kind_str) {
+                        shadowed_selectors.push(ResourceShadowedSelector {
+                            selector_input: format!("{kind_str}/{selector_input}"),
+                        });
+                    } else {
+                        let resolved = self
+                            .resource_selector_resolution_service
+                            .resolve_single_selector(selector_input)
+                            .await?;
+                        items.push(ResourceSelectionItem::Exact(ResourceExactSelector {
+                            kind_descriptor,
+                            selector_input: resolved.input,
+                            resource_ref: resolved.resource_ref,
+                        }));
+                    }
+                }
+            }
+        }
+
+        Ok(ResourceSelectionSyntax {
+            items,
+            shadowed_selectors,
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const ALL_SELECTOR: &str = "all";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 enum ParsedSyntax<'a> {
+    /// `all` — all resources across supported kinds; other args are shadowed.
+    All {
+        shadowed_inputs: Vec<ShadowedParsedInput<'a>>,
+    },
     /// `kind sel1 sel2 ...` — kind is a plain word, selectors have no `/`
     SameKind {
         kind_str: &'a str,
@@ -108,6 +176,12 @@ enum ParsedSyntax<'a> {
     },
     /// `kind/sel1 kind/sel2 ...` — every arg contains exactly one `/`
     RefForm { pairs: Vec<(&'a str, &'a str)> },
+}
+
+#[derive(Debug)]
+struct ShadowedParsedInput<'a> {
+    kind_str: Option<&'a str>,
+    display: &'a str,
 }
 
 impl ResourceSelectionSyntaxServiceImpl {
@@ -128,6 +202,29 @@ impl ResourceSelectionSyntaxServiceImpl {
         let has_plain = args.iter().any(|a| !a.contains('/'));
 
         if has_slash && has_plain {
+            if args.iter().any(|arg| arg == ALL_SELECTOR) {
+                let mut shadowed_inputs = Vec::new();
+                for arg in args {
+                    if arg == ALL_SELECTOR {
+                        continue;
+                    }
+
+                    if arg.contains('/') {
+                        let (kind_str, _) = Self::parse_ref_arg(arg)?;
+                        shadowed_inputs.push(ShadowedParsedInput {
+                            kind_str: Some(kind_str),
+                            display: arg,
+                        });
+                    } else {
+                        shadowed_inputs.push(ShadowedParsedInput {
+                            kind_str: None,
+                            display: arg,
+                        });
+                    }
+                }
+                return Ok(ParsedSyntax::All { shadowed_inputs });
+            }
+
             return Err(CLIError::usage_error(
                 "Cannot mix positional `kind name` and slash `kind/name` syntax in the same \
                  command",
@@ -138,21 +235,21 @@ impl ResourceSelectionSyntaxServiceImpl {
             // Ref form: every arg must be `kind/selector`
             let mut pairs = Vec::with_capacity(args.len());
             for arg in args {
-                let parts: Vec<&str> = arg.splitn(2, '/').collect();
-                if parts.len() == 2
-                    && !parts[0].is_empty()
-                    && !parts[1].is_empty()
-                    && !parts[1].contains('/')
-                {
-                    pairs.push((parts[0], parts[1]));
-                } else {
-                    return Err(CLIError::usage_error(format!(
-                        "Invalid resource reference `{arg}`. Expected `kind/name`"
-                    )));
-                }
+                pairs.push(Self::parse_ref_arg(arg)?);
             }
             Ok(ParsedSyntax::RefForm { pairs })
         } else {
+            if args[0] == ALL_SELECTOR {
+                let shadowed_inputs = args[1..]
+                    .iter()
+                    .map(|arg| ShadowedParsedInput {
+                        kind_str: None,
+                        display: arg.as_str(),
+                    })
+                    .collect();
+                return Ok(ParsedSyntax::All { shadowed_inputs });
+            }
+
             // Same-kind form: `kind sel1 sel2 ...`
             if args.len() < 2 {
                 return Err(CLIError::usage_error(format!(
@@ -166,6 +263,21 @@ impl ResourceSelectionSyntaxServiceImpl {
                 kind_str,
                 selector_inputs,
             })
+        }
+    }
+
+    fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {
+        let parts: Vec<&str> = arg.splitn(2, '/').collect();
+        if parts.len() == 2
+            && !parts[0].is_empty()
+            && !parts[1].is_empty()
+            && !parts[1].contains('/')
+        {
+            Ok((parts[0], parts[1]))
+        } else {
+            Err(CLIError::usage_error(format!(
+                "Invalid resource reference `{arg}`. Expected `kind/name`"
+            )))
         }
     }
 }
@@ -230,6 +342,87 @@ mod tests {
         assert_matches!(
             ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
             Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69")]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_all() {
+        let a = args(&["all"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::All {
+                shadowed_inputs,
+            }) if shadowed_inputs.is_empty()
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_all_with_shadowed_plain() {
+        let a = args(&["all", "some-name"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::All {
+                shadowed_inputs,
+            }) if shadowed_inputs.len() == 1
+                && shadowed_inputs[0].kind_str.is_none()
+                && shadowed_inputs[0].display == "some-name"
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_all_with_shadowed_ref_form() {
+        let a = args(&["all", "vs/my-vars"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::All {
+                shadowed_inputs,
+            }) if shadowed_inputs.len() == 1
+                && shadowed_inputs[0].kind_str == Some("vs")
+                && shadowed_inputs[0].display == "vs/my-vars"
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_all_with_mixed_shadowed() {
+        let a = args(&["all", "vs/my-vars", "some-name"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::All { shadowed_inputs })
+            if shadowed_inputs.len() == 2
+                && shadowed_inputs[0].kind_str == Some("vs")
+                && shadowed_inputs[0].display == "vs/my-vars"
+                && shadowed_inputs[1].kind_str.is_none()
+                && shadowed_inputs[1].display == "some-name"
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_same_kind_all() {
+        let a = args(&["vs", "all", "my-vars"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::SameKind {
+                kind_str: "vs",
+                selector_inputs,
+            }) if selector_inputs == vec!["all", "my-vars"]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_slash_form_all_by_kind_single() {
+        let a = args(&["vs/all"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all")]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_slash_form_all_by_kind_with_shadowed() {
+        let a = args(&["vs/all", "vs/my-vars"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all"), ("vs", "my-vars")]
         );
     }
 

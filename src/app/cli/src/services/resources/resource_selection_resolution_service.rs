@@ -37,7 +37,9 @@ pub struct ResourceSelectionResolution {
 
 #[derive(Debug, Clone)]
 pub struct ResourceTarget {
-    pub kind_descriptor: ResourceKindDescriptor,
+    pub kind: String,
+    pub api_version: String,
+    pub canonical_kind_name: String,
     pub uid: ResourceUID,
     pub name: ResourceName,
     pub selector_input: String,

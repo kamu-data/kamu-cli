@@ -18,9 +18,11 @@ use crate::CLIError;
 pub trait ResourceSelectionSyntaxService: Send + Sync {
     /// Parses positional CLI arguments into a normalized resource selection.
     ///
-    /// Accepted forms (Phase 2):
-    /// - `kind name` — two positional args, neither contains `/`
-    /// - `kind/name` — one positional arg containing exactly one `/`
+    /// Accepted forms:
+    /// - `all`
+    /// - `kind all` or `kind/all`
+    /// - `kind name ...` — same-kind selectors, none containing `/`
+    /// - `kind/name ...` — slash selectors, each containing exactly one `/`
     async fn parse_get_args(
         &self,
         explicit_context_name: Option<&str>,
@@ -31,15 +33,33 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ResourceSelectionSyntax {
-    pub selectors: Vec<ResolvedResourceSelectorByKind>,
+    pub items: Vec<ResourceSelectionItem>,
+    pub shadowed_selectors: Vec<ResourceShadowedSelector>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResolvedResourceSelectorByKind {
+pub enum ResourceSelectionItem {
+    All,
+    AllByKind {
+        kind_descriptor: ResourceKindDescriptor,
+        selector_input: String,
+    },
+    Exact(ResourceExactSelector),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ResourceExactSelector {
     pub kind_descriptor: ResourceKindDescriptor,
     pub selector_input: String,
     pub resource_ref: ResourceRef,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ResourceShadowedSelector {
+    pub selector_input: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

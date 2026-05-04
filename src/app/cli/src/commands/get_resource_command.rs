@@ -161,8 +161,14 @@ impl GetResourceCommand {
 
     fn print_name(&self, target: &ResourceTarget) -> Result<(), CLIError> {
         let mut stdout = std::io::stdout();
-        writeln!(stdout, "{}/{}", target.kind_descriptor.name, target.name).int_err()?;
+        writeln!(stdout, "{}/{}", target.canonical_kind_name, target.name).int_err()?;
         Ok(())
+    }
+
+    fn print_shadowed_selector_warning(selector_input: &str) {
+        eprintln!(
+            "Warning: selector `{selector_input}` ignored because `all` selects the same scope"
+        );
     }
 
     fn write_stdout(&self, rendered: &str) -> Result<(), CLIError> {
@@ -179,8 +185,8 @@ impl GetResourceCommand {
     ) -> Result<Option<String>, CLIError> {
         let rendered = resource_facade
             .render_manifest(RenderResourceManifestRequest {
-                kind: target.kind_descriptor.kind.clone(),
-                api_version: Some(target.kind_descriptor.api_version.clone()),
+                kind: target.kind.clone(),
+                api_version: Some(target.api_version.clone()),
                 account: None,
                 resource_ref: ResourceRef::ById(target.uid),
                 format,
@@ -205,8 +211,8 @@ impl GetResourceCommand {
     ) -> Result<Option<String>, CLIError> {
         let resource = resource_facade
             .get(kamu_resources_facade::GetResourceRequest {
-                kind: target.kind_descriptor.kind.clone(),
-                api_version: Some(target.kind_descriptor.api_version.clone()),
+                kind: target.kind.clone(),
+                api_version: Some(target.api_version.clone()),
                 account: None,
                 resource_ref: ResourceRef::ById(target.uid),
             })
@@ -286,6 +292,10 @@ impl Command for GetResourceCommand {
             .resource_selection_syntax_service
             .parse_get_args(self.explicit_context_name.as_deref(), &self.args)
             .await?;
+
+        for shadowed_selector in &syntax.shadowed_selectors {
+            Self::print_shadowed_selector_warning(&shadowed_selector.selector_input);
+        }
 
         let resource_facade = self
             .resource_facade_factory
