@@ -197,14 +197,13 @@ impl GetResourceCommand {
             .await;
 
         match resource {
-            Ok(resource) => self.print_name(&kind_name, &resource),
+            Ok(resource) => self.print_name(&kind_name, &resource)?,
             Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
-                if self.ignore_not_found =>
-            {
-                Ok(())
-            }
-            Err(error) => Err(error.into()),
+                if self.ignore_not_found => {}
+            Err(error) => return Err(error.into()),
         }
+
+        Ok(())
     }
 
     async fn run_spec_view(
@@ -213,7 +212,7 @@ impl GetResourceCommand {
         kind_descriptor: ResourceKindDescriptor,
         resource_ref: ResourceRef,
         format: FacadeResourceManifestFormat,
-    ) -> Result<(), CLIError> {
+    ) -> Result<Option<String>, CLIError> {
         let rendered = resource_facade
             .render_manifest(RenderResourceManifestRequest {
                 kind: kind_descriptor.kind,
@@ -225,11 +224,11 @@ impl GetResourceCommand {
             .await;
 
         match rendered {
-            Ok(rendered) => self.write_stdout(&rendered.manifest),
+            Ok(rendered) => Ok(Some(rendered.manifest)),
             Err(
                 RenderResourceManifestError::NameNotFound(_)
                 | RenderResourceManifestError::UIDNotFound(_),
-            ) if self.ignore_not_found => Ok(()),
+            ) if self.ignore_not_found => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
@@ -240,7 +239,7 @@ impl GetResourceCommand {
         kind_descriptor: ResourceKindDescriptor,
         resource_ref: ResourceRef,
         format: FacadeResourceManifestFormat,
-    ) -> Result<(), CLIError> {
+    ) -> Result<Option<String>, CLIError> {
         let resource = resource_facade
             .get(kamu_resources_facade::GetResourceRequest {
                 kind: kind_descriptor.kind,
@@ -251,14 +250,58 @@ impl GetResourceCommand {
             .await;
 
         match resource {
-            Ok(resource) => self.write_stdout(&self.render_full_resource(&resource, format)?),
+            Ok(resource) => Ok(Some(self.render_full_resource(&resource, format)?)),
             Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
                 if self.ignore_not_found =>
             {
-                Ok(())
+                Ok(None)
             }
             Err(error) => Err(error.into()),
         }
+    }
+
+    fn output_rendered_items(
+        &self,
+        mut rendered_items: Vec<String>,
+        format: FacadeResourceManifestFormat,
+    ) -> Result<(), CLIError> {
+        match rendered_items.len().cmp(&1) {
+            std::cmp::Ordering::Equal => self.write_stdout(&rendered_items.remove(0)),
+            std::cmp::Ordering::Greater => {
+                let output = match format {
+                    FacadeResourceManifestFormat::Json => Self::wrap_items_json(rendered_items)?,
+                    FacadeResourceManifestFormat::Yaml => Self::wrap_items_yaml(rendered_items)?,
+                };
+                self.write_stdout(&output)
+            }
+            std::cmp::Ordering::Less => Ok(()),
+        }
+    }
+
+    fn wrap_items_json(rendered_items: Vec<String>) -> Result<String, CLIError> {
+        let values: Vec<serde_json::Value> = rendered_items
+            .into_iter()
+            .map(|s| serde_json::from_str(&s))
+            .collect::<Result<_, _>>()
+            .map_err(CLIError::critical)?;
+        #[derive(serde::Serialize)]
+        struct ItemList {
+            items: Vec<serde_json::Value>,
+        }
+        serde_json::to_string_pretty(&ItemList { items: values }).map_err(CLIError::critical)
+    }
+
+    fn wrap_items_yaml(rendered_items: Vec<String>) -> Result<String, CLIError> {
+        let values: Vec<serde_yaml::Value> = rendered_items
+            .into_iter()
+            .map(|s| serde_yaml::from_str(&s))
+            .collect::<Result<_, _>>()
+            .map_err(CLIError::critical)?;
+        #[derive(serde::Serialize)]
+        struct ItemList {
+            items: Vec<serde_yaml::Value>,
+        }
+        serde_yaml::to_string(&ItemList { items: values }).map_err(CLIError::critical)
     }
 }
 
@@ -276,19 +319,10 @@ impl Command for GetResourceCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        let mut syntax = self
+        let syntax = self
             .resource_selection_syntax_service
             .parse_get_args(self.explicit_context_name.as_deref(), &self.args)
             .await?;
-        assert_eq!(
-            syntax.selectors.len(),
-            1,
-            "Expected exactly one resource selector"
-        );
-
-        let selector = syntax.selectors.remove(0);
-        let kind_descriptor = selector.kind_descriptor;
-        let resource_ref = selector.resource_ref;
 
         let resource_facade = self
             .resource_facade_factory
@@ -296,29 +330,41 @@ impl Command for GetResourceCommand {
 
         match self.run_mode() {
             GetRunMode::Name => {
-                self.run_name_view(resource_facade.as_ref(), kind_descriptor, resource_ref)
-                    .await
+                for selector in syntax.selectors {
+                    self.run_name_view(
+                        resource_facade.as_ref(),
+                        selector.kind_descriptor,
+                        selector.resource_ref,
+                    )
+                    .await?;
+                }
+                Ok(())
             }
-            GetRunMode::Manifest { format, spec: true } => {
-                self.run_spec_view(
-                    resource_facade.as_ref(),
-                    kind_descriptor,
-                    resource_ref,
-                    format,
-                )
-                .await
-            }
-            GetRunMode::Manifest {
-                format,
-                spec: false,
-            } => {
-                self.run_full_view(
-                    resource_facade.as_ref(),
-                    kind_descriptor,
-                    resource_ref,
-                    format,
-                )
-                .await
+            GetRunMode::Manifest { format, spec } => {
+                let mut rendered_items: Vec<String> = Vec::new();
+                for selector in syntax.selectors {
+                    let item = if spec {
+                        self.run_spec_view(
+                            resource_facade.as_ref(),
+                            selector.kind_descriptor,
+                            selector.resource_ref,
+                            format,
+                        )
+                        .await?
+                    } else {
+                        self.run_full_view(
+                            resource_facade.as_ref(),
+                            selector.kind_descriptor,
+                            selector.resource_ref,
+                            format,
+                        )
+                        .await?
+                    };
+                    if let Some(rendered) = item {
+                        rendered_items.push(rendered);
+                    }
+                }
+                self.output_rendered_items(rendered_items, format)
             }
         }
     }

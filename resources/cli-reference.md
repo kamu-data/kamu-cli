@@ -746,7 +746,7 @@ Returns manifest representation of a resource
 
 **Arguments:**
 
-* `<ARGS>` — Resource selector(s) in `kind name` or `kind/name` form
+* `<ARGS>` — Resource selector(s): `kind name...` or `kind/name...`
 
 **Options:**
 
@@ -760,13 +760,15 @@ Returns manifest representation of a resource
 * `--spec` — Return an apply-compatible spec manifest instead of the full resource view
 * `--ignore-not-found` — Exit successfully when the resource does not exist
 
-Returns the current state of a single resource as YAML or JSON.
+Returns the current state of one or more resources as YAML or JSON.
 
 Only real resource kinds supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
 
 By default this command returns the full resource view, including status.
 Use `--spec` to return the apply-compatible spec manifest instead.
+
+When multiple selectors are provided, the output is wrapped in an `items` list.
 
 **Examples:**
 
@@ -782,6 +784,14 @@ Get the apply-compatible spec manifest:
 
     kamu get vs my-vars --spec
 
+Get multiple resources of the same kind:
+
+    kamu get variablesets vars-a vars-b
+
+Get multiple resources by slash-separated ref form:
+
+    kamu get vs/vars-a ss/db-creds
+
 Get a resource by UUID:
 
     kamu get variablesets 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
@@ -790,9 +800,9 @@ Read a resource from a remote context:
 
     kamu get storages warehouse --context prod
 
-Ignore a missing resource:
+Ignore missing resources:
 
-    kamu get secretsets missing --ignore-not-found
+    kamu get secretsets missing-a missing-b --ignore-not-found
 
 
 
