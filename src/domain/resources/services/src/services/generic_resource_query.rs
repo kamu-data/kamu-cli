@@ -91,6 +91,26 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
+    async fn list_snapshots_by_kind(
+        &self,
+        account_id: odf::AccountID,
+        kind: &str,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        let mut resource_snapshots_stream = self
+            .resource_repository
+            .list_resource_snapshots_by_kind(account_id, kind, pagination);
+
+        use tokio_stream::StreamExt;
+
+        let mut resource_snapshots = Vec::new();
+        while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
+            resource_snapshots.push(resource_snapshot?);
+        }
+
+        Ok(resource_snapshots)
+    }
+
     async fn list_all_snapshots(
         &self,
         account_id: odf::AccountID,

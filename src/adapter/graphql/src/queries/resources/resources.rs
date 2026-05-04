@@ -13,6 +13,8 @@ use crate::prelude::*;
 use crate::queries::{
     Resource,
     ResourceConnection,
+    ResourceIdentity,
+    ResourceIdentityConnection,
     ResourceKindDescriptor,
     ResourceKindInput,
     ResourceManifestFormat,
@@ -56,6 +58,17 @@ impl Resources {
         resource_helpers::get_resource(ctx, selector, None /* current subject */).await
     }
 
+    /// Returns resource identity by selector, if found
+    #[tracing::instrument(level = "info", name = Resources_resource_identity, skip_all, fields(?selector))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resource_identity(
+        &self,
+        ctx: &Context<'_>,
+        selector: ResourceSelectorInput,
+    ) -> Result<Option<ResourceIdentity>> {
+        resource_helpers::get_resource_identity(ctx, selector, None /* current subject */).await
+    }
+
     /// Returns resources of the specified kind
     #[tracing::instrument(level = "info", name = Resources_list_by_kind, skip_all, fields(?kind, ?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -76,6 +89,26 @@ impl Resources {
         .await
     }
 
+    /// Returns resource identities of the specified kind
+    #[tracing::instrument(level = "info", name = Resources_list_identities_by_kind, skip_all, fields(?kind, ?page, ?per_page))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn list_identities_by_kind(
+        &self,
+        ctx: &Context<'_>,
+        kind: ResourceKindInput,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceIdentityConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_resource_identities_connection(
+            ctx, kind, None, /* current subject */
+            page, per_page,
+        )
+        .await
+    }
+
     /// Returns resources across all kinds
     #[tracing::instrument(level = "info", name = Resources_list_all, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -89,6 +122,25 @@ impl Resources {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         resource_helpers::list_all_resources_connection(
+            ctx, None, /* current subject */
+            page, per_page,
+        )
+        .await
+    }
+
+    /// Returns resource identities across all kinds
+    #[tracing::instrument(level = "info", name = Resources_list_all_identities, skip_all, fields(?page, ?per_page))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn list_all_identities(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceIdentityConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_all_resource_identities_connection(
             ctx, None, /* current subject */
             page, per_page,
         )

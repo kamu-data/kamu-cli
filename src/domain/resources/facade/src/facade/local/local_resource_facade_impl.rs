@@ -19,6 +19,7 @@ use domain::{
     ResourceCrudDispatcherDeleteRequest,
     ResourceCrudDispatcherGetRequest,
     ResourceCrudDispatcherListRequest,
+    ResourceIdentityView,
     ResourceKindDescriptor,
     ResourceManifest,
     ResourceMetadataInput,
@@ -32,6 +33,7 @@ use domain::{
     ResourceView,
     ResourceWarning,
     ResourcesSummary,
+    UnsupportedResourceDescriptorError,
 };
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
@@ -44,8 +46,10 @@ use crate::{
     DeleteResourceRequest,
     GetResourceError,
     GetResourceRequest,
+    ListAllResourceIdentitiesRequest,
     ListAllResourcesError,
     ListAllResourcesRequest,
+    ListResourceIdentitiesRequest,
     ListResourcesError,
     ListResourcesRequest,
     ListSupportedResourceKindsError,
@@ -178,6 +182,40 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map_err(Into::into)
     }
 
+    async fn get_identity(
+        &self,
+        request: GetResourceRequest,
+    ) -> Result<ResourceIdentityView, GetResourceError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        let uid = self
+            .resolve_resource_uid::<GetResourceError>(
+                &request.kind,
+                &target_account.id,
+                &request.resource_ref,
+            )
+            .await?;
+
+        let snapshot = self
+            .resolve_snapshot_for_kind(&request.kind, &target_account.id, &uid)
+            .await?;
+
+        if let Some(expected_api_version) = request.api_version.as_ref()
+            && snapshot.api_version != *expected_api_version
+        {
+            return Err(ResourceAPIVersionMismatchError {
+                expected_api_version: expected_api_version.clone(),
+                actual_api_version: snapshot.api_version,
+            }
+            .into());
+        }
+
+        self.resource_identity_from_snapshot(snapshot)
+    }
+
     async fn render_manifest(
         &self,
         request: RenderResourceManifestRequest,
@@ -223,6 +261,31 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map_err(Into::into)
     }
 
+    async fn list_identities(
+        &self,
+        request: ListResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        get_resource_crud_dispatcher_by_kind::<ListResourcesError>(&self.catalog, &request.kind)?;
+
+        let snapshots = self
+            .generic_resource_query_service
+            .list_snapshots_by_kind(target_account.id.clone(), &request.kind, request.pagination)
+            .await?;
+
+        snapshots
+            .into_iter()
+            .map(|snapshot| {
+                self.resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(snapshot)
+                    .map_err(|error| InternalError::new(format!("{error}")).into())
+            })
+            .collect()
+    }
+
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
@@ -238,6 +301,29 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_all_identities(
+        &self,
+        request: ListAllResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        let snapshots = self
+            .generic_resource_query_service
+            .list_all_snapshots(target_account.id.clone(), request.pagination)
+            .await?;
+
+        snapshots
+            .into_iter()
+            .map(|snapshot| {
+                self.resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(snapshot)
+                    .map_err(|error| InternalError::new(format!("{error}")).into())
+            })
+            .collect()
     }
 
     async fn plan_apply_manifest(
@@ -416,6 +502,34 @@ impl LocalResourceFacadeImpl {
         });
 
         descriptors
+    }
+
+    fn resource_identity_from_snapshot<E>(
+        &self,
+        snapshot: ResourceSnapshot,
+    ) -> Result<ResourceIdentityView, E>
+    where
+        E: From<UnsupportedResourceDescriptorError>,
+    {
+        let canonical_kind_name = self
+            .list_resource_kind_descriptors()
+            .into_iter()
+            .find(|descriptor| {
+                descriptor.kind == snapshot.kind && descriptor.api_version == snapshot.api_version
+            })
+            .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
+                kind: snapshot.kind.clone(),
+                api_version: snapshot.api_version.clone(),
+            })?
+            .name;
+
+        Ok(ResourceIdentityView {
+            kind: snapshot.kind,
+            api_version: snapshot.api_version,
+            canonical_kind_name,
+            uid: snapshot.uid,
+            name: snapshot.metadata.name,
+        })
     }
 
     async fn resolve_resource_uid<E>(

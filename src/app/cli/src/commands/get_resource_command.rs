@@ -164,13 +164,9 @@ impl GetResourceCommand {
         }
     }
 
-    fn print_name(
-        &self,
-        kind_name: &str,
-        resource: &kamu_resources::ResourceView,
-    ) -> Result<(), CLIError> {
+    fn print_name(&self, identity: &kamu_resources::ResourceIdentityView) -> Result<(), CLIError> {
         let mut stdout = std::io::stdout();
-        writeln!(stdout, "{kind_name}/{}", resource.metadata.name).int_err()?;
+        writeln!(stdout, "{}/{}", identity.canonical_kind_name, identity.name).int_err()?;
         Ok(())
     }
 
@@ -186,9 +182,8 @@ impl GetResourceCommand {
         kind_descriptor: ResourceKindDescriptor,
         resource_ref: ResourceRef,
     ) -> Result<(), CLIError> {
-        let kind_name = kind_descriptor.name.clone();
-        let resource = resource_facade
-            .get(kamu_resources_facade::GetResourceRequest {
+        let identity = resource_facade
+            .get_identity(kamu_resources_facade::GetResourceRequest {
                 kind: kind_descriptor.kind,
                 api_version: Some(kind_descriptor.api_version),
                 account: None,
@@ -196,8 +191,8 @@ impl GetResourceCommand {
             })
             .await;
 
-        match resource {
-            Ok(resource) => self.print_name(&kind_name, &resource)?,
+        match identity {
+            Ok(identity) => self.print_name(&identity)?,
             Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
                 if self.ignore_not_found => {}
             Err(error) => return Err(error.into()),

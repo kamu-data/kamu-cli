@@ -175,6 +175,29 @@ impl From<kamu_resources::ResourceView> for Resource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceIdentity {
+    pub id: ResourceID,
+    pub api_version: String,
+    pub kind: ResourceKind,
+    pub canonical_kind_name: String,
+    pub name: String,
+}
+
+impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
+    fn from(value: kamu_resources::ResourceIdentityView) -> Self {
+        Self {
+            id: value.uid.into(),
+            api_version: value.api_version,
+            kind: ResourceKind::new(value.kind),
+            canonical_kind_name: value.canonical_kind_name,
+            name: value.name,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceMetadata {
     pub id: ResourceID,
     pub account_id: AccountID<'static>,
@@ -374,5 +397,13 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(ResourceSummary, ResourceConnection, ResourceEdge);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(
+    ResourceIdentity,
+    ResourceIdentityConnection,
+    ResourceIdentityEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

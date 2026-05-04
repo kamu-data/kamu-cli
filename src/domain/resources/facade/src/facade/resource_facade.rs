@@ -15,6 +15,7 @@ use domain::{
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
     ResourceAPIVersionMismatchError,
+    ResourceIdentityView,
     ResourceInvalidSpecError,
     ResourceKindDescriptor,
     ResourceManifestAccount,
@@ -51,6 +52,11 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
 
+    async fn get_identity(
+        &self,
+        request: GetResourceRequest,
+    ) -> Result<ResourceIdentityView, GetResourceError>;
+
     async fn render_manifest(
         &self,
         request: RenderResourceManifestRequest,
@@ -61,10 +67,20 @@ pub trait ResourceFacade: Send + Sync {
         request: ListResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListResourcesError>;
 
+    async fn list_identities(
+        &self,
+        request: ListResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
+
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
+
+    async fn list_all_identities(
+        &self,
+        request: ListAllResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError>;
 
     async fn plan_apply_manifest(
         &self,
@@ -140,7 +156,24 @@ pub struct ListResourcesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
+pub struct ListResourceIdentitiesRequest {
+    pub kind: String,
+    pub account: Option<ResourceManifestAccount>,
+    pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
 pub struct ListAllResourcesRequest {
+    pub account: Option<ResourceManifestAccount>,
+    pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ListAllResourceIdentitiesRequest {
     pub account: Option<ResourceManifestAccount>,
     pub pagination: PaginationOpts,
 }

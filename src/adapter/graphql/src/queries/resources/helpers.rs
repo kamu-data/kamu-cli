@@ -14,6 +14,8 @@ use crate::prelude::*;
 use crate::queries::{
     Resource,
     ResourceConnection,
+    ResourceIdentity,
+    ResourceIdentityConnection,
     ResourceKindDescriptor,
     ResourceKindInput,
     ResourceManifestFormat,
@@ -125,6 +127,57 @@ pub(crate) async fn get_resource(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn get_resource_identity(
+    ctx: &Context<'_>,
+    selector: ResourceSelectorInput,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<Option<ResourceIdentity>> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let ResourceSelectorInput {
+        kind,
+        api_version,
+        resource_ref,
+    } = selector;
+
+    let kind = kind.into_resource_type();
+
+    let identity = resource_facade
+        .get_identity(kamu_resources_facade::GetResourceRequest {
+            kind,
+            api_version,
+            account,
+            resource_ref: resource_ref.into(),
+        })
+        .await;
+
+    match identity {
+        Ok(identity) => Ok(Some(identity.into())),
+        Err(
+            kamu_resources_facade::GetResourceError::UIDNotFound(_)
+            | kamu_resources_facade::GetResourceError::NameNotFound(_),
+        ) => Ok(None),
+        Err(kamu_resources_facade::GetResourceError::ApiVersionMismatch(error)) => {
+            Err(GqlError::gql(error.to_string()))
+        }
+        Err(kamu_resources_facade::GetResourceError::KindMismatch(error)) => {
+            Err(GqlError::gql(error.to_string()))
+        }
+        Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(_)) => {
+            Err(GqlError::gql("Unsupported resource kind"))
+        }
+        Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
+            Err(map_resolve_manifest_account_error(error))
+        }
+        Err(kamu_resources_facade::GetResourceError::RemoteRequest(error)) => {
+            Err(error.int_err().into())
+        }
+        Err(kamu_resources_facade::GetResourceError::Internal(error)) => Err(error.into()),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn list_resources_connection(
     ctx: &Context<'_>,
     kind: ResourceKindInput,
@@ -151,6 +204,37 @@ pub(crate) async fn list_resources_connection(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn list_resource_identities_connection(
+    ctx: &Context<'_>,
+    kind: ResourceKindInput,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+    page: usize,
+    per_page: usize,
+) -> Result<ResourceIdentityConnection> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let items = resource_facade
+        .list_identities(kamu_resources_facade::ListResourceIdentitiesRequest {
+            kind: kind.into_resource_type(),
+            account,
+            pagination: PaginationOpts::from_page(page, per_page),
+        })
+        .await
+        .map_err(map_list_resources_error)?;
+
+    let total_count = items.len();
+    let items = items.into_iter().map(ResourceIdentity::from).collect();
+
+    Ok(ResourceIdentityConnection::new(
+        items,
+        page,
+        per_page,
+        total_count,
+    ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn list_all_resources_connection(
     ctx: &Context<'_>,
     account: Option<kamu_resources::ResourceManifestAccount>,
@@ -171,6 +255,35 @@ pub(crate) async fn list_all_resources_connection(
     let items = items.into_iter().map(ResourceSummary::from).collect();
 
     Ok(ResourceConnection::new(items, page, per_page, total_count))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn list_all_resource_identities_connection(
+    ctx: &Context<'_>,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+    page: usize,
+    per_page: usize,
+) -> Result<ResourceIdentityConnection> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let items = resource_facade
+        .list_all_identities(kamu_resources_facade::ListAllResourceIdentitiesRequest {
+            account,
+            pagination: PaginationOpts::from_page(page, per_page),
+        })
+        .await
+        .map_err(map_list_all_resources_error)?;
+
+    let total_count = items.len();
+    let items = items.into_iter().map(ResourceIdentity::from).collect();
+
+    Ok(ResourceIdentityConnection::new(
+        items,
+        page,
+        per_page,
+        total_count,
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,8 @@ use crate::prelude::*;
 use crate::queries::{
     Resource,
     ResourceConnection,
+    ResourceIdentity,
+    ResourceIdentityConnection,
     ResourceKindInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
@@ -54,6 +56,24 @@ impl AdminResources {
         .await
     }
 
+    /// Returns resource identity by selector from the target account, if found
+    #[tracing::instrument(level = "info", name = AdminResources_resource_identity, skip_all)]
+    async fn resource_identity(
+        &self,
+        ctx: &Context<'_>,
+        selector: ResourceSelectorInput,
+    ) -> Result<Option<ResourceIdentity>> {
+        resource_helpers::get_resource_identity(
+            ctx,
+            selector,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
+    }
+
     /// Returns resources of the specified kind from the target account
     #[tracing::instrument(level = "info", name = AdminResources_list_by_kind, skip_all)]
     async fn list_by_kind(
@@ -79,6 +99,32 @@ impl AdminResources {
         .await
     }
 
+    /// Returns resource identities of the specified kind from the target
+    /// account
+    #[tracing::instrument(level = "info", name = AdminResources_list_identities_by_kind, skip_all)]
+    async fn list_identities_by_kind(
+        &self,
+        ctx: &Context<'_>,
+        kind: ResourceKindInput,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceIdentityConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_resource_identities_connection(
+            ctx,
+            kind,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+            page,
+            per_page,
+        )
+        .await
+    }
+
     /// Returns resources across all kinds from the target account
     #[tracing::instrument(level = "info", name = AdminResources_list_all, skip_all)]
     async fn list_all(
@@ -91,6 +137,29 @@ impl AdminResources {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         resource_helpers::list_all_resources_connection(
+            ctx,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+            page,
+            per_page,
+        )
+        .await
+    }
+
+    /// Returns resource identities across all kinds from the target account
+    #[tracing::instrument(level = "info", name = AdminResources_list_all_identities, skip_all)]
+    async fn list_all_identities(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceIdentityConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+
+        resource_helpers::list_all_resource_identities_connection(
             ctx,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),

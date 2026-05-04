@@ -17,6 +17,17 @@ use crate::{ResourceMetadata, ResourceName, ResourceUID};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceIdentityView {
+    pub kind: String,
+    pub api_version: String,
+    pub canonical_kind_name: String,
+    pub uid: ResourceUID,
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceView {
     pub kind: String,
     pub api_version: String,

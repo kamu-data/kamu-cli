@@ -483,13 +483,26 @@ type AdminResources {
 	"""
 	resource(selector: ResourceSelectorInput!): Resource
 	"""
+	Returns resource identity by selector from the target account, if found
+	"""
+	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
+	"""
 	Returns resources of the specified kind from the target account
 	"""
 	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
 	"""
+	Returns resource identities of the specified kind from the target
+	account
+	"""
+	listIdentitiesByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	"""
 	Returns resources across all kinds from the target account
 	"""
 	listAll(page: Int, perPage: Int): ResourceConnection!
+	"""
+	Returns resource identities across all kinds from the target account
+	"""
+	listAllIdentities(page: Int, perPage: Int): ResourceIdentityConnection!
 	"""
 	Returns a summary-oriented dashboard for the target account
 	"""
@@ -3821,6 +3834,34 @@ type ResourceEdge {
 
 scalar ResourceID
 
+type ResourceIdentity {
+	id: ResourceID!
+	apiVersion: String!
+	kind: ResourceKind!
+	canonicalKindName: String!
+	name: String!
+}
+
+type ResourceIdentityConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ResourceIdentity!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ResourceIdentityEdge!]!
+}
+
+type ResourceIdentityEdge {
+	node: ResourceIdentity!
+}
+
 type ResourceKind {
 	value: String!
 	builtin: ResourceBuiltinKind
@@ -3937,13 +3978,25 @@ type Resources {
 	"""
 	resource(selector: ResourceSelectorInput!): Resource
 	"""
+	Returns resource identity by selector, if found
+	"""
+	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
+	"""
 	Returns resources of the specified kind
 	"""
 	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
 	"""
+	Returns resource identities of the specified kind
+	"""
+	listIdentitiesByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	"""
 	Returns resources across all kinds
 	"""
 	listAll(page: Int, perPage: Int): ResourceConnection!
+	"""
+	Returns resource identities across all kinds
+	"""
+	listAllIdentities(page: Int, perPage: Int): ResourceIdentityConnection!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
