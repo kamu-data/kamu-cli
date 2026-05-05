@@ -612,6 +612,7 @@ impl ApplyPrinter<'_> {
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewMetadata<'a> {
             uid: &'a kamu_resources::ResourceUID,
+            account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
             labels: &'a std::collections::BTreeMap<String, String>,
@@ -626,6 +627,7 @@ impl ApplyPrinter<'_> {
             fn new(resource: &'a ResourceView) -> Self {
                 Self {
                     uid: &resource.metadata.uid,
+                    account: &resource.account,
                     name: &resource.metadata.name,
                     description: &resource.metadata.description,
                     labels: &resource.metadata.labels,
@@ -640,10 +642,9 @@ impl ApplyPrinter<'_> {
 
         #[derive(serde::Serialize)]
         struct RenderedResourceView<'a> {
-            kind: &'a str,
             #[serde(rename = "apiVersion")]
             api_version: &'a str,
-            account: &'a kamu_resources::ResourceViewAccount,
+            kind: &'a str,
             metadata: RenderedResourceViewMetadata<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<chrono::DateTime<chrono::Utc>>,
@@ -652,9 +653,8 @@ impl ApplyPrinter<'_> {
         }
 
         serde_yaml::to_string(&RenderedResourceView {
-            kind: &resource.kind,
             api_version: &resource.api_version,
-            account: &resource.account,
+            kind: &resource.kind,
             metadata: RenderedResourceViewMetadata::new(resource),
             last_reconciled_at: &resource.last_reconciled_at,
             spec: common::json_to_yaml_value(&resource.spec),
