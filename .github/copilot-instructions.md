@@ -6,12 +6,12 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 
 1. **Always run formatting first** using `cargo fmt` before running any linting checks
 2. **Always run Clippy** using `make clippy` to check for linting issues
-3. Run Clippy before and after making code changes to ensure no new warnings are introduced
-4. If Clippy reports warnings or errors, address them as part of the code changes
-5. Use `cargo check` for basic compilation checks when needed
-6. The project follows strict linting standards - treat Clippy warnings as errors that need to be fixed
+3. If Clippy reports warnings or errors, address them as part of the code changes
+4. Use `cargo check` for basic compilation checks when needed
+5. The project follows strict linting standards - treat Clippy warnings as errors that need to be fixed
 
 ## Code Style
+
 - Follow the project's existing code style and formatting
 - The project uses rustfmt for code formatting
 - Respect the existing module structure and naming conventions
@@ -19,12 +19,27 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - **Use safe numeric casting**: Prefer `usize::try_from(x).unwrap()` over `x as usize` for potentially unsafe numeric casts to avoid Clippy warnings
 
 ## Testing
+
 - This project uses `cargo nextest` for running tests
 - Run tests with `cargo nextest run` when making changes that could affect functionality
 - Ensure all tests pass before considering changes complete
 - Tests should never refer internal methods or fields directly; use public interfaces for testing
 
+## Specialized Guidance
+
+Codex agents should start with `AGENTS.md` and load repo-local skills from `.agents/skills/` only when the task needs them. Copilot users can continue using this file directly; the skills are optional focused references, not required for basic editing.
+
+Specialized skill topics:
+- Repository test-suite wiring: `.agents/skills/kamu-repository-tests`
+- SQLx, migrations, and database validation: `.agents/skills/kamu-sqlx-database-work`
+- GraphQL API and schema work: `.agents/skills/kamu-graphql-api`
+- Domain design, outbox, events, and errors: `.agents/skills/kamu-domain-design`
+- Releases, changelog, and general dependencies: `.agents/skills/kamu-release-dependency-workflows`
+- DataFusion stack upgrades: `.agents/skills/kamu-datafusion-upgrade-workflows`
+- Jupyter demo and demo image releases: `.agents/skills/kamu-jupyter-demo-release-workflows`
+
 ## Event Modeling Style
+
 - Prefer using enums for event types to ensure type safety and clarity.
 - Use descriptive names for events to convey their purpose clearly.
 - Implement serialization and deserialization traits for all event enums to facilitate data interchange.
@@ -35,6 +50,7 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 ## Changelog
 
 When completing a full PR (not incremental local changes), update the `CHANGELOG.md` file:
+
 - Add entries to the `[Unreleased]` section at the top of the file
 - Use the appropriate subsection: `### Added` for new features, `### Changed` for modifications, `### Fixed` for bug fixes
 - Write a brief, high-level summary of the change from an end-user perspective
