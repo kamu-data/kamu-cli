@@ -14,6 +14,7 @@ use crate::queries::{
     BatchResourceManifestsResult,
     BatchResourcesResult,
     Resource,
+    ResourceBatchSelectorInput,
     ResourceConnection,
     ResourceIdentity,
     ResourceIdentityConnection,
@@ -60,15 +61,15 @@ impl AdminResources {
     }
 
     /// Returns resources by selectors from the target account
-    #[tracing::instrument(level = "info", name = AdminResources_resources, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = AdminResources_resources, skip_all, fields(selector_count = selector.resource_refs.len()))]
     async fn resources(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
     ) -> Result<BatchResourcesResult> {
         resource_helpers::get_resources(
             ctx,
-            selectors,
+            selector,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),
                 name: None,
@@ -96,15 +97,15 @@ impl AdminResources {
     }
 
     /// Returns resource identities by selectors from the target account
-    #[tracing::instrument(level = "info", name = AdminResources_resource_identities, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = AdminResources_resource_identities, skip_all, fields(selector_count = selector.resource_refs.len()))]
     async fn resource_identities(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
     ) -> Result<BatchResourceIdentitiesResult> {
         resource_helpers::get_resource_identities(
             ctx,
-            selectors,
+            selector,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),
                 name: None,
@@ -246,16 +247,16 @@ impl AdminResources {
 
     /// Renders canonical manifest representations from stored resources in
     /// the target account
-    #[tracing::instrument(level = "info", name = AdminResources_render_manifests, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = AdminResources_render_manifests, skip_all, fields(selector_count = selector.resource_refs.len()))]
     async fn render_manifests(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<BatchResourceManifestsResult> {
         resource_helpers::render_resource_manifests(
             ctx,
-            selectors,
+            selector,
             format,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),

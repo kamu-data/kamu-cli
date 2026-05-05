@@ -15,6 +15,7 @@ use crate::queries::{
     BatchResourceManifestsResult,
     BatchResourcesResult,
     Resource,
+    ResourceBatchSelectorInput,
     ResourceConnection,
     ResourceIdentity,
     ResourceIdentityConnection,
@@ -62,14 +63,14 @@ impl Resources {
     }
 
     /// Returns resources by selectors
-    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = selector.resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resources(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
     ) -> Result<BatchResourcesResult> {
-        resource_helpers::get_resources(ctx, selectors, None /* current subject */).await
+        resource_helpers::get_resources(ctx, selector, None /* current subject */).await
     }
 
     /// Returns resource identity by selector, if found
@@ -84,14 +85,14 @@ impl Resources {
     }
 
     /// Returns resource identities by selectors
-    #[tracing::instrument(level = "info", name = Resources_resource_identities, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = Resources_resource_identities, skip_all, fields(selector_count = selector.resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resource_identities(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
     ) -> Result<BatchResourceIdentitiesResult> {
-        resource_helpers::get_resource_identities(ctx, selectors, None /* current subject */).await
+        resource_helpers::get_resource_identities(ctx, selector, None /* current subject */).await
     }
 
     /// Returns resources of the specified kind
@@ -188,16 +189,16 @@ impl Resources {
     }
 
     /// Renders canonical manifest representations from stored resources
-    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = selectors.len()))]
+    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = selector.resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn render_manifests(
         &self,
         ctx: &Context<'_>,
-        selectors: Vec<ResourceSelectorInput>,
+        selector: ResourceBatchSelectorInput,
         format: ResourceManifestFormat,
     ) -> Result<BatchResourceManifestsResult> {
         resource_helpers::render_resource_manifests(
-            ctx, selectors, format, None, /* current subject */
+            ctx, selector, format, None, /* current subject */
         )
         .await
     }

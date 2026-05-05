@@ -15,26 +15,23 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
 
-type BatchGetResourcesResponse = kamu_resources_facade::BatchRequestResponse<
+type BatchGetResourcesResponse = kamu_resources_facade::BatchResourceResponse<
     kamu_resources::ResourceView,
-    kamu_resources_facade::GetResourceError,
+    kamu_resources_facade::ResourceLookupProblem,
 >;
 
-type BatchGetResourceIdentitiesResponse = kamu_resources_facade::BatchRequestResponse<
+type BatchGetResourceIdentitiesResponse = kamu_resources_facade::BatchResourceResponse<
     kamu_resources::ResourceIdentityView,
-    kamu_resources_facade::GetResourceError,
+    kamu_resources_facade::ResourceLookupProblem,
 >;
 
-type BatchRenderResourceManifestsResponse = kamu_resources_facade::BatchRequestResponse<
+type BatchRenderResourceManifestsResponse = kamu_resources_facade::BatchResourceResponse<
     kamu_resources_facade::RenderResourceManifestResult,
-    kamu_resources_facade::RenderResourceManifestError,
+    kamu_resources_facade::ResourceLookupProblem,
 >;
 
 type BatchGetResourceProblem =
-    kamu_resources_facade::BatchRequestProblem<kamu_resources_facade::GetResourceError>;
-
-type BatchRenderResourceManifestProblem =
-    kamu_resources_facade::BatchRequestProblem<kamu_resources_facade::RenderResourceManifestError>;
+    kamu_resources_facade::BatchResourceProblem<kamu_resources_facade::ResourceLookupProblem>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,6 +83,16 @@ pub struct ResourceSelectorInput {
     pub api_version: Option<String>,
     #[graphql(name = "ref")]
     pub resource_ref: ResourceRefInput,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceBatchSelectorInput {
+    pub kind: ResourceKindInput,
+    pub api_version: Option<String>,
+    #[graphql(name = "refs")]
+    pub resource_refs: Vec<ResourceRefInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,14 +207,21 @@ impl From<kamu_resources::ResourceView> for Resource {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
-    pub resources: Vec<Resource>,
+    pub resources: Vec<BatchResourceSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
 impl From<BatchGetResourcesResponse> for BatchResourcesResult {
     fn from(value: BatchGetResourcesResponse) -> Self {
         Self {
-            resources: value.items.into_iter().map(Into::into).collect(),
+            resources: value
+                .successes
+                .into_iter()
+                .map(|success| BatchResourceSuccess {
+                    request_index: success.request_index,
+                    resource: success.item.into(),
+                })
+                .collect(),
             problems: value.problems.into_iter().map(Into::into).collect(),
         }
     }
@@ -216,8 +230,16 @@ impl From<BatchGetResourcesResponse> for BatchResourcesResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
+pub struct BatchResourceSuccess {
+    pub request_index: usize,
+    pub resource: Resource,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
-    pub manifests: Vec<ResourceRenderManifestResult>,
+    pub manifests: Vec<BatchResourceManifestSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -225,16 +247,27 @@ impl From<BatchRenderResourceManifestsResponse> for BatchResourceManifestsResult
     fn from(value: BatchRenderResourceManifestsResponse) -> Self {
         Self {
             manifests: value
-                .items
+                .successes
                 .into_iter()
-                .map(|manifest| ResourceRenderManifestResult {
-                    manifest: manifest.manifest,
-                    format: manifest.format.into(),
+                .map(|success| BatchResourceManifestSuccess {
+                    request_index: success.request_index,
+                    manifest: ResourceRenderManifestResult {
+                        manifest: success.item.manifest,
+                        format: success.item.format.into(),
+                    },
                 })
                 .collect(),
             problems: value.problems.into_iter().map(Into::into).collect(),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct BatchResourceManifestSuccess {
+    pub request_index: usize,
+    pub manifest: ResourceRenderManifestResult,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,17 +297,32 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceIdentitiesResult {
-    pub identities: Vec<ResourceIdentity>,
+    pub identities: Vec<BatchResourceIdentitySuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
 impl From<BatchGetResourceIdentitiesResponse> for BatchResourceIdentitiesResult {
     fn from(value: BatchGetResourceIdentitiesResponse) -> Self {
         Self {
-            identities: value.items.into_iter().map(Into::into).collect(),
+            identities: value
+                .successes
+                .into_iter()
+                .map(|success| BatchResourceIdentitySuccess {
+                    request_index: success.request_index,
+                    identity: success.item.into(),
+                })
+                .collect(),
             problems: value.problems.into_iter().map(Into::into).collect(),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct BatchResourceIdentitySuccess {
+    pub request_index: usize,
+    pub identity: ResourceIdentity,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +336,7 @@ pub struct BatchResourceProblem {
 
 impl From<BatchGetResourceProblem> for BatchResourceProblem {
     fn from(value: BatchGetResourceProblem) -> Self {
-        let code = BatchResourceProblemCode::from_get_resource_error(&value.error);
+        let code = BatchResourceProblemCode::from_lookup_problem(&value.error);
         Self {
             request_index: value.request_index,
             message: value.error.to_string(),
@@ -296,19 +344,6 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
         }
     }
 }
-
-impl From<BatchRenderResourceManifestProblem> for BatchResourceProblem {
-    fn from(value: BatchRenderResourceManifestProblem) -> Self {
-        let code = BatchResourceProblemCode::from_render_manifest_error(&value.error);
-        Self {
-            request_index: value.request_index,
-            message: value.error.to_string(),
-            code,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BatchResourceProblemCode {
@@ -316,40 +351,16 @@ pub enum BatchResourceProblemCode {
     NameNotFound,
     ApiVersionMismatch,
     KindMismatch,
-    UnsupportedDescriptor,
-    BadAccount,
-    RemoteRequest,
-    Internal,
 }
 
 impl BatchResourceProblemCode {
-    fn from_get_resource_error(error: &kamu_resources_facade::GetResourceError) -> Self {
-        use kamu_resources_facade::GetResourceError as E;
+    fn from_lookup_problem(error: &kamu_resources_facade::ResourceLookupProblem) -> Self {
+        use kamu_resources_facade::ResourceLookupProblem as E;
         match error {
             E::UIDNotFound(_) => Self::UidNotFound,
             E::NameNotFound(_) => Self::NameNotFound,
             E::ApiVersionMismatch(_) => Self::ApiVersionMismatch,
             E::KindMismatch(_) => Self::KindMismatch,
-            E::UnsupportedDescriptor(_) => Self::UnsupportedDescriptor,
-            E::BadAccount(_) => Self::BadAccount,
-            E::RemoteRequest(_) => Self::RemoteRequest,
-            E::Internal(_) => Self::Internal,
-        }
-    }
-
-    fn from_render_manifest_error(
-        error: &kamu_resources_facade::RenderResourceManifestError,
-    ) -> Self {
-        use kamu_resources_facade::RenderResourceManifestError as E;
-        match error {
-            E::UIDNotFound(_) => Self::UidNotFound,
-            E::NameNotFound(_) => Self::NameNotFound,
-            E::ApiVersionMismatch(_) => Self::ApiVersionMismatch,
-            E::KindMismatch(_) => Self::KindMismatch,
-            E::UnsupportedDescriptor(_) => Self::UnsupportedDescriptor,
-            E::BadAccount(_) => Self::BadAccount,
-            E::RemoteRequest(_) => Self::RemoteRequest,
-            E::Internal(_) => Self::Internal,
         }
     }
 }

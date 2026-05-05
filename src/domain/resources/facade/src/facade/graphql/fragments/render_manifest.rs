@@ -70,8 +70,17 @@ pub(crate) struct AdminBatchRenderManifestsFieldFragment {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchResourceManifestsResultFragment {
-    pub manifests: Vec<ResourceRenderManifestResultFragment>,
+    pub manifests: Vec<BatchResourceManifestSuccessFragment>,
     pub problems: Vec<super::BatchResourceProblemFragment>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceManifestSuccessFragment {
+    pub request_index: usize,
+    pub manifest: ResourceRenderManifestResultFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

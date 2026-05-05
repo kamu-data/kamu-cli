@@ -72,8 +72,15 @@ pub(crate) struct AdminBatchGetResourcesRootFragment {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchResourcesResultFragment {
-    pub resources: Vec<ResourceFragment>,
+    pub resources: Vec<BatchResourceSuccessFragment>,
     pub problems: Vec<BatchResourceProblemFragment>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceSuccessFragment {
+    pub request_index: usize,
+    pub resource: ResourceFragment,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,10 +100,6 @@ pub(crate) enum BatchResourceProblemCodeFragment {
     NameNotFound,
     ApiVersionMismatch,
     KindMismatch,
-    UnsupportedDescriptor,
-    BadAccount,
-    RemoteRequest,
-    Internal,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

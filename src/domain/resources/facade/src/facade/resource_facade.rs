@@ -11,31 +11,29 @@ use database_common::PaginationOpts;
 use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
-    ApplyResourceCrudDispatcherError,
-    DeleteResourcesCrudDispatcherError,
-    GetResourceCrudDispatcherError,
-    ResourceAPIVersionMismatchError,
     ResourceIdentityView,
-    ResourceInvalidSpecError,
     ResourceKindDescriptor,
     ResourceManifestAccount,
-    ResourceMetadataValidationError,
     ResourceName,
-    ResourceNameNotFoundError,
     ResourceSummaryView,
     ResourceUID,
-    ResourceUIDNotFoundError,
     ResourceView,
     ResourcesSummary,
-    UnsupportedResourceDescriptorError,
 };
-use event_sourcing::ConcurrentModificationError;
-use graphql_http::GraphqlHttpRequestError;
-use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources as domain;
-use thiserror::Error;
 
-use crate::ResolveManifestAccountError;
+use crate::{
+    ApplyManifestError,
+    BatchResourceError,
+    DeleteResourceError,
+    GetResourceError,
+    ListAllResourcesError,
+    ListResourcesError,
+    ListSupportedResourceKindsError,
+    RenderResourceManifestError,
+    ResourceLookupProblem,
+    ResourcesSummaryError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,37 +48,39 @@ pub trait ResourceFacade: Send + Sync {
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
-    async fn get(
-        &self,
-        request: ScalarRequest<GetResourceRequest>,
-    ) -> Result<ResourceView, GetResourceError>;
+    async fn get(&self, selector: ResourceSelector) -> Result<ResourceView, GetResourceError>;
 
     async fn get_many(
         &self,
-        request: BatchRequest<GetResourceRequest>,
-    ) -> Result<BatchRequestResponse<ResourceView, GetResourceError>, GetResourceError>;
+        selector: ResourceBatchSelector,
+    ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>;
 
     async fn get_identity(
         &self,
-        request: ScalarRequest<GetResourceRequest>,
+        selector: ResourceSelector,
     ) -> Result<ResourceIdentityView, GetResourceError>;
 
     async fn get_identities(
         &self,
-        request: BatchRequest<GetResourceRequest>,
-    ) -> Result<BatchRequestResponse<ResourceIdentityView, GetResourceError>, GetResourceError>;
+        selector: ResourceBatchSelector,
+    ) -> Result<
+        BatchResourceResponse<ResourceIdentityView, ResourceLookupProblem>,
+        BatchResourceError,
+    >;
 
     async fn render_manifest(
         &self,
-        request: ScalarRequest<RenderResourceManifestRequest>,
+        selector: ResourceSelector,
+        format: ResourceManifestFormat,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
 
     async fn render_manifests(
         &self,
-        request: BatchRequest<RenderResourceManifestRequest>,
+        selector: ResourceBatchSelector,
+        format: ResourceManifestFormat,
     ) -> Result<
-        BatchRequestResponse<RenderResourceManifestResult, RenderResourceManifestError>,
-        RenderResourceManifestError,
+        BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
+        BatchResourceError,
     >;
 
     async fn list(
@@ -113,36 +113,45 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
-    async fn delete(
-        &self,
-        request: DeleteResourceRequest,
-    ) -> Result<ResourceUID, DeleteResourceError>;
+    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ScalarRequest<R> {
+pub struct ResourceSelector {
     pub account: Option<ResourceManifestAccount>,
-    pub request: R,
+    pub kind: String,
+    pub api_version: Option<String>,
+    pub resource_ref: ResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct BatchRequest<R> {
+pub struct ResourceBatchSelector {
     pub account: Option<ResourceManifestAccount>,
-    pub requests: Vec<R>,
+    pub kind: String,
+    pub api_version: Option<String>,
+    pub resource_refs: Vec<ResourceRef>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct BatchResourceResponse<T, E> {
+    pub successes: Vec<BatchResourceSuccess<T>>,
+    pub problems: Vec<BatchResourceProblem<E>>,
 }
 
 #[derive(Debug)]
-pub struct BatchRequestResponse<T, E> {
-    pub items: Vec<T>,
-    pub problems: Vec<BatchRequestProblem<E>>,
+pub struct BatchResourceSuccess<T> {
+    pub request_index: usize,
+    pub item: T,
 }
 
 #[derive(Debug)]
-pub struct BatchRequestProblem<E> {
+pub struct BatchResourceProblem<E> {
     pub request_index: usize,
     pub error: E,
 }
@@ -162,25 +171,6 @@ pub struct ApplyManifestRequest {
 pub enum ResourceManifestFormat {
     Json,
     Yaml,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct GetResourceRequest {
-    pub kind: String,
-    pub api_version: Option<String>,
-    pub resource_ref: ResourceRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct RenderResourceManifestRequest {
-    pub kind: String,
-    pub api_version: Option<String>,
-    pub resource_ref: ResourceRef,
-    pub format: ResourceManifestFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -227,127 +217,9 @@ pub struct ListAllResourceIdentitiesRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct DeleteResourceRequest {
-    pub kind: String,
-    pub account: Option<ResourceManifestAccount>,
-    pub resource_ref: ResourceRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, Default)]
 pub struct ResourcesSummaryRequest {
     pub account: Option<ResourceManifestAccount>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ApplyManifestError {
-    #[error(transparent)]
-    ParseManifest(#[from] ParseResourceManifestError),
-
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    InvalidMetadata(#[from] ResourceMetadataValidationError),
-
-    #[error(transparent)]
-    InvalidSpec(#[from] ResourceInvalidSpecError),
-
-    #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
-
-    #[error(transparent)]
-    TypeMismatch(#[from] kamu_resources::ResourceTypeMismatchError),
-
-    #[error(transparent)]
-    ConcurrentModification(ConcurrentModificationError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
-    fn from(err: ApplyResourceCrudDispatcherError) -> Self {
-        use ApplyResourceCrudDispatcherError as E;
-        match err {
-            E::Internal(err) => Self::Internal(err),
-            E::NotFound(err) => Self::UIDNotFound(err),
-            E::TypeMismatch(err) => Self::TypeMismatch(err),
-            E::ConcurrentModification(err) => Self::ConcurrentModification(err),
-            E::InvalidSpec {
-                kind,
-                api_version,
-                message,
-            } => Self::InvalidSpec(ResourceInvalidSpecError {
-                kind,
-                api_version,
-                message,
-            }),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum GetResourceError {
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
-
-    #[error(transparent)]
-    NameNotFound(#[from] ResourceNameNotFoundError),
-
-    #[error(transparent)]
-    ApiVersionMismatch(#[from] ResourceAPIVersionMismatchError),
-
-    #[error(transparent)]
-    KindMismatch(#[from] ResourceKindMismatchError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceCrudDispatcherError> for GetResourceError {
-    fn from(err: GetResourceCrudDispatcherError) -> Self {
-        use GetResourceCrudDispatcherError as E;
-        match err {
-            E::NotFound(err) => Self::UIDNotFound(err),
-            E::TypeMismatch(err) => {
-                if err.expected_kind != err.actual_kind {
-                    Self::KindMismatch(ResourceKindMismatchError {
-                        uid: err.uid,
-                        expected_kind: err.expected_kind,
-                        actual_kind: err.actual_kind,
-                    })
-                } else {
-                    Self::ApiVersionMismatch(ResourceAPIVersionMismatchError {
-                        expected_api_version: err.expected_api_version,
-                        actual_api_version: err.actual_api_version,
-                    })
-                }
-            }
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -356,161 +228,6 @@ impl From<GetResourceCrudDispatcherError> for GetResourceError {
 pub struct RenderResourceManifestResult {
     pub manifest: String,
     pub format: ResourceManifestFormat,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum RenderResourceManifestError {
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
-
-    #[error(transparent)]
-    NameNotFound(#[from] ResourceNameNotFoundError),
-
-    #[error(transparent)]
-    ApiVersionMismatch(#[from] ResourceAPIVersionMismatchError),
-
-    #[error(transparent)]
-    KindMismatch(#[from] ResourceKindMismatchError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceError> for RenderResourceManifestError {
-    fn from(err: GetResourceError) -> Self {
-        match err {
-            GetResourceError::UnsupportedDescriptor(err) => Self::UnsupportedDescriptor(err),
-            GetResourceError::BadAccount(err) => Self::BadAccount(err),
-            GetResourceError::UIDNotFound(err) => Self::UIDNotFound(err),
-            GetResourceError::NameNotFound(err) => Self::NameNotFound(err),
-            GetResourceError::ApiVersionMismatch(err) => Self::ApiVersionMismatch(err),
-            GetResourceError::KindMismatch(err) => Self::KindMismatch(err),
-            GetResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
-            GetResourceError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListResourcesError {
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListAllResourcesError {
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ResourcesSummaryError {
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum DeleteResourceError {
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
-
-    #[error(transparent)]
-    NameNotFound(#[from] ResourceNameNotFoundError),
-
-    #[error(transparent)]
-    KindMismatch(#[from] ResourceKindMismatchError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
-    fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
-        use DeleteResourcesCrudDispatcherError as E;
-        match err {
-            E::Access(err) => Self::Internal(err.int_err()),
-            E::ConcurrentModification(err) => Self::Internal(err.int_err()),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListSupportedResourceKindsError {
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Failed to parse resource manifest: {message}")]
-pub struct ParseResourceManifestError {
-    pub message: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Resource uid {uid} refers to kind '{actual_kind}', expected '{expected_kind}'")]
-pub struct ResourceKindMismatchError {
-    pub uid: ResourceUID,
-    pub expected_kind: String,
-    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

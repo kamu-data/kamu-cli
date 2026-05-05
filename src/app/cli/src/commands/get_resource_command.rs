@@ -7,18 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_resources_facade::{
-    BatchRequest,
-    GetResourceError,
-    GetResourceRequest,
+    BatchResourceProblem,
     RenderResourceManifestError,
-    RenderResourceManifestRequest,
+    ResourceBatchSelector,
     ResourceFacade,
+    ResourceLookupProblem,
     ResourceManifestFormat as FacadeResourceManifestFormat,
     ResourceRef,
 };
@@ -206,31 +206,35 @@ impl GetResourceCommand {
         targets: &[ResourceTarget],
         format: FacadeResourceManifestFormat,
     ) -> Result<Vec<String>, CLIError> {
-        let mut rendered_items = Vec::new();
+        let mut rendered_items = vec![None; targets.len()];
 
-        for chunk in targets.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
-            let requests = chunk
-                .iter()
-                .map(|target| RenderResourceManifestRequest {
-                    kind: target.kind.clone(),
-                    api_version: Some(target.api_version.clone()),
-                    resource_ref: ResourceRef::ById(target.uid),
-                    format,
-                })
-                .collect();
+        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
+            for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
+                let result = resource_facade
+                    .render_manifests(
+                        ResourceBatchSelector {
+                            account: None,
+                            kind: kind.clone(),
+                            api_version: Some(api_version.clone()),
+                            resource_refs: chunk
+                                .iter()
+                                .map(|(_, target)| ResourceRef::ById(target.uid))
+                                .collect(),
+                        },
+                        format,
+                    )
+                    .await?;
 
-            let result = resource_facade
-                .render_manifests(BatchRequest {
-                    account: None,
-                    requests,
-                })
-                .await?;
+                self.handle_render_manifest_problems(result.problems)?;
 
-            self.handle_render_manifest_problems(result.problems)?;
-            rendered_items.extend(result.items.into_iter().map(|rendered| rendered.manifest));
+                for success in result.successes {
+                    let (original_index, _) = chunk[success.request_index];
+                    rendered_items[original_index] = Some(success.item.manifest);
+                }
+            }
         }
 
-        Ok(rendered_items)
+        Ok(rendered_items.into_iter().flatten().collect())
     }
 
     async fn run_full_views(
@@ -239,43 +243,61 @@ impl GetResourceCommand {
         targets: &[ResourceTarget],
         format: FacadeResourceManifestFormat,
     ) -> Result<Vec<String>, CLIError> {
-        let mut rendered_items = Vec::new();
+        let mut rendered_items = vec![None; targets.len()];
 
-        for chunk in targets.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
-            let requests = chunk
-                .iter()
-                .map(|target| GetResourceRequest {
-                    kind: target.kind.clone(),
-                    api_version: Some(target.api_version.clone()),
-                    resource_ref: ResourceRef::ById(target.uid),
-                })
-                .collect();
+        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
+            for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
+                let result = resource_facade
+                    .get_many(ResourceBatchSelector {
+                        account: None,
+                        kind: kind.clone(),
+                        api_version: Some(api_version.clone()),
+                        resource_refs: chunk
+                            .iter()
+                            .map(|(_, target)| ResourceRef::ById(target.uid))
+                            .collect(),
+                    })
+                    .await?;
 
-            let result = resource_facade
-                .get_many(BatchRequest {
-                    account: None,
-                    requests,
-                })
-                .await?;
+                self.handle_get_resource_problems(result.problems)?;
 
-            self.handle_get_resource_problems(result.problems)?;
-            for resource in result.items {
-                rendered_items.push(self.render_full_resource(&resource, format)?);
+                for success in result.successes {
+                    let (original_index, _) = chunk[success.request_index];
+                    rendered_items[original_index] =
+                        Some(self.render_full_resource(&success.item, format)?);
+                }
             }
         }
 
-        Ok(rendered_items)
+        Ok(rendered_items.into_iter().flatten().collect())
+    }
+
+    fn group_targets_by_descriptor(
+        targets: &[ResourceTarget],
+    ) -> BTreeMap<(String, String), Vec<(usize, &ResourceTarget)>> {
+        let mut groups = BTreeMap::new();
+        for (index, target) in targets.iter().enumerate() {
+            groups
+                .entry((target.kind.clone(), target.api_version.clone()))
+                .or_insert_with(Vec::new)
+                .push((index, target));
+        }
+        groups
     }
 
     fn handle_get_resource_problems(
         &self,
-        problems: Vec<kamu_resources_facade::BatchRequestProblem<GetResourceError>>,
+        problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
     ) -> Result<(), CLIError> {
         for problem in problems {
             match problem.error {
-                GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_)
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
                     if self.ignore_not_found => {}
-                error => return Err(error.into()),
+                error => {
+                    return Err(
+                        kamu_resources_facade::GetResourceError::LookupProblem(error).into(),
+                    );
+                }
             }
         }
 
@@ -284,14 +306,13 @@ impl GetResourceCommand {
 
     fn handle_render_manifest_problems(
         &self,
-        problems: Vec<kamu_resources_facade::BatchRequestProblem<RenderResourceManifestError>>,
+        problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
     ) -> Result<(), CLIError> {
         for problem in problems {
             match problem.error {
-                RenderResourceManifestError::NameNotFound(_)
-                | RenderResourceManifestError::UIDNotFound(_)
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
                     if self.ignore_not_found => {}
-                error => return Err(error.into()),
+                error => return Err(RenderResourceManifestError::LookupProblem(error).into()),
             }
         }
 

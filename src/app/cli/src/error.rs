@@ -19,6 +19,7 @@ use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_datasets::DeleteDatasetError;
 use kamu_resources_facade::{
     ApplyManifestError,
+    BatchResourceError,
     DeleteResourceError,
     GetResourceError,
     ListAllResourcesError,
@@ -285,16 +286,26 @@ impl From<ListAllResourcesError> for CLIError {
     }
 }
 
+impl From<BatchResourceError> for CLIError {
+    fn from(e: BatchResourceError) -> Self {
+        use BatchResourceError as E;
+
+        match e {
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
 impl From<DeleteResourceError> for CLIError {
     fn from(e: DeleteResourceError) -> Self {
         use DeleteResourceError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_)
-            | E::BadAccount(_)
-            | E::UIDNotFound(_)
-            | E::NameNotFound(_)
-            | E::KindMismatch(_)) => Self::failure(e),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -306,12 +317,9 @@ impl From<GetResourceError> for CLIError {
         use GetResourceError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_)
-            | E::BadAccount(_)
-            | E::UIDNotFound(_)
-            | E::NameNotFound(_)
-            | E::ApiVersionMismatch(_)
-            | E::KindMismatch(_)) => Self::failure(e),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -323,12 +331,9 @@ impl From<RenderResourceManifestError> for CLIError {
         use RenderResourceManifestError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_)
-            | E::BadAccount(_)
-            | E::UIDNotFound(_)
-            | E::NameNotFound(_)
-            | E::ApiVersionMismatch(_)
-            | E::KindMismatch(_)) => Self::failure(e),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

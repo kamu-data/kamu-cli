@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub(crate) mod helpers;
-mod local_resource_facade_impl;
-mod resource_account_resolver_impl;
+mod batch_uid_resolver;
+mod identity_support;
+mod manifest_support;
+mod validation_helpers;
 
-pub use local_resource_facade_impl::*;
-pub(crate) use resource_account_resolver_impl::*;
+pub(crate) use batch_uid_resolver::*;
+pub(crate) use identity_support::*;
+pub(crate) use manifest_support::*;
+pub(crate) use validation_helpers::*;

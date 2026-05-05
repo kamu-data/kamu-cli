@@ -485,7 +485,7 @@ type AdminResources {
 	"""
 	Returns resources by selectors from the target account
 	"""
-	resources(selectors: [ResourceSelectorInput!]!): BatchResourcesResult!
+	resources(selector: ResourceBatchSelectorInput!): BatchResourcesResult!
 	"""
 	Returns resource identity by selector from the target account, if found
 	"""
@@ -493,7 +493,7 @@ type AdminResources {
 	"""
 	Returns resource identities by selectors from the target account
 	"""
-	resourceIdentities(selectors: [ResourceSelectorInput!]!): BatchResourceIdentitiesResult!
+	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesResult!
 	"""
 	Returns resources of the specified kind from the target account
 	"""
@@ -524,7 +524,7 @@ type AdminResources {
 	Renders canonical manifest representations from stored resources in
 	the target account
 	"""
-	renderManifests(selectors: [ResourceSelectorInput!]!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
+	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
 }
 
 type AdminResourcesMut {
@@ -624,12 +624,22 @@ Base64-encoded binary data (url-safe, no padding)
 scalar Base64Usnp
 
 type BatchResourceIdentitiesResult {
-	identities: [ResourceIdentity!]!
+	identities: [BatchResourceIdentitySuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
+type BatchResourceIdentitySuccess {
+	requestIndex: Int!
+	identity: ResourceIdentity!
+}
+
+type BatchResourceManifestSuccess {
+	requestIndex: Int!
+	manifest: ResourceRenderManifestResult!
+}
+
 type BatchResourceManifestsResult {
-	manifests: [ResourceRenderManifestResult!]!
+	manifests: [BatchResourceManifestSuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
@@ -644,14 +654,15 @@ enum BatchResourceProblemCode {
 	NAME_NOT_FOUND
 	API_VERSION_MISMATCH
 	KIND_MISMATCH
-	UNSUPPORTED_DESCRIPTOR
-	BAD_ACCOUNT
-	REMOTE_REQUEST
-	INTERNAL
+}
+
+type BatchResourceSuccess {
+	requestIndex: Int!
+	resource: Resource!
 }
 
 type BatchResourcesResult {
-	resources: [Resource!]!
+	resources: [BatchResourceSuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
@@ -3843,6 +3854,12 @@ type ResourceApplyWarning {
 	message: String!
 }
 
+input ResourceBatchSelectorInput {
+	kind: ResourceKindInput!
+	apiVersion: String
+	refs: [ResourceRefInput!]!
+}
+
 enum ResourceBuiltinKind {
 	SECRET_SET
 	VARIABLE_SET
@@ -4025,7 +4042,7 @@ type Resources {
 	"""
 	Returns resources by selectors
 	"""
-	resources(selectors: [ResourceSelectorInput!]!): BatchResourcesResult!
+	resources(selector: ResourceBatchSelectorInput!): BatchResourcesResult!
 	"""
 	Returns resource identity by selector, if found
 	"""
@@ -4033,7 +4050,7 @@ type Resources {
 	"""
 	Returns resource identities by selectors
 	"""
-	resourceIdentities(selectors: [ResourceSelectorInput!]!): BatchResourceIdentitiesResult!
+	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesResult!
 	"""
 	Returns resources of the specified kind
 	"""
@@ -4057,7 +4074,7 @@ type Resources {
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selectors: [ResourceSelectorInput!]!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
+	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
 }
 
 type ResourcesMut {

@@ -14,14 +14,13 @@ use internal_error::BoxedError;
 use kamu_resources::{ResourceKindDescriptor, ResourceSummaryView, ResourceUID, ResourceView};
 use kamu_resources_facade::{
     DeleteResourceError,
-    DeleteResourceRequest,
     GetResourceError,
-    GetResourceRequest,
     ListAllResourcesRequest,
     ListResourcesRequest,
     ResourceFacade,
+    ResourceLookupProblem,
     ResourceRef,
-    ScalarRequest,
+    ResourceSelector,
 };
 
 use super::{BatchError, CLIError, Command};
@@ -124,13 +123,11 @@ impl DeleteResourcesCommand {
 
         let resource = self
             .resource_facade
-            .get(ScalarRequest {
+            .get(ResourceSelector {
                 account: None,
-                request: GetResourceRequest {
-                    kind: kind_descriptor.kind.clone(),
-                    api_version: Some(kind_descriptor.api_version.clone()),
-                    resource_ref: resolved_selector.resource_ref,
-                },
+                kind: kind_descriptor.kind.clone(),
+                api_version: Some(kind_descriptor.api_version.clone()),
+                resource_ref: resolved_selector.resource_ref,
             })
             .await;
 
@@ -139,14 +136,12 @@ impl DeleteResourcesCommand {
                 targets: vec![DeleteResourceTarget::from_resource_view(resource)],
                 ignored_selectors: Vec::new(),
             }),
-            Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
-                if self.ignore_not_found =>
-            {
-                Ok(PreparedDeleteTargets {
-                    targets: Vec::new(),
-                    ignored_selectors: vec![selector.clone()],
-                })
-            }
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+            )) if self.ignore_not_found => Ok(PreparedDeleteTargets {
+                targets: Vec::new(),
+                ignored_selectors: vec![selector.clone()],
+            }),
             Err(error) => Err(error.into()),
         }
     }
@@ -251,9 +246,10 @@ impl DeleteResourcesCommand {
 
             match self
                 .resource_facade
-                .delete(DeleteResourceRequest {
+                .delete(ResourceSelector {
                     kind: target.kind.clone(),
                     account: None,
+                    api_version: Some(target.api_version.clone()),
                     resource_ref: ResourceRef::ById(target.uid),
                 })
                 .await
@@ -266,9 +262,9 @@ impl DeleteResourcesCommand {
                         self.output_config.as_ref(),
                     );
                 }
-                Err(DeleteResourceError::NameNotFound(_) | DeleteResourceError::UIDNotFound(_))
-                    if self.ignore_not_found =>
-                {
+                Err(DeleteResourceError::LookupProblem(
+                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+                )) if self.ignore_not_found => {
                     summary.record_ignored();
                     DeleteResourcesPrinter::print_ignored(
                         &target.display_name(),
@@ -391,6 +387,7 @@ struct PreparedDeleteTargets {
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
     kind: String,
+    api_version: String,
     uid: ResourceUID,
     name: String,
 }
@@ -399,6 +396,7 @@ impl DeleteResourceTarget {
     fn from_resource_summary_view(resource: ResourceSummaryView) -> Self {
         Self {
             kind: resource.kind,
+            api_version: resource.api_version,
             uid: resource.uid,
             name: resource.name,
         }
@@ -407,6 +405,7 @@ impl DeleteResourceTarget {
     fn from_resource_view(resource: ResourceView) -> Self {
         Self {
             kind: resource.kind,
+            api_version: resource.api_version,
             uid: resource.metadata.uid,
             name: resource.metadata.name,
         }

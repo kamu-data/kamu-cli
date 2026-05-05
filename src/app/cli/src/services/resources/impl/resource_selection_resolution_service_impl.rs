@@ -7,17 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 
 use database_common::PaginationOpts;
 use kamu_resources::{ResourceIdentityView, ResourceKindDescriptor};
 use kamu_resources_facade::{
-    BatchRequest,
     GetResourceError,
-    GetResourceRequest,
     ListAllResourceIdentitiesRequest,
     ListResourceIdentitiesRequest,
+    ResourceBatchSelector,
     ResourceFacade,
+    ResourceLookupProblem,
 };
 
 use crate::CLIError;
@@ -109,46 +110,66 @@ impl ResourceSelectionResolutionServiceImpl {
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
     ) -> Result<Vec<Result<ResourceIdentityView, GetResourceError>>, CLIError> {
-        let exact_requests = selection
+        let exact_selectors = selection
             .items
             .iter()
-            .filter_map(|item| match item {
-                ResourceSelectionItem::Exact(selector) => Some(GetResourceRequest {
-                    kind: selector.kind_descriptor.kind.clone(),
-                    api_version: Some(selector.kind_descriptor.api_version.clone()),
-                    resource_ref: selector.resource_ref.clone(),
-                }),
+            .enumerate()
+            .filter_map(|(index, item)| match item {
+                ResourceSelectionItem::Exact(selector) => Some((
+                    index,
+                    selector.kind_descriptor.kind.clone(),
+                    selector.kind_descriptor.api_version.clone(),
+                    selector.resource_ref.clone(),
+                )),
                 ResourceSelectionItem::All | ResourceSelectionItem::AllByKind { .. } => None,
             })
             .collect::<Vec<_>>();
 
-        let exact_request_count = exact_requests.len();
-
-        let exact_batch_result = resource_facade
-            .get_identities(BatchRequest {
-                account: None,
-                requests: exact_requests,
-            })
-            .await?;
-
+        let exact_request_count = exact_selectors.len();
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
             .collect::<Vec<Option<Result<ResourceIdentityView, GetResourceError>>>>();
+        let mut groups = BTreeMap::new();
 
-        for problem in exact_batch_result.problems {
-            exact_results[problem.request_index] = Some(Err(problem.error));
+        for (exact_index, (_, kind, api_version, resource_ref)) in
+            exact_selectors.into_iter().enumerate()
+        {
+            groups
+                .entry((kind, api_version))
+                .or_insert_with(Vec::new)
+                .push((exact_index, resource_ref));
         }
 
-        let mut identities = exact_batch_result.items.into_iter();
-        for exact_result in &mut exact_results {
-            if exact_result.is_none() {
-                *exact_result = Some(Ok(identities
-                    .next()
-                    .expect("Every resolved exact selector must have an identity")));
+        for ((kind, api_version), entries) in groups {
+            let exact_batch_result = resource_facade
+                .get_identities(ResourceBatchSelector {
+                    account: None,
+                    kind,
+                    api_version: Some(api_version),
+                    resource_refs: entries
+                        .iter()
+                        .map(|(_, resource_ref)| resource_ref.clone())
+                        .collect(),
+                })
+                .await?;
+
+            for problem in exact_batch_result.problems {
+                let (exact_index, _) = entries[problem.request_index];
+                exact_results[exact_index] =
+                    Some(Err(Self::lookup_problem_to_get_error(problem.error)));
+            }
+
+            for success in exact_batch_result.successes {
+                let (exact_index, _) = entries[success.request_index];
+                exact_results[exact_index] = Some(Ok(success.item));
             }
         }
 
         Ok(exact_results.into_iter().flatten().collect())
+    }
+
+    fn lookup_problem_to_get_error(error: ResourceLookupProblem) -> GetResourceError {
+        GetResourceError::LookupProblem(error)
     }
 
     async fn process_all_item(
@@ -223,9 +244,9 @@ impl ResourceSelectionResolutionServiceImpl {
                     selector.selector_input,
                 ));
             }
-            Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
-                if options.ignore_not_found =>
-            {
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+            )) if options.ignore_not_found => {
                 ignored_selectors.push(ResourceIgnoredSelector {
                     kind_descriptor: selector.kind_descriptor,
                     selector_input: selector.selector_input,

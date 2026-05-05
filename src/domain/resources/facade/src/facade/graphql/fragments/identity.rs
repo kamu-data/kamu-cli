@@ -70,8 +70,17 @@ pub(crate) struct AdminBatchGetResourceIdentitiesRootFragment {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchResourceIdentitiesResultFragment {
-    pub identities: Vec<ResourceIdentityFragment>,
+    pub identities: Vec<BatchResourceIdentitySuccessFragment>,
     pub problems: Vec<super::BatchResourceProblemFragment>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceIdentitySuccessFragment {
+    pub request_index: usize,
+    pub identity: ResourceIdentityFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

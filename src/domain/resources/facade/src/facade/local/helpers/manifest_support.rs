@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use domain::{ResourceManifest, ResourceMetadataInput, ResourceView, ResourceWarning};
-use internal_error::ResultIntoInternal;
-use kamu_resources as domain;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_resources::{ResourceManifest, ResourceMetadataInput, ResourceView, ResourceWarning};
 
 use crate::{
     ApplyManifestError,
     ParseResourceManifestError,
-    RenderResourceManifestError,
     ResolvedAccount,
     ResourceManifestFormat,
 };
@@ -25,7 +23,7 @@ const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn parse_manifest(
+pub(crate) fn parse_manifest(
     format: ResourceManifestFormat,
     manifest: &str,
 ) -> Result<ResourceManifest, ParseResourceManifestError> {
@@ -45,7 +43,7 @@ pub(super) fn parse_manifest(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn make_metadata_input(
+pub(crate) fn make_metadata_input(
     manifest: &ResourceManifest,
     target_account: &ResolvedAccount,
 ) -> Result<ResourceMetadataInput, ApplyManifestError> {
@@ -61,7 +59,7 @@ pub(super) fn make_metadata_input(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn collect_manifest_metadata_warnings(
+pub(crate) fn collect_manifest_metadata_warnings(
     manifest: &ResourceManifest,
 ) -> Vec<ResourceWarning> {
     let mut warnings = Vec::new();
@@ -84,7 +82,7 @@ pub(super) fn collect_manifest_metadata_warnings(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
+pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
     let ResourceView {
         kind,
         api_version,
@@ -114,17 +112,13 @@ pub(super) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn serialize_manifest(
+pub(crate) fn serialize_manifest(
     manifest: &ResourceManifest,
     format: ResourceManifestFormat,
-) -> Result<String, RenderResourceManifestError> {
+) -> Result<String, InternalError> {
     match format {
-        ResourceManifestFormat::Json => serde_json::to_string_pretty(manifest)
-            .int_err()
-            .map_err(Into::into),
-        ResourceManifestFormat::Yaml => serde_yaml::to_string(manifest)
-            .int_err()
-            .map_err(Into::into),
+        ResourceManifestFormat::Json => serde_json::to_string_pretty(manifest).int_err(),
+        ResourceManifestFormat::Yaml => serde_yaml::to_string(manifest).int_err(),
     }
 }
 

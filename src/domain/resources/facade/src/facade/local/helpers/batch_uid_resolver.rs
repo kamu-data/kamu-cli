@@ -9,60 +9,67 @@
 
 use std::collections::HashMap;
 
-use domain::{GenericResourceQueryService, ResourceName, ResourceUID};
-use kamu_resources as domain;
-use kamu_resources::{ResourceNameNotFoundError, ResourceUIDNotFoundError};
+use kamu_resources::{
+    GenericResourceQueryService,
+    ResourceName,
+    ResourceNameNotFoundError,
+    ResourceUID,
+    ResourceUIDNotFoundError,
+};
 
-use crate::{BatchRequestProblem, GetResourceError, GetResourceRequest, ResourceRef};
+use crate::{
+    BatchResourceError,
+    BatchResourceProblem,
+    ResourceBatchSelector,
+    ResourceLookupProblem,
+    ResourceRef,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) type BatchUidEntries = Vec<(usize, GetResourceRequest, ResourceUID)>;
-pub(super) type BatchNameGroups = HashMap<String, Vec<(usize, GetResourceRequest, ResourceName)>>;
+pub(crate) type BatchUidEntries = Vec<(usize, ResourceRef, ResourceUID)>;
+pub(crate) type BatchNameEntries = Vec<(usize, ResourceRef, ResourceName)>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) struct BatchRequestGroups {
+pub(crate) struct BatchResourceRefGroups {
     pub uid_entries: BatchUidEntries,
-    pub name_groups: BatchNameGroups,
+    pub name_entries: BatchNameEntries,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Result of the name→UID resolution phase. All requests are now keyed by UID;
 /// any name-not-found failures are recorded in `problems`.
-pub(super) struct BatchUidsResolutionResponse {
+pub(crate) struct BatchUidsResolutionResponse {
     pub uid_entries: BatchUidEntries,
-    pub problems: Vec<BatchRequestProblem<GetResourceError>>,
+    pub problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Split a flat list of requests into those already keyed by UID and those
 /// that still need a name→UID lookup, grouped by kind.
-pub(super) fn group_batch_requests(requests: Vec<GetResourceRequest>) -> BatchRequestGroups {
+pub(crate) fn group_batch_resource_refs(selector: ResourceBatchSelector) -> BatchResourceRefGroups {
     let mut uid_entries = Vec::new();
-    let mut name_groups: BatchNameGroups = HashMap::new();
+    let mut name_entries = Vec::new();
 
-    for (request_index, get_request) in requests.into_iter().enumerate() {
-        match &get_request.resource_ref {
+    for (request_index, resource_ref) in selector.resource_refs.into_iter().enumerate() {
+        match &resource_ref {
             ResourceRef::ById(uid) => {
                 let uid = *uid;
-                uid_entries.push((request_index, get_request, uid));
+                uid_entries.push((request_index, resource_ref, uid));
             }
             ResourceRef::ByName(name) => {
                 let name = name.clone();
-                name_groups
-                    .entry(get_request.kind.clone())
-                    .or_default()
-                    .push((request_index, get_request, name));
+                name_entries.push((request_index, resource_ref, name));
             }
         }
     }
 
-    BatchRequestGroups {
+    BatchResourceRefGroups {
         uid_entries,
-        name_groups,
+        name_entries,
     }
 }
 
@@ -71,34 +78,36 @@ pub(super) fn group_batch_requests(requests: Vec<GetResourceRequest>) -> BatchRe
 /// Resolve all `ByName` groups to UIDs using a single batched query per kind.
 /// Returns a combined list of `(request_index, request, uid)` entries plus any
 /// name-not-found problems.
-pub(super) async fn resolve_batch_uids(
+pub(crate) async fn resolve_batch_uids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
-    groups: BatchRequestGroups,
-) -> Result<BatchUidsResolutionResponse, GetResourceError> {
+    kind: &str,
+    groups: BatchResourceRefGroups,
+) -> Result<BatchUidsResolutionResponse, BatchResourceError> {
     let mut uid_entries = groups.uid_entries;
     let mut problems = Vec::new();
 
-    for (kind, entries) in groups.name_groups {
-        let names = entries
+    if !groups.name_entries.is_empty() {
+        let names = groups
+            .name_entries
             .iter()
             .map(|(_, _, name)| name.clone())
             .collect::<Vec<_>>();
 
         let uid_by_name = query_service
-            .find_resource_identities_by_names(account_id, &kind, &names)
+            .find_resource_identities_by_names(account_id, kind, &names)
             .await?
             .into_iter()
             .map(|row| (row.name, ResourceUID::new(row.uid)))
             .collect::<HashMap<_, _>>();
 
-        for (request_index, get_request, name) in entries {
+        for (request_index, resource_ref, name) in groups.name_entries {
             match uid_by_name.get(&name) {
-                Some(uid) => uid_entries.push((request_index, get_request, *uid)),
-                None => problems.push(BatchRequestProblem {
+                Some(uid) => uid_entries.push((request_index, resource_ref, *uid)),
+                None => problems.push(BatchResourceProblem {
                     request_index,
-                    error: GetResourceError::NameNotFound(ResourceNameNotFoundError {
-                        kind: get_request.kind,
+                    error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                        kind: kind.to_string(),
                         name,
                     }),
                 }),
@@ -116,14 +125,14 @@ pub(super) async fn resolve_batch_uids(
 
 /// Scalar name→UID resolution. Returns `None`-as-`NameNotFound` converted to
 /// the caller's error type so it can be used in both batch and scalar paths.
-pub(super) async fn resolve_resource_uid<E>(
+pub(crate) async fn resolve_resource_uid<E>(
     query_service: &dyn GenericResourceQueryService,
     kind: &str,
     account_id: &odf::AccountID,
     resource_ref: &ResourceRef,
 ) -> Result<ResourceUID, E>
 where
-    E: From<internal_error::InternalError> + From<ResourceNameNotFoundError>,
+    E: From<internal_error::InternalError> + From<ResourceLookupProblem>,
 {
     match resource_ref {
         ResourceRef::ById(uid) => Ok(*uid),
@@ -131,10 +140,10 @@ where
             .find_resource_uid_by_name(account_id, kind, name)
             .await?
             .ok_or_else(|| {
-                ResourceNameNotFoundError {
+                ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
                     kind: kind.to_string(),
                     name: name.clone(),
-                }
+                })
                 .into()
             }),
     }
@@ -143,8 +152,8 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// UID not-found error for use after a batch UID fetch misses an entry.
-pub(super) fn uid_not_found(uid: ResourceUID) -> GetResourceError {
-    GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid))
+pub(crate) fn uid_not_found(uid: ResourceUID) -> ResourceLookupProblem {
+    ResourceLookupProblem::UIDNotFound(ResourceUIDNotFoundError(uid))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

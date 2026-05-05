@@ -77,9 +77,10 @@ pub(crate) async fn delete_resource(
 
     let kind = selector.kind.into_resource_type();
     let resource_id = resource_facade
-        .delete(kamu_resources_facade::DeleteResourceRequest {
+        .delete(kamu_resources_facade::ResourceSelector {
             kind: kind.clone(),
             account,
+            api_version: selector.api_version,
             resource_ref: selector.resource_ref.into(),
         })
         .await
@@ -99,9 +100,7 @@ pub(crate) fn map_delete_resource_error(
     match error {
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => GqlError::Internal(error.int_err()),
-        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
-        E::NameNotFound(error) => GqlError::gql(error.to_string()),
-        E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::LookupProblem(problem) => GqlError::gql(problem.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

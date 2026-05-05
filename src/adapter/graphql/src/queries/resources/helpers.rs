@@ -16,6 +16,7 @@ use crate::queries::{
     BatchResourceManifestsResult,
     BatchResourcesResult,
     Resource,
+    ResourceBatchSelectorInput,
     ResourceConnection,
     ResourceIdentity,
     ResourceIdentityConnection,
@@ -95,27 +96,22 @@ pub(crate) async fn get_resource(
     let kind = kind.into_resource_type();
 
     let resource = resource_facade
-        .get(kamu_resources_facade::ScalarRequest {
+        .get(kamu_resources_facade::ResourceSelector {
             account,
-            request: kamu_resources_facade::GetResourceRequest {
-                kind,
-                api_version,
-                resource_ref: resource_ref.into(),
-            },
+            kind,
+            api_version,
+            resource_ref: resource_ref.into(),
         })
         .await;
 
     match resource {
         Ok(resource) => Ok(Some(resource.into())),
-        Err(
-            kamu_resources_facade::GetResourceError::UIDNotFound(_)
-            | kamu_resources_facade::GetResourceError::NameNotFound(_),
-        ) => Ok(None),
-        Err(kamu_resources_facade::GetResourceError::ApiVersionMismatch(error)) => {
-            Err(GqlError::gql(error.to_string()))
-        }
-        Err(kamu_resources_facade::GetResourceError::KindMismatch(error)) => {
-            Err(GqlError::gql(error.to_string()))
+        Err(kamu_resources_facade::GetResourceError::LookupProblem(
+            kamu_resources_facade::ResourceLookupProblem::UIDNotFound(_)
+            | kamu_resources_facade::ResourceLookupProblem::NameNotFound(_),
+        )) => Ok(None),
+        Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
+            Err(GqlError::gql(problem.to_string()))
         }
         Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(_)) => {
             Err(GqlError::gql("Unsupported resource kind"))
@@ -134,33 +130,27 @@ pub(crate) async fn get_resource(
 
 pub(crate) async fn get_resources(
     ctx: &Context<'_>,
-    selectors: Vec<ResourceSelectorInput>,
+    selector: ResourceBatchSelectorInput,
     account: Option<kamu_resources::ResourceManifestAccount>,
 ) -> Result<BatchResourcesResult> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-    let requests = selectors
-        .into_iter()
-        .map(|selector| {
-            let ResourceSelectorInput {
-                kind,
-                api_version,
-                resource_ref,
-            } = selector;
-
-            kamu_resources_facade::GetResourceRequest {
-                kind: kind.into_resource_type(),
-                api_version,
-                resource_ref: resource_ref.into(),
-            }
-        })
-        .collect();
+    let ResourceBatchSelectorInput {
+        kind,
+        api_version,
+        resource_refs,
+    } = selector;
 
     resource_facade
-        .get_many(kamu_resources_facade::BatchRequest { account, requests })
+        .get_many(kamu_resources_facade::ResourceBatchSelector {
+            account,
+            kind: kind.into_resource_type(),
+            api_version,
+            resource_refs: resource_refs.into_iter().map(Into::into).collect(),
+        })
         .await
         .map(Into::into)
-        .map_err(map_get_resource_error)
+        .map_err(map_batch_resource_error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,27 +171,22 @@ pub(crate) async fn get_resource_identity(
     let kind = kind.into_resource_type();
 
     let identity = resource_facade
-        .get_identity(kamu_resources_facade::ScalarRequest {
+        .get_identity(kamu_resources_facade::ResourceSelector {
             account,
-            request: kamu_resources_facade::GetResourceRequest {
-                kind,
-                api_version,
-                resource_ref: resource_ref.into(),
-            },
+            kind,
+            api_version,
+            resource_ref: resource_ref.into(),
         })
         .await;
 
     match identity {
         Ok(identity) => Ok(Some(identity.into())),
-        Err(
-            kamu_resources_facade::GetResourceError::UIDNotFound(_)
-            | kamu_resources_facade::GetResourceError::NameNotFound(_),
-        ) => Ok(None),
-        Err(kamu_resources_facade::GetResourceError::ApiVersionMismatch(error)) => {
-            Err(GqlError::gql(error.to_string()))
-        }
-        Err(kamu_resources_facade::GetResourceError::KindMismatch(error)) => {
-            Err(GqlError::gql(error.to_string()))
+        Err(kamu_resources_facade::GetResourceError::LookupProblem(
+            kamu_resources_facade::ResourceLookupProblem::UIDNotFound(_)
+            | kamu_resources_facade::ResourceLookupProblem::NameNotFound(_),
+        )) => Ok(None),
+        Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
+            Err(GqlError::gql(problem.to_string()))
         }
         Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(_)) => {
             Err(GqlError::gql("Unsupported resource kind"))
@@ -220,33 +205,27 @@ pub(crate) async fn get_resource_identity(
 
 pub(crate) async fn get_resource_identities(
     ctx: &Context<'_>,
-    selectors: Vec<ResourceSelectorInput>,
+    selector: ResourceBatchSelectorInput,
     account: Option<kamu_resources::ResourceManifestAccount>,
 ) -> Result<BatchResourceIdentitiesResult> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-    let requests = selectors
-        .into_iter()
-        .map(|selector| {
-            let ResourceSelectorInput {
-                kind,
-                api_version,
-                resource_ref,
-            } = selector;
-
-            kamu_resources_facade::GetResourceRequest {
-                kind: kind.into_resource_type(),
-                api_version,
-                resource_ref: resource_ref.into(),
-            }
-        })
-        .collect();
+    let ResourceBatchSelectorInput {
+        kind,
+        api_version,
+        resource_refs,
+    } = selector;
 
     resource_facade
-        .get_identities(kamu_resources_facade::BatchRequest { account, requests })
+        .get_identities(kamu_resources_facade::ResourceBatchSelector {
+            account,
+            kind: kind.into_resource_type(),
+            api_version,
+            resource_refs: resource_refs.into_iter().map(Into::into).collect(),
+        })
         .await
         .map(Into::into)
-        .map_err(map_get_resource_error)
+        .map_err(map_batch_resource_error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,15 +355,15 @@ pub(crate) async fn render_resource_manifest(
     } = selector;
 
     let rendered = resource_facade
-        .render_manifest(kamu_resources_facade::ScalarRequest {
-            account,
-            request: kamu_resources_facade::RenderResourceManifestRequest {
+        .render_manifest(
+            kamu_resources_facade::ResourceSelector {
+                account,
                 kind: kind.into_resource_type(),
                 api_version,
                 resource_ref: resource_ref.into(),
-                format: format.into(),
             },
-        })
+            format.into(),
+        )
         .await
         .map_err(map_render_resource_manifest_error)?;
 
@@ -396,35 +375,31 @@ pub(crate) async fn render_resource_manifest(
 
 pub(crate) async fn render_resource_manifests(
     ctx: &Context<'_>,
-    selectors: Vec<ResourceSelectorInput>,
+    selector: ResourceBatchSelectorInput,
     format: ResourceManifestFormat,
     account: Option<kamu_resources::ResourceManifestAccount>,
 ) -> Result<BatchResourceManifestsResult> {
     let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-    let requests = selectors
-        .into_iter()
-        .map(|selector| {
-            let ResourceSelectorInput {
-                kind,
-                api_version,
-                resource_ref,
-            } = selector;
-
-            kamu_resources_facade::RenderResourceManifestRequest {
-                kind: kind.into_resource_type(),
-                api_version,
-                resource_ref: resource_ref.into(),
-                format: format.into(),
-            }
-        })
-        .collect();
+    let ResourceBatchSelectorInput {
+        kind,
+        api_version,
+        resource_refs,
+    } = selector;
 
     resource_facade
-        .render_manifests(kamu_resources_facade::BatchRequest { account, requests })
+        .render_manifests(
+            kamu_resources_facade::ResourceBatchSelector {
+                account,
+                kind: kind.into_resource_type(),
+                api_version,
+                resource_refs: resource_refs.into_iter().map(Into::into).collect(),
+            },
+            format.into(),
+        )
         .await
         .map(Into::into)
-        .map_err(map_render_resource_manifest_error)
+        .map_err(map_batch_resource_error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,10 +412,7 @@ fn map_render_resource_manifest_error(
     match error {
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
-        E::NameNotFound(error) => GqlError::gql(error.to_string()),
-        E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
-        E::KindMismatch(error) => GqlError::gql(error.to_string()),
+        E::LookupProblem(problem) => GqlError::gql(problem.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -448,12 +420,10 @@ fn map_render_resource_manifest_error(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_get_resource_error(error: kamu_resources_facade::GetResourceError) -> GqlError {
-    use kamu_resources_facade::GetResourceError as E;
+fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) -> GqlError {
+    use kamu_resources_facade::BatchResourceError as E;
+
     match error {
-        E::UIDNotFound(_) | E::NameNotFound(_) => GqlError::gql(error.to_string()),
-        E::ApiVersionMismatch(error) => GqlError::gql(error.to_string()),
-        E::KindMismatch(error) => GqlError::gql(error.to_string()),
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
