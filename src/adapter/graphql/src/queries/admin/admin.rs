@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::AdminGuard;
 use crate::prelude::*;
-use crate::queries::AdminResources;
-use crate::{AdminGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,17 +20,6 @@ impl Admin {
     #[graphql(guard = "AdminGuard::new()")]
     async fn self_test(&self) -> Result<String> {
         Ok("OK".to_string())
-    }
-
-    #[graphql(guard = "AdminGuard::new()")]
-    async fn resources(
-        &self,
-        ctx: &Context<'_>,
-        account_id: AccountID<'_>,
-    ) -> Result<AdminResources> {
-        Ok(AdminResources::from_account(
-            utils::get_account_by_id(ctx, &account_id).await?,
-        ))
     }
 }
 

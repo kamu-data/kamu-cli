@@ -9,7 +9,13 @@
 
 use crate::mutations::ResourceApplyOutcome;
 use crate::prelude::*;
-use crate::queries::{ResourceKind, ResourceManifestFormat, ResourceSelectorInput};
+use crate::queries::{
+    ResourceAccountSelectorInput,
+    ResourceKind,
+    ResourceManifestFormat,
+    ResourceSelectorInput,
+    map_resolve_manifest_account_error,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,8 +33,27 @@ impl ResourcesMut {
         format: ResourceManifestFormat,
         dry_run: Option<bool>,
     ) -> Result<ResourceApplyOutcome> {
-        super::helpers::apply_resource_manifest(ctx, manifest, format, dry_run.unwrap_or(false))
-            .await
+        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+        let request = kamu_resources_facade::ApplyManifestRequest {
+            format: format.into(),
+            manifest,
+        };
+
+        let result = if dry_run.unwrap_or(false) {
+            resource_facade
+                .plan_apply_manifest(request)
+                .await
+                .map(ResourceApplyOutcome::from)
+        } else {
+            resource_facade
+                .apply_manifest(request)
+                .await
+                .map(ResourceApplyOutcome::from)
+        }
+        .map_err(map_apply_resource_error)?;
+
+        Ok(result)
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
@@ -38,7 +63,30 @@ impl ResourcesMut {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
     ) -> Result<ResourceDeleteResult> {
-        super::helpers::delete_resource(ctx, selector, None).await
+        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+        let ResourceSelectorInput {
+            kind,
+            api_version,
+            resource_ref,
+            account,
+        } = selector;
+        let kind = kind.into_resource_type();
+
+        let resource_id = resource_facade
+            .delete(kamu_resources_facade::ResourceSelector {
+                kind: kind.clone(),
+                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                api_version,
+                resource_ref: resource_ref.into(),
+            })
+            .await
+            .map_err(map_delete_resource_error)?;
+
+        Ok(ResourceDeleteResult {
+            resource_id: resource_id.into(),
+            kind: ResourceKind::new(kind).into(),
+        })
     }
 }
 
@@ -48,6 +96,42 @@ impl ResourcesMut {
 pub struct ResourceDeleteResult {
     pub resource_id: ResourceID,
     pub kind: Option<ResourceKind>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_apply_resource_error(error: kamu_resources_facade::ApplyManifestError) -> GqlError {
+    use kamu_resources_facade::ApplyManifestError as E;
+
+    match error {
+        E::ParseManifest(error) => GqlError::gql(error.to_string()),
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidMetadata(error) => GqlError::gql(error.to_string()),
+        E::InvalidSpec(error) => GqlError::gql(error.to_string()),
+        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
+        E::TypeMismatch(error) => GqlError::gql(error.to_string()),
+        E::ConcurrentModification(error) => {
+            tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
+            GqlError::gql("Resource was modified concurrently")
+        }
+        E::RemoteRequest(error) => error.int_err().into(),
+        E::Internal(error) => error.into(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) -> GqlError {
+    use kamu_resources_facade::DeleteResourceError as E;
+
+    match error {
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::LookupProblem(problem) => GqlError::gql(problem.to_string()),
+        E::RemoteRequest(error) => error.int_err().into(),
+        E::Internal(error) => error.into(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

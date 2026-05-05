@@ -28,20 +28,6 @@ pub(crate) struct ResourcesDeleteMutFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminDeleteMutationDataFragment {
-    pub admin: AdminDeleteMutationRootFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminDeleteMutationRootFragment {
-    pub resources: ResourcesDeleteMutFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceDeleteResultFragment {
     pub resource_id: domain::ResourceUID,
 }

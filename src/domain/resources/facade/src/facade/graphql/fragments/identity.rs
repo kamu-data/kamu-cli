@@ -27,20 +27,6 @@ pub(crate) struct GetResourceIdentityFieldFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminGetResourceIdentityQueryDataFragment {
-    pub admin: AdminGetResourceIdentityRootFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminGetResourceIdentityRootFragment {
-    pub resources: GetResourceIdentityFieldFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct BatchGetResourceIdentitiesQueryDataFragment {
     pub resources: BatchGetResourceIdentitiesFieldFragment,
 }
@@ -49,20 +35,6 @@ pub(crate) struct BatchGetResourceIdentitiesQueryDataFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchGetResourceIdentitiesFieldFragment {
     pub resource_identities: BatchResourceIdentitiesResultFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchGetResourceIdentitiesQueryDataFragment {
-    pub admin: AdminBatchGetResourceIdentitiesRootFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchGetResourceIdentitiesRootFragment {
-    pub resources: BatchGetResourceIdentitiesFieldFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,20 +73,6 @@ pub(crate) struct ListIdentitiesByKindResourcesFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminListIdentitiesByKindQueryDataFragment {
-    pub admin: AdminListIdentitiesByKindFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminListIdentitiesByKindFieldFragment {
-    pub resources: ListIdentitiesByKindResourcesFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct ListAllIdentitiesQueryDataFragment {
     pub resources: ListAllIdentitiesResourcesFragment,
 }
@@ -123,20 +81,6 @@ pub(crate) struct ListAllIdentitiesQueryDataFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ListAllIdentitiesResourcesFragment {
     pub list_all_identities: ResourceIdentityConnectionFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminListAllIdentitiesQueryDataFragment {
-    pub admin: AdminListAllIdentitiesFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminListAllIdentitiesFieldFragment {
-    pub resources: ListAllIdentitiesResourcesFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

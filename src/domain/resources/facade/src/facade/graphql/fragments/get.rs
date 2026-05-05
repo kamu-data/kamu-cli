@@ -29,20 +29,6 @@ pub(crate) struct GetResourceFieldFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminGetResourceQueryDataFragment {
-    pub admin: AdminGetResourceRootFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminGetResourceRootFragment {
-    pub resources: GetResourceFieldFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct BatchGetResourcesQueryDataFragment {
     pub resources: BatchGetResourcesFieldFragment,
 }
@@ -51,20 +37,6 @@ pub(crate) struct BatchGetResourcesQueryDataFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchGetResourcesFieldFragment {
     pub resources: BatchResourcesResultFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchGetResourcesQueryDataFragment {
-    pub admin: AdminBatchGetResourcesRootFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchGetResourcesRootFragment {
-    pub resources: BatchGetResourcesFieldFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

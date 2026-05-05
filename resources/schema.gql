@@ -469,66 +469,10 @@ type AddPushSource {
 
 type Admin {
 	selfTest: String!
-	resources(accountId: AccountID!): AdminResources!
 }
 
 type AdminMut {
 	search: AdminSearchMut!
-	resources(accountId: AccountID!): AdminResourcesMut!
-}
-
-type AdminResources {
-	"""
-	Returns a resource by selector from the target account, if found
-	"""
-	resource(selector: ResourceSelectorInput!): Resource
-	"""
-	Returns resources by selectors from the target account
-	"""
-	resources(selector: ResourceBatchSelectorInput!): BatchResourcesResult!
-	"""
-	Returns resource identity by selector from the target account, if found
-	"""
-	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
-	"""
-	Returns resource identities by selectors from the target account
-	"""
-	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesResult!
-	"""
-	Returns resources of the specified kind from the target account
-	"""
-	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
-	"""
-	Returns resource identities of the specified kind from the target
-	account
-	"""
-	listIdentitiesByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceIdentityConnection!
-	"""
-	Returns resources across all kinds from the target account
-	"""
-	listAll(page: Int, perPage: Int): ResourceConnection!
-	"""
-	Returns resource identities across all kinds from the target account
-	"""
-	listAllIdentities(page: Int, perPage: Int): ResourceIdentityConnection!
-	"""
-	Returns a summary-oriented dashboard for the target account
-	"""
-	summary: ResourcesSummary!
-	"""
-	Renders a canonical manifest representation from a stored resource in
-	the target account
-	"""
-	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!): ResourceRenderManifestResult!
-	"""
-	Renders canonical manifest representations from stored resources in
-	the target account
-	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
-}
-
-type AdminResourcesMut {
-	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
 }
 
 type AdminSearchMut {
@@ -3808,6 +3752,11 @@ type Resource {
 	status: JSON
 }
 
+input ResourceAccountSelectorInput @oneOf {
+	byId: AccountID
+	byName: AccountName
+}
+
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
 	path: String!
@@ -3858,6 +3807,7 @@ input ResourceBatchSelectorInput {
 	kind: ResourceKindInput!
 	apiVersion: String
 	refs: [ResourceRefInput!]!
+	account: ResourceAccountSelectorInput
 }
 
 enum ResourceBuiltinKind {
@@ -3997,6 +3947,7 @@ input ResourceSelectorInput {
 	kind: ResourceKindInput!
 	apiVersion: String
 	ref: ResourceRefInput!
+	account: ResourceAccountSelectorInput
 }
 
 type ResourceStatusSummary {
@@ -4032,9 +3983,10 @@ type Resources {
 	"""
 	supportedKinds: [ResourceKindDescriptor!]!
 	"""
-	Returns a summary-oriented dashboard for the current subject
+	Returns a summary-oriented dashboard for the current or specified
+	subject
 	"""
-	summary: ResourcesSummary!
+	summary(account: ResourceAccountSelectorInput): ResourcesSummary!
 	"""
 	Returns a resource by selector, if found
 	"""
@@ -4054,19 +4006,19 @@ type Resources {
 	"""
 	Returns resources of the specified kind
 	"""
-	listByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceConnection!
+	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
 	"""
 	Returns resource identities of the specified kind
 	"""
-	listIdentitiesByKind(kind: ResourceKindInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
 	"""
 	Returns resources across all kinds
 	"""
-	listAll(page: Int, perPage: Int): ResourceConnection!
+	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
 	"""
 	Returns resource identities across all kinds
 	"""
-	listAllIdentities(page: Int, perPage: Int): ResourceIdentityConnection!
+	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""

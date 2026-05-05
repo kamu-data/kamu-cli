@@ -27,20 +27,6 @@ pub(crate) struct RenderManifestResourcesFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminRenderManifestQueryDataFragment {
-    pub admin: AdminRenderManifestFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminRenderManifestFieldFragment {
-    pub resources: RenderManifestResourcesFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct BatchRenderManifestsQueryDataFragment {
     pub resources: BatchRenderManifestsResourcesFragment,
 }
@@ -49,20 +35,6 @@ pub(crate) struct BatchRenderManifestsQueryDataFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchRenderManifestsResourcesFragment {
     pub render_manifests: BatchResourceManifestsResultFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchRenderManifestsQueryDataFragment {
-    pub admin: AdminBatchRenderManifestsFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminBatchRenderManifestsFieldFragment {
-    pub resources: BatchRenderManifestsResourcesFragment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

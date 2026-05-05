@@ -268,18 +268,28 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
-    fn target_account_id<E>(
+    fn account_selector_input(
         account: Option<&domain::ResourceManifestAccount>,
-    ) -> Result<Option<odf::AccountID>, E>
-    where
-        E: From<InternalError>,
-    {
+    ) -> Result<Option<String>, InternalError> {
         match account {
             None => Ok(None),
-            Some(account) => account.id.clone().map(Some).ok_or_else(|| {
-                InternalError::new("Remote admin resource requests require target account id")
-                    .into()
-            }),
+            Some(account) => {
+                if let Some(id) = &account.id {
+                    Ok(Some(format!(
+                        "account: {{ byId: {} }}",
+                        serde_json::to_string(&id.to_string()).int_err()?
+                    )))
+                } else if let Some(name) = &account.name {
+                    Ok(Some(format!(
+                        "account: {{ byName: {} }}",
+                        serde_json::to_string(name).int_err()?
+                    )))
+                } else {
+                    Err(InternalError::new(
+                        "Remote resource request account selector must contain either id or name",
+                    ))
+                }
+            }
         }
     }
 
@@ -356,150 +366,96 @@ impl RemoteGraphqlResourceFacadeImpl {
         kind: &str,
         page: usize,
         per_page: usize,
-        target_account_id: Option<&odf::AccountID>,
+        account: Option<&domain::ResourceManifestAccount>,
     ) -> Result<String, InternalError> {
         let kind = serde_json::to_string(kind).int_err()?;
+        let account_arg = Self::account_selector_input(account)?
+            .map(|s| format!("{s}, "))
+            .unwrap_or_default();
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      listByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                listByKind(kind: {{ custom: {kind} }}, {account_arg}page: {page}, perPage: {per_page}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::LIST_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    listByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::LIST_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::LIST_FIELDS,
+        ))
     }
 
     fn list_all_resources_query(
         page: usize,
         per_page: usize,
-        target_account_id: Option<&odf::AccountID>,
-    ) -> String {
-        if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      listAll(page: {page}, perPage: {per_page}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        account: Option<&domain::ResourceManifestAccount>,
+    ) -> Result<String, InternalError> {
+        let account_arg = Self::account_selector_input(account)?
+            .map(|s| format!("{s}, "))
+            .unwrap_or_default();
+
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                listAll({account_arg}page: {page}, perPage: {per_page}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::LIST_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    listAll(page: {page}, perPage: {per_page}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::LIST_FIELDS,
-            )
-        }
+              }}
+            }}
+            "#,
+            fields = Self::LIST_FIELDS,
+        ))
     }
 
     fn list_resource_identities_query(
         kind: &str,
         page: usize,
         per_page: usize,
-        target_account_id: Option<&odf::AccountID>,
+        account: Option<&domain::ResourceManifestAccount>,
     ) -> Result<String, InternalError> {
         let kind = serde_json::to_string(kind).int_err()?;
+        let account_arg = Self::account_selector_input(account)?
+            .map(|s| format!("{s}, "))
+            .unwrap_or_default();
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      listIdentitiesByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                listIdentitiesByKind(kind: {{ custom: {kind} }}, {account_arg}page: {page}, perPage: {per_page}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::IDENTITY_LIST_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    listIdentitiesByKind(kind: {{ custom: {kind} }}, page: {page}, perPage: {per_page}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::IDENTITY_LIST_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::IDENTITY_LIST_FIELDS,
+        ))
     }
 
     fn list_all_resource_identities_query(
         page: usize,
         per_page: usize,
-        target_account_id: Option<&odf::AccountID>,
-    ) -> String {
-        if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      listAllIdentities(page: {page}, perPage: {per_page}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        account: Option<&domain::ResourceManifestAccount>,
+    ) -> Result<String, InternalError> {
+        let account_arg = Self::account_selector_input(account)?
+            .map(|s| format!("{s}, "))
+            .unwrap_or_default();
+
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                listAllIdentities({account_arg}page: {page}, perPage: {per_page}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::IDENTITY_LIST_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    listAllIdentities(page: {page}, perPage: {per_page}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::IDENTITY_LIST_FIELDS,
-            )
-        }
+              }}
+            }}
+            "#,
+            fields = Self::IDENTITY_LIST_FIELDS,
+        ))
     }
 
     fn graphql_page_params(offset: usize, limit: usize) -> (usize, usize) {
@@ -516,7 +472,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     async fn list_resource_summaries<E>(
         &self,
         query_kind: RemoteListQuery<'_>,
-        maybe_target_account_id: Option<&odf::AccountID>,
+        account: Option<&domain::ResourceManifestAccount>,
         offset: usize,
         limit: usize,
     ) -> Result<Vec<ResourceSummaryView>, E>
@@ -527,29 +483,18 @@ impl RemoteGraphqlResourceFacadeImpl {
 
         let query = match query_kind {
             RemoteListQuery::ByKind(kind) => {
-                Self::list_resources_query(kind, page, per_page, maybe_target_account_id)
-                    .map_err(E::from)?
+                Self::list_resources_query(kind, page, per_page, account).map_err(E::from)?
             }
             RemoteListQuery::All => {
-                Self::list_all_resources_query(page, per_page, maybe_target_account_id)
+                Self::list_all_resources_query(page, per_page, account).map_err(E::from)?
             }
         };
 
         let nodes = match query_kind {
-            RemoteListQuery::ByKind(_) if maybe_target_account_id.is_some() => {
-                let response: fragments::AdminListByKindQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.admin.resources.list_by_kind.nodes
-            }
             RemoteListQuery::ByKind(_) => {
                 let response: fragments::ListByKindQueryDataFragment =
                     self.execute_graphql(&query).await?;
                 response.resources.list_by_kind.nodes
-            }
-            RemoteListQuery::All if maybe_target_account_id.is_some() => {
-                let response: fragments::AdminListAllQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.admin.resources.list_all.nodes
             }
             RemoteListQuery::All => {
                 let response: fragments::ListAllQueryDataFragment =
@@ -567,7 +512,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     async fn list_resource_identities<E>(
         &self,
         query_kind: RemoteListQuery<'_>,
-        maybe_target_account_id: Option<&odf::AccountID>,
+        account: Option<&domain::ResourceManifestAccount>,
         offset: usize,
         limit: usize,
     ) -> Result<Vec<ResourceIdentityView>, E>
@@ -578,29 +523,20 @@ impl RemoteGraphqlResourceFacadeImpl {
 
         let query = match query_kind {
             RemoteListQuery::ByKind(kind) => {
-                Self::list_resource_identities_query(kind, page, per_page, maybe_target_account_id)
+                Self::list_resource_identities_query(kind, page, per_page, account)
                     .map_err(E::from)?
             }
             RemoteListQuery::All => {
-                Self::list_all_resource_identities_query(page, per_page, maybe_target_account_id)
+                Self::list_all_resource_identities_query(page, per_page, account)
+                    .map_err(E::from)?
             }
         };
 
         let nodes = match query_kind {
-            RemoteListQuery::ByKind(_) if maybe_target_account_id.is_some() => {
-                let response: fragments::AdminListIdentitiesByKindQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.admin.resources.list_identities_by_kind.nodes
-            }
             RemoteListQuery::ByKind(_) => {
                 let response: fragments::ListIdentitiesByKindQueryDataFragment =
                     self.execute_graphql(&query).await?;
                 response.resources.list_identities_by_kind.nodes
-            }
-            RemoteListQuery::All if maybe_target_account_id.is_some() => {
-                let response: fragments::AdminListAllIdentitiesQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.admin.resources.list_all_identities.nodes
             }
             RemoteListQuery::All => {
                 let response: fragments::ListAllIdentitiesQueryDataFragment =
@@ -616,6 +552,7 @@ impl RemoteGraphqlResourceFacadeImpl {
         kind: &str,
         api_version: Option<&str>,
         resource_ref: &ResourceRef,
+        account: Option<&domain::ResourceManifestAccount>,
     ) -> Result<String, InternalError> {
         let kind = serde_json::to_string(kind).int_err()?;
         let selector_ref = Self::resource_ref_input(resource_ref)?;
@@ -626,24 +563,18 @@ impl RemoteGraphqlResourceFacadeImpl {
             ),
             None => String::new(),
         };
+        let account_arg = Self::account_selector_input(account)?
+            .map(|s| format!("{s},"))
+            .unwrap_or_default();
 
         Ok(format!(
             r#"{{
                 kind: {{ custom: {kind} }},
                 {maybe_api_version}
-                ref: {selector_ref}
+                ref: {selector_ref},
+                {account_arg}
             }}"#
         ))
-    }
-
-    fn resource_refs_input(resource_refs: &[ResourceRef]) -> Result<String, InternalError> {
-        let refs = resource_refs
-            .iter()
-            .map(Self::resource_ref_input)
-            .collect::<Result<Vec<_>, _>>()?
-            .join(", ");
-
-        Ok(format!("[{refs}]"))
     }
 
     fn batch_selector_input(selector: &ResourceBatchSelector) -> Result<String, InternalError> {
@@ -656,315 +587,181 @@ impl RemoteGraphqlResourceFacadeImpl {
             ),
             None => String::new(),
         };
+        let account_arg = Self::account_selector_input(selector.account.as_ref())?
+            .map(|s| format!("{s},"))
+            .unwrap_or_default();
 
         Ok(format!(
             r#"{{
                 kind: {{ custom: {kind} }},
                 {maybe_api_version}
-                refs: {refs}
+                refs: {refs},
+                {account_arg}
             }}"#
         ))
     }
 
-    fn get_resource_query(
-        selector: &ResourceSelector,
-        target_account_id: Option<&odf::AccountID>,
-    ) -> Result<String, GetResourceError> {
-        let selector = Self::selector_input(
+    fn get_resource_query(selector: &ResourceSelector) -> Result<String, GetResourceError> {
+        let selector_str = Self::selector_input(
             &selector.kind,
             selector.api_version.as_deref(),
             &selector.resource_ref,
+            selector.account.as_ref(),
         )?;
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      resource(selector: {selector}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                resource(selector: {selector_str}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::RESOURCE_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    resource(selector: {selector}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::RESOURCE_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::RESOURCE_FIELDS,
+        ))
     }
 
-    fn get_resources_query(
-        selector: &ResourceBatchSelector,
-        target_account_id: Option<&odf::AccountID>,
-    ) -> Result<String, BatchResourceError> {
-        let selector = Self::batch_selector_input(selector)?;
+    fn get_resources_query(selector: &ResourceBatchSelector) -> Result<String, BatchResourceError> {
+        let selector_str = Self::batch_selector_input(selector)?;
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      resources(selector: {selector}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                resources(selector: {selector_str}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::BATCH_RESOURCE_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    resources(selector: {selector}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::BATCH_RESOURCE_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::BATCH_RESOURCE_FIELDS,
+        ))
     }
 
     fn get_resource_identity_query(
         selector: &ResourceSelector,
-        target_account_id: Option<&odf::AccountID>,
     ) -> Result<String, GetResourceError> {
-        let selector = Self::selector_input(
+        let selector_str = Self::selector_input(
             &selector.kind,
             selector.api_version.as_deref(),
             &selector.resource_ref,
+            selector.account.as_ref(),
         )?;
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      resourceIdentity(selector: {selector}) {{
-                        id
-                        apiVersion
-                        kind {{
-                          value
-                        }}
-                        canonicalKindName
-                        name
-                      }}
-                    }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                resourceIdentity(selector: {selector_str}) {{
+                  id
+                  apiVersion
+                  kind {{
+                    value
                   }}
+                  canonicalKindName
+                  name
                 }}
-                "#
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    resourceIdentity(selector: {selector}) {{
-                      id
-                      apiVersion
-                      kind {{
-                        value
-                      }}
-                      canonicalKindName
-                      name
-                    }}
-                  }}
-                }}
-                "#
-            )
-        })
+              }}
+            }}
+            "#
+        ))
     }
 
     fn get_resource_identities_query(
         selector: &ResourceBatchSelector,
-        target_account_id: Option<&odf::AccountID>,
     ) -> Result<String, BatchResourceError> {
-        let selector = Self::batch_selector_input(selector)?;
+        let selector_str = Self::batch_selector_input(selector)?;
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      resourceIdentities(selector: {selector}) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                resourceIdentities(selector: {selector_str}) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::BATCH_IDENTITY_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    resourceIdentities(selector: {selector}) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::BATCH_IDENTITY_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::BATCH_IDENTITY_FIELDS,
+        ))
     }
 
     fn render_manifest_query(
         selector: &ResourceSelector,
         format: ResourceManifestFormat,
-        target_account_id: Option<&odf::AccountID>,
     ) -> Result<String, RenderResourceManifestError> {
-        let selector = Self::selector_input(
+        let selector_str = Self::selector_input(
             &selector.kind,
             selector.api_version.as_deref(),
             &selector.resource_ref,
+            selector.account.as_ref(),
         )
         .map_err(RenderResourceManifestError::Internal)?;
         let format = format.to_string();
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      renderManifest(
-                        selector: {selector}
-                        format: {format}
-                      ) {{
-                        manifest
-                        format
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                renderManifest(
+                  selector: {selector_str}
+                  format: {format}
+                ) {{
+                  manifest
+                  format
                 }}
-                "#
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    renderManifest(
-                      selector: {selector}
-                      format: {format}
-                    ) {{
-                      manifest
-                      format
-                    }}
-                  }}
-                }}
-                "#
-            )
-        })
+              }}
+            }}
+            "#
+        ))
     }
 
     fn render_manifests_query(
         selector: &ResourceBatchSelector,
         format: ResourceManifestFormat,
-        target_account_id: Option<&odf::AccountID>,
     ) -> Result<String, BatchResourceError> {
-        let selector = Self::batch_selector_input(selector)?;
+        let selector_str = Self::batch_selector_input(selector)?;
         let format = format.to_string();
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      renderManifests(
-                        selector: {selector}
-                        format: {format}
-                      ) {{
-                        {fields}
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                renderManifests(
+                  selector: {selector_str}
+                  format: {format}
+                ) {{
+                  {fields}
                 }}
-                "#,
-                fields = Self::BATCH_RENDER_MANIFEST_FIELDS,
-            )
-        } else {
-            format!(
-                r#"
-                query {{
-                  resources {{
-                    renderManifests(
-                      selector: {selector}
-                      format: {format}
-                    ) {{
-                      {fields}
-                    }}
-                  }}
-                }}
-                "#,
-                fields = Self::BATCH_RENDER_MANIFEST_FIELDS,
-            )
-        })
+              }}
+            }}
+            "#,
+            fields = Self::BATCH_RENDER_MANIFEST_FIELDS,
+        ))
     }
 
-    fn delete_resource_query(
-        selector: &ResourceSelector,
-        target_account_id: Option<&odf::AccountID>,
-    ) -> Result<String, DeleteResourceError> {
-        let selector = Self::selector_input(
+    fn delete_resource_query(selector: &ResourceSelector) -> Result<String, DeleteResourceError> {
+        let selector_str = Self::selector_input(
             &selector.kind,
             selector.api_version.as_deref(),
             &selector.resource_ref,
+            selector.account.as_ref(),
         )
         .map_err(DeleteResourceError::Internal)?;
 
-        Ok(if let Some(target_account_id) = target_account_id {
-            format!(
-                r#"
-                mutation {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      delete(selector: {selector}) {{
-                        resourceId
-                      }}
-                    }}
-                  }}
+        Ok(format!(
+            r#"
+            mutation {{
+              resources {{
+                delete(selector: {selector_str}) {{
+                  resourceId
                 }}
-                "#
-            )
-        } else {
-            format!(
-                r#"
-                mutation {{
-                  resources {{
-                    delete(selector: {selector}) {{
-                      resourceId
-                    }}
-                  }}
-                }}
-                "#
-            )
-        })
+              }}
+            }}
+            "#
+        ))
     }
 
     fn resource_ref_input(resource_ref: &ResourceRef) -> Result<String, InternalError> {
@@ -978,6 +775,16 @@ impl RemoteGraphqlResourceFacadeImpl {
                 serde_json::to_string(&name).int_err()?
             )),
         }
+    }
+
+    fn resource_refs_input(resource_refs: &[ResourceRef]) -> Result<String, InternalError> {
+        let refs = resource_refs
+            .iter()
+            .map(Self::resource_ref_input)
+            .collect::<Result<Vec<_>, _>>()?
+            .join(", ");
+
+        Ok(format!("[{refs}]"))
     }
 
     fn map_delete_graphql_error(
@@ -1262,70 +1069,43 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<ResourcesSummaryError>(request.account.as_ref())?;
+        let summary_field = match Self::account_selector_input(request.account.as_ref())
+            .map_err(ResourcesSummaryError::Internal)?
+        {
+            None => "summary".to_string(),
+            Some(account_arg) => format!("summary({account_arg})"),
+        };
 
-        let response = if let Some(target_account_id) = maybe_target_account_id {
-            let query = format!(
-                r#"
-                query {{
-                  admin {{
-                    resources(accountId: "{target_account_id}") {{
-                      summary {{
-                        resourceCounts {{
-                          kind
-                          name
-                          apiVersion
-                          totalCount
-                          phaseCounts {{
-                            pending
-                            reconciling
-                            ready
-                            degraded
-                            failed
-                          }}
-                        }}
-                      }}
+        let query = format!(
+            r#"
+            query {{
+              resources {{
+                {summary_field} {{
+                  resourceCounts {{
+                    kind
+                    name
+                    apiVersion
+                    totalCount
+                    phaseCounts {{
+                      pending
+                      reconciling
+                      ready
+                      degraded
+                      failed
                     }}
                   }}
                 }}
-                "#
-            );
+              }}
+            }}
+            "#
+        );
 
-            let response: fragments::AdminSummaryQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.summary
-        } else {
-            let response: fragments::SummaryQueryDataFragment = self
-                .execute_graphql(
-                    r#"
-                    query {
-                      resources {
-                        summary {
-                          resourceCounts {
-                            kind
-                            name
-                            apiVersion
-                            totalCount
-                            phaseCounts {
-                              pending
-                              reconciling
-                              ready
-                              degraded
-                              failed
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .await?;
-            response.resources.summary
-        };
+        let response: fragments::SummaryQueryDataFragment = self.execute_graphql(&query).await?;
 
         Ok(ResourcesSummary {
             resource_counts: response
+                .resources
+                .summary
                 .resource_counts
                 .into_iter()
                 .map(|item| ResourceTypeCountSummary {
@@ -1349,22 +1129,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
     ) -> Result<kamu_resources::ResourceView, GetResourceError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<GetResourceError>(selector.account.as_ref())?;
+        let query = Self::get_resource_query(&selector)?;
 
-        let query = Self::get_resource_query(&selector, maybe_target_account_id.as_ref())?;
+        let response: fragments::GetResourceQueryDataFragment =
+            self.execute_graphql(&query).await?;
 
-        let maybe_resource = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminGetResourceQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.resource
-        } else {
-            let response: fragments::GetResourceQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.resource
-        };
-
-        let Some(resource) = maybe_resource else {
+        let Some(resource) = response.resources.resource else {
             return Err(Self::not_found_error(&selector));
         };
 
@@ -1385,20 +1155,11 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             });
         }
 
-        let maybe_target_account_id =
-            Self::target_account_id::<BatchResourceError>(selector.account.as_ref())?;
+        let query = Self::get_resources_query(&selector)?;
 
-        let query = Self::get_resources_query(&selector, maybe_target_account_id.as_ref())?;
-
-        let batch_result = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminBatchGetResourcesQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.resources
-        } else {
-            let response: fragments::BatchGetResourcesQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.resources
-        };
+        let response: fragments::BatchGetResourcesQueryDataFragment =
+            self.execute_graphql(&query).await?;
+        let batch_result = response.resources.resources;
 
         let successes = batch_result
             .resources
@@ -1453,22 +1214,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
     ) -> Result<ResourceIdentityView, GetResourceError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<GetResourceError>(selector.account.as_ref())?;
+        let query = Self::get_resource_identity_query(&selector)?;
 
-        let query = Self::get_resource_identity_query(&selector, maybe_target_account_id.as_ref())?;
+        let response: fragments::GetResourceIdentityQueryDataFragment =
+            self.execute_graphql(&query).await?;
 
-        let maybe_identity = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminGetResourceIdentityQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.resource_identity
-        } else {
-            let response: fragments::GetResourceIdentityQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.resource_identity
-        };
-
-        let Some(identity) = maybe_identity else {
+        let Some(identity) = response.resources.resource_identity else {
             return Err(Self::not_found_error(&selector));
         };
 
@@ -1489,21 +1240,11 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             });
         }
 
-        let maybe_target_account_id =
-            Self::target_account_id::<BatchResourceError>(selector.account.as_ref())?;
+        let query = Self::get_resource_identities_query(&selector)?;
 
-        let query =
-            Self::get_resource_identities_query(&selector, maybe_target_account_id.as_ref())?;
-
-        let batch_result = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminBatchGetResourceIdentitiesQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.resource_identities
-        } else {
-            let response: fragments::BatchGetResourceIdentitiesQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.resource_identities
-        };
+        let response: fragments::BatchGetResourceIdentitiesQueryDataFragment =
+            self.execute_graphql(&query).await?;
+        let batch_result = response.resources.resource_identities;
 
         let successes = batch_result
             .identities
@@ -1554,25 +1295,14 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         selector: ResourceSelector,
         format: ResourceManifestFormat,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<RenderResourceManifestError>(selector.account.as_ref())?;
+        let query = Self::render_manifest_query(&selector, format)?;
 
-        let query =
-            Self::render_manifest_query(&selector, format, maybe_target_account_id.as_ref())?;
+        let response: fragments::RenderManifestQueryDataFragment = self
+            .execute_graphql(&query)
+            .await
+            .map_err(|error| Self::map_render_manifest_remote_error(&selector, error))?;
 
-        let rendered = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminRenderManifestQueryDataFragment = self
-                .execute_graphql(&query)
-                .await
-                .map_err(|error| Self::map_render_manifest_remote_error(&selector, error))?;
-            response.admin.resources.render_manifest
-        } else {
-            let response: fragments::RenderManifestQueryDataFragment = self
-                .execute_graphql(&query)
-                .await
-                .map_err(|error| Self::map_render_manifest_remote_error(&selector, error))?;
-            response.resources.render_manifest
-        };
+        let rendered = response.resources.render_manifest;
 
         Ok(RenderResourceManifestResult {
             manifest: rendered.manifest,
@@ -1595,21 +1325,11 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             });
         }
 
-        let maybe_target_account_id =
-            Self::target_account_id::<BatchResourceError>(selector.account.as_ref())?;
+        let query = Self::render_manifests_query(&selector, format)?;
 
-        let query =
-            Self::render_manifests_query(&selector, format, maybe_target_account_id.as_ref())?;
-
-        let batch_result = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminBatchRenderManifestsQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.admin.resources.render_manifests
-        } else {
-            let response: fragments::BatchRenderManifestsQueryDataFragment =
-                self.execute_graphql(&query).await?;
-            response.resources.render_manifests
-        };
+        let response: fragments::BatchRenderManifestsQueryDataFragment =
+            self.execute_graphql(&query).await?;
+        let batch_result = response.resources.render_manifests;
 
         let successes = batch_result
             .manifests
@@ -1662,12 +1382,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ListResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListResourcesError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<ListResourcesError>(request.account.as_ref())?;
-
         self.list_resource_summaries::<ListResourcesError>(
             RemoteListQuery::ByKind(&request.kind),
-            maybe_target_account_id.as_ref(),
+            request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
@@ -1678,12 +1395,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ListResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<ListResourcesError>(request.account.as_ref())?;
-
         self.list_resource_identities::<ListResourcesError>(
             RemoteListQuery::ByKind(&request.kind),
-            maybe_target_account_id.as_ref(),
+            request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
@@ -1694,12 +1408,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ListAllResourcesRequest,
     ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListAllResourcesError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<ListAllResourcesError>(request.account.as_ref())?;
-
         self.list_resource_summaries::<ListAllResourcesError>(
             RemoteListQuery::All,
-            maybe_target_account_id.as_ref(),
+            request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
@@ -1710,12 +1421,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ListAllResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<ListAllResourcesError>(request.account.as_ref())?;
-
         self.list_resource_identities::<ListAllResourcesError>(
             RemoteListQuery::All,
-            maybe_target_account_id.as_ref(),
+            request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
@@ -1756,26 +1464,14 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
     ) -> Result<kamu_resources::ResourceUID, DeleteResourceError> {
-        let maybe_target_account_id =
-            Self::target_account_id::<DeleteResourceError>(selector.account.as_ref())?;
+        let query = Self::delete_resource_query(&selector)?;
 
-        let query = Self::delete_resource_query(&selector, maybe_target_account_id.as_ref())?;
+        let response: fragments::DeleteMutationDataFragment = self
+            .execute_graphql(&query)
+            .await
+            .map_err(|error| Self::map_delete_remote_error(&selector, error))?;
 
-        let resource_id = if maybe_target_account_id.is_some() {
-            let response: fragments::AdminDeleteMutationDataFragment = self
-                .execute_graphql(&query)
-                .await
-                .map_err(|error| Self::map_delete_remote_error(&selector, error))?;
-            response.admin.resources.delete.resource_id
-        } else {
-            let response: fragments::DeleteMutationDataFragment = self
-                .execute_graphql(&query)
-                .await
-                .map_err(|error| Self::map_delete_remote_error(&selector, error))?;
-            response.resources.delete.resource_id
-        };
-
-        Ok(resource_id)
+        Ok(response.resources.delete.resource_id)
     }
 }
 
@@ -1786,5 +1482,3 @@ enum RemoteListQuery<'a> {
     ByKind(&'a str),
     All,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

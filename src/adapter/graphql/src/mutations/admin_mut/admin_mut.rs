@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::{AdminResourcesMut, AdminSearchMut};
+use crate::AdminGuard;
+use crate::mutations::AdminSearchMut;
 use crate::prelude::*;
-use crate::{AdminGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,17 +21,6 @@ impl AdminMut {
     #[graphql(guard = "AdminGuard::new()")]
     async fn search(&self) -> AdminSearchMut {
         AdminSearchMut
-    }
-
-    #[graphql(guard = "AdminGuard::new()")]
-    async fn resources(
-        &self,
-        ctx: &Context<'_>,
-        account_id: AccountID<'_>,
-    ) -> Result<AdminResourcesMut> {
-        Ok(AdminResourcesMut::from_account(
-            utils::get_account_by_id(ctx, &account_id).await?,
-        ))
     }
 }
 

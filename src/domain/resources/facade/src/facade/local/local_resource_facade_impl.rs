@@ -326,6 +326,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let metadata = make_metadata_input(&manifest, &target_account)?;
         let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
 
+        self.ensure_manifest_uid_is_accessible(
+            &manifest.kind,
+            &manifest.api_version,
+            &target_account.id,
+            manifest.metadata.uid,
+        )
+        .await?;
+
         let plan = dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
                 uid: manifest.metadata.uid,
@@ -369,6 +377,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let metadata = make_metadata_input(&manifest, &target_account)?;
         let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
+
+        self.ensure_manifest_uid_is_accessible(
+            &manifest.kind,
+            &manifest.api_version,
+            &target_account.id,
+            manifest.metadata.uid,
+        )
+        .await?;
 
         let result = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
@@ -723,21 +739,62 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError> + From<ResourceLookupProblem>,
     {
-        let Some(snapshot) = self
-            .generic_resource_query_service
-            .get_snapshot_by_uid(&uid)
-            .await?
-        else {
+        let Some(snapshot) = self.find_account_snapshot(account_id, uid).await? else {
             return Err(ResourceLookupProblem::UIDNotFound(ResourceUIDNotFoundError(uid)).into());
         };
 
         ensure_kind_matches::<E>(uid, kind, &snapshot.kind)?;
 
+        Ok(snapshot)
+    }
+
+    async fn find_account_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        uid: ResourceUID,
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
+        let Some(snapshot) = self
+            .generic_resource_query_service
+            .get_snapshot_by_uid(&uid)
+            .await?
+        else {
+            return Ok(None);
+        };
+
         if snapshot.metadata.account != *account_id {
-            return Err(ResourceLookupProblem::UIDNotFound(ResourceUIDNotFoundError(uid)).into());
+            return Ok(None);
         }
 
-        Ok(snapshot)
+        Ok(Some(snapshot))
+    }
+
+    async fn ensure_manifest_uid_is_accessible(
+        &self,
+        kind: &str,
+        api_version: &str,
+        account_id: &odf::AccountID,
+        maybe_uid: Option<ResourceUID>,
+    ) -> Result<(), ApplyManifestError> {
+        let Some(uid) = maybe_uid else {
+            return Ok(());
+        };
+
+        let Some(snapshot) = self.find_account_snapshot(account_id, uid).await? else {
+            return Err(ResourceUIDNotFoundError(uid).into());
+        };
+
+        if snapshot.kind != kind || snapshot.api_version != api_version {
+            return Err(ResourceTypeMismatchError::new(
+                uid,
+                kind.to_string(),
+                api_version.to_string(),
+                snapshot.kind,
+                snapshot.api_version,
+            )
+            .into());
+        }
+
+        Ok(())
     }
 }
 

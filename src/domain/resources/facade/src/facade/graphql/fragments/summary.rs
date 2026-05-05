@@ -13,26 +13,6 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AdminSummaryQueryDataFragment {
-    pub admin: AdminResourcesFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminResourcesFieldFragment {
-    pub resources: AdminSummaryFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AdminSummaryFieldFragment {
-    pub summary: ResourcesSummaryFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct SummaryQueryDataFragment {
     pub resources: SummaryFragment,
 }

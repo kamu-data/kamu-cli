@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 
 use crate::prelude::*;
+use crate::scalars::{AccountID, AccountName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -77,12 +78,36 @@ impl ResourceKindInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceAccountSelectorInput {
+    ById(AccountID<'static>),
+    ByName(AccountName<'static>),
+}
+
+impl ResourceAccountSelectorInput {
+    pub fn into_manifest_account(self) -> kamu_resources::ResourceManifestAccount {
+        match self {
+            Self::ById(id) => kamu_resources::ResourceManifestAccount {
+                id: Some(id.into()),
+                name: None,
+            },
+            Self::ByName(name) => kamu_resources::ResourceManifestAccount {
+                id: None,
+                name: Some(name.to_string()),
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
     pub kind: ResourceKindInput,
     pub api_version: Option<String>,
     #[graphql(name = "ref")]
     pub resource_ref: ResourceRefInput,
+    pub account: Option<ResourceAccountSelectorInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,6 +118,7 @@ pub struct ResourceBatchSelectorInput {
     pub api_version: Option<String>,
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
+    pub account: Option<ResourceAccountSelectorInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,13 +9,7 @@
 
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
-use kamu_accounts::{
-    AccountService,
-    AccountServiceExt,
-    CurrentAccountSubject,
-    GetAccessTokenError,
-    LoggedAccount,
-};
+use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetAction, DatasetEnvVarsConfig};
 use kamu_task_system as ts;
@@ -84,20 +78,6 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
             unreachable!("We are not expecting anonymous accounts")
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_account_by_id(
-    ctx: &Context<'_>,
-    account_id: &crate::scalars::AccountID<'_>,
-) -> Result<kamu_accounts::Account, GqlError> {
-    let account_service = from_catalog_n!(ctx, dyn AccountService);
-
-    account_service
-        .try_get_account_by_id(account_id)
-        .await?
-        .ok_or_else(|| GqlError::gql("Account not found"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
