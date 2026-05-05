@@ -23,7 +23,7 @@ jobs:
       github.event.workflow_run.conclusion == null ||
       github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           # Checkout the same commit that the release was built for (workflow_run)
           # OR the manually specified SHA (workflow_dispatch)
