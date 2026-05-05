@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_resources::{ResourceManifestAccount, ResourceView};
+use kamu_resources::ResourceManifestAccount;
 
 use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver};
 
@@ -38,37 +38,6 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
         self.ensure_can_use_account_resources(&target_account)
             .await?;
         Ok(target_account)
-    }
-
-    async fn hydrate_resource_view_account(
-        &self,
-        mut view: ResourceView,
-        target_account: Option<&ResolvedAccount>,
-    ) -> Result<ResourceView, InternalError> {
-        if let Some(account) = target_account
-            && view.account.id == account.id
-        {
-            view.account.name = Some(account.name.clone());
-            return Ok(view);
-        }
-
-        if view.account.name.is_none() {
-            let maybe_name = self
-                .account_service
-                .find_account_name_by_id(&view.account.id)
-                .await?;
-
-            let Some(account_name) = maybe_name else {
-                return Err(InternalError::new(format!(
-                    "Account {} not found while hydrating resource view",
-                    view.account.id
-                )));
-            };
-
-            view.account.name = Some(account_name);
-        }
-
-        Ok(view)
     }
 }
 

@@ -95,11 +95,13 @@ pub(crate) async fn get_resource(
     let kind = kind.into_resource_type();
 
     let resource = resource_facade
-        .get(kamu_resources_facade::GetResourceRequest {
-            kind,
-            api_version,
+        .get(kamu_resources_facade::ScalarRequest {
             account,
-            resource_ref: resource_ref.into(),
+            request: kamu_resources_facade::GetResourceRequest {
+                kind,
+                api_version,
+                resource_ref: resource_ref.into(),
+            },
         })
         .await;
 
@@ -149,14 +151,13 @@ pub(crate) async fn get_resources(
             kamu_resources_facade::GetResourceRequest {
                 kind: kind.into_resource_type(),
                 api_version,
-                account: account.clone(),
                 resource_ref: resource_ref.into(),
             }
         })
         .collect();
 
     resource_facade
-        .get_many(kamu_resources_facade::BatchRequest { requests })
+        .get_many(kamu_resources_facade::BatchRequest { account, requests })
         .await
         .map(Into::into)
         .map_err(map_get_resource_error)
@@ -180,11 +181,13 @@ pub(crate) async fn get_resource_identity(
     let kind = kind.into_resource_type();
 
     let identity = resource_facade
-        .get_identity(kamu_resources_facade::GetResourceRequest {
-            kind,
-            api_version,
+        .get_identity(kamu_resources_facade::ScalarRequest {
             account,
-            resource_ref: resource_ref.into(),
+            request: kamu_resources_facade::GetResourceRequest {
+                kind,
+                api_version,
+                resource_ref: resource_ref.into(),
+            },
         })
         .await;
 
@@ -234,14 +237,13 @@ pub(crate) async fn get_resource_identities(
             kamu_resources_facade::GetResourceRequest {
                 kind: kind.into_resource_type(),
                 api_version,
-                account: account.clone(),
                 resource_ref: resource_ref.into(),
             }
         })
         .collect();
 
     resource_facade
-        .get_identities(kamu_resources_facade::BatchRequest { requests })
+        .get_identities(kamu_resources_facade::BatchRequest { account, requests })
         .await
         .map(Into::into)
         .map_err(map_get_resource_error)
@@ -374,12 +376,14 @@ pub(crate) async fn render_resource_manifest(
     } = selector;
 
     let rendered = resource_facade
-        .render_manifest(kamu_resources_facade::RenderResourceManifestRequest {
-            kind: kind.into_resource_type(),
-            api_version,
+        .render_manifest(kamu_resources_facade::ScalarRequest {
             account,
-            resource_ref: resource_ref.into(),
-            format: format.into(),
+            request: kamu_resources_facade::RenderResourceManifestRequest {
+                kind: kind.into_resource_type(),
+                api_version,
+                resource_ref: resource_ref.into(),
+                format: format.into(),
+            },
         })
         .await
         .map_err(map_render_resource_manifest_error)?;
@@ -410,7 +414,6 @@ pub(crate) async fn render_resource_manifests(
             kamu_resources_facade::RenderResourceManifestRequest {
                 kind: kind.into_resource_type(),
                 api_version,
-                account: account.clone(),
                 resource_ref: resource_ref.into(),
                 format: format.into(),
             }
@@ -418,7 +421,7 @@ pub(crate) async fn render_resource_manifests(
         .collect();
 
     resource_facade
-        .render_manifests(kamu_resources_facade::BatchRequest { requests })
+        .render_manifests(kamu_resources_facade::BatchRequest { account, requests })
         .await
         .map(Into::into)
         .map_err(map_render_resource_manifest_error)

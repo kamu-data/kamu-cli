@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::{ResourceManifestAccount, ResourceView};
+use kamu_resources::ResourceManifestAccount;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,12 +27,6 @@ pub trait ResourceAccountResolver: Send + Sync {
         &self,
         selector: Option<&ResourceManifestAccount>,
     ) -> Result<ResolvedAccount, ResolveManifestAccountError>;
-
-    async fn hydrate_resource_view_account(
-        &self,
-        view: ResourceView,
-        target_account: Option<&ResolvedAccount>,
-    ) -> Result<ResourceView, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

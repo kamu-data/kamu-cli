@@ -214,14 +214,16 @@ impl GetResourceCommand {
                 .map(|target| RenderResourceManifestRequest {
                     kind: target.kind.clone(),
                     api_version: Some(target.api_version.clone()),
-                    account: None,
                     resource_ref: ResourceRef::ById(target.uid),
                     format,
                 })
                 .collect();
 
             let result = resource_facade
-                .render_manifests(BatchRequest { requests })
+                .render_manifests(BatchRequest {
+                    account: None,
+                    requests,
+                })
                 .await?;
 
             self.handle_render_manifest_problems(result.problems)?;
@@ -245,12 +247,16 @@ impl GetResourceCommand {
                 .map(|target| GetResourceRequest {
                     kind: target.kind.clone(),
                     api_version: Some(target.api_version.clone()),
-                    account: None,
                     resource_ref: ResourceRef::ById(target.uid),
                 })
                 .collect();
 
-            let result = resource_facade.get_many(BatchRequest { requests }).await?;
+            let result = resource_facade
+                .get_many(BatchRequest {
+                    account: None,
+                    requests,
+                })
+                .await?;
 
             self.handle_get_resource_problems(result.problems)?;
             for resource in result.items {

@@ -116,7 +116,6 @@ impl ResourceSelectionResolutionServiceImpl {
                 ResourceSelectionItem::Exact(selector) => Some(GetResourceRequest {
                     kind: selector.kind_descriptor.kind.clone(),
                     api_version: Some(selector.kind_descriptor.api_version.clone()),
-                    account: None,
                     resource_ref: selector.resource_ref.clone(),
                 }),
                 ResourceSelectionItem::All | ResourceSelectionItem::AllByKind { .. } => None,
@@ -127,6 +126,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let exact_batch_result = resource_facade
             .get_identities(BatchRequest {
+                account: None,
                 requests: exact_requests,
             })
             .await?;

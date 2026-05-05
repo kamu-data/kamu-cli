@@ -50,7 +50,10 @@ pub trait ResourceFacade: Send + Sync {
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
-    async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
+    async fn get(
+        &self,
+        request: ScalarRequest<GetResourceRequest>,
+    ) -> Result<ResourceView, GetResourceError>;
 
     async fn get_many(
         &self,
@@ -59,7 +62,7 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get_identity(
         &self,
-        request: GetResourceRequest,
+        request: ScalarRequest<GetResourceRequest>,
     ) -> Result<ResourceIdentityView, GetResourceError>;
 
     async fn get_identities(
@@ -69,7 +72,7 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn render_manifest(
         &self,
-        request: RenderResourceManifestRequest,
+        request: ScalarRequest<RenderResourceManifestRequest>,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
 
     async fn render_manifests(
@@ -119,7 +122,16 @@ pub trait ResourceFacade: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
+pub struct ScalarRequest<R> {
+    pub account: Option<ResourceManifestAccount>,
+    pub request: R,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
 pub struct BatchRequest<R> {
+    pub account: Option<ResourceManifestAccount>,
     pub requests: Vec<R>,
 }
 
@@ -158,7 +170,6 @@ pub enum ResourceManifestFormat {
 pub struct GetResourceRequest {
     pub kind: String,
     pub api_version: Option<String>,
-    pub account: Option<ResourceManifestAccount>,
     pub resource_ref: ResourceRef,
 }
 
@@ -168,7 +179,6 @@ pub struct GetResourceRequest {
 pub struct RenderResourceManifestRequest {
     pub kind: String,
     pub api_version: Option<String>,
-    pub account: Option<ResourceManifestAccount>,
     pub resource_ref: ResourceRef,
     pub format: ResourceManifestFormat,
 }

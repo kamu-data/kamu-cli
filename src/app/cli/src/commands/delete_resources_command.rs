@@ -21,6 +21,7 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     ResourceFacade,
     ResourceRef,
+    ScalarRequest,
 };
 
 use super::{BatchError, CLIError, Command};
@@ -123,11 +124,13 @@ impl DeleteResourcesCommand {
 
         let resource = self
             .resource_facade
-            .get(GetResourceRequest {
-                kind: kind_descriptor.kind.clone(),
-                api_version: Some(kind_descriptor.api_version.clone()),
+            .get(ScalarRequest {
                 account: None,
-                resource_ref: resolved_selector.resource_ref,
+                request: GetResourceRequest {
+                    kind: kind_descriptor.kind.clone(),
+                    api_version: Some(kind_descriptor.api_version.clone()),
+                    resource_ref: resolved_selector.resource_ref,
+                },
             })
             .await;
 

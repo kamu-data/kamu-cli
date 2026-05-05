@@ -22,9 +22,6 @@ use domain::{
     ResourceIdentityRow,
     ResourceIdentityView,
     ResourceKindDescriptor,
-    ResourceManifest,
-    ResourceMetadataInput,
-    ResourceName,
     ResourceNameNotFoundError,
     ResourcePresentationDispatcher,
     ResourceSnapshot,
@@ -33,14 +30,21 @@ use domain::{
     ResourceUID,
     ResourceUIDNotFoundError,
     ResourceView,
-    ResourceWarning,
     ResourcesSummary,
     UnsupportedResourceDescriptorError,
 };
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_resources as domain;
+use internal_error::InternalError;
+use kamu_resources::{self as domain};
 use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_dispatcher_by_kind};
 
+use super::batch_uid_resolver::{
+    BatchUidEntries,
+    group_batch_requests,
+    resolve_batch_uids,
+    resolve_resource_uid,
+    uid_not_found,
+};
+use super::manifest_support;
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -58,18 +62,16 @@ use crate::{
     ListResourcesError,
     ListResourcesRequest,
     ListSupportedResourceKindsError,
-    ParseResourceManifestError,
     RenderResourceManifestError,
     RenderResourceManifestRequest,
     RenderResourceManifestResult,
-    ResolvedAccount,
     ResourceAccountResolver,
     ResourceFacade,
     ResourceKindMismatchError,
-    ResourceManifestFormat,
     ResourceRef,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
+    ScalarRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,11 +103,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let resource_kind_descriptors = self.list_resource_kind_descriptors();
-        let descriptors_by_key: HashMap<(String, String), String> = resource_kind_descriptors
-            .into_iter()
-            .map(|descriptor| ((descriptor.kind, descriptor.api_version), descriptor.name))
-            .collect();
+        let descriptors_by_key = self.resource_kind_names_by_key();
 
         let resource_counts = self
             .generic_resource_query_service
@@ -136,10 +134,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(ResourcesSummary { resource_counts })
     }
 
-    async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError> {
+    async fn get(
+        &self,
+        request: ScalarRequest<GetResourceRequest>,
+    ) -> Result<ResourceView, GetResourceError> {
+        let ScalarRequest { account, request } = request;
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
+            .resolve_target_account(account.as_ref())
             .await?;
 
         let uid = self
@@ -151,18 +153,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind(&request.kind, &target_account.id, &uid)
+            .resolve_snapshot_for_kind::<GetResourceError>(&request.kind, &target_account.id, uid)
             .await?;
 
-        if let Some(expected_api_version) = request.api_version.as_ref()
-            && snapshot.api_version != *expected_api_version
-        {
-            return Err(ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.clone(),
-                actual_api_version: snapshot.api_version,
-            }
-            .into());
-        }
+        Self::ensure_requested_api_version::<GetResourceError>(
+            request.api_version.as_ref(),
+            &snapshot.api_version,
+        )?;
 
         let dispatcher = get_resource_crud_dispatcher::<GetResourceError>(
             &self.catalog,
@@ -177,20 +174,20 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             })
             .await?;
 
-        self.resource_account_resolver
-            .hydrate_resource_view_account(view, Some(&target_account))
-            .await
-            .map_err(Into::into)
+        Ok(ResourceView {
+            account: domain::ResourceViewAccount {
+                id: target_account.id,
+                name: Some(target_account.name),
+            },
+            ..view
+        })
     }
 
     async fn get_many(
         &self,
         request: BatchRequest<GetResourceRequest>,
     ) -> Result<BatchRequestResponse<ResourceView, GetResourceError>, GetResourceError> {
-        let (mut indexed_resources, mut problems) = self.get_many_indexed(request.requests).await?;
-
-        indexed_resources.sort_by_key(|resource| resource.request_index);
-        problems.sort_by_key(|problem| problem.request_index);
+        let (indexed_resources, problems) = self.get_many_indexed(request).await?;
 
         Ok(BatchRequestResponse {
             items: indexed_resources
@@ -203,11 +200,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get_identity(
         &self,
-        request: GetResourceRequest,
+        request: ScalarRequest<GetResourceRequest>,
     ) -> Result<ResourceIdentityView, GetResourceError> {
+        let ScalarRequest { account, request } = request;
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
+            .resolve_target_account(account.as_ref())
             .await?;
 
         let uid = self
@@ -219,20 +217,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind(&request.kind, &target_account.id, &uid)
+            .resolve_snapshot_for_kind::<GetResourceError>(&request.kind, &target_account.id, uid)
             .await?;
 
-        if let Some(expected_api_version) = request.api_version.as_ref()
-            && snapshot.api_version != *expected_api_version
-        {
-            return Err(ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.clone(),
-                actual_api_version: snapshot.api_version,
-            }
-            .into());
-        }
+        Self::ensure_requested_api_version::<GetResourceError>(
+            request.api_version.as_ref(),
+            &snapshot.api_version,
+        )?;
 
-        self.resource_identity_from_snapshot(snapshot)
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        Self::resource_identity_from_snapshot::<GetResourceError>(snapshot, &descriptors_by_key)
     }
 
     async fn get_identities(
@@ -240,53 +234,56 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         request: BatchRequest<GetResourceRequest>,
     ) -> Result<BatchRequestResponse<ResourceIdentityView, GetResourceError>, GetResourceError>
     {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
         let descriptors_by_key = self.resource_kind_names_by_key();
-        let mut groups = self.group_batch_identity_requests(request.requests).await;
-        let mut indexed_identities = Vec::new();
-
-        self.resolve_uid_identity_groups(
-            groups.uid_groups,
-            &descriptors_by_key,
-            &mut indexed_identities,
-            &mut groups.problems,
+        let groups = group_batch_requests(request.requests);
+        let resolution_response = resolve_batch_uids(
+            self.generic_resource_query_service.as_ref(),
+            &target_account.id,
+            groups,
         )
         .await?;
 
-        self.resolve_name_identity_groups(
-            groups.name_groups,
-            &descriptors_by_key,
-            &mut indexed_identities,
-            &mut groups.problems,
-        )
-        .await?;
-
-        indexed_identities.sort_by_key(|identity| identity.request_index);
-        groups.problems.sort_by_key(|problem| problem.request_index);
+        let (identities, problems) = self
+            .resolve_uid_identity_groups(
+                &target_account.id,
+                resolution_response.uid_entries,
+                resolution_response.problems,
+                &descriptors_by_key,
+            )
+            .await?;
 
         Ok(BatchRequestResponse {
-            items: indexed_identities
+            items: identities
                 .into_iter()
                 .map(|indexed_identity| indexed_identity.identity)
                 .collect(),
-            problems: groups.problems,
+            problems,
         })
     }
 
     async fn render_manifest(
         &self,
-        request: RenderResourceManifestRequest,
+        request: ScalarRequest<RenderResourceManifestRequest>,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
+        let ScalarRequest { account, request } = request;
         let view = self
-            .get(GetResourceRequest {
-                kind: request.kind,
-                api_version: request.api_version,
-                account: request.account,
-                resource_ref: request.resource_ref,
+            .get(ScalarRequest {
+                account,
+                request: GetResourceRequest {
+                    kind: request.kind,
+                    api_version: request.api_version,
+                    resource_ref: request.resource_ref,
+                },
             })
             .await?;
 
-        let manifest = Self::resource_view_to_manifest(view);
-        let manifest = Self::serialize_manifest(&manifest, request.format)?;
+        let manifest = manifest_support::resource_view_to_manifest(view);
+        let manifest = manifest_support::serialize_manifest(&manifest, request.format)?;
 
         Ok(RenderResourceManifestResult {
             manifest,
@@ -304,31 +301,30 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let formats_by_index = request
             .requests
             .iter()
-            .map(|request| request.format)
+            .map(|r| r.format)
             .collect::<Vec<_>>();
 
-        let get_requests = request
-            .requests
-            .into_iter()
-            .map(|request| GetResourceRequest {
-                kind: request.kind,
-                api_version: request.api_version,
-                account: request.account,
-                resource_ref: request.resource_ref,
-            })
-            .collect();
+        let get_batch = BatchRequest {
+            account: request.account,
+            requests: request
+                .requests
+                .into_iter()
+                .map(|r| GetResourceRequest {
+                    kind: r.kind,
+                    api_version: r.api_version,
+                    resource_ref: r.resource_ref,
+                })
+                .collect(),
+        };
 
-        let (mut indexed_resources, mut get_problems) = self.get_many_indexed(get_requests).await?;
-
-        indexed_resources.sort_by_key(|resource| resource.request_index);
-        get_problems.sort_by_key(|problem| problem.request_index);
+        let (indexed_resources, get_problems) = self.get_many_indexed(get_batch).await?;
 
         let manifests = indexed_resources
             .into_iter()
             .map(|resource| {
                 let format = formats_by_index[resource.request_index];
-                let manifest = Self::resource_view_to_manifest(resource.resource);
-                let manifest = Self::serialize_manifest(&manifest, format)?;
+                let manifest = manifest_support::resource_view_to_manifest(resource.resource);
+                let manifest = manifest_support::serialize_manifest(&manifest, format)?;
                 Ok(RenderResourceManifestResult { manifest, format })
             })
             .collect::<Result<Vec<_>, RenderResourceManifestError>>()?;
@@ -386,13 +382,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_snapshots_by_kind(target_account.id, &request.kind, request.pagination)
             .await?;
 
-        snapshots
-            .into_iter()
-            .map(|snapshot| {
-                self.resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(snapshot)
-                    .map_err(|error| InternalError::new(format!("{error}")).into())
-            })
-            .collect()
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        Self::map_snapshots_to_identities(snapshots, &descriptors_by_key).map_err(Into::into)
     }
 
     async fn list_all(
@@ -426,20 +417,15 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_all_snapshots(target_account.id, request.pagination)
             .await?;
 
-        snapshots
-            .into_iter()
-            .map(|snapshot| {
-                self.resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(snapshot)
-                    .map_err(|error| InternalError::new(format!("{error}")).into())
-            })
-            .collect()
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        Self::map_snapshots_to_identities(snapshots, &descriptors_by_key).map_err(Into::into)
     }
 
     async fn plan_apply_manifest(
         &self,
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
-        let manifest = self.parse_manifest(request.format, &request.manifest)?;
+        let manifest = manifest_support::parse_manifest(request.format, &request.manifest)?;
 
         let target_account = self
             .resource_account_resolver
@@ -452,8 +438,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             &manifest.api_version,
         )?;
 
-        let metadata = self.make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
+        let metadata = manifest_support::make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = manifest_support::collect_manifest_metadata_warnings(&manifest);
 
         let plan = dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
@@ -466,10 +452,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, metadata_warnings);
-                plan.resource = self
-                    .resource_account_resolver
-                    .hydrate_resource_view_account(plan.resource, Some(&target_account))
-                    .await?;
+                plan.resource.account = domain::ResourceViewAccount {
+                    id: target_account.id,
+                    name: Some(target_account.name),
+                };
 
                 ApplyManifestPlanningDecision::Planned(plan)
             }
@@ -483,7 +469,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
-        let manifest = self.parse_manifest(request.format, &request.manifest)?;
+        let manifest = manifest_support::parse_manifest(request.format, &request.manifest)?;
 
         let target_account = self
             .resource_account_resolver
@@ -496,8 +482,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             &manifest.api_version,
         )?;
 
-        let metadata = self.make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = Self::collect_manifest_metadata_warnings(&manifest);
+        let metadata = manifest_support::make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = manifest_support::collect_manifest_metadata_warnings(&manifest);
 
         let result = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
@@ -510,10 +496,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, metadata_warnings);
-                result.resource = self
-                    .resource_account_resolver
-                    .hydrate_resource_view_account(result.resource, Some(&target_account))
-                    .await?;
+                result.resource.account = domain::ResourceViewAccount {
+                    id: target_account.id,
+                    name: Some(target_account.name),
+                };
 
                 ApplyManifestApplicationDecision::Applied(result)
             }
@@ -541,12 +527,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_uid(&uid)
+            .resolve_snapshot_for_kind::<DeleteResourceError>(
+                &request.kind,
+                &target_account.id,
+                uid,
+            )
             .await?;
-
-        let snapshot =
-            self.ensure_snapshot_matches_kind(&request.kind, &target_account.id, uid, snapshot)?;
 
         let dispatcher = get_resource_crud_dispatcher::<DeleteResourceError>(
             &self.catalog,
@@ -567,8 +553,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
-    const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
-
     fn list_resource_kind_descriptors(&self) -> Vec<ResourceKindDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
@@ -622,7 +606,7 @@ impl LocalResourceFacadeImpl {
 
     async fn get_many_indexed(
         &self,
-        requests: Vec<GetResourceRequest>,
+        batch: BatchRequest<GetResourceRequest>,
     ) -> Result<
         (
             Vec<IndexedResourceView>,
@@ -630,112 +614,75 @@ impl LocalResourceFacadeImpl {
         ),
         GetResourceError,
     > {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(batch.account.as_ref())
+            .await?;
+
         let descriptors_by_key = self.resource_kind_names_by_key();
-        let groups = self.group_batch_materialization_requests(requests).await;
+        let groups = group_batch_requests(batch.requests);
+
+        let resolution_response = resolve_batch_uids(
+            self.generic_resource_query_service.as_ref(),
+            &target_account.id,
+            groups,
+        )
+        .await?;
+
+        let uid_entries = resolution_response.uid_entries;
         let mut indexed_resources = Vec::new();
-        let mut problems = groups.problems;
+        let mut problems = resolution_response.problems;
 
-        for (account_id, entries) in groups.uid_groups {
-            let uids = entries
-                .iter()
-                .map(|(_, _, uid, _)| *uid)
-                .collect::<Vec<_>>();
-            let snapshots_by_uid = self
-                .generic_resource_query_service
-                .find_snapshots_by_uids(&account_id, &uids)
-                .await?
-                .into_iter()
-                .map(|snapshot| (snapshot.uid, snapshot))
-                .collect::<HashMap<_, _>>();
+        let uids = uid_entries
+            .iter()
+            .map(|(_, _, uid)| *uid)
+            .collect::<Vec<_>>();
 
-            for (request_index, get_request, uid, target_account) in entries {
-                match snapshots_by_uid
-                    .get(&uid)
-                    .cloned()
-                    .ok_or_else(|| GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid)))
-                    .and_then(|snapshot| {
-                        Self::validate_materialized_snapshot(
-                            snapshot,
-                            &get_request,
-                            &descriptors_by_key,
-                        )
-                    }) {
-                    Ok(snapshot) => {
-                        let resource = Self::resource_view_from_snapshot(snapshot);
-                        let resource = self
-                            .resource_account_resolver
-                            .hydrate_resource_view_account(resource, Some(&target_account))
-                            .await
-                            .map_err(GetResourceError::Internal)?;
-                        indexed_resources.push(IndexedResourceView {
-                            request_index,
-                            resource,
-                        });
-                    }
-                    Err(error) => {
-                        problems.push(BatchRequestProblem {
-                            request_index,
-                            error,
-                        });
-                    }
-                }
-            }
-        }
+        let snapshots_by_uid = self
+            .generic_resource_query_service
+            .find_snapshots_by_uids(&target_account.id, &uids)
+            .await?
+            .into_iter()
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect::<HashMap<_, _>>();
 
-        Ok((indexed_resources, problems))
-    }
+        for (request_index, get_request, uid) in uid_entries {
+            match snapshots_by_uid
+                .get(&uid)
+                .cloned()
+                .ok_or_else(|| GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid)))
+                .and_then(|snapshot| {
+                    Self::validate_materialized_snapshot(
+                        snapshot,
+                        &get_request,
+                        &descriptors_by_key,
+                    )
+                }) {
+                Ok(snapshot) => {
+                    let mut resource = Self::resource_view_from_snapshot(snapshot);
+                    resource.account = domain::ResourceViewAccount {
+                        id: target_account.id.clone(),
+                        name: Some(target_account.name.clone()),
+                    };
 
-    async fn group_batch_materialization_requests(
-        &self,
-        requests: Vec<GetResourceRequest>,
-    ) -> BatchMaterializationGroups {
-        let mut uid_groups = HashMap::new();
-        let mut problems = Vec::new();
-
-        for (request_index, get_request) in requests.into_iter().enumerate() {
-            let target_account = match self
-                .resource_account_resolver
-                .resolve_target_account(get_request.account.as_ref())
-                .await
-            {
-                Ok(target_account) => target_account,
-                Err(error) => {
-                    problems.push(BatchRequestProblem {
+                    indexed_resources.push(IndexedResourceView {
                         request_index,
-                        error: error.into(),
+                        resource,
                     });
-                    continue;
                 }
-            };
-
-            let uid = match self
-                .resolve_resource_uid::<GetResourceError>(
-                    &get_request.kind,
-                    &target_account.id,
-                    &get_request.resource_ref,
-                )
-                .await
-            {
-                Ok(uid) => uid,
                 Err(error) => {
                     problems.push(BatchRequestProblem {
                         request_index,
                         error,
                     });
-                    continue;
                 }
-            };
-
-            uid_groups
-                .entry(target_account.id.clone())
-                .or_insert_with(Vec::new)
-                .push((request_index, get_request, uid, target_account));
+            }
         }
 
-        BatchMaterializationGroups {
-            uid_groups,
-            problems,
-        }
+        indexed_resources.sort_by_key(|resource| resource.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
+
+        Ok((indexed_resources, problems))
     }
 
     fn validate_materialized_snapshot(
@@ -743,24 +690,11 @@ impl LocalResourceFacadeImpl {
         request: &GetResourceRequest,
         descriptors_by_key: &HashMap<(String, String), String>,
     ) -> Result<ResourceSnapshot, GetResourceError> {
-        if snapshot.kind != request.kind {
-            return Err(ResourceKindMismatchError {
-                uid: snapshot.uid,
-                expected_kind: request.kind.clone(),
-                actual_kind: snapshot.kind,
-            }
-            .into());
-        }
-
-        if let Some(expected_api_version) = request.api_version.as_ref()
-            && snapshot.api_version != *expected_api_version
-        {
-            return Err(ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.clone(),
-                actual_api_version: snapshot.api_version,
-            }
-            .into());
-        }
+        Self::ensure_kind_matches::<GetResourceError>(snapshot.uid, &request.kind, &snapshot.kind)?;
+        Self::ensure_requested_api_version::<GetResourceError>(
+            request.api_version.as_ref(),
+            &snapshot.api_version,
+        )?;
 
         if !descriptors_by_key.contains_key(&(snapshot.kind.clone(), snapshot.api_version.clone()))
         {
@@ -800,171 +734,73 @@ impl LocalResourceFacadeImpl {
         }
     }
 
-    async fn group_batch_identity_requests(
-        &self,
-        requests: Vec<GetResourceRequest>,
-    ) -> BatchIdentityLookupGroups {
-        let mut uid_groups = HashMap::new();
-        let mut name_groups = HashMap::new();
-        let mut problems = Vec::new();
-
-        for (request_index, get_request) in requests.into_iter().enumerate() {
-            let target_account = match self
-                .resource_account_resolver
-                .resolve_target_account(get_request.account.as_ref())
-                .await
-            {
-                Ok(target_account) => target_account,
-                Err(error) => {
-                    problems.push(BatchRequestProblem {
-                        request_index,
-                        error: error.into(),
-                    });
-                    continue;
-                }
-            };
-
-            match &get_request.resource_ref {
-                ResourceRef::ById(uid) => {
-                    let uid = *uid;
-                    uid_groups
-                        .entry(target_account.id)
-                        .or_insert_with(Vec::new)
-                        .push((request_index, get_request, uid));
-                }
-                ResourceRef::ByName(name) => {
-                    let name = name.clone();
-                    name_groups
-                        .entry((target_account.id, get_request.kind.clone()))
-                        .or_insert_with(Vec::new)
-                        .push((request_index, get_request, name));
-                }
-            }
-        }
-
-        BatchIdentityLookupGroups {
-            uid_groups,
-            name_groups,
-            problems,
-        }
-    }
-
     async fn resolve_uid_identity_groups(
         &self,
-        uid_groups: BatchUidIdentityGroups,
+        account_id: &odf::AccountID,
+        uid_entries: BatchUidEntries,
+        mut problems: Vec<BatchRequestProblem<GetResourceError>>,
         descriptors_by_key: &HashMap<(String, String), String>,
-        identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
-    ) -> Result<(), GetResourceError> {
-        for (account_id, entries) in uid_groups {
-            let uids = entries.iter().map(|(_, _, uid)| *uid).collect::<Vec<_>>();
+    ) -> Result<
+        (
+            Vec<IndexedResourceIdentity>,
+            Vec<BatchRequestProblem<GetResourceError>>,
+        ),
+        GetResourceError,
+    > {
+        let uids = uid_entries
+            .iter()
+            .map(|(_, _, uid)| *uid)
+            .collect::<Vec<_>>();
 
-            let rows_by_uid = self
-                .generic_resource_query_service
-                .find_resource_identities_by_uids(&account_id, &uids)
-                .await?
-                .into_iter()
-                .map(|row| (row.uid, row))
-                .collect::<HashMap<_, _>>();
+        let rows_by_uid = self
+            .generic_resource_query_service
+            .find_resource_identities_by_uids(account_id, &uids)
+            .await?
+            .into_iter()
+            .map(|row| (row.uid, row))
+            .collect::<HashMap<_, _>>();
 
-            for (request_index, get_request, uid) in entries {
-                Self::push_batch_identity_result(
+        let mut identities = Vec::new();
+        for (request_index, get_request, uid) in uid_entries {
+            let row_result = rows_by_uid
+                .get(uid.as_ref())
+                .cloned()
+                .ok_or_else(|| uid_not_found(uid));
+            match row_result
+                .and_then(|row| Self::validate_identity_row(row, &get_request, descriptors_by_key))
+            {
+                Ok(identity) => identities.push(IndexedResourceIdentity {
                     request_index,
-                    rows_by_uid.get(uid.as_ref()).cloned().ok_or_else(|| {
-                        GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid))
-                    }),
-                    &get_request,
-                    descriptors_by_key,
-                    identities,
-                    problems,
-                );
+                    identity,
+                }),
+                Err(error) => problems.push(BatchRequestProblem {
+                    request_index,
+                    error,
+                }),
             }
         }
 
-        Ok(())
-    }
+        identities.sort_by_key(|identity| identity.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
 
-    async fn resolve_name_identity_groups(
-        &self,
-        name_groups: BatchNameIdentityGroups,
-        descriptors_by_key: &HashMap<(String, String), String>,
-        identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
-    ) -> Result<(), GetResourceError> {
-        for ((account_id, kind), entries) in name_groups {
-            let names = entries
-                .iter()
-                .map(|(_, _, name)| name.clone())
-                .collect::<Vec<_>>();
-
-            let rows_by_name = self
-                .generic_resource_query_service
-                .find_resource_identities_by_names(&account_id, &kind, &names)
-                .await?
-                .into_iter()
-                .map(|row| (row.name.clone(), row))
-                .collect::<HashMap<_, _>>();
-
-            for (request_index, get_request, name) in entries {
-                Self::push_batch_identity_result(
-                    request_index,
-                    rows_by_name.get(&name).cloned().ok_or_else(|| {
-                        GetResourceError::NameNotFound(ResourceNameNotFoundError {
-                            kind: get_request.kind.clone(),
-                            name,
-                        })
-                    }),
-                    &get_request,
-                    descriptors_by_key,
-                    identities,
-                    problems,
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    fn push_batch_identity_result(
-        request_index: usize,
-        row_result: Result<ResourceIdentityRow, GetResourceError>,
-        request: &GetResourceRequest,
-        descriptors_by_key: &HashMap<(String, String), String>,
-        identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
-    ) {
-        match row_result
-            .and_then(|row| Self::validate_identity_row(row, request, descriptors_by_key))
-        {
-            Ok(identity) => identities.push(IndexedResourceIdentity {
-                request_index,
-                identity,
-            }),
-            Err(error) => problems.push(BatchRequestProblem {
-                request_index,
-                error,
-            }),
-        }
+        Ok((identities, problems))
     }
 
     fn resource_identity_from_snapshot<E>(
-        &self,
         snapshot: ResourceSnapshot,
+        descriptors_by_key: &HashMap<(String, String), String>,
     ) -> Result<ResourceIdentityView, E>
     where
         E: From<UnsupportedResourceDescriptorError>,
     {
-        let canonical_kind_name = self
-            .list_resource_kind_descriptors()
-            .into_iter()
-            .find(|descriptor| {
-                descriptor.kind == snapshot.kind && descriptor.api_version == snapshot.api_version
-            })
-            .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
-                kind: snapshot.kind.clone(),
-                api_version: snapshot.api_version.clone(),
+        let key = (snapshot.kind.clone(), snapshot.api_version.clone());
+        let found = descriptors_by_key.get(&key);
+        let canonical_kind_name = found
+            .ok_or_else(|| {
+                let (kind, api_version) = key;
+                UnsupportedResourceDescriptorError::NotFound { kind, api_version }
             })?
-            .name;
+            .clone();
 
         Ok(ResourceIdentityView {
             kind: snapshot.kind,
@@ -979,11 +815,12 @@ impl LocalResourceFacadeImpl {
         row: ResourceIdentityRow,
         descriptors_by_key: &HashMap<(String, String), String>,
     ) -> Result<ResourceIdentityView, GetResourceError> {
-        let canonical_kind_name = descriptors_by_key
-            .get(&(row.kind.clone(), row.api_version.clone()))
-            .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
-                kind: row.kind.clone(),
-                api_version: row.api_version.clone(),
+        let key = (row.kind.clone(), row.api_version.clone());
+        let found = descriptors_by_key.get(&key);
+        let canonical_kind_name = found
+            .ok_or_else(|| {
+                let (kind, api_version) = key;
+                UnsupportedResourceDescriptorError::NotFound { kind, api_version }
             })?
             .clone();
 
@@ -1001,24 +838,15 @@ impl LocalResourceFacadeImpl {
         request: &GetResourceRequest,
         descriptors_by_key: &HashMap<(String, String), String>,
     ) -> Result<ResourceIdentityView, GetResourceError> {
-        if row.kind != request.kind {
-            return Err(ResourceKindMismatchError {
-                uid: ResourceUID::new(row.uid),
-                expected_kind: request.kind.clone(),
-                actual_kind: row.kind,
-            }
-            .into());
-        }
-
-        if let Some(expected_api_version) = request.api_version.as_ref()
-            && row.api_version != *expected_api_version
-        {
-            return Err(ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.clone(),
-                actual_api_version: row.api_version,
-            }
-            .into());
-        }
+        Self::ensure_kind_matches::<GetResourceError>(
+            ResourceUID::new(row.uid),
+            &request.kind,
+            &row.kind,
+        )?;
+        Self::ensure_requested_api_version::<GetResourceError>(
+            request.api_version.as_ref(),
+            &row.api_version,
+        )?;
 
         Self::resource_identity_from_row(row, descriptors_by_key)
     }
@@ -1032,166 +860,89 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError> + From<ResourceNameNotFoundError>,
     {
-        match resource_ref {
-            ResourceRef::ById(uid) => Ok(*uid),
-            ResourceRef::ByName(name) => self
-                .generic_resource_query_service
-                .find_resource_uid_by_name(account_id, kind, name)
-                .await?
-                .ok_or_else(|| {
-                    ResourceNameNotFoundError {
-                        kind: kind.to_string(),
-                        name: name.clone(),
-                    }
-                    .into()
-                }),
-        }
-    }
-
-    fn parse_manifest(
-        &self,
-        format: ResourceManifestFormat,
-        manifest: &str,
-    ) -> Result<ResourceManifest, ParseResourceManifestError> {
-        match format {
-            ResourceManifestFormat::Json => {
-                serde_json::from_str(manifest).map_err(|e| ParseResourceManifestError {
-                    message: format!("input is not valid JSON: {e}"),
-                })
-            }
-            ResourceManifestFormat::Yaml => {
-                serde_yaml::from_str(manifest).map_err(|e| ParseResourceManifestError {
-                    message: format!("input is not valid YAML: {e}"),
-                })
-            }
-        }
-    }
-
-    fn make_metadata_input(
-        &self,
-        manifest: &ResourceManifest,
-        target_account: &ResolvedAccount,
-    ) -> Result<ResourceMetadataInput, ApplyManifestError> {
-        ResourceMetadataInput::try_new(
-            target_account.id.clone(),
-            manifest.metadata.name.clone(),
-            manifest.metadata.description.clone(),
-            manifest.metadata.labels.clone(),
-            manifest.metadata.annotations.clone(),
+        resolve_resource_uid(
+            self.generic_resource_query_service.as_ref(),
+            kind,
+            account_id,
+            resource_ref,
         )
-        .map_err(Into::into)
+        .await
     }
 
-    fn collect_manifest_metadata_warnings(manifest: &ResourceManifest) -> Vec<ResourceWarning> {
-        let mut warnings = Vec::new();
-
-        if manifest
-            .metadata
-            .description
-            .as_ref()
-            .is_none_or(|description| description.trim().is_empty())
-        {
-            warnings.push(ResourceWarning {
-                code: Self::WARNING_CODE_MISSING_DESCRIPTION,
-                path: Some("metadata.description".to_string()),
-                message: "Resource has no description".to_string(),
-            });
-        }
-
-        warnings
+    fn map_snapshots_to_identities(
+        snapshots: Vec<ResourceSnapshot>,
+        descriptors_by_key: &HashMap<(String, String), String>,
+    ) -> Result<Vec<ResourceIdentityView>, InternalError> {
+        snapshots
+            .into_iter()
+            .map(|snapshot| {
+                Self::resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(
+                    snapshot,
+                    descriptors_by_key,
+                )
+                .map_err(|error| InternalError::new(format!("{error}")))
+            })
+            .collect()
     }
 
-    fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
-        let ResourceView {
-            kind,
-            api_version,
-            account,
-            metadata,
-            spec,
-            ..
-        } = view;
-
-        ResourceManifest {
-            api_version,
-            kind,
-            metadata: kamu_resources::ResourceManifestMetadata {
-                uid: Some(metadata.uid),
-                account: Some(kamu_resources::ResourceManifestAccount {
-                    id: Some(account.id),
-                    name: account.name.map(|name| name.to_string()),
-                }),
-                name: metadata.name,
-                description: metadata.description,
-                labels: metadata.labels.into_iter().collect(),
-                annotations: metadata.annotations.into_iter().collect(),
-            },
-            spec,
-        }
-    }
-
-    fn serialize_manifest(
-        manifest: &ResourceManifest,
-        format: ResourceManifestFormat,
-    ) -> Result<String, RenderResourceManifestError> {
-        match format {
-            ResourceManifestFormat::Json => serde_json::to_string_pretty(manifest)
-                .int_err()
-                .map_err(Into::into),
-            ResourceManifestFormat::Yaml => serde_yaml::to_string(manifest)
-                .int_err()
-                .map_err(Into::into),
-        }
-    }
-
-    async fn resolve_snapshot_for_kind(
-        &self,
-        kind: &str,
-        account_id: &odf::AccountID,
-        uid: &ResourceUID,
-    ) -> Result<ResourceSnapshot, GetResourceError> {
-        let Some(snapshot) = self
-            .generic_resource_query_service
-            .get_snapshot_by_uid(uid)
-            .await?
-        else {
-            return Err(ResourceUIDNotFoundError(*uid).into());
-        };
-
-        if snapshot.kind != kind {
+    fn ensure_kind_matches<E>(
+        uid: ResourceUID,
+        expected_kind: &str,
+        actual_kind: &str,
+    ) -> Result<(), E>
+    where
+        E: From<ResourceKindMismatchError>,
+    {
+        if actual_kind != expected_kind {
             return Err(ResourceKindMismatchError {
-                uid: *uid,
-                expected_kind: kind.to_string(),
-                actual_kind: snapshot.kind,
+                uid,
+                expected_kind: expected_kind.to_string(),
+                actual_kind: actual_kind.to_string(),
             }
             .into());
         }
 
-        if snapshot.metadata.account != *account_id {
-            return Err(ResourceUIDNotFoundError(*uid).into());
-        }
-
-        Ok(snapshot)
+        Ok(())
     }
 
-    fn ensure_snapshot_matches_kind(
+    fn ensure_requested_api_version<E>(
+        expected_api_version: Option<&String>,
+        actual_api_version: &str,
+    ) -> Result<(), E>
+    where
+        E: From<ResourceAPIVersionMismatchError>,
+    {
+        if let Some(expected_api_version) = expected_api_version
+            && actual_api_version != expected_api_version
+        {
+            return Err(ResourceAPIVersionMismatchError {
+                expected_api_version: expected_api_version.clone(),
+                actual_api_version: actual_api_version.to_string(),
+            }
+            .into());
+        }
+
+        Ok(())
+    }
+
+    async fn resolve_snapshot_for_kind<E>(
         &self,
         kind: &str,
         account_id: &odf::AccountID,
         uid: ResourceUID,
-        maybe_snapshot: Option<ResourceSnapshot>,
-    ) -> Result<ResourceSnapshot, DeleteResourceError> {
-        let Some(snapshot) = maybe_snapshot else {
+    ) -> Result<ResourceSnapshot, E>
+    where
+        E: From<InternalError> + From<ResourceUIDNotFoundError> + From<ResourceKindMismatchError>,
+    {
+        let Some(snapshot) = self
+            .generic_resource_query_service
+            .get_snapshot_by_uid(&uid)
+            .await?
+        else {
             return Err(ResourceUIDNotFoundError(uid).into());
         };
 
-        if snapshot.kind != kind {
-            return Err(ResourceKindMismatchError {
-                uid,
-                expected_kind: kind.to_string(),
-                actual_kind: snapshot.kind,
-            }
-            .into());
-        }
+        Self::ensure_kind_matches::<E>(uid, kind, &snapshot.kind)?;
 
         if snapshot.metadata.account != *account_id {
             return Err(ResourceUIDNotFoundError(uid).into());
@@ -1202,24 +953,6 @@ impl LocalResourceFacadeImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type BatchUidIdentityGroups =
-    HashMap<odf::AccountID, Vec<(usize, GetResourceRequest, ResourceUID)>>;
-type BatchNameIdentityGroups =
-    HashMap<(odf::AccountID, String), Vec<(usize, GetResourceRequest, ResourceName)>>;
-type BatchMaterializationUidGroups =
-    HashMap<odf::AccountID, Vec<(usize, GetResourceRequest, ResourceUID, ResolvedAccount)>>;
-
-struct BatchIdentityLookupGroups {
-    uid_groups: BatchUidIdentityGroups,
-    name_groups: BatchNameIdentityGroups,
-    problems: Vec<BatchRequestProblem<GetResourceError>>,
-}
-
-struct BatchMaterializationGroups {
-    uid_groups: BatchMaterializationUidGroups,
-    problems: Vec<BatchRequestProblem<GetResourceError>>,
-}
 
 struct IndexedResourceIdentity {
     request_index: usize,
