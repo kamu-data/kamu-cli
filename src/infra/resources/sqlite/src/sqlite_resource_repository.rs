@@ -435,6 +435,81 @@ impl ResourceRepository for SqliteResourceRepository {
         }))
     }
 
+    async fn find_resource_snapshots_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+        let uids_placeholders =
+            sqlite_generate_placeholders_list(uids.len(), NonZeroUsize::new(2).unwrap());
+
+        let query_str = format!(
+            r#"
+            SELECT
+                resource_uid as uid,
+                account_id,
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE account_id = $1
+              AND resource_uid IN ({uids_placeholders})
+              AND deleted_at IS NULL
+            "#,
+        );
+
+        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(account_id_str);
+        for uid in uids {
+            query = query.bind(*uid.as_ref());
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceSnapshot {
+                uid: ResourceUID::new(row.uid),
+                kind: row.resource_kind,
+                api_version: row.api_version,
+                metadata: ResourceMetadata {
+                    account: row.account_id,
+                    name: row.resource_name,
+                    description: row.description,
+                    labels: serde_json::from_value(row.labels).unwrap(),
+                    annotations: serde_json::from_value(row.annotations).unwrap(),
+                    generation: u64::try_from(row.generation).unwrap(),
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                    deleted_at: row.deleted_at,
+                },
+                spec: row.spec,
+                status: row.status,
+                last_reconciled_at: row.last_reconciled_at,
+                last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            })
+            .collect())
+    }
+
     fn list_resource_uids(
         &self,
         account_id: odf::AccountID,
@@ -713,6 +788,28 @@ impl ResourceRepository for SqliteResourceRepository {
             })
             .collect())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(sqlx::FromRow)]
+struct ResourceSnapshotRow {
+    uid: uuid::Uuid,
+    account_id: odf::AccountID,
+    resource_kind: String,
+    api_version: String,
+    resource_name: ResourceName,
+    description: Option<String>,
+    labels: serde_json::Value,
+    annotations: serde_json::Value,
+    spec: serde_json::Value,
+    status: Option<serde_json::Value>,
+    generation: i64,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    deleted_at: Option<DateTime<Utc>>,
+    last_reconciled_at: Option<DateTime<Utc>>,
+    last_event_id: Option<i64>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

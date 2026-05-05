@@ -247,6 +247,23 @@ impl ResourceRepository for InMemoryResourceRepository {
             .cloned())
     }
 
+    async fn find_resource_snapshots_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(uids
+            .iter()
+            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter(|snapshot| {
+                snapshot.metadata.account == *account_id && snapshot.metadata.deleted_at.is_none()
+            })
+            .cloned()
+            .collect())
+    }
+
     fn list_resource_uids(
         &self,
         account_id: odf::AccountID,

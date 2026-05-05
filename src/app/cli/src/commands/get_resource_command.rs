@@ -13,7 +13,9 @@ use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
 use kamu_resources_facade::{
+    BatchRequest,
     GetResourceError,
+    GetResourceRequest,
     RenderResourceManifestError,
     RenderResourceManifestRequest,
     ResourceFacade,
@@ -65,6 +67,8 @@ pub struct GetResourceCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl GetResourceCommand {
+    const MATERIALIZATION_BATCH_SIZE: usize = 100;
+
     fn resolution_options(&self) -> ResourceSelectionResolutionOptions {
         ResourceSelectionResolutionOptions {
             ignore_not_found: self.ignore_not_found,
@@ -196,56 +200,96 @@ impl GetResourceCommand {
         Ok(())
     }
 
-    async fn run_spec_view(
+    async fn run_spec_views(
         &self,
         resource_facade: &dyn ResourceFacade,
-        target: &ResourceTarget,
+        targets: &[ResourceTarget],
         format: FacadeResourceManifestFormat,
-    ) -> Result<Option<String>, CLIError> {
-        let rendered = resource_facade
-            .render_manifest(RenderResourceManifestRequest {
-                kind: target.kind.clone(),
-                api_version: Some(target.api_version.clone()),
-                account: None,
-                resource_ref: ResourceRef::ById(target.uid),
-                format,
-            })
-            .await;
+    ) -> Result<Vec<String>, CLIError> {
+        let mut rendered_items = Vec::new();
 
-        match rendered {
-            Ok(rendered) => Ok(Some(rendered.manifest)),
-            Err(
-                RenderResourceManifestError::NameNotFound(_)
-                | RenderResourceManifestError::UIDNotFound(_),
-            ) if self.ignore_not_found => Ok(None),
-            Err(error) => Err(error.into()),
+        for chunk in targets.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
+            let requests = chunk
+                .iter()
+                .map(|target| RenderResourceManifestRequest {
+                    kind: target.kind.clone(),
+                    api_version: Some(target.api_version.clone()),
+                    account: None,
+                    resource_ref: ResourceRef::ById(target.uid),
+                    format,
+                })
+                .collect();
+
+            let result = resource_facade
+                .render_manifests(BatchRequest { requests })
+                .await?;
+
+            self.handle_render_manifest_problems(result.problems)?;
+            rendered_items.extend(result.items.into_iter().map(|rendered| rendered.manifest));
         }
+
+        Ok(rendered_items)
     }
 
-    async fn run_full_view(
+    async fn run_full_views(
         &self,
         resource_facade: &dyn ResourceFacade,
-        target: &ResourceTarget,
+        targets: &[ResourceTarget],
         format: FacadeResourceManifestFormat,
-    ) -> Result<Option<String>, CLIError> {
-        let resource = resource_facade
-            .get(kamu_resources_facade::GetResourceRequest {
-                kind: target.kind.clone(),
-                api_version: Some(target.api_version.clone()),
-                account: None,
-                resource_ref: ResourceRef::ById(target.uid),
-            })
-            .await;
+    ) -> Result<Vec<String>, CLIError> {
+        let mut rendered_items = Vec::new();
 
-        match resource {
-            Ok(resource) => Ok(Some(self.render_full_resource(&resource, format)?)),
-            Err(GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_))
-                if self.ignore_not_found =>
-            {
-                Ok(None)
+        for chunk in targets.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
+            let requests = chunk
+                .iter()
+                .map(|target| GetResourceRequest {
+                    kind: target.kind.clone(),
+                    api_version: Some(target.api_version.clone()),
+                    account: None,
+                    resource_ref: ResourceRef::ById(target.uid),
+                })
+                .collect();
+
+            let result = resource_facade.get_many(BatchRequest { requests }).await?;
+
+            self.handle_get_resource_problems(result.problems)?;
+            for resource in result.items {
+                rendered_items.push(self.render_full_resource(&resource, format)?);
             }
-            Err(error) => Err(error.into()),
         }
+
+        Ok(rendered_items)
+    }
+
+    fn handle_get_resource_problems(
+        &self,
+        problems: Vec<kamu_resources_facade::BatchRequestProblem<GetResourceError>>,
+    ) -> Result<(), CLIError> {
+        for problem in problems {
+            match problem.error {
+                GetResourceError::NameNotFound(_) | GetResourceError::UIDNotFound(_)
+                    if self.ignore_not_found => {}
+                error => return Err(error.into()),
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_render_manifest_problems(
+        &self,
+        problems: Vec<kamu_resources_facade::BatchRequestProblem<RenderResourceManifestError>>,
+    ) -> Result<(), CLIError> {
+        for problem in problems {
+            match problem.error {
+                RenderResourceManifestError::NameNotFound(_)
+                | RenderResourceManifestError::UIDNotFound(_)
+                    if self.ignore_not_found => {}
+                error => return Err(error.into()),
+            }
+        }
+
+        Ok(())
     }
 
     fn output_rendered_items(
@@ -333,19 +377,13 @@ impl Command for GetResourceCommand {
                 Ok(())
             }
             GetRunMode::Manifest { format, spec } => {
-                let mut rendered_items: Vec<String> = Vec::new();
-                for target in resolved_targets.targets {
-                    let item = if spec {
-                        self.run_spec_view(resource_facade.as_ref(), &target, format)
-                            .await?
-                    } else {
-                        self.run_full_view(resource_facade.as_ref(), &target, format)
-                            .await?
-                    };
-                    if let Some(rendered) = item {
-                        rendered_items.push(rendered);
-                    }
-                }
+                let rendered_items = if spec {
+                    self.run_spec_views(resource_facade.as_ref(), &resolved_targets.targets, format)
+                        .await?
+                } else {
+                    self.run_full_views(resource_facade.as_ref(), &resolved_targets.targets, format)
+                        .await?
+                };
                 self.output_rendered_items(rendered_items, format)
             }
         }

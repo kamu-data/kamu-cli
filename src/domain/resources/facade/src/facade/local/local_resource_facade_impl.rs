@@ -44,9 +44,9 @@ use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_di
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
-    BatchGetResourceIdentitiesRequest,
-    BatchGetResourceIdentitiesResult,
-    BatchGetResourceIdentityProblem,
+    BatchRequest,
+    BatchRequestProblem,
+    BatchRequestResponse,
     DeleteResourceError,
     DeleteResourceRequest,
     GetResourceError,
@@ -183,6 +183,24 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map_err(Into::into)
     }
 
+    async fn get_many(
+        &self,
+        request: BatchRequest<GetResourceRequest>,
+    ) -> Result<BatchRequestResponse<ResourceView, GetResourceError>, GetResourceError> {
+        let (mut indexed_resources, mut problems) = self.get_many_indexed(request.requests).await?;
+
+        indexed_resources.sort_by_key(|resource| resource.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
+
+        Ok(BatchRequestResponse {
+            items: indexed_resources
+                .into_iter()
+                .map(|resource| resource.resource)
+                .collect(),
+            problems,
+        })
+    }
+
     async fn get_identity(
         &self,
         request: GetResourceRequest,
@@ -219,8 +237,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get_identities(
         &self,
-        request: BatchGetResourceIdentitiesRequest,
-    ) -> Result<BatchGetResourceIdentitiesResult, GetResourceError> {
+        request: BatchRequest<GetResourceRequest>,
+    ) -> Result<BatchRequestResponse<ResourceIdentityView, GetResourceError>, GetResourceError>
+    {
         let descriptors_by_key = self.resource_kind_names_by_key();
         let mut groups = self.group_batch_identity_requests(request.requests).await;
         let mut indexed_identities = Vec::new();
@@ -244,8 +263,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         indexed_identities.sort_by_key(|identity| identity.request_index);
         groups.problems.sort_by_key(|problem| problem.request_index);
 
-        Ok(BatchGetResourceIdentitiesResult {
-            identities: indexed_identities
+        Ok(BatchRequestResponse {
+            items: indexed_identities
                 .into_iter()
                 .map(|indexed_identity| indexed_identity.identity)
                 .collect(),
@@ -272,6 +291,59 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(RenderResourceManifestResult {
             manifest,
             format: request.format,
+        })
+    }
+
+    async fn render_manifests(
+        &self,
+        request: BatchRequest<RenderResourceManifestRequest>,
+    ) -> Result<
+        BatchRequestResponse<RenderResourceManifestResult, RenderResourceManifestError>,
+        RenderResourceManifestError,
+    > {
+        let formats_by_index = request
+            .requests
+            .iter()
+            .map(|request| request.format)
+            .collect::<Vec<_>>();
+
+        let get_requests = request
+            .requests
+            .into_iter()
+            .map(|request| GetResourceRequest {
+                kind: request.kind,
+                api_version: request.api_version,
+                account: request.account,
+                resource_ref: request.resource_ref,
+            })
+            .collect();
+
+        let (mut indexed_resources, mut get_problems) = self.get_many_indexed(get_requests).await?;
+
+        indexed_resources.sort_by_key(|resource| resource.request_index);
+        get_problems.sort_by_key(|problem| problem.request_index);
+
+        let manifests = indexed_resources
+            .into_iter()
+            .map(|resource| {
+                let format = formats_by_index[resource.request_index];
+                let manifest = Self::resource_view_to_manifest(resource.resource);
+                let manifest = Self::serialize_manifest(&manifest, format)?;
+                Ok(RenderResourceManifestResult { manifest, format })
+            })
+            .collect::<Result<Vec<_>, RenderResourceManifestError>>()?;
+
+        let problems = get_problems
+            .into_iter()
+            .map(|problem| BatchRequestProblem {
+                request_index: problem.request_index,
+                error: problem.error.into(),
+            })
+            .collect();
+
+        Ok(BatchRequestResponse {
+            items: manifests,
+            problems,
         })
     }
 
@@ -548,6 +620,186 @@ impl LocalResourceFacadeImpl {
             .collect()
     }
 
+    async fn get_many_indexed(
+        &self,
+        requests: Vec<GetResourceRequest>,
+    ) -> Result<
+        (
+            Vec<IndexedResourceView>,
+            Vec<BatchRequestProblem<GetResourceError>>,
+        ),
+        GetResourceError,
+    > {
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        let groups = self.group_batch_materialization_requests(requests).await;
+        let mut indexed_resources = Vec::new();
+        let mut problems = groups.problems;
+
+        for (account_id, entries) in groups.uid_groups {
+            let uids = entries
+                .iter()
+                .map(|(_, _, uid, _)| *uid)
+                .collect::<Vec<_>>();
+            let snapshots_by_uid = self
+                .generic_resource_query_service
+                .find_snapshots_by_uids(&account_id, &uids)
+                .await?
+                .into_iter()
+                .map(|snapshot| (snapshot.uid, snapshot))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, get_request, uid, target_account) in entries {
+                match snapshots_by_uid
+                    .get(&uid)
+                    .cloned()
+                    .ok_or_else(|| GetResourceError::UIDNotFound(ResourceUIDNotFoundError(uid)))
+                    .and_then(|snapshot| {
+                        Self::validate_materialized_snapshot(
+                            snapshot,
+                            &get_request,
+                            &descriptors_by_key,
+                        )
+                    }) {
+                    Ok(snapshot) => {
+                        let resource = Self::resource_view_from_snapshot(snapshot);
+                        let resource = self
+                            .resource_account_resolver
+                            .hydrate_resource_view_account(resource, Some(&target_account))
+                            .await
+                            .map_err(GetResourceError::Internal)?;
+                        indexed_resources.push(IndexedResourceView {
+                            request_index,
+                            resource,
+                        });
+                    }
+                    Err(error) => {
+                        problems.push(BatchRequestProblem {
+                            request_index,
+                            error,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok((indexed_resources, problems))
+    }
+
+    async fn group_batch_materialization_requests(
+        &self,
+        requests: Vec<GetResourceRequest>,
+    ) -> BatchMaterializationGroups {
+        let mut uid_groups = HashMap::new();
+        let mut problems = Vec::new();
+
+        for (request_index, get_request) in requests.into_iter().enumerate() {
+            let target_account = match self
+                .resource_account_resolver
+                .resolve_target_account(get_request.account.as_ref())
+                .await
+            {
+                Ok(target_account) => target_account,
+                Err(error) => {
+                    problems.push(BatchRequestProblem {
+                        request_index,
+                        error: error.into(),
+                    });
+                    continue;
+                }
+            };
+
+            let uid = match self
+                .resolve_resource_uid::<GetResourceError>(
+                    &get_request.kind,
+                    &target_account.id,
+                    &get_request.resource_ref,
+                )
+                .await
+            {
+                Ok(uid) => uid,
+                Err(error) => {
+                    problems.push(BatchRequestProblem {
+                        request_index,
+                        error,
+                    });
+                    continue;
+                }
+            };
+
+            uid_groups
+                .entry(target_account.id.clone())
+                .or_insert_with(Vec::new)
+                .push((request_index, get_request, uid, target_account));
+        }
+
+        BatchMaterializationGroups {
+            uid_groups,
+            problems,
+        }
+    }
+
+    fn validate_materialized_snapshot(
+        snapshot: ResourceSnapshot,
+        request: &GetResourceRequest,
+        descriptors_by_key: &HashMap<(String, String), String>,
+    ) -> Result<ResourceSnapshot, GetResourceError> {
+        if snapshot.kind != request.kind {
+            return Err(ResourceKindMismatchError {
+                uid: snapshot.uid,
+                expected_kind: request.kind.clone(),
+                actual_kind: snapshot.kind,
+            }
+            .into());
+        }
+
+        if let Some(expected_api_version) = request.api_version.as_ref()
+            && snapshot.api_version != *expected_api_version
+        {
+            return Err(ResourceAPIVersionMismatchError {
+                expected_api_version: expected_api_version.clone(),
+                actual_api_version: snapshot.api_version,
+            }
+            .into());
+        }
+
+        if !descriptors_by_key.contains_key(&(snapshot.kind.clone(), snapshot.api_version.clone()))
+        {
+            return Err(UnsupportedResourceDescriptorError::NotFound {
+                kind: snapshot.kind,
+                api_version: snapshot.api_version,
+            }
+            .into());
+        }
+
+        Ok(snapshot)
+    }
+
+    fn resource_view_from_snapshot(snapshot: ResourceSnapshot) -> ResourceView {
+        let ResourceSnapshot {
+            uid,
+            kind,
+            api_version,
+            metadata,
+            spec,
+            status,
+            last_reconciled_at,
+            ..
+        } = snapshot;
+
+        ResourceView {
+            kind,
+            api_version,
+            account: domain::ResourceViewAccount {
+                id: metadata.account.clone(),
+                name: None,
+            },
+            metadata: domain::ResourceViewMetadata::from_owned(uid, metadata),
+            last_reconciled_at,
+            spec,
+            status,
+        }
+    }
+
     async fn group_batch_identity_requests(
         &self,
         requests: Vec<GetResourceRequest>,
@@ -564,7 +816,7 @@ impl LocalResourceFacadeImpl {
             {
                 Ok(target_account) => target_account,
                 Err(error) => {
-                    problems.push(BatchGetResourceIdentityProblem {
+                    problems.push(BatchRequestProblem {
                         request_index,
                         error: error.into(),
                     });
@@ -602,7 +854,7 @@ impl LocalResourceFacadeImpl {
         uid_groups: BatchUidIdentityGroups,
         descriptors_by_key: &HashMap<(String, String), String>,
         identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
     ) -> Result<(), GetResourceError> {
         for (account_id, entries) in uid_groups {
             let uids = entries.iter().map(|(_, _, uid)| *uid).collect::<Vec<_>>();
@@ -637,7 +889,7 @@ impl LocalResourceFacadeImpl {
         name_groups: BatchNameIdentityGroups,
         descriptors_by_key: &HashMap<(String, String), String>,
         identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
     ) -> Result<(), GetResourceError> {
         for ((account_id, kind), entries) in name_groups {
             let names = entries
@@ -679,7 +931,7 @@ impl LocalResourceFacadeImpl {
         request: &GetResourceRequest,
         descriptors_by_key: &HashMap<(String, String), String>,
         identities: &mut Vec<IndexedResourceIdentity>,
-        problems: &mut Vec<BatchGetResourceIdentityProblem>,
+        problems: &mut Vec<BatchRequestProblem<GetResourceError>>,
     ) {
         match row_result
             .and_then(|row| Self::validate_identity_row(row, request, descriptors_by_key))
@@ -688,7 +940,7 @@ impl LocalResourceFacadeImpl {
                 request_index,
                 identity,
             }),
-            Err(error) => problems.push(BatchGetResourceIdentityProblem {
+            Err(error) => problems.push(BatchRequestProblem {
                 request_index,
                 error,
             }),
@@ -955,16 +1207,28 @@ type BatchUidIdentityGroups =
     HashMap<odf::AccountID, Vec<(usize, GetResourceRequest, ResourceUID)>>;
 type BatchNameIdentityGroups =
     HashMap<(odf::AccountID, String), Vec<(usize, GetResourceRequest, ResourceName)>>;
+type BatchMaterializationUidGroups =
+    HashMap<odf::AccountID, Vec<(usize, GetResourceRequest, ResourceUID, ResolvedAccount)>>;
 
 struct BatchIdentityLookupGroups {
     uid_groups: BatchUidIdentityGroups,
     name_groups: BatchNameIdentityGroups,
-    problems: Vec<BatchGetResourceIdentityProblem>,
+    problems: Vec<BatchRequestProblem<GetResourceError>>,
+}
+
+struct BatchMaterializationGroups {
+    uid_groups: BatchMaterializationUidGroups,
+    problems: Vec<BatchRequestProblem<GetResourceError>>,
 }
 
 struct IndexedResourceIdentity {
     request_index: usize,
     identity: ResourceIdentityView,
+}
+
+struct IndexedResourceView {
+    request_index: usize,
+    resource: ResourceView,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

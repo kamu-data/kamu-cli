@@ -11,6 +11,8 @@ use super::helpers as resource_helpers;
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceIdentitiesResult,
+    BatchResourceManifestsResult,
+    BatchResourcesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -49,6 +51,24 @@ impl AdminResources {
         resource_helpers::get_resource(
             ctx,
             selector,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
+    }
+
+    /// Returns resources by selectors from the target account
+    #[tracing::instrument(level = "info", name = AdminResources_resources, skip_all, fields(selector_count = selectors.len()))]
+    async fn resources(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+    ) -> Result<BatchResourcesResult> {
+        resource_helpers::get_resources(
+            ctx,
+            selectors,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),
                 name: None,
@@ -215,6 +235,27 @@ impl AdminResources {
         resource_helpers::render_resource_manifest(
             ctx,
             selector,
+            format,
+            Some(kamu_resources::ResourceManifestAccount {
+                id: Some(self.of_account.id.clone()),
+                name: None,
+            }),
+        )
+        .await
+    }
+
+    /// Renders canonical manifest representations from stored resources in
+    /// the target account
+    #[tracing::instrument(level = "info", name = AdminResources_render_manifests, skip_all, fields(selector_count = selectors.len()))]
+    async fn render_manifests(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+        format: ResourceManifestFormat,
+    ) -> Result<BatchResourceManifestsResult> {
+        resource_helpers::render_resource_manifests(
+            ctx,
+            selectors,
             format,
             Some(kamu_resources::ResourceManifestAccount {
                 id: Some(self.of_account.id.clone()),

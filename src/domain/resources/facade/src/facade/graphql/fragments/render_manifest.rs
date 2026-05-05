@@ -41,6 +41,43 @@ pub(crate) struct AdminRenderManifestFieldFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct BatchRenderManifestsQueryDataFragment {
+    pub resources: BatchRenderManifestsResourcesFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchRenderManifestsResourcesFragment {
+    pub render_manifests: BatchResourceManifestsResultFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchRenderManifestsQueryDataFragment {
+    pub admin: AdminBatchRenderManifestsFieldFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchRenderManifestsFieldFragment {
+    pub resources: BatchRenderManifestsResourcesFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceManifestsResultFragment {
+    pub manifests: Vec<ResourceRenderManifestResultFragment>,
+    pub problems: Vec<super::BatchResourceProblemFragment>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceRenderManifestResultFragment {
     pub manifest: String,
     pub format: ResourceManifestFormatFragment,

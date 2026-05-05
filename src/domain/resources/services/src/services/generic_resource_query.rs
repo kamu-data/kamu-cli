@@ -112,6 +112,16 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
+    async fn find_snapshots_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[crate::domain::ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        self.resource_repository
+            .find_resource_snapshots_by_uids(account_id, uids)
+            .await
+    }
+
     async fn list_snapshots_by_kind(
         &self,
         account_id: odf::AccountID,

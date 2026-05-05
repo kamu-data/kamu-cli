@@ -52,6 +52,11 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get(&self, request: GetResourceRequest) -> Result<ResourceView, GetResourceError>;
 
+    async fn get_many(
+        &self,
+        request: BatchRequest<GetResourceRequest>,
+    ) -> Result<BatchRequestResponse<ResourceView, GetResourceError>, GetResourceError>;
+
     async fn get_identity(
         &self,
         request: GetResourceRequest,
@@ -59,13 +64,21 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get_identities(
         &self,
-        request: BatchGetResourceIdentitiesRequest,
-    ) -> Result<BatchGetResourceIdentitiesResult, GetResourceError>;
+        request: BatchRequest<GetResourceRequest>,
+    ) -> Result<BatchRequestResponse<ResourceIdentityView, GetResourceError>, GetResourceError>;
 
     async fn render_manifest(
         &self,
         request: RenderResourceManifestRequest,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
+
+    async fn render_manifests(
+        &self,
+        request: BatchRequest<RenderResourceManifestRequest>,
+    ) -> Result<
+        BatchRequestResponse<RenderResourceManifestResult, RenderResourceManifestError>,
+        RenderResourceManifestError,
+    >;
 
     async fn list(
         &self,
@@ -106,6 +119,25 @@ pub trait ResourceFacade: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
+pub struct BatchRequest<R> {
+    pub requests: Vec<R>,
+}
+
+#[derive(Debug)]
+pub struct BatchRequestResponse<T, E> {
+    pub items: Vec<T>,
+    pub problems: Vec<BatchRequestProblem<E>>,
+}
+
+#[derive(Debug)]
+pub struct BatchRequestProblem<E> {
+    pub request_index: usize,
+    pub error: E,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
 pub struct ApplyManifestRequest {
     pub format: ResourceManifestFormat,
     pub manifest: String,
@@ -128,29 +160,6 @@ pub struct GetResourceRequest {
     pub api_version: Option<String>,
     pub account: Option<ResourceManifestAccount>,
     pub resource_ref: ResourceRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct BatchGetResourceIdentitiesRequest {
-    pub requests: Vec<GetResourceRequest>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct BatchGetResourceIdentitiesResult {
-    pub identities: Vec<ResourceIdentityView>,
-    pub problems: Vec<BatchGetResourceIdentityProblem>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct BatchGetResourceIdentityProblem {
-    pub request_index: usize,
-    pub error: GetResourceError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

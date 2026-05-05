@@ -32,6 +32,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_find_resource_snapshots_by_uids,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
     harness = InMemoryResourceRepositoryHarness
 );

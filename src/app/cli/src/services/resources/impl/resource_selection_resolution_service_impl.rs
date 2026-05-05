@@ -12,7 +12,7 @@ use std::future::Future;
 use database_common::PaginationOpts;
 use kamu_resources::{ResourceIdentityView, ResourceKindDescriptor};
 use kamu_resources_facade::{
-    BatchGetResourceIdentitiesRequest,
+    BatchRequest,
     GetResourceError,
     GetResourceRequest,
     ListAllResourceIdentitiesRequest,
@@ -126,7 +126,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let exact_request_count = exact_requests.len();
 
         let exact_batch_result = resource_facade
-            .get_identities(BatchGetResourceIdentitiesRequest {
+            .get_identities(BatchRequest {
                 requests: exact_requests,
             })
             .await?;
@@ -139,7 +139,7 @@ impl ResourceSelectionResolutionServiceImpl {
             exact_results[problem.request_index] = Some(Err(problem.error));
         }
 
-        let mut identities = exact_batch_result.identities.into_iter();
+        let mut identities = exact_batch_result.items.into_iter();
         for exact_result in &mut exact_results {
             if exact_result.is_none() {
                 *exact_result = Some(Ok(identities

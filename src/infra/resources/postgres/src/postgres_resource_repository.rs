@@ -421,6 +421,76 @@ impl ResourceRepository for PostgresResourceRepository {
         }))
     }
 
+    async fn find_resource_snapshots_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let uids = uids.iter().map(|uid| *uid.as_ref()).collect::<Vec<_>>();
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                resource_uid as "uid: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE account_id = $1
+              AND resource_uid = ANY($2)
+              AND deleted_at IS NULL
+            "#,
+            account_id_stack.as_str(),
+            &uids,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceSnapshot {
+                uid: ResourceUID::new(row.uid),
+                kind: row.resource_kind,
+                api_version: row.api_version,
+                metadata: ResourceMetadata {
+                    account: row.account_id,
+                    name: row.resource_name,
+                    description: row.description,
+                    labels: serde_json::from_value(row.labels).unwrap(),
+                    annotations: serde_json::from_value(row.annotations).unwrap(),
+                    generation: u64::try_from(row.generation).unwrap(),
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                    deleted_at: row.deleted_at,
+                },
+                spec: row.spec,
+                status: row.status,
+                last_reconciled_at: row.last_reconciled_at,
+                last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            })
+            .collect())
+    }
+
     fn list_resource_uids(
         &self,
         account_id: odf::AccountID,

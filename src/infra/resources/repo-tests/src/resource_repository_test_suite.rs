@@ -144,6 +144,40 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_find_resource_snapshots_by_uids(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "first");
+    first.uid = repo.new_resource_uid().await.unwrap();
+    let mut second = make_test_snapshot(account_id.clone(), "OtherKind", "second");
+    second.uid = repo.new_resource_uid().await.unwrap();
+    let mut other_account = make_test_snapshot(other_account_id, "TestKind", "other-account");
+    other_account.uid = repo.new_resource_uid().await.unwrap();
+    let missing_uid = repo.new_resource_uid().await.unwrap();
+
+    repo.create_resource(&first).await.unwrap();
+    repo.create_resource(&second).await.unwrap();
+    repo.create_resource(&other_account).await.unwrap();
+
+    let found = repo
+        .find_resource_snapshots_by_uids(
+            &account_id,
+            &[second.uid, missing_uid, first.uid, other_account.uid],
+        )
+        .await
+        .unwrap();
+
+    let found_uids = found
+        .into_iter()
+        .map(|snapshot| snapshot.uid)
+        .collect::<Vec<_>>();
+    assert_eq!(found_uids, vec![second.uid, first.uid]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");

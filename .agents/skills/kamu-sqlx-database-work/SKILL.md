@@ -13,6 +13,21 @@ Use compile-time SQL checking for DB-backed repositories.
 - Do not assume Postgres is unavailable; this repo uses a local Dockerized Postgres for SQLx macro validation.
 - SQLite-backed repositories have a local database setup for the same purpose.
 - Keep repository layers simple; put domain-level algorithms in services unless storage-specific behavior is the actual concern.
+- Declare row structs implementing `sqlx::FromRow` for query results instead of using name-based dynamic column resolutions. When these can be shared across Postgres/SQLite,
+  place them in a domain crate where repository traits are defined, and use `cfg_attr` to derive `sqlx::FromRow` only when the SQLx feature is enabled. For example:
+
+```rust
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MyEntityRow {
+    pub entity_id: Uuid,
+    pub key: String,
+    pub value: Vec<u8>,
+}
+
+```
+
+- Use `query_as!` with explicit struct types to ensure compile-time column verification and avoid runtime column name lookups.
 
 ## Local SQLx Setup
 

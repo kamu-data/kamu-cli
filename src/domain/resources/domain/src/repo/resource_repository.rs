@@ -69,6 +69,12 @@ pub trait ResourceRepository: Send + Sync {
         uid: &ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    async fn find_resource_snapshots_by_uids(
+        &self,
+        account_id: &odf::AccountID,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError>;
+
     fn list_resource_uids(
         &self,
         account_id: odf::AccountID,

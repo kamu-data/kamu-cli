@@ -13,6 +13,8 @@ use database_common::PaginationOpts;
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceIdentitiesResult,
+    BatchResourceManifestsResult,
+    BatchResourcesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -128,6 +130,40 @@ pub(crate) async fn get_resource(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn get_resources(
+    ctx: &Context<'_>,
+    selectors: Vec<ResourceSelectorInput>,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<BatchResourcesResult> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let requests = selectors
+        .into_iter()
+        .map(|selector| {
+            let ResourceSelectorInput {
+                kind,
+                api_version,
+                resource_ref,
+            } = selector;
+
+            kamu_resources_facade::GetResourceRequest {
+                kind: kind.into_resource_type(),
+                api_version,
+                account: account.clone(),
+                resource_ref: resource_ref.into(),
+            }
+        })
+        .collect();
+
+    resource_facade
+        .get_many(kamu_resources_facade::BatchRequest { requests })
+        .await
+        .map(Into::into)
+        .map_err(map_get_resource_error)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn get_resource_identity(
     ctx: &Context<'_>,
     selector: ResourceSelectorInput,
@@ -205,7 +241,7 @@ pub(crate) async fn get_resource_identities(
         .collect();
 
     resource_facade
-        .get_identities(kamu_resources_facade::BatchGetResourceIdentitiesRequest { requests })
+        .get_identities(kamu_resources_facade::BatchRequest { requests })
         .await
         .map(Into::into)
         .map_err(map_get_resource_error)
@@ -353,6 +389,42 @@ pub(crate) async fn render_resource_manifest(
         format: rendered.format.into(),
     })
 }
+
+pub(crate) async fn render_resource_manifests(
+    ctx: &Context<'_>,
+    selectors: Vec<ResourceSelectorInput>,
+    format: ResourceManifestFormat,
+    account: Option<kamu_resources::ResourceManifestAccount>,
+) -> Result<BatchResourceManifestsResult> {
+    let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+    let requests = selectors
+        .into_iter()
+        .map(|selector| {
+            let ResourceSelectorInput {
+                kind,
+                api_version,
+                resource_ref,
+            } = selector;
+
+            kamu_resources_facade::RenderResourceManifestRequest {
+                kind: kind.into_resource_type(),
+                api_version,
+                account: account.clone(),
+                resource_ref: resource_ref.into(),
+                format: format.into(),
+            }
+        })
+        .collect();
+
+    resource_facade
+        .render_manifests(kamu_resources_facade::BatchRequest { requests })
+        .await
+        .map(Into::into)
+        .map_err(map_render_resource_manifest_error)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn map_render_resource_manifest_error(
     error: kamu_resources_facade::RenderResourceManifestError,

@@ -40,3 +40,63 @@ pub(crate) struct AdminGetResourceRootFragment {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchGetResourcesQueryDataFragment {
+    pub resources: BatchGetResourcesFieldFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchGetResourcesFieldFragment {
+    pub resources: BatchResourcesResultFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchGetResourcesQueryDataFragment {
+    pub admin: AdminBatchGetResourcesRootFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminBatchGetResourcesRootFragment {
+    pub resources: BatchGetResourcesFieldFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourcesResultFragment {
+    pub resources: Vec<ResourceFragment>,
+    pub problems: Vec<BatchResourceProblemFragment>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchResourceProblemFragment {
+    pub request_index: usize,
+    pub code: BatchResourceProblemCodeFragment,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub(crate) enum BatchResourceProblemCodeFragment {
+    UidNotFound,
+    NameNotFound,
+    ApiVersionMismatch,
+    KindMismatch,
+    UnsupportedDescriptor,
+    BadAccount,
+    RemoteRequest,
+    Internal,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

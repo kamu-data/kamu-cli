@@ -71,30 +71,7 @@ pub(crate) struct AdminBatchGetResourceIdentitiesRootFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BatchResourceIdentitiesResultFragment {
     pub identities: Vec<ResourceIdentityFragment>,
-    pub problems: Vec<BatchResourceIdentityProblemFragment>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchResourceIdentityProblemFragment {
-    pub request_index: usize,
-    pub code: BatchResourceIdentityProblemCodeFragment,
-    pub message: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum BatchResourceIdentityProblemCodeFragment {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
-    UnsupportedDescriptor,
-    BadAccount,
-    RemoteRequest,
-    Internal,
+    pub problems: Vec<super::BatchResourceProblemFragment>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,8 @@ use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceIdentitiesResult,
+    BatchResourceManifestsResult,
+    BatchResourcesResult,
     Resource,
     ResourceConnection,
     ResourceIdentity,
@@ -57,6 +59,17 @@ impl Resources {
         selector: ResourceSelectorInput,
     ) -> Result<Option<Resource>> {
         resource_helpers::get_resource(ctx, selector, None /* current subject */).await
+    }
+
+    /// Returns resources by selectors
+    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = selectors.len()))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resources(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+    ) -> Result<BatchResourcesResult> {
+        resource_helpers::get_resources(ctx, selectors, None /* current subject */).await
     }
 
     /// Returns resource identity by selector, if found
@@ -170,6 +183,21 @@ impl Resources {
     ) -> Result<ResourceRenderManifestResult> {
         resource_helpers::render_resource_manifest(
             ctx, selector, format, None, /* current subject */
+        )
+        .await
+    }
+
+    /// Renders canonical manifest representations from stored resources
+    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = selectors.len()))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn render_manifests(
+        &self,
+        ctx: &Context<'_>,
+        selectors: Vec<ResourceSelectorInput>,
+        format: ResourceManifestFormat,
+    ) -> Result<BatchResourceManifestsResult> {
+        resource_helpers::render_resource_manifests(
+            ctx, selectors, format, None, /* current subject */
         )
         .await
     }
