@@ -374,7 +374,7 @@ impl ResourceRepository for SqliteResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
 
@@ -493,7 +493,7 @@ impl ResourceRepository for SqliteResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
 
@@ -567,7 +567,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 spec: row.spec,
                 status: row.status,
                 last_reconciled_at: row.last_reconciled_at,
-                last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                last_event_id: row.last_event_id.map(EventID::new),
             })
             .collect())
     }
@@ -683,7 +683,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })
@@ -754,7 +754,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })

@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
+use event_sourcing::EventID;
 use internal_error::InternalError;
 use kamu_resources::{
     CreateResourceError,
@@ -103,7 +104,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn update_resource(
         &self,
         resource_snapshot: &ResourceSnapshot,
-        expected_last_event_id: Option<event_sourcing::EventID>,
+        expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError> {
         let resource_update = ResourceSnapshotUpdate {
             snapshot: resource_snapshot.clone(),

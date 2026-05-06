@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::Utc;
 use event_sourcing::*;
 
 use crate::*;
@@ -33,7 +34,7 @@ impl WebhookSubscription {
             Aggregate::new(
                 subscription_id,
                 WebhookSubscriptionEventCreated {
-                    event_time: chrono::Utc::now(),
+                    event_time: Utc::now(),
                     subscription_id,
                     dataset_id,
                     label,
@@ -48,35 +49,35 @@ impl WebhookSubscription {
 
     pub fn enable(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventEnabled {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }
 
     pub fn pause(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventPaused {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }
 
     pub fn resume(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventResumed {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }
 
     pub fn mark_unreachable(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventMarkedUnreachable {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }
 
     pub fn reactivate(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventReactivated {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }
@@ -88,7 +89,7 @@ impl WebhookSubscription {
         event_types: Vec<WebhookEventType>,
     ) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventModified {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
             new_target_url: target_url,
             new_label: label,
@@ -101,7 +102,7 @@ impl WebhookSubscription {
         new_secret: WebhookSubscriptionSecret,
     ) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventSecretRotated {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
             new_secret,
         })
@@ -109,7 +110,7 @@ impl WebhookSubscription {
 
     pub fn remove(&mut self) -> Result<(), ProjectionError<WebhookSubscriptionState>> {
         self.apply(WebhookSubscriptionEventRemoved {
-            event_time: chrono::Utc::now(),
+            event_time: Utc::now(),
             subscription_id: self.id(),
         })
     }

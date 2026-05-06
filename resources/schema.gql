@@ -3835,9 +3835,19 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
+type ResourceDeleteManyResult {
+	resources: [ResourceDeleteSuccess!]!
+	problems: [BatchResourceProblem!]!
+}
+
 type ResourceDeleteResult {
 	resourceId: ResourceID!
 	kind: ResourceKind
+}
+
+type ResourceDeleteSuccess {
+	requestIndex: Int!
+	resourceId: ResourceID!
 }
 
 type ResourceEdge {
@@ -4032,6 +4042,7 @@ type Resources {
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
+	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyResult!
 }
 
 type ResourcesSummary {

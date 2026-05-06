@@ -12,6 +12,7 @@ use std::fmt::Display;
 
 use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use internal_error::*;
 use odf_metadata::*;
 use odf_storage::*;
@@ -223,7 +224,7 @@ pub trait MetadataChainExt: MetadataChain {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let previous_nearest_watermark: Option<chrono::DateTime<chrono::Utc>> = self
+                let previous_nearest_watermark: Option<DateTime<Utc>> = self
                     .accept_one_by_hash(old_head, crate::SearchSingleDataBlockVisitor::next())
                     .await
                     .int_err()?
@@ -1066,7 +1067,7 @@ impl Display for OffsetsNotSequentialError {
 pub struct MetadataChainIncrementInterval {
     pub num_blocks: u64,
     pub num_records: u64,
-    pub updated_watermark: Option<chrono::DateTime<chrono::Utc>>,
+    pub updated_watermark: Option<DateTime<Utc>>,
 }
 
 impl std::ops::AddAssign for MetadataChainIncrementInterval {

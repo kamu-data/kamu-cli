@@ -232,7 +232,7 @@ impl ResourceSnapshotRow {
             spec: self.spec,
             status: self.status,
             last_reconciled_at: self.last_reconciled_at,
-            last_event_id: self.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: self.last_event_id.map(EventID::new),
         }
     }
 }

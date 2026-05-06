@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use chrono::{Duration, DurationRound, Utc};
+use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
@@ -4468,8 +4468,8 @@ impl FlowRunsHarness {
     async fn reschedule_waiting_flow(
         &self,
         flow_id: &str,
-        event_time: chrono::DateTime<Utc>,
-        scheduled_for_activation_at: chrono::DateTime<Utc>,
+        event_time: DateTime<Utc>,
+        scheduled_for_activation_at: DateTime<Utc>,
     ) {
         let flow_event_store = self
             .catalog_authorized
