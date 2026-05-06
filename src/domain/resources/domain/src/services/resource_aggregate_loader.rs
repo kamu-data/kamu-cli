@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::LoadError;
+use event_sourcing::{GetEventsError, LoadError};
 
 use crate::{ReconcilableEventSourcedResource, ResourceUID};
 
@@ -16,6 +16,11 @@ use crate::{ReconcilableEventSourcedResource, ResourceUID};
 #[async_trait::async_trait]
 pub trait ResourceAggregateLoader<R: ReconcilableEventSourcedResource>: Send + Sync {
     async fn load(&self, uid: &ResourceUID) -> Result<R, LoadError<R::ResourceState>>;
+
+    async fn load_many(
+        &self,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<Result<R, LoadError<R::ResourceState>>>, GetEventsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

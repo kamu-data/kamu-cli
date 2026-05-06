@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceSnapshotUpdate,
     ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
@@ -187,6 +188,22 @@ impl ResourceRepository for PostgresResourceRepository {
 
         if update_result.rows_affected() == 0 {
             return Err(UpdateResourceError::concurrent_modification());
+        }
+
+        Ok(())
+    }
+
+    async fn update_resources(
+        &self,
+        resource_updates: &[ResourceSnapshotUpdate],
+    ) -> Result<(), UpdateResourceError> {
+        // TODO: replace with bulk update
+        for resource_update in resource_updates {
+            self.update_resource(
+                &resource_update.snapshot,
+                resource_update.expected_last_event_id,
+            )
+            .await?;
         }
 
         Ok(())

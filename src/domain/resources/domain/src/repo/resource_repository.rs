@@ -37,6 +37,19 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
+    ) -> Result<(), UpdateResourceError> {
+        let resource_update = ResourceSnapshotUpdate {
+            snapshot: resource_snapshot.clone(),
+            expected_last_event_id,
+        };
+
+        self.update_resources(std::slice::from_ref(&resource_update))
+            .await
+    }
+
+    async fn update_resources(
+        &self,
+        resource_updates: &[ResourceSnapshotUpdate],
     ) -> Result<(), UpdateResourceError>;
 
     async fn find_resource_uid_by_name(
@@ -136,6 +149,14 @@ impl UpdateResourceError {
     pub fn concurrent_modification() -> Self {
         Self::ConcurrentModification(ConcurrentModificationError {})
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ResourceSnapshotUpdate {
+    pub snapshot: ResourceSnapshot,
+    pub expected_last_event_id: Option<EventID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

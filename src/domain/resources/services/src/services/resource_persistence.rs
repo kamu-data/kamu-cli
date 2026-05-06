@@ -20,6 +20,7 @@ use crate::domain::{
     ResourceDescriptorProvider,
     ResourcePersistenceError,
     ResourceRepository,
+    ResourceSnapshotUpdate,
     ResourceStatusLike,
     UpdateResourceError,
 };
@@ -104,6 +105,41 @@ where
         resource: &mut R,
         now: DateTime<Utc>,
     ) -> Result<(), ResourcePersistenceError> {
+        self.delete_many(std::slice::from_mut(resource), now).await
+    }
+
+    pub async fn delete_many(
+        &self,
+        resources: &mut [R],
+        now: DateTime<Utc>,
+    ) -> Result<(), ResourcePersistenceError> {
+        for resource in resources.iter_mut() {
+            Self::mark_deleted(resource, now)?;
+        }
+
+        let expected_last_event_ids = resources
+            .iter()
+            .map(|resource| resource.aggregate().last_stored_event_id())
+            .collect::<Vec<_>>();
+
+        // TODO: find a way to bulk it
+        for resource in resources.iter_mut() {
+            match resource.aggregate_mut().save(self.event_store).await {
+                Ok(()) => {}
+                Err(SaveError::ConcurrentModification(err)) => {
+                    return Err(ResourcePersistenceError::ConcurrentModification(err));
+                }
+                Err(err) => {
+                    return Err(ResourcePersistenceError::Internal(err.int_err()));
+                }
+            }
+        }
+
+        self.sync_snapshots(resources, expected_last_event_ids)
+            .await
+    }
+
+    fn mark_deleted(resource: &mut R, now: DateTime<Utc>) -> Result<(), ResourcePersistenceError> {
         let tombstone_name = format!("deleted-{}", resource.uid());
 
         resource.try_delete(now, tombstone_name).map_err(|err| {
@@ -112,20 +148,7 @@ where
                     .int_err()
                     .with_context(format!("Failed to delete resource {}", resource.uid())),
             )
-        })?;
-
-        match self.save(resource).await {
-            Ok(()) => Ok(()),
-            Err(ResourcePersistenceError::Duplicate(err)) => {
-                Err(ResourcePersistenceError::Internal(
-                    format!("{err}").int_err().with_context(format!(
-                        "Unexpected duplicate resource state while deleting resource {}",
-                        resource.uid()
-                    )),
-                ))
-            }
-            Err(err) => Err(err),
-        }
+        })
     }
 }
 
@@ -141,17 +164,36 @@ where
         resource: &R,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), ResourcePersistenceError> {
-        let snapshot = resource.make_resource_snapshot()?;
-
-        match self
-            .resource_repository
-            .update_resource(&snapshot, expected_last_event_id)
+        self.sync_snapshots(std::slice::from_ref(resource), vec![expected_last_event_id])
             .await
-        {
+    }
+
+    async fn sync_snapshots(
+        &self,
+        resources: &[R],
+        expected_last_event_ids: Vec<Option<EventID>>,
+    ) -> Result<(), ResourcePersistenceError> {
+        let updates = resources
+            .iter()
+            .zip(expected_last_event_ids)
+            .map(|(resource, expected_last_event_id)| {
+                Ok(ResourceSnapshotUpdate {
+                    snapshot: resource.make_resource_snapshot()?,
+                    expected_last_event_id,
+                })
+            })
+            .collect::<Result<Vec<_>, ResourcePersistenceError>>()?;
+
+        match self.resource_repository.update_resources(&updates).await {
             Ok(()) => Ok(()),
             Err(UpdateResourceError::ConcurrentModification(err)) => {
                 Err(ResourcePersistenceError::ConcurrentModification(err))
             }
+            Err(UpdateResourceError::Duplicate(err)) => Err(ResourcePersistenceError::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context("Unexpected duplicate resource state while syncing resources"),
+            )),
             Err(err) => Err(ResourcePersistenceError::Internal(err.int_err())),
         }
     }
@@ -210,6 +252,19 @@ macro_rules! declare_resource_persistence_service {
                 );
 
                 helper.delete(resource, now).await
+            }
+
+            async fn delete_many(
+                &self,
+                resources: &mut [$resource],
+                now: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
+                    self.resource_repository.as_ref(),
+                    self.event_store.as_ref(),
+                );
+
+                helper.delete_many(resources, now).await
             }
         }
     };
