@@ -21,6 +21,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotUpdate,
     ResourceSummaryRow,
     ResourceUID,
     UpdateResourceError,
@@ -178,6 +179,40 @@ pub async fn test_find_resource_snapshots_by_uids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_find_resource_snapshots_by_kind_and_uids(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "first");
+    first.uid = repo.new_resource_uid().await.unwrap();
+    let mut second = make_test_snapshot(account_id.clone(), "OtherKind", "second");
+    second.uid = repo.new_resource_uid().await.unwrap();
+    let mut third = make_test_snapshot(other_account_id, "TestKind", "third");
+    third.uid = repo.new_resource_uid().await.unwrap();
+    let missing_uid = repo.new_resource_uid().await.unwrap();
+
+    repo.create_resource(&first).await.unwrap();
+    repo.create_resource(&second).await.unwrap();
+    repo.create_resource(&third).await.unwrap();
+
+    let found = repo
+        .find_resource_snapshots_by_kind_and_uids(
+            "TestKind",
+            &[second.uid, missing_uid, third.uid, first.uid],
+        )
+        .await
+        .unwrap();
+
+    let found_uids = found
+        .into_iter()
+        .map(|snapshot| snapshot.uid)
+        .collect::<Vec<_>>();
+    assert_eq!(found_uids, vec![third.uid, first.uid]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
@@ -291,6 +326,149 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
         result,
         Err(UpdateResourceError::ConcurrentModification(_))
     ));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_update_resources(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "bulk-first");
+    first.uid = repo.new_resource_uid().await.unwrap();
+    let mut second = make_test_snapshot(account_id, "TestKind", "bulk-second");
+    second.uid = repo.new_resource_uid().await.unwrap();
+
+    repo.create_resource(&first).await.unwrap();
+    repo.create_resource(&second).await.unwrap();
+
+    let first_event_id = EventID::new(1);
+    let second_event_id = EventID::new(2);
+
+    let updated_first = ResourceSnapshot {
+        metadata: ResourceMetadata {
+            description: Some("Updated first".to_string()),
+            generation: 1,
+            updated_at: Utc::now(),
+            ..first.metadata.clone()
+        },
+        last_event_id: Some(first_event_id),
+        ..first.clone()
+    };
+    let updated_second = ResourceSnapshot {
+        metadata: ResourceMetadata {
+            description: Some("Updated second".to_string()),
+            generation: 1,
+            updated_at: Utc::now(),
+            ..second.metadata.clone()
+        },
+        last_event_id: Some(second_event_id),
+        ..second.clone()
+    };
+
+    repo.update_resources(&[
+        ResourceSnapshotUpdate {
+            snapshot: updated_first.clone(),
+            expected_last_event_id: None,
+        },
+        ResourceSnapshotUpdate {
+            snapshot: updated_second.clone(),
+            expected_last_event_id: None,
+        },
+    ])
+    .await
+    .unwrap();
+
+    let found_first = repo
+        .find_resource_snapshot_by_uid(&first.uid)
+        .await
+        .unwrap()
+        .unwrap();
+    let found_second = repo
+        .find_resource_snapshot_by_uid(&second.uid)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        found_first.metadata.description,
+        updated_first.metadata.description
+    );
+    assert_eq!(found_first.metadata.generation, 1);
+    assert_eq!(found_first.last_event_id, Some(first_event_id));
+
+    assert_eq!(
+        found_second.metadata.description,
+        updated_second.metadata.description
+    );
+    assert_eq!(found_second.metadata.generation, 1);
+    assert_eq!(found_second.last_event_id, Some(second_event_id));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "bulk-concurrent-first");
+    first.uid = repo.new_resource_uid().await.unwrap();
+    let mut second = make_test_snapshot(account_id, "TestKind", "bulk-concurrent-second");
+    second.uid = repo.new_resource_uid().await.unwrap();
+
+    repo.create_resource(&first).await.unwrap();
+    repo.create_resource(&second).await.unwrap();
+
+    let updated_first = ResourceSnapshot {
+        metadata: ResourceMetadata {
+            generation: 1,
+            ..first.metadata.clone()
+        },
+        last_event_id: Some(EventID::new(1)),
+        ..first.clone()
+    };
+    let updated_second = ResourceSnapshot {
+        metadata: ResourceMetadata {
+            generation: 1,
+            ..second.metadata.clone()
+        },
+        last_event_id: Some(EventID::new(2)),
+        ..second.clone()
+    };
+
+    let result = repo
+        .update_resources(&[
+            ResourceSnapshotUpdate {
+                snapshot: updated_first,
+                expected_last_event_id: Some(EventID::new(99)),
+            },
+            ResourceSnapshotUpdate {
+                snapshot: updated_second,
+                expected_last_event_id: None,
+            },
+        ])
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(UpdateResourceError::ConcurrentModification(_))
+    ));
+
+    let found_first = repo
+        .find_resource_snapshot_by_uid(&first.uid)
+        .await
+        .unwrap()
+        .unwrap();
+    let found_second = repo
+        .find_resource_snapshot_by_uid(&second.uid)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(found_first.last_event_id, None);
+    assert_eq!(found_first.metadata.generation, 0);
+    assert_eq!(found_second.last_event_id, None);
+    assert_eq!(found_second.metadata.generation, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -45,6 +45,13 @@ pub trait GenericResourceQueryService: Send + Sync {
         uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
+    async fn find_owned_snapshots(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, FindOwnedResourceError>;
+
     async fn get_snapshot_by_uid(
         &self,
         uid: &crate::ResourceUID,

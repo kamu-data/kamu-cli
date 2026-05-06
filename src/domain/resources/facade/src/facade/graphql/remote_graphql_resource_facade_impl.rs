@@ -184,6 +184,18 @@ impl RemoteGraphqlResourceFacadeImpl {
         }
     "#;
 
+    const BATCH_DELETE_FIELDS: &'static str = r#"
+        resources {
+          requestIndex
+          resourceId
+        }
+        problems {
+          requestIndex
+          code
+          message
+        }
+    "#;
+
     const IDENTITY_LIST_FIELDS: &'static str = r#"
         nodes {
           id
@@ -761,6 +773,25 @@ impl RemoteGraphqlResourceFacadeImpl {
               }}
             }}
             "#
+        ))
+    }
+
+    fn delete_resources_query(
+        selector: &ResourceBatchSelector,
+    ) -> Result<String, BatchResourceError> {
+        let selector_str = Self::batch_selector_input(selector)?;
+
+        Ok(format!(
+            r#"
+            mutation {{
+              resources {{
+                deleteMany(selector: {selector_str}) {{
+                  {fields}
+                }}
+              }}
+            }}
+            "#,
+            fields = Self::BATCH_DELETE_FIELDS,
         ))
     }
 
@@ -1472,6 +1503,68 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .map_err(|error| Self::map_delete_remote_error(&selector, error))?;
 
         Ok(response.resources.delete.resource_id)
+    }
+
+    async fn delete_many(
+        &self,
+        selector: ResourceBatchSelector,
+    ) -> Result<BatchResourceResponse<domain::ResourceUID, ResourceLookupProblem>, BatchResourceError>
+    {
+        if selector.resource_refs.is_empty() {
+            return Ok(BatchResourceResponse {
+                successes: Vec::new(),
+                problems: Vec::new(),
+            });
+        }
+
+        let query = Self::delete_resources_query(&selector)?;
+
+        let response: fragments::DeleteManyMutationDataFragment =
+            self.execute_graphql(&query).await?;
+        let batch_result = response.resources.delete_many;
+
+        let successes = batch_result
+            .resources
+            .into_iter()
+            .map(|success| BatchResourceSuccess {
+                request_index: success.request_index,
+                item: success.resource_id,
+            })
+            .collect();
+
+        let problems = batch_result
+            .problems
+            .into_iter()
+            .map(|problem| {
+                let resource_ref = selector
+                    .resource_refs
+                    .get(problem.request_index)
+                    .ok_or_else(|| {
+                        BatchResourceError::Internal(InternalError::new(format!(
+                            "Remote resource delete problem index {} is out of bounds",
+                            problem.request_index
+                        )))
+                    })?;
+
+                let request_index = problem.request_index;
+                let error = Self::batch_resource_problem_error(
+                    &problem,
+                    &selector.kind,
+                    resource_ref,
+                    selector.api_version.as_deref(),
+                )?;
+
+                Ok(BatchResourceProblem {
+                    request_index,
+                    error,
+                })
+            })
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
+
+        Ok(BatchResourceResponse {
+            successes,
+            problems,
+        })
     }
 }
 

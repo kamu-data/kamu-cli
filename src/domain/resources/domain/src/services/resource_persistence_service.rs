@@ -26,6 +26,12 @@ pub trait ResourcePersistenceService<R: ReconcilableEventSourcedResource>: Send 
         resource: &mut R,
         now: DateTime<Utc>,
     ) -> Result<(), ResourcePersistenceError>;
+
+    async fn delete_many(
+        &self,
+        resources: &mut [R],
+        now: DateTime<Utc>,
+    ) -> Result<(), ResourcePersistenceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

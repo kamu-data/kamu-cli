@@ -28,7 +28,37 @@ pub(crate) struct ResourcesDeleteMutFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct DeleteManyMutationDataFragment {
+    pub resources: ResourcesDeleteManyMutFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResourcesDeleteManyMutFragment {
+    pub delete_many: BatchDeleteResourcesResultFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceDeleteResultFragment {
+    pub resource_id: domain::ResourceUID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchDeleteResourcesResultFragment {
+    pub resources: Vec<BatchDeleteResourceSuccessFragment>,
+    pub problems: Vec<super::BatchResourceProblemFragment>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchDeleteResourceSuccessFragment {
+    pub request_index: usize,
     pub resource_id: domain::ResourceUID,
 }
 

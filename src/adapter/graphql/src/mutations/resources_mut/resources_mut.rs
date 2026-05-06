@@ -10,7 +10,9 @@
 use crate::mutations::ResourceApplyOutcome;
 use crate::prelude::*;
 use crate::queries::{
+    BatchResourceProblem,
     ResourceAccountSelectorInput,
+    ResourceBatchSelectorInput,
     ResourceKind,
     ResourceManifestFormat,
     ResourceSelectorInput,
@@ -88,6 +90,35 @@ impl ResourcesMut {
             kind: ResourceKind::new(kind).into(),
         })
     }
+
+    #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn delete_many(
+        &self,
+        ctx: &Context<'_>,
+        selector: ResourceBatchSelectorInput,
+    ) -> Result<ResourceDeleteManyResult> {
+        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+        let ResourceBatchSelectorInput {
+            kind,
+            api_version,
+            resource_refs,
+            account,
+        } = selector;
+        let kind = kind.into_resource_type();
+
+        resource_facade
+            .delete_many(kamu_resources_facade::ResourceBatchSelector {
+                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                kind,
+                api_version,
+                resource_refs: resource_refs.into_iter().map(Into::into).collect(),
+            })
+            .await
+            .map(Into::into)
+            .map_err(map_batch_delete_resource_error)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +127,43 @@ impl ResourcesMut {
 pub struct ResourceDeleteResult {
     pub resource_id: ResourceID,
     pub kind: Option<ResourceKind>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceDeleteManyResult {
+    pub resources: Vec<ResourceDeleteSuccess>,
+    pub problems: Vec<BatchResourceProblem>,
+}
+
+type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse<
+    kamu_resources::ResourceUID,
+    kamu_resources_facade::ResourceLookupProblem,
+>;
+
+impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
+    fn from(value: BatchDeleteResourcesResponse) -> Self {
+        Self {
+            resources: value
+                .successes
+                .into_iter()
+                .map(|success| ResourceDeleteSuccess {
+                    request_index: success.request_index,
+                    resource_id: success.item.into(),
+                })
+                .collect(),
+            problems: value.problems.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceDeleteSuccess {
+    pub request_index: usize,
+    pub resource_id: ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +183,19 @@ fn map_apply_resource_error(error: kamu_resources_facade::ApplyManifestError) ->
             tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
             GqlError::gql("Resource was modified concurrently")
         }
+        E::RemoteRequest(error) => error.int_err().into(),
+        E::Internal(error) => error.into(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceError) -> GqlError {
+    use kamu_resources_facade::BatchResourceError as E;
+
+    match error {
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

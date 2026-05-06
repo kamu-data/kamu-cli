@@ -114,6 +114,11 @@ pub trait ResourceFacade: Send + Sync {
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
     async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError>;
+
+    async fn delete_many(
+        &self,
+        selector: ResourceBatchSelector,
+    ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use internal_error::ErrorIntoInternal;
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -21,7 +23,6 @@ use crate::domain::{
     ResourceDescriptorProvider,
     ResourcePersistenceError,
     ResourcePersistenceService,
-    ResourceSnapshot,
     ResourceStatusLike,
     ResourceUID,
 };
@@ -65,64 +66,70 @@ where
         account_id: odf::AccountID,
         uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError> {
-        for uid in uids {
-            let Some(_resource_snapshot) =
-                self.find_owned_resource_snapshot(&account_id, uid).await?
-            else {
-                continue;
-            };
+        let unique_uids = uids
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
-            self.delete_resource(&uid).await?;
-        }
+        let owned_snapshots = self
+            .generic_resource_query_service
+            .find_owned_snapshots(&account_id, R::DESCRIPTOR.resource_type, &unique_uids)
+            .await?;
 
-        Ok(())
-    }
+        let owned_uids = owned_snapshots
+            .into_iter()
+            .map(|snapshot| snapshot.uid)
+            .collect::<HashSet<_>>();
 
-    async fn delete_and_sync_resource(&self, mut resource: R) -> Result<(), DeleteResourcesError> {
-        let uid = *resource.uid();
+        let owned_resource_uids = unique_uids
+            .into_iter()
+            .filter(|uid| owned_uids.contains(uid))
+            .collect::<Vec<_>>();
+
+        let mut resources = self.load_resources(&owned_resource_uids).await?;
+
         match self
             .resource_persistence_service
-            .delete(&mut resource, self.time_source.now())
+            .delete_many(&mut resources, self.time_source.now())
             .await
         {
             Ok(()) => Ok(()),
             Err(ResourcePersistenceError::Duplicate(_)) => {
-                unreachable!("delete() must not expose duplicate persistence errors")
+                unreachable!("delete_many() must not expose duplicate persistence errors")
             }
             Err(ResourcePersistenceError::ConcurrentModification(err)) => {
                 Err(DeleteResourcesError::ConcurrentModification(err))
             }
             Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
-                err.with_context(format!("Failed to persist deleted resource {uid}")),
+                err.with_context("Failed to persist deleted resources"),
             )),
         }
     }
 
-    async fn find_owned_resource_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        uid: ResourceUID,
-    ) -> Result<Option<ResourceSnapshot>, DeleteResourcesError> {
-        self.generic_resource_query_service
-            .find_owned_snapshot(account_id, R::DESCRIPTOR.resource_type, uid)
-            .await
-            .map_err(DeleteResourcesError::from)
-    }
-
-    async fn delete_resource(&self, uid: &ResourceUID) -> Result<(), DeleteResourcesError> {
-        let resource = self
-            .resource_aggregate_loader
-            .load(uid)
+    async fn load_resources(&self, uids: &[ResourceUID]) -> Result<Vec<R>, DeleteResourcesError> {
+        self.resource_aggregate_loader
+            .load_many(uids)
             .await
             .map_err(|err| {
                 DeleteResourcesError::Internal(
                     format!("{err}")
                         .int_err()
-                        .with_context(format!("Failed to load resource {uid}")),
+                        .with_context("Failed to load resources"),
                 )
-            })?;
-
-        self.delete_and_sync_resource(resource).await
+            })?
+            .into_iter()
+            .zip(uids)
+            .map(|(resource_result, uid)| {
+                resource_result.map_err(|err| {
+                    DeleteResourcesError::Internal(
+                        format!("{err}")
+                            .int_err()
+                            .with_context(format!("Failed to load resource {uid}")),
+                    )
+                })
+            })
+            .collect()
     }
 }
 

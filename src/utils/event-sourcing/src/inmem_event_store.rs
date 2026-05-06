@@ -154,6 +154,26 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
         })
     }
 
+    fn get_events_multi(
+        &self,
+        queries: &[Proj::Query],
+    ) -> MultiEventStream<'_, Proj::Query, Proj::Event> {
+        let queries = queries.to_vec();
+        let events = self.state.lock().unwrap().get_events().to_vec();
+
+        Box::pin(async_stream::try_stream! {
+            for (i, event) in events.into_iter().enumerate() {
+                if let Some(query) = queries.iter().find(|query| event.matches_query(query)) {
+                    yield (
+                        query.clone(),
+                        EventID::new(i64::try_from(i + 1).unwrap()),
+                        event,
+                    );
+                }
+            }
+        })
+    }
+
     async fn save_events(
         &self,
         query: &Proj::Query,
@@ -171,6 +191,33 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
 
         // The id is computed from the index
         Ok(EventID::new(i64::try_from(g.events_count()).unwrap()))
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<Proj::Query, Proj::Event>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        crate::validate_multi_save_items(&items)?;
+
+        let mut g = self.state.lock().unwrap();
+        for item in &items {
+            self.detect_concurrent_modification(&g, &item.query, item.maybe_prev_stored_event_id)?;
+        }
+
+        let mut result = Vec::with_capacity(items.len());
+        for item in items {
+            for event in item.events {
+                g.add_event(event);
+            }
+
+            result.push(EventID::new(i64::try_from(g.events_count()).unwrap()));
+        }
+
+        Ok(result)
     }
 }
 

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use event_sourcing::EventID;
@@ -22,7 +24,9 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotRow,
     ResourceSnapshotStream,
+    ResourceSnapshotUpdate,
     ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
@@ -121,71 +125,130 @@ impl ResourceRepository for PostgresResourceRepository {
         resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError> {
+        let resource_update = ResourceSnapshotUpdate {
+            snapshot: resource_snapshot.clone(),
+            expected_last_event_id,
+        };
+
+        self.update_resources(std::slice::from_ref(&resource_update))
+            .await
+    }
+
+    async fn update_resources(
+        &self,
+        resource_updates: &[ResourceSnapshotUpdate],
+    ) -> Result<(), UpdateResourceError> {
+        if resource_updates.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.metadata.account.as_stack_string();
-        let account_id_str = account_id_stack.as_str();
-        let labels = serde_json::to_value(&resource_snapshot.metadata.labels).unwrap();
-        let annotations = serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap();
-        let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
-        let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
-        let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
-        let resource_uid: &uuid::Uuid = resource_snapshot.uid.as_ref();
-
-        let update_result = sqlx::query!(
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Postgres>::new(
             r#"
-            UPDATE resources
-            SET
-                account_id = $2,
-                api_version = $3,
-                resource_name = $4,
-                description = $5,
-                labels = $6,
-                annotations = $7,
-                spec = $8,
-                status = $9,
-                generation = $10,
-                updated_at = $11,
-                deleted_at = $12,
-                last_reconciled_at = $13,
-                last_event_id = $14
-            WHERE resource_uid = $1
-              AND (
-                    last_event_id IS NULL AND CAST($15 as BIGINT) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($15 as BIGINT) IS NOT NULL AND last_event_id = $15
-              )
+            WITH resource_updates(
+                resource_uid,
+                account_id,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id,
+                expected_last_event_id
+            ) AS (
             "#,
-            resource_uid,
-            account_id_str,
-            resource_snapshot.api_version,
-            resource_snapshot.metadata.name,
-            resource_snapshot.metadata.description,
-            labels,
-            annotations,
-            resource_snapshot.spec,
-            resource_snapshot.status,
-            generation,
-            resource_snapshot.metadata.updated_at,
-            resource_snapshot.metadata.deleted_at,
-            resource_snapshot.last_reconciled_at,
-            last_event_id,
-            expected_last_event_id,
-        )
-        .execute(connection_mut)
-        .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                UpdateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.metadata.account.clone(),
-                    kind: resource_snapshot.kind.clone(),
-                    name: resource_snapshot.metadata.name.clone(),
-                })
-            }
-            _ => UpdateResourceError::Internal(e.int_err()),
-        })?;
+        );
 
-        if update_result.rows_affected() == 0 {
+        query_builder.push_values(resource_updates, |mut b, resource_update| {
+            let resource_snapshot = &resource_update.snapshot;
+
+            b.push_bind(*resource_snapshot.uid.as_ref())
+                .push_bind(
+                    resource_snapshot
+                        .metadata
+                        .account
+                        .as_stack_string()
+                        .to_string(),
+                )
+                .push_bind(resource_snapshot.api_version.clone())
+                .push_bind(resource_snapshot.metadata.name.clone())
+                .push_bind(resource_snapshot.metadata.description.clone())
+                .push_bind(serde_json::to_value(&resource_snapshot.metadata.labels).unwrap())
+                .push_bind(serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap())
+                .push_bind(resource_snapshot.spec.clone())
+                .push_bind(resource_snapshot.status.clone())
+                .push_bind(i64::try_from(resource_snapshot.metadata.generation).unwrap())
+                .push_bind(resource_snapshot.metadata.updated_at)
+                .push_bind(resource_snapshot.metadata.deleted_at)
+                .push_bind(resource_snapshot.last_reconciled_at)
+                .push_bind(resource_snapshot.last_event_id.map(EventID::into_inner))
+                .push_bind(
+                    resource_update
+                        .expected_last_event_id
+                        .map(EventID::into_inner),
+                );
+        });
+
+        query_builder.push(
+            r#"
+            ),
+            matched_resource_updates AS (
+                SELECT u.*
+                FROM resource_updates AS u
+                JOIN resources AS r
+                    ON r.resource_uid = u.resource_uid
+                    AND (
+                        r.last_event_id IS NULL AND u.expected_last_event_id IS NULL OR
+                        r.last_event_id = u.expected_last_event_id
+                    )
+            )
+            UPDATE resources AS r
+            SET
+                account_id = u.account_id,
+                api_version = u.api_version,
+                resource_name = u.resource_name,
+                description = u.description,
+                labels = u.labels,
+                annotations = u.annotations,
+                spec = u.spec,
+                status = u.status,
+                generation = u.generation,
+                updated_at = u.updated_at,
+                deleted_at = u.deleted_at,
+                last_reconciled_at = u.last_reconciled_at,
+                last_event_id = u.last_event_id
+            FROM matched_resource_updates AS u
+            WHERE r.resource_uid = u.resource_uid
+              AND (SELECT COUNT(*) FROM matched_resource_updates) =
+            "#,
+        );
+        query_builder.push_bind(i64::try_from(resource_updates.len()).unwrap());
+
+        let update_result = query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .map_err(|e: sqlx::Error| match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    let resource_snapshot = &resource_updates[0].snapshot;
+                    UpdateResourceError::Duplicate(ResourceDuplicateError {
+                        account_id: resource_snapshot.metadata.account.clone(),
+                        kind: resource_snapshot.kind.clone(),
+                        name: resource_snapshot.metadata.name.clone(),
+                    })
+                }
+                _ => UpdateResourceError::Internal(e.int_err()),
+            })?;
+
+        if update_result.rows_affected() != u64::try_from(resource_updates.len()).unwrap() {
             return Err(UpdateResourceError::concurrent_modification());
         }
 
@@ -358,8 +421,64 @@ impl ResourceRepository for PostgresResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
+    }
+
+    async fn find_resource_snapshots_by_kind_and_uids(
+        &self,
+        kind: &str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let uids = uids.iter().map(|uid| *uid.as_ref()).collect::<Vec<_>>();
+        let rows = sqlx::query_as::<_, ResourceSnapshotRow>(
+            r#"
+            SELECT
+            resource_uid as uid,
+            account_id,
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE resource_kind = $1
+              AND resource_uid = ANY($2)
+              AND deleted_at IS NULL
+            "#,
+        )
+        .bind(kind)
+        .bind(&uids)
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let mut snapshots_by_uid = rows
+            .into_iter()
+            .map(ResourceSnapshotRow::into_snapshot)
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect::<HashMap<_, _>>();
+
+        Ok(uids
+            .into_iter()
+            .filter_map(|uid| snapshots_by_uid.remove(&ResourceUID::new(uid)))
+            .collect())
     }
 
     async fn find_resource_snapshot_by_uid(
@@ -417,7 +536,7 @@ impl ResourceRepository for PostgresResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
 
@@ -486,7 +605,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 spec: row.spec,
                 status: row.status,
                 last_reconciled_at: row.last_reconciled_at,
-                last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                last_event_id: row.last_event_id.map(EventID::new),
             })
             .collect())
     }
@@ -600,7 +719,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })
@@ -670,7 +789,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })

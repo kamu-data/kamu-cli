@@ -15,7 +15,9 @@ use event_sourcing::{
     EventStream,
     GetEventsOpts,
     InMemoryEventStore,
+    MultiEventStream,
     SaveEventsError,
+    SaveEventsItem,
 };
 use futures::{StreamExt, TryStreamExt, future};
 use internal_error::InternalError;
@@ -80,6 +82,20 @@ impl EventStore<ResourceRawEventProjection> for InMemoryRawResourceEventStore {
         )
     }
 
+    fn get_events_multi(
+        &self,
+        queries: &[ResourceRawEventQuery],
+    ) -> MultiEventStream<'_, ResourceRawEventQuery, ResourceRawEvent> {
+        Box::pin(
+            self.inner
+                .get_events_multi(queries)
+                .map_ok(|(query, event_id, mut event)| {
+                    event.event_id = event_id;
+                    (query, event_id, event)
+                }),
+        )
+    }
+
     async fn save_events(
         &self,
         query: &ResourceRawEventQuery,
@@ -89,6 +105,13 @@ impl EventStore<ResourceRawEventProjection> for InMemoryRawResourceEventStore {
         self.inner
             .save_events(query, maybe_prev_stored_event_id, events)
             .await
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<ResourceRawEventQuery, ResourceRawEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        self.inner.save_events_multi(items).await
     }
 }
 

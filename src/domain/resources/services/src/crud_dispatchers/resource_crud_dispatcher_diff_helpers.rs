@@ -9,7 +9,7 @@
 
 use std::collections::BTreeSet;
 
-use chrono::SubsecRound;
+use chrono::{DateTime, SubsecRound, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
@@ -179,9 +179,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn normalize_timestamp_precision(
-    value: chrono::DateTime<chrono::Utc>,
-) -> chrono::DateTime<chrono::Utc> {
+fn normalize_timestamp_precision(value: DateTime<Utc>) -> DateTime<Utc> {
     value.trunc_subsecs(6)
 }
 

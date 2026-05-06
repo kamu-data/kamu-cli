@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
@@ -25,6 +26,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
     ResourceUID,
@@ -372,8 +374,68 @@ impl ResourceRepository for SqliteResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
+    }
+
+    async fn find_resource_snapshots_by_kind_and_uids(
+        &self,
+        kind: &str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let uids_placeholders =
+            sqlite_generate_placeholders_list(uids.len(), NonZeroUsize::new(2).unwrap());
+
+        let query_str = format!(
+            r#"
+            SELECT
+                resource_uid as uid,
+                account_id,
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE resource_kind = $1
+              AND resource_uid IN ({uids_placeholders})
+              AND deleted_at IS NULL
+            "#,
+        );
+
+        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(kind);
+        for uid in uids {
+            query = query.bind(*uid.as_ref());
+        }
+
+        let rows = query.fetch_all(connection_mut).await.int_err()?;
+
+        let mut snapshots_by_uid = rows
+            .into_iter()
+            .map(ResourceSnapshotRow::into_snapshot)
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect::<HashMap<_, _>>();
+
+        Ok(uids
+            .iter()
+            .filter_map(|uid| snapshots_by_uid.remove(uid))
+            .collect())
     }
 
     async fn find_resource_snapshot_by_uid(
@@ -431,7 +493,7 @@ impl ResourceRepository for SqliteResourceRepository {
             spec: row.spec,
             status: row.status,
             last_reconciled_at: row.last_reconciled_at,
-            last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+            last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
 
@@ -505,7 +567,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 spec: row.spec,
                 status: row.status,
                 last_reconciled_at: row.last_reconciled_at,
-                last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                last_event_id: row.last_event_id.map(EventID::new),
             })
             .collect())
     }
@@ -621,7 +683,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })
@@ -692,7 +754,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     spec: row.spec,
                     status: row.status,
                     last_reconciled_at: row.last_reconciled_at,
-                    last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
+                    last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
         })
@@ -788,28 +850,6 @@ impl ResourceRepository for SqliteResourceRepository {
             })
             .collect())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(sqlx::FromRow)]
-struct ResourceSnapshotRow {
-    uid: uuid::Uuid,
-    account_id: odf::AccountID,
-    resource_kind: String,
-    api_version: String,
-    resource_name: ResourceName,
-    description: Option<String>,
-    labels: serde_json::Value,
-    annotations: serde_json::Value,
-    spec: serde_json::Value,
-    status: Option<serde_json::Value>,
-    generation: i64,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    deleted_at: Option<DateTime<Utc>>,
-    last_reconciled_at: Option<DateTime<Utc>>,
-    last_event_id: Option<i64>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

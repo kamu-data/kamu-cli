@@ -24,6 +24,7 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    ResourceSnapshotUpdate,
     ResourceSummaryRow,
     ResourceUID,
     ResourceUIDStream,
@@ -105,46 +106,71 @@ impl ResourceRepository for InMemoryResourceRepository {
         resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
     ) -> Result<(), UpdateResourceError> {
+        let resource_update = ResourceSnapshotUpdate {
+            snapshot: resource_snapshot.clone(),
+            expected_last_event_id,
+        };
+
+        self.update_resources(std::slice::from_ref(&resource_update))
+            .await
+    }
+
+    async fn update_resources(
+        &self,
+        resource_updates: &[ResourceSnapshotUpdate],
+    ) -> Result<(), UpdateResourceError> {
         let mut guard = self.state.lock().unwrap();
+        let mut prepared_updates = Vec::with_capacity(resource_updates.len());
 
-        let previous_snapshot = guard
-            .snapshots_by_id
-            .get(&resource_snapshot.uid)
-            .cloned()
-            .ok_or_else(UpdateResourceError::concurrent_modification)?;
+        for resource_update in resource_updates {
+            let resource_snapshot = &resource_update.snapshot;
+            let previous_snapshot = guard
+                .snapshots_by_id
+                .get(&resource_snapshot.uid)
+                .cloned()
+                .ok_or_else(UpdateResourceError::concurrent_modification)?;
 
-        if previous_snapshot.last_event_id != expected_last_event_id {
-            return Err(UpdateResourceError::concurrent_modification());
-        }
+            if previous_snapshot.last_event_id != resource_update.expected_last_event_id {
+                return Err(UpdateResourceError::concurrent_modification());
+            }
 
-        let previous_lookup_key = ResourceLookupKey {
-            account_id: previous_snapshot.metadata.account,
-            kind: previous_snapshot.kind,
-            name: previous_snapshot.metadata.name,
-        };
-        let next_lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.metadata.account.clone(),
-            kind: resource_snapshot.kind.clone(),
-            name: resource_snapshot.metadata.name.clone(),
-        };
-
-        if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
-            && *existing_resource_id != resource_snapshot.uid
-        {
-            return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
+            let previous_lookup_key = ResourceLookupKey {
+                account_id: previous_snapshot.metadata.account,
+                kind: previous_snapshot.kind,
+                name: previous_snapshot.metadata.name,
+            };
+            let next_lookup_key = ResourceLookupKey {
                 account_id: resource_snapshot.metadata.account.clone(),
                 kind: resource_snapshot.kind.clone(),
                 name: resource_snapshot.metadata.name.clone(),
-            }));
+            };
+
+            if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
+                && *existing_resource_id != resource_snapshot.uid
+            {
+                return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
+                    account_id: resource_snapshot.metadata.account.clone(),
+                    kind: resource_snapshot.kind.clone(),
+                    name: resource_snapshot.metadata.name.clone(),
+                }));
+            }
+
+            prepared_updates.push((
+                resource_snapshot.clone(),
+                previous_lookup_key,
+                next_lookup_key,
+            ));
         }
 
-        guard.ids_by_lookup_key.remove(&previous_lookup_key);
-        guard
-            .ids_by_lookup_key
-            .insert(next_lookup_key, resource_snapshot.uid);
-        guard
-            .snapshots_by_id
-            .insert(resource_snapshot.uid, resource_snapshot.clone());
+        for (resource_snapshot, previous_lookup_key, next_lookup_key) in prepared_updates {
+            guard.ids_by_lookup_key.remove(&previous_lookup_key);
+            guard
+                .ids_by_lookup_key
+                .insert(next_lookup_key, resource_snapshot.uid);
+            guard
+                .snapshots_by_id
+                .insert(resource_snapshot.uid, resource_snapshot);
+        }
 
         Ok(())
     }
@@ -232,6 +258,22 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| snapshot.kind == query.kind)
             .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
             .cloned())
+    }
+
+    async fn find_resource_snapshots_by_kind_and_uids(
+        &self,
+        kind: &str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(uids
+            .iter()
+            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter(|snapshot| snapshot.kind == kind)
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .cloned()
+            .collect())
     }
 
     async fn find_resource_snapshot_by_uid(

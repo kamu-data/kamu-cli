@@ -40,6 +40,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_find_resource_snapshots_by_kind_and_uids,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
     harness = InMemoryResourceRepositoryHarness
 );
@@ -65,6 +73,22 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_update_resource_optimistic_locking,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_update_resources,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_update_resources_wrong_event_id_fails,
     harness = InMemoryResourceRepositoryHarness
 );
 

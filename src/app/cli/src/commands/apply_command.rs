@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::{BoxedError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
@@ -615,12 +617,12 @@ impl ApplyPrinter<'_> {
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
-            labels: &'a std::collections::BTreeMap<String, String>,
-            annotations: &'a std::collections::BTreeMap<String, String>,
+            labels: &'a BTreeMap<String, String>,
+            annotations: &'a BTreeMap<String, String>,
             generation: u64,
-            created_at: &'a chrono::DateTime<chrono::Utc>,
-            updated_at: &'a chrono::DateTime<chrono::Utc>,
-            deleted_at: &'a Option<chrono::DateTime<chrono::Utc>>,
+            created_at: &'a DateTime<Utc>,
+            updated_at: &'a DateTime<Utc>,
+            deleted_at: &'a Option<DateTime<Utc>>,
         }
 
         impl<'a> RenderedResourceViewMetadata<'a> {
@@ -647,7 +649,7 @@ impl ApplyPrinter<'_> {
             kind: &'a str,
             metadata: RenderedResourceViewMetadata<'a>,
             #[serde(rename = "lastReconciledAt")]
-            last_reconciled_at: &'a Option<chrono::DateTime<chrono::Utc>>,
+            last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: serde_yaml::Value,
             status: Option<serde_yaml::Value>,
         }

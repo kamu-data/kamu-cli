@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use chrono::Utc;
 use dill::Catalog;
-use event_sourcing::{EventID, GetEventsOpts, SaveEventsError};
+use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
 use futures::TryStreamExt;
 use kamu_resources::{
     ResourceMetadata,
@@ -464,6 +464,200 @@ pub async fn test_concurrent_modification_rejected(catalog: &Catalog) {
     assert!(
         matches!(result, Err(SaveEventsError::ConcurrentModification(_))),
         "expected ConcurrentModification on stale ID, got {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_events_multi(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+
+    let query_a = make_resource(catalog, "TestKind").await;
+    let query_b = make_resource(catalog, "TestKind").await;
+    let query_c = make_resource(catalog, "TestKind").await;
+
+    event_store
+        .save_events(
+            &query_a,
+            None,
+            vec![
+                make_raw_event(&query_a, "Created", serde_json::json!({"owner": "a"})),
+                make_raw_event(&query_a, "SpecUpdated", serde_json::json!({"owner": "a"})),
+            ],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &query_b,
+            None,
+            vec![make_raw_event(
+                &query_b,
+                "Created",
+                serde_json::json!({"owner": "b"}),
+            )],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &query_c,
+            None,
+            vec![make_raw_event(
+                &query_c,
+                "Created",
+                serde_json::json!({"owner": "c"}),
+            )],
+        )
+        .await
+        .unwrap();
+
+    let events: Vec<_> = event_store
+        .get_events_multi(&[query_b.clone(), query_a.clone()])
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(3, events.len());
+    assert_eq!(events[0].0, query_a);
+    assert_eq!(events[0].2.payload["owner"], serde_json::json!("a"));
+    assert_eq!(events[1].0, query_a);
+    assert_eq!(events[1].2.payload["owner"], serde_json::json!("a"));
+    assert_eq!(events[2].0, query_b);
+    assert_eq!(events[2].2.payload["owner"], serde_json::json!("b"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_save_events_multi(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+
+    let query_a = make_resource(catalog, "TestKind").await;
+    let query_b = make_resource(catalog, "TestKind").await;
+
+    let event_ids = event_store
+        .save_events_multi(vec![
+            SaveEventsItem {
+                query: query_a.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![
+                    make_raw_event(&query_a, "Created", serde_json::json!({"owner": "a"})),
+                    make_raw_event(&query_a, "SpecUpdated", serde_json::json!({"owner": "a"})),
+                ],
+            },
+            SaveEventsItem {
+                query: query_b.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![make_raw_event(
+                    &query_b,
+                    "Created",
+                    serde_json::json!({"owner": "b"}),
+                )],
+            },
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!(event_ids, vec![EventID::new(2), EventID::new(3)]);
+
+    let events_a: Vec<_> = event_store
+        .get_events(&query_a, GetEventsOpts::default())
+        .map_ok(|(_, event)| event)
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(2, events_a.len());
+    assert_eq!(events_a[1].event_id, EventID::new(2));
+
+    let events_b: Vec<_> = event_store
+        .get_events(&query_b, GetEventsOpts::default())
+        .map_ok(|(_, event)| event)
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(1, events_b.len());
+    assert_eq!(events_b[0].event_id, EventID::new(3));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_save_events_multi_rejects_concurrent_modification_atomically(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+
+    let query_a = make_resource(catalog, "TestKind").await;
+    let query_b = make_resource(catalog, "TestKind").await;
+
+    event_store
+        .save_events(
+            &query_a,
+            None,
+            vec![make_raw_event(
+                &query_a,
+                "Created",
+                serde_json::json!({"owner": "a"}),
+            )],
+        )
+        .await
+        .unwrap();
+
+    let result = event_store
+        .save_events_multi(vec![
+            SaveEventsItem {
+                query: query_a.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![make_raw_event(
+                    &query_a,
+                    "SpecUpdated",
+                    serde_json::json!({"owner": "a"}),
+                )],
+            },
+            SaveEventsItem {
+                query: query_b.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![make_raw_event(
+                    &query_b,
+                    "Created",
+                    serde_json::json!({"owner": "b"}),
+                )],
+            },
+        ])
+        .await;
+
+    assert!(
+        matches!(result, Err(SaveEventsError::ConcurrentModification(_))),
+        "expected ConcurrentModification, got {result:?}"
+    );
+
+    let total = event_store.total_events_stored().await.unwrap();
+    assert_eq!(1, total);
+
+    let events_b: Vec<_> = event_store
+        .get_events(&query_b, GetEventsOpts::default())
+        .try_collect()
+        .await
+        .unwrap();
+    assert!(events_b.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_save_events_multi_rejects_empty_item(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+
+    let query = make_resource(catalog, "TestKind").await;
+    let result = event_store
+        .save_events_multi(vec![SaveEventsItem {
+            query,
+            maybe_prev_stored_event_id: None,
+            events: vec![],
+        }])
+        .await;
+
+    assert!(
+        matches!(result, Err(SaveEventsError::NothingToSave)),
+        "expected NothingToSave, got {result:?}"
     );
 }
 
