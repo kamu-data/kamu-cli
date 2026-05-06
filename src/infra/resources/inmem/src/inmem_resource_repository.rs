@@ -259,6 +259,22 @@ impl ResourceRepository for InMemoryResourceRepository {
             .cloned())
     }
 
+    async fn find_resource_snapshots_by_kind_and_uids(
+        &self,
+        kind: &str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        Ok(uids
+            .iter()
+            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter(|snapshot| snapshot.kind == kind)
+            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .cloned()
+            .collect())
+    }
+
     async fn find_resource_snapshot_by_uid(
         &self,
         uid: &ResourceUID,

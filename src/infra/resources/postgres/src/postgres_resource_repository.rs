@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use event_sourcing::EventID;
@@ -22,6 +24,7 @@ use kamu_resources::{
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
+    ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
@@ -420,6 +423,62 @@ impl ResourceRepository for PostgresResourceRepository {
             last_reconciled_at: row.last_reconciled_at,
             last_event_id: row.last_event_id.map(event_sourcing::EventID::new),
         }))
+    }
+
+    async fn find_resource_snapshots_by_kind_and_uids(
+        &self,
+        kind: &str,
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        if uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let uids = uids.iter().map(|uid| *uid.as_ref()).collect::<Vec<_>>();
+        let rows = sqlx::query_as::<_, ResourceSnapshotRow>(
+            r#"
+            SELECT
+            resource_uid as uid,
+            account_id,
+                resource_kind,
+                api_version,
+                resource_name,
+                description,
+                labels,
+                annotations,
+                spec,
+                status,
+                generation,
+                created_at,
+                updated_at,
+                deleted_at,
+                last_reconciled_at,
+                last_event_id
+            FROM resources
+            WHERE resource_kind = $1
+              AND resource_uid = ANY($2)
+              AND deleted_at IS NULL
+            "#,
+        )
+        .bind(kind)
+        .bind(&uids)
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let mut snapshots_by_uid = rows
+            .into_iter()
+            .map(ResourceSnapshotRow::into_snapshot)
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect::<HashMap<_, _>>();
+
+        Ok(uids
+            .into_iter()
+            .filter_map(|uid| snapshots_by_uid.remove(&ResourceUID::new(uid)))
+            .collect())
     }
 
     async fn find_resource_snapshot_by_uid(

@@ -118,27 +118,27 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .iter()
             .map(|snapshot| snapshot.uid)
             .collect::<HashSet<_>>();
+        let missing_uids = uids
+            .iter()
+            .copied()
+            .filter(|uid| !owned_uids.contains(uid))
+            .collect::<Vec<_>>();
 
-        for uid in uids.iter().filter(|uid| !owned_uids.contains(uid)) {
-            let query = ResourceRawEventQuery {
-                kind: kind.to_string(),
-                uid: *uid,
-            };
-
-            if let Some(resource_snapshot) = self
-                .resource_repository
-                .find_resource_snapshot(&query)
-                .await?
-            {
-                return Err(odf::AccessError::Unauthorized(
-                    ResourceNotOwnedByAccountError {
-                        uid: resource_snapshot.uid,
-                        resource_type: kind,
-                    }
-                    .into(),
-                )
-                .into());
-            }
+        if let Some(resource_snapshot) = self
+            .resource_repository
+            .find_resource_snapshots_by_kind_and_uids(kind, &missing_uids)
+            .await?
+            .into_iter()
+            .next()
+        {
+            return Err(odf::AccessError::Unauthorized(
+                ResourceNotOwnedByAccountError {
+                    uid: resource_snapshot.uid,
+                    resource_type: kind,
+                }
+                .into(),
+            )
+            .into());
         }
 
         Ok(resource_snapshots
