@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use database_common::collect_all_pages;
@@ -50,6 +51,7 @@ pub struct ListResourcesCommand {
     scope: ListResourcesScope,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
+    max_results: Option<NonZeroUsize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,6 +65,7 @@ impl ListResourcesCommand {
         scope: ListResourcesScope,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
+        max_results: Option<NonZeroUsize>,
     ) -> Self {
         Self {
             resource_facade,
@@ -72,6 +75,7 @@ impl ListResourcesCommand {
             scope,
             output_config,
             detail_level,
+            max_results,
         }
     }
 
@@ -269,30 +273,57 @@ impl ListResourcesCommand {
         &self,
         kind: &str,
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+        if let Some(max_results) = self.max_results {
             self.resource_facade
                 .list(kamu_resources_facade::ListResourcesRequest {
                     kind: kind.to_string(),
                     account: None,
-                    pagination,
+                    pagination: database_common::PaginationOpts {
+                        offset: 0,
+                        limit: max_results.get(),
+                    },
                 })
                 .await
                 .map_err(Into::into)
-        })
-        .await
+        } else {
+            collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+                self.resource_facade
+                    .list(kamu_resources_facade::ListResourcesRequest {
+                        kind: kind.to_string(),
+                        account: None,
+                        pagination,
+                    })
+                    .await
+                    .map_err(Into::into)
+            })
+            .await
+        }
     }
 
     async fn list_all_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+        if let Some(max_results) = self.max_results {
             self.resource_facade
                 .list_all(kamu_resources_facade::ListAllResourcesRequest {
                     account: None,
-                    pagination,
+                    pagination: database_common::PaginationOpts {
+                        offset: 0,
+                        limit: max_results.get(),
+                    },
                 })
                 .await
                 .map_err(Into::into)
-        })
-        .await
+        } else {
+            collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
+                self.resource_facade
+                    .list_all(kamu_resources_facade::ListAllResourcesRequest {
+                        account: None,
+                        pagination,
+                    })
+                    .await
+                    .map_err(Into::into)
+            })
+            .await
+        }
     }
 
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {

@@ -231,6 +231,8 @@ pub fn get_command(
                 c.resource_context.context,
                 cli_catalog.get_one()?,
                 c.wide,
+                c.max_results,
+                c.unbounded,
             )
             .cast(),
         ),

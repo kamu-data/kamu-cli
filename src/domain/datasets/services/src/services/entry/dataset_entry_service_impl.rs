@@ -761,6 +761,15 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         )
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn all_dataset_handles_paged(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let listing = self.list_all_dataset_handles(pagination).await?;
+        Ok(listing.list)
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
     fn all_dataset_handles_by_owner_name(
         &self,
@@ -795,6 +804,27 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         )
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
+    async fn all_dataset_handles_by_owner_name_paged(
+        &self,
+        owner_name: &odf::AccountName,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let owner_id = match self
+            .resolve_account_id_by_maybe_name(Some(owner_name))
+            .await
+        {
+            Ok(id) => id,
+            Err(ResolveAccountIdByNameError::NotFound(_)) => return Ok(Vec::new()),
+            Err(e) => return Err(e.int_err()),
+        };
+
+        let listing = self
+            .list_all_dataset_handles_by_owner_id(&owner_id, pagination)
+            .await?;
+        Ok(listing.list)
+    }
+
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
@@ -808,6 +838,18 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     .await
             },
         )
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%owner_id))]
+    async fn all_dataset_handles_by_owner_id_paged(
+        &self,
+        owner_id: &odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let listing = self
+            .list_all_dataset_handles_by_owner_id(owner_id, pagination)
+            .await?;
+        Ok(listing.list)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]

@@ -1006,6 +1006,8 @@ List datasets or resources
     Parquet columnar storage. Only available when exporting to file(s)
 
 * `-w`, `--wide` — Show more details (repeat for more)
+* `--max-results <N>` — Maximum number of results to list
+* `--unbounded` — Disable the result limit
 
 **Examples:**
 

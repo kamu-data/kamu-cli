@@ -1218,6 +1218,14 @@ pub struct List {
     #[arg(long, short = 'w', action = ArgAction::Count)]
     pub wide: u8,
 
+    /// Maximum number of results to list
+    #[arg(long, value_name = "N", conflicts_with = "unbounded")]
+    pub max_results: Option<NonZeroUsize>,
+
+    /// Disable the result limit
+    #[arg(long)]
+    pub unbounded: bool,
+
     /// List accessible datasets of the specified account
     #[arg(long, hide = true)]
     pub target_account: Option<String>,

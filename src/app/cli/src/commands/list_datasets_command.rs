@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
+use database_common::PaginationOpts;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 
@@ -32,6 +33,7 @@ pub struct ListDatasetsCommand {
     related_account: accounts::RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
+    max_results: Option<NonZeroUsize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,6 +49,7 @@ impl ListDatasetsCommand {
         related_account: accounts::RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
+        max_results: Option<NonZeroUsize>,
     ) -> Self {
         Self {
             tenancy_config,
@@ -58,6 +61,7 @@ impl ListDatasetsCommand {
             related_account,
             output_config,
             detail_level,
+            max_results,
         }
     }
 
@@ -173,23 +177,53 @@ impl ListDatasetsCommand {
         fields
     }
 
-    fn stream_datasets(&self) -> odf::dataset::DatasetHandleStream<'_> {
-        match self.tenancy_config {
+    async fn list_datasets(
+        &self,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        // Decide wheter listing all datasets of filtering by owner
+        let maybe_owner_name = match self.tenancy_config {
             TenancyConfig::MultiTenant => match &self.related_account.target_account {
-                accounts::TargetAccountSelection::Current => self
-                    .dataset_registry
-                    .all_dataset_handles_by_owner_name(&self.current_account.account_name),
-                accounts::TargetAccountSelection::Specific {
-                    account_name: user_name,
-                } => self.dataset_registry.all_dataset_handles_by_owner_name(
-                    &odf::AccountName::from_str(user_name.as_str()).unwrap(),
-                ),
-                accounts::TargetAccountSelection::AllUsers => {
-                    self.dataset_registry.all_dataset_handles()
+                accounts::TargetAccountSelection::Current => {
+                    Some(self.current_account.account_name.clone())
                 }
+                accounts::TargetAccountSelection::Specific { account_name } => {
+                    Some(odf::AccountName::from_str(account_name.as_str()).unwrap())
+                }
+                accounts::TargetAccountSelection::AllUsers => None,
             },
-            TenancyConfig::SingleTenant => self.dataset_registry.all_dataset_handles(),
-        }
+            TenancyConfig::SingleTenant => None,
+        };
+
+        use futures::TryStreamExt;
+
+        // Owner-aware path
+        let dataset_handles = if let Some(owner_name) = maybe_owner_name {
+            if let Some(pagination) = pagination {
+                self.dataset_registry
+                    .all_dataset_handles_by_owner_name_paged(&owner_name, pagination)
+                    .await?
+            } else {
+                self.dataset_registry
+                    .all_dataset_handles_by_owner_name(&owner_name)
+                    .try_collect()
+                    .await?
+            }
+        } else {
+            // All datasets path
+            if let Some(pagination) = pagination {
+                self.dataset_registry
+                    .all_dataset_handles_paged(pagination)
+                    .await?
+            } else {
+                self.dataset_registry
+                    .all_dataset_handles()
+                    .try_collect()
+                    .await?
+            }
+        };
+
+        Ok(dataset_handles)
     }
 }
 
@@ -245,7 +279,11 @@ impl Command for ListDatasetsCommand {
         let mut size: Vec<u64> = Vec::new();
         let mut watermark: Vec<Option<i64>> = Vec::new();
 
-        let mut datasets: Vec<_> = self.stream_datasets().try_collect().await?;
+        let pagination = self
+            .max_results
+            .map(|max_results| PaginationOpts::from_max_results(max_results.get()));
+
+        let mut datasets: Vec<_> = self.list_datasets(pagination).await?;
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         let maybe_rebac_dataset_properties_map = if show_visibility {

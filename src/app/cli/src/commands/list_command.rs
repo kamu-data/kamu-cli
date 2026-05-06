@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use kamu::domain::*;
@@ -59,6 +60,12 @@ pub struct ListCommand {
 
     #[dill::component(explicit)]
     detail_level: u8,
+
+    #[dill::component(explicit)]
+    max_results: Option<NonZeroUsize>,
+
+    #[dill::component(explicit)]
+    unbounded: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +91,11 @@ impl ListCommand {
             self.related_account.clone(),
             self.output_config.clone(),
             self.detail_level,
+            if self.unbounded {
+                None
+            } else {
+                self.max_results
+            },
         )
     }
 
@@ -119,6 +131,11 @@ impl ListCommand {
             scope,
             self.output_config.clone(),
             self.detail_level,
+            if self.unbounded {
+                None
+            } else {
+                self.max_results
+            },
         ))
     }
 }

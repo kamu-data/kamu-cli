@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
@@ -20,15 +21,32 @@ use crate::ResolvedDataset;
 pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
     fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_>;
 
+    async fn all_dataset_handles_paged(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
+
     fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_>;
 
+    async fn all_dataset_handles_by_owner_name_paged(
+        &self,
+        owner_name: &odf::AccountName,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
+
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
     ) -> odf::dataset::DatasetHandleStream<'_>;
+
+    async fn all_dataset_handles_by_owner_id_paged(
+        &self,
+        owner_id: &odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,

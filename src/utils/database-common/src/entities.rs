@@ -13,7 +13,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
-use futures::Stream;
+use futures::{Stream, TryStream, TryStreamExt};
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +29,13 @@ impl PaginationOpts {
         Self {
             offset: page * per_page,
             limit: per_page,
+        }
+    }
+
+    pub fn from_max_results(max_results: usize) -> Self {
+        Self {
+            offset: 0,
+            limit: max_results,
         }
     }
 
@@ -62,6 +69,37 @@ where
         }
 
         page += 1;
+    }
+
+    Ok(items)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn collect_stream_page<S, T, E>(
+    mut stream: S,
+    pagination: PaginationOpts,
+) -> Result<Vec<T>, E>
+where
+    S: TryStream<Ok = T, Error = E> + Unpin,
+{
+    if pagination.limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut items = Vec::with_capacity(pagination.limit);
+    let mut skipped = 0usize;
+
+    while let Some(item) = stream.try_next().await? {
+        if skipped < pagination.offset {
+            skipped += 1;
+            continue;
+        }
+
+        items.push(item);
+        if items.len() >= pagination.limit {
+            break;
+        }
     }
 
     Ok(items)
