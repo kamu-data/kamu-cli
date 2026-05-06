@@ -100,6 +100,20 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(())
     }
 
+    async fn update_resource(
+        &self,
+        resource_snapshot: &ResourceSnapshot,
+        expected_last_event_id: Option<event_sourcing::EventID>,
+    ) -> Result<(), UpdateResourceError> {
+        let resource_update = ResourceSnapshotUpdate {
+            snapshot: resource_snapshot.clone(),
+            expected_last_event_id,
+        };
+
+        self.update_resources(std::slice::from_ref(&resource_update))
+            .await
+    }
+
     async fn update_resources(
         &self,
         resource_updates: &[ResourceSnapshotUpdate],

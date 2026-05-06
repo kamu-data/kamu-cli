@@ -37,20 +37,22 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         resource_snapshot: &ResourceSnapshot,
         expected_last_event_id: Option<EventID>,
-    ) -> Result<(), UpdateResourceError> {
-        let resource_update = ResourceSnapshotUpdate {
-            snapshot: resource_snapshot.clone(),
-            expected_last_event_id,
-        };
-
-        self.update_resources(std::slice::from_ref(&resource_update))
-            .await
-    }
+    ) -> Result<(), UpdateResourceError>;
 
     async fn update_resources(
         &self,
         resource_updates: &[ResourceSnapshotUpdate],
-    ) -> Result<(), UpdateResourceError>;
+    ) -> Result<(), UpdateResourceError> {
+        for resource_update in resource_updates {
+            self.update_resource(
+                &resource_update.snapshot,
+                resource_update.expected_last_event_id,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
 
     async fn find_resource_uid_by_name(
         &self,
