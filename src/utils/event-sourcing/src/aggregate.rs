@@ -440,6 +440,69 @@ where
         Ok(())
     }
 
+    /// Persists pending events for multiple aggregates.
+    #[tracing::instrument(
+        level = "debug",
+        name = "save_multi",
+        skip_all,
+        fields(
+            agg_type = %std::any::type_name::<Proj>(),
+            agg_cnt = ?aggregates.len(),
+        )
+    )]
+    pub async fn save_multi<Access>(
+        aggregates: &mut [Access],
+        event_store: &Store,
+    ) -> Result<(), SaveError>
+    where
+        Access: AggregateAccess<Projection = Proj, Store = Store>,
+    {
+        // Form save items for aggregates with pending events and remember their indices
+        // in the original vector, as not all aggregates may have pending events
+        let mut save_items = Vec::new();
+        let mut save_aggregate_indices = Vec::new();
+
+        for (aggregate_index, aggregate_access) in aggregates.iter_mut().enumerate() {
+            let aggregate = aggregate_access.aggregate_mut();
+
+            let events = aggregate.pending_events.take_inner();
+            if events.is_empty() {
+                continue;
+            }
+
+            save_items.push(SaveEventsItem {
+                query: aggregate.query.clone(),
+                maybe_prev_stored_event_id: aggregate.last_stored_event_id,
+                events,
+            });
+            save_aggregate_indices.push(aggregate_index);
+        }
+
+        if save_items.is_empty() {
+            return Ok(());
+        }
+
+        // Save events for all aggregates
+        let new_last_stored_event_ids = event_store.save_events_multi(save_items).await?;
+
+        // Then update the last stored event ID for all saved aggregates.
+        let saved_agg_cnt = save_aggregate_indices.len();
+        assert_eq!(saved_agg_cnt, new_last_stored_event_ids.len());
+
+        for (aggregate_index, last_stored_event_id) in save_aggregate_indices
+            .into_iter()
+            .zip(new_last_stored_event_ids)
+        {
+            aggregates[aggregate_index]
+                .aggregate_mut()
+                .last_stored_event_id = Some(last_stored_event_id);
+        }
+
+        tracing::debug!(saved_agg_cnt, "Saved aggregates",);
+
+        Ok(())
+    }
+
     /// Updates the state projection and adds the event to pending updates list
     pub fn apply(&mut self, event: Proj::Event) -> Result<(), ProjectionError<Proj>> {
         match Proj::apply(self.state.take(), event.clone()) {

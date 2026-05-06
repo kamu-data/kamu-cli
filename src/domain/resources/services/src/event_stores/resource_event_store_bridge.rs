@@ -14,8 +14,10 @@ use event_sourcing::{
     EventStream,
     GetEventsError,
     GetEventsOpts,
+    MultiEventStream,
     Projection,
     SaveEventsError,
+    SaveEventsItem,
 };
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::Serialize;
@@ -140,6 +142,25 @@ where
         }))
     }
 
+    pub fn get_events_multi<'a>(
+        raw_event_store: &'a dyn ResourceRawEventStore,
+        queries: &[ResourceUID],
+    ) -> MultiEventStream<'a, ResourceUID, TEvent> {
+        let raw_queries = queries.iter().map(Self::make_raw_query).collect::<Vec<_>>();
+
+        Box::pin(
+            raw_event_store
+                .get_events_multi(&raw_queries)
+                .map(|result| {
+                    result.and_then(|(raw_query, event_id, raw_event)| {
+                        let (_, event) =
+                            Self::decode_raw_event(raw_event).map_err(GetEventsError::Internal)?;
+                        Ok((raw_query.uid, event_id, event))
+                    })
+                }),
+        )
+    }
+
     pub async fn save_events(
         raw_event_store: &dyn ResourceRawEventStore,
         query: &ResourceUID,
@@ -156,6 +177,32 @@ where
         raw_event_store
             .save_events(&raw_query, maybe_prev_stored_event_id, raw_events)
             .await
+    }
+
+    pub async fn save_events_multi(
+        raw_event_store: &dyn ResourceRawEventStore,
+        items: Vec<SaveEventsItem<ResourceUID, TEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        let raw_items = items
+            .into_iter()
+            .map(|item| {
+                let raw_query = Self::make_raw_query(&item.query);
+                let raw_events = item
+                    .events
+                    .iter()
+                    .map(|event| Self::encode_raw_event(&item.query, event))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(SaveEventsError::Internal)?;
+
+                Ok(SaveEventsItem {
+                    query: raw_query,
+                    maybe_prev_stored_event_id: item.maybe_prev_stored_event_id,
+                    events: raw_events,
+                })
+            })
+            .collect::<Result<Vec<_>, SaveEventsError>>()?;
+
+        raw_event_store.save_events_multi(raw_items).await
     }
 }
 
@@ -207,6 +254,16 @@ macro_rules! declare_resource_event_store_bridge {
                 )
             }
 
+            fn get_events_multi(
+                &self,
+                queries: &[kamu_resources::ResourceUID],
+            ) -> event_sourcing::MultiEventStream<'_, kamu_resources::ResourceUID, $event> {
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::get_events_multi(
+                    self.raw_event_store.as_ref(),
+                    queries,
+                )
+            }
+
             async fn save_events(
                 &self,
                 query: &kamu_resources::ResourceUID,
@@ -218,6 +275,17 @@ macro_rules! declare_resource_event_store_bridge {
                     query,
                     maybe_prev_stored_event_id,
                     events,
+                )
+                .await
+            }
+
+            async fn save_events_multi(
+                &self,
+                items: Vec<event_sourcing::SaveEventsItem<kamu_resources::ResourceUID, $event>>,
+            ) -> Result<Vec<event_sourcing::EventID>, event_sourcing::SaveEventsError> {
+                $crate::RawResourceEventStoreBridge::<$resource, $state, $event>::save_events_multi(
+                    self.raw_event_store.as_ref(),
+                    items,
                 )
                 .await
             }

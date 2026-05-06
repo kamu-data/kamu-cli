@@ -27,7 +27,34 @@ pub struct MyEntityRow {
 
 ```
 
-- Use `query_as!` with explicit struct types to ensure compile-time column verification and avoid runtime column name lookups.
+- Use `query_as!` and related SQLX macros with explicit struct types to ensure compile-time column verification and avoid runtime column name lookups.
+
+### Avoiding dynamic QueryBuilder in Postgres
+
+For Postgres queries that filter on a set of composite keys (e.g. `(uid, kind)` pairs), prefer static `UNNEST`-based queries over dynamically built `OR` chains:
+
+```sql
+-- Prefer this:
+WHERE (resource_uid, resource_kind) IN (
+    SELECT * FROM UNNEST($1::uuid[], $2::text[])
+)
+
+-- Over a dynamically built:
+-- WHERE (resource_uid = $1 AND resource_kind = $2) OR (resource_uid = $3 AND resource_kind = $4) ...
+```
+
+Extract the arrays before entering any `async_stream::stream!` block so they are captured cleanly:
+
+```rust
+let uids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.uid.as_ref()).collect();
+let kinds: Vec<String> = queries.iter().map(|q| q.kind.clone()).collect();
+```
+
+### SQLite and dynamic QueryBuilder
+
+SQLite does not have `UNNEST` or a type-safe array unpacking equivalent. Using `json_each()` is fragile because SQLite stores UUIDs as blobs while `json_each` returns text, causing type mismatch in comparisons. For multi-key filtering in SQLite, keep the dynamic `QueryBuilder` with `OR` chains — it is the appropriate approach.
+
+Dynamic `QueryBuilder` is also necessary in SQLite for variable-row bulk `INSERT ... VALUES` (e.g. chunked inserts). Do not try to eliminate this usage.
 
 ## Local SQLx Setup
 

@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use std::collections::HashSet;
 
-use crate::{EventID, Projection};
+use internal_error::{ErrorIntoInternal, InternalError};
+
+use crate::{EventID, Projection, ProjectionEvent};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,6 +58,32 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<Proj::Event>,
     ) -> Result<EventID, SaveEventsError>;
+
+    /// Persists event batches for multiple aggregates.
+    ///
+    /// Returns last stored event ID for every item, preserving input order.
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<Proj::Query, Proj::Event>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        // This is a fallback implementation that saves events for each aggregate
+        // separately. It can be optimized by particular event stores.
+
+        let mut event_ids = Vec::with_capacity(items.len());
+
+        for item in items {
+            if item.events.is_empty() {
+                return Err(SaveEventsError::NothingToSave);
+            }
+
+            let event_id = self
+                .save_events(&item.query, item.maybe_prev_stored_event_id, item.events)
+                .await?;
+            event_ids.push(event_id);
+        }
+
+        Ok(event_ids)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +99,15 @@ pub type MultiEventStream<'a, Query, Event> = std::pin::Pin<
             + 'a,
     >,
 >;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct SaveEventsItem<Query, Event> {
+    pub query: Query,
+    pub maybe_prev_stored_event_id: Option<EventID>,
+    pub events: Vec<Event>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,5 +150,45 @@ impl SaveEventsError {
 #[derive(thiserror::Error, Debug)]
 #[error("Concurrent modification")]
 pub struct ConcurrentModificationError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Validates items before a multi-save operation.
+///
+/// Checks that:
+/// - no item has an empty event list
+/// - no two items share the same query
+/// - every event's query matches its containing item's query
+pub fn validate_multi_save_items<Query, Event>(
+    items: &[SaveEventsItem<Query, Event>],
+) -> Result<(), SaveEventsError>
+where
+    Query: Eq + std::hash::Hash + Clone + std::fmt::Debug,
+    Event: ProjectionEvent<Query>,
+{
+    let mut seen_queries = HashSet::new();
+
+    for item in items {
+        if item.events.is_empty() {
+            return Err(SaveEventsError::NothingToSave);
+        }
+
+        if !seen_queries.insert(item.query.clone()) {
+            return Err(SaveEventsError::Internal(
+                format!("Duplicate query in multi-save: {:?}", item.query).int_err(),
+            ));
+        }
+
+        for event in &item.events {
+            if !event.matches_query(&item.query) {
+                return Err(SaveEventsError::Internal(
+                    format!("Event query does not match save query: {:?}", item.query).int_err(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

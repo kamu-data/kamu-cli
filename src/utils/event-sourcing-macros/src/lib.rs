@@ -163,6 +163,18 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub async fn save_multi(
+                aggregates: &mut [Self],
+                event_store: &#store_type,
+            ) -> Result<(), SaveError> {
+                ::event_sourcing::Aggregate::<#proj_type, #store_type>::save_multi(
+                    aggregates,
+                    event_store,
+                )
+                .await
+            }
+
+            #[inline]
             pub fn apply<Event>(
                 &mut self,
                 event: Event,

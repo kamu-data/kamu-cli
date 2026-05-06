@@ -122,16 +122,13 @@ where
             .map(|resource| resource.aggregate().last_stored_event_id())
             .collect::<Vec<_>>();
 
-        // TODO: find a way to bulk it
-        for resource in resources.iter_mut() {
-            match resource.aggregate_mut().save(self.event_store).await {
-                Ok(()) => {}
-                Err(SaveError::ConcurrentModification(err)) => {
-                    return Err(ResourcePersistenceError::ConcurrentModification(err));
-                }
-                Err(err) => {
-                    return Err(ResourcePersistenceError::Internal(err.int_err()));
-                }
+        match event_sourcing::Aggregate::save_multi(resources, self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
             }
         }
 

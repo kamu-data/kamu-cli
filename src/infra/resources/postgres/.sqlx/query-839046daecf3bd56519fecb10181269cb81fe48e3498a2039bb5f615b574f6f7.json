@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH input AS (\n                SELECT\n                    ROW_NUMBER() OVER (ORDER BY item_index, event_index) AS row_num,\n                    resource_uid,\n                    resource_kind,\n                    event_time,\n                    event_type,\n                    event_payload,\n                    item_index\n                FROM UNNEST(\n                    $1::uuid[],\n                    $2::text[],\n                    $3::timestamptz[],\n                    $4::text[],\n                    $5::jsonb[],\n                    $6::bigint[],\n                    $7::bigint[]\n                ) AS e(\n                    resource_uid,\n                    resource_kind,\n                    event_time,\n                    event_type,\n                    event_payload,\n                    item_index,\n                    event_index\n                )\n            ),\n            inserted AS (\n                INSERT INTO resource_events (\n                    resource_uid,\n                    resource_kind,\n                    event_time,\n                    event_type,\n                    event_payload\n                )\n                SELECT\n                    resource_uid,\n                    resource_kind,\n                    event_time,\n                    event_type,\n                    event_payload\n                FROM input\n                ORDER BY row_num\n                RETURNING event_id\n            ),\n            numbered_inserted AS (\n                SELECT\n                    event_id,\n                    ROW_NUMBER() OVER (ORDER BY event_id) AS row_num\n                FROM inserted\n            )\n            SELECT\n                input.item_index as \"item_index!\",\n                MAX(numbered_inserted.event_id) AS \"event_id!\"\n            FROM input\n            JOIN numbered_inserted USING (row_num)\n            GROUP BY input.item_index\n            ORDER BY input.item_index\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "item_index!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TimestamptzArray",
+        "TextArray",
+        "JsonbArray",
+        "Int8Array",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "839046daecf3bd56519fecb10181269cb81fe48e3498a2039bb5f615b574f6f7"
+}
