@@ -137,20 +137,13 @@ pub struct ResourceDeleteManyResult {
     pub problems: Vec<BatchResourceProblem>,
 }
 
-impl
-    From<
-        kamu_resources_facade::BatchResourceResponse<
-            kamu_resources::ResourceUID,
-            kamu_resources_facade::ResourceLookupProblem,
-        >,
-    > for ResourceDeleteManyResult
-{
-    fn from(
-        value: kamu_resources_facade::BatchResourceResponse<
-            kamu_resources::ResourceUID,
-            kamu_resources_facade::ResourceLookupProblem,
-        >,
-    ) -> Self {
+type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse<
+    kamu_resources::ResourceUID,
+    kamu_resources_facade::ResourceLookupProblem,
+>;
+
+impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
+    fn from(value: BatchDeleteResourcesResponse) -> Self {
         Self {
             resources: value
                 .successes

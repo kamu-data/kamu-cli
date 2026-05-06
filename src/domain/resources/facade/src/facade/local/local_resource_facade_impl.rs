@@ -432,13 +432,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         )
         .await?;
 
-        let uid_entries = resolution_response.uid_entries;
         let mut problems = resolution_response.problems;
         let mut successes = Vec::new();
         let mut seen_valid_uids = HashSet::new();
         let mut uids_by_api_version = HashMap::<String, Vec<ResourceUID>>::new();
 
-        let uids = uid_entries
+        let uids = resolution_response
+            .uid_entries
             .iter()
             .map(|(_, _, uid)| *uid)
             .collect::<Vec<_>>();
@@ -451,7 +451,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map(|row| (row.uid, row))
             .collect::<HashMap<_, _>>();
 
-        for (request_index, _, uid) in uid_entries {
+        for (request_index, _, uid) in resolution_response.uid_entries {
             let row_result = rows_by_uid
                 .get(uid.as_ref())
                 .cloned()
@@ -663,11 +663,11 @@ impl LocalResourceFacadeImpl {
         )
         .await?;
 
-        let uid_entries = resolution_response.uid_entries;
         let mut indexed_resources = Vec::new();
         let mut problems = resolution_response.problems;
 
-        let uids = uid_entries
+        let uids = resolution_response
+            .uid_entries
             .iter()
             .map(|(_, _, uid)| *uid)
             .collect::<Vec<_>>();
@@ -680,7 +680,7 @@ impl LocalResourceFacadeImpl {
             .map(|snapshot| (snapshot.uid, snapshot))
             .collect::<HashMap<_, _>>();
 
-        for (request_index, _, uid) in uid_entries {
+        for (request_index, _, uid) in resolution_response.uid_entries {
             match snapshots_by_uid
                 .get(&uid)
                 .cloned()
