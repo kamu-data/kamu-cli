@@ -113,6 +113,53 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
+    async fn delete_many(
+        &self,
+        selector: ResourceBatchSelector,
+    ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError> {
+        let mut successes = Vec::new();
+        let mut problems = Vec::new();
+
+        for (request_index, resource_ref) in selector.resource_refs.into_iter().enumerate() {
+            let scalar_selector = ResourceSelector {
+                account: selector.account.clone(),
+                kind: selector.kind.clone(),
+                api_version: selector.api_version.clone(),
+                resource_ref,
+            };
+
+            match self.delete(scalar_selector).await {
+                Ok(uid) => successes.push(BatchResourceSuccess {
+                    request_index,
+                    item: uid,
+                }),
+                Err(DeleteResourceError::LookupProblem(error)) => {
+                    problems.push(BatchResourceProblem {
+                        request_index,
+                        error,
+                    });
+                }
+                Err(DeleteResourceError::UnsupportedDescriptor(error)) => {
+                    return Err(BatchResourceError::UnsupportedDescriptor(error));
+                }
+                Err(DeleteResourceError::BadAccount(error)) => {
+                    return Err(BatchResourceError::BadAccount(error));
+                }
+                Err(DeleteResourceError::RemoteRequest(error)) => {
+                    return Err(BatchResourceError::RemoteRequest(error));
+                }
+                Err(DeleteResourceError::Internal(error)) => {
+                    return Err(BatchResourceError::Internal(error));
+                }
+            }
+        }
+
+        Ok(BatchResourceResponse {
+            successes,
+            problems,
+        })
+    }
+
     async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError>;
 }
 

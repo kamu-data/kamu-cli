@@ -243,6 +243,28 @@ impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
     }
 }
 
+impl From<BatchResourceError> for DeleteResourceError {
+    fn from(err: BatchResourceError) -> Self {
+        match err {
+            BatchResourceError::UnsupportedDescriptor(err) => Self::UnsupportedDescriptor(err),
+            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
+            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
+            BatchResourceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<DeleteResourcesCrudDispatcherError> for BatchResourceError {
+    fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
+        use DeleteResourcesCrudDispatcherError as E;
+        match err {
+            E::Access(err) => Self::Internal(err.int_err()),
+            E::ConcurrentModification(err) => Self::Internal(err.int_err()),
+            E::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

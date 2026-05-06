@@ -410,46 +410,122 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError> {
+    async fn delete_many(
+        &self,
+        selector: ResourceBatchSelector,
+    ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let uid = resolve_resource_uid::<DeleteResourceError>(
+        let kind = selector.kind.clone();
+        let api_version = selector.api_version.clone();
+        get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
+
+        let groups = group_batch_resource_refs(selector);
+        let resolution_response = resolve_batch_uids(
             self.generic_resource_query_service.as_ref(),
-            &selector.kind,
             &target_account.id,
-            &selector.resource_ref,
+            &kind,
+            groups,
         )
         .await?;
 
-        let snapshot = self
-            .resolve_snapshot_for_kind::<DeleteResourceError>(
-                &selector.kind,
-                &target_account.id,
-                uid,
-            )
-            .await?;
+        let uid_entries = resolution_response.uid_entries;
+        let mut problems = resolution_response.problems;
+        let mut successes = Vec::new();
+        let mut seen_valid_uids = HashSet::new();
+        let mut uids_by_api_version = HashMap::<String, Vec<ResourceUID>>::new();
 
-        ensure_requested_api_version::<DeleteResourceError>(
-            selector.api_version.as_ref(),
-            &snapshot.api_version,
-        )?;
+        let uids = uid_entries
+            .iter()
+            .map(|(_, _, uid)| *uid)
+            .collect::<Vec<_>>();
 
-        let dispatcher = get_resource_crud_dispatcher::<DeleteResourceError>(
-            &self.catalog,
-            &selector.kind,
-            &snapshot.api_version,
-        )?;
-        dispatcher
-            .delete(ResourceCrudDispatcherDeleteRequest {
-                account_id: target_account.id,
-                uids: vec![uid],
+        let rows_by_uid = self
+            .generic_resource_query_service
+            .find_resource_identities_by_uids(&target_account.id, &uids)
+            .await?
+            .into_iter()
+            .map(|row| (row.uid, row))
+            .collect::<HashMap<_, _>>();
+
+        for (request_index, _, uid) in uid_entries {
+            let row_result = rows_by_uid
+                .get(uid.as_ref())
+                .cloned()
+                .ok_or_else(|| uid_not_found(uid));
+
+            match row_result.and_then(|row| {
+                validate_identity_row(
+                    row,
+                    &kind,
+                    api_version.as_ref(),
+                    ensure_kind_matches::<ResourceLookupProblem>,
+                    ensure_requested_api_version::<ResourceLookupProblem>,
+                )
+            }) {
+                Ok(row) => {
+                    successes.push(BatchResourceSuccess {
+                        request_index,
+                        item: uid,
+                    });
+
+                    if seen_valid_uids.insert(uid) {
+                        uids_by_api_version
+                            .entry(row.api_version)
+                            .or_default()
+                            .push(uid);
+                    }
+                }
+                Err(error) => problems.push(BatchResourceProblem {
+                    request_index,
+                    error,
+                }),
+            }
+        }
+
+        for (api_version, uids) in uids_by_api_version {
+            let dispatcher = get_resource_crud_dispatcher::<BatchResourceError>(
+                &self.catalog,
+                &kind,
+                &api_version,
+            )?;
+            dispatcher
+                .delete(ResourceCrudDispatcherDeleteRequest {
+                    account_id: target_account.id.clone(),
+                    uids,
+                })
+                .await?;
+        }
+
+        successes.sort_by_key(|success| success.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
+
+        Ok(BatchResourceResponse {
+            successes,
+            problems,
+        })
+    }
+
+    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError> {
+        let response = self
+            .delete_many(ResourceBatchSelector {
+                account: selector.account,
+                kind: selector.kind,
+                api_version: selector.api_version,
+                resource_refs: vec![selector.resource_ref],
             })
             .await?;
 
-        Ok(uid)
+        if let Some(success) = response.successes.into_iter().next() {
+            Ok(success.item)
+        } else if let Some(problem) = response.problems.into_iter().next() {
+            Err(problem.error.into())
+        } else {
+            Err(InternalError::new("Delete response did not contain an item").into())
+        }
     }
 }
 
