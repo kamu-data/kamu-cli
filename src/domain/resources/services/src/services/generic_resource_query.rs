@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -101,6 +102,49 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         }
 
         Ok(Some(resource_snapshot))
+    }
+
+    async fn find_owned_snapshots(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        uids: &[crate::domain::ResourceUID],
+    ) -> Result<Vec<ResourceSnapshot>, FindOwnedResourceError> {
+        let resource_snapshots = self
+            .resource_repository
+            .find_resource_snapshots_by_uids(account_id, uids)
+            .await?;
+        let owned_uids = resource_snapshots
+            .iter()
+            .map(|snapshot| snapshot.uid)
+            .collect::<HashSet<_>>();
+
+        for uid in uids.iter().filter(|uid| !owned_uids.contains(uid)) {
+            let query = ResourceRawEventQuery {
+                kind: kind.to_string(),
+                uid: *uid,
+            };
+
+            if let Some(resource_snapshot) = self
+                .resource_repository
+                .find_resource_snapshot(&query)
+                .await?
+            {
+                return Err(odf::AccessError::Unauthorized(
+                    ResourceNotOwnedByAccountError {
+                        uid: resource_snapshot.uid,
+                        resource_type: kind,
+                    }
+                    .into(),
+                )
+                .into());
+            }
+        }
+
+        Ok(resource_snapshots
+            .into_iter()
+            .filter(|snapshot| snapshot.kind == kind)
+            .collect())
     }
 
     async fn get_snapshot_by_uid(

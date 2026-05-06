@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use internal_error::ErrorIntoInternal;
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -21,7 +23,6 @@ use crate::domain::{
     ResourceDescriptorProvider,
     ResourcePersistenceError,
     ResourcePersistenceService,
-    ResourceSnapshot,
     ResourceStatusLike,
     ResourceUID,
 };
@@ -65,13 +66,26 @@ where
         account_id: odf::AccountID,
         uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError> {
-        for uid in uids {
-            let Some(_resource_snapshot) =
-                self.find_owned_resource_snapshot(&account_id, uid).await?
-            else {
-                continue;
-            };
+        let unique_uids = uids
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
+        let owned_snapshots = self
+            .generic_resource_query_service
+            .find_owned_snapshots(&account_id, R::DESCRIPTOR.resource_type, &unique_uids)
+            .await?;
+
+        let owned_uids = owned_snapshots
+            .into_iter()
+            .map(|snapshot| snapshot.uid)
+            .collect::<HashSet<_>>();
+
+        for uid in unique_uids
+            .into_iter()
+            .filter(|uid| owned_uids.contains(uid))
+        {
             self.delete_resource(&uid).await?;
         }
 
@@ -96,17 +110,6 @@ where
                 err.with_context(format!("Failed to persist deleted resource {uid}")),
             )),
         }
-    }
-
-    async fn find_owned_resource_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        uid: ResourceUID,
-    ) -> Result<Option<ResourceSnapshot>, DeleteResourcesError> {
-        self.generic_resource_query_service
-            .find_owned_snapshot(account_id, R::DESCRIPTOR.resource_type, uid)
-            .await
-            .map_err(DeleteResourcesError::from)
     }
 
     async fn delete_resource(&self, uid: &ResourceUID) -> Result<(), DeleteResourcesError> {
