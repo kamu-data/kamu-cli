@@ -105,6 +105,83 @@ impl DeleteResourcesCommand {
         })
     }
 
+    pub(super) async fn validate_and_prepare(&self) -> Result<PreparedDeleteTargets, CLIError> {
+        self.validate_args().await?;
+        self.prepare_targets().await
+    }
+
+    pub(super) async fn run_prepared(
+        &self,
+        prepared: PreparedDeleteTargets,
+    ) -> Result<(), CLIError> {
+        if !self.output_config.quiet {
+            self.resource_context_reporter.report_usage(
+                if self.dry_run {
+                    "Previewing resource deletion in context"
+                } else {
+                    "Deleting resources from context"
+                },
+                &self.resolved_context,
+            );
+        }
+
+        let PreparedDeleteTargets {
+            targets,
+            ignored_selectors,
+        } = prepared;
+
+        let mut summary = DeleteResourcesSummary::default();
+        let mut errors = Vec::new();
+
+        for ignored_selector in ignored_selectors {
+            summary.record_ignored();
+            DeleteResourcesPrinter::print_ignored(
+                &ignored_selector,
+                self.dry_run,
+                self.output_config.as_ref(),
+            );
+        }
+
+        if targets.is_empty() {
+            if summary.total_items == 0 {
+                eprintln!(
+                    "{}",
+                    console::style("There are no matching resources to delete").yellow()
+                );
+            }
+            DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
+
+            if errors.is_empty() {
+                return Ok(());
+            }
+
+            return Err(BatchError {
+                summary: DeleteResourcesPrinter::batch_failure_summary(errors.len(), self.dry_run),
+                errors_with_context: errors,
+            }
+            .into());
+        }
+
+        if !self.dry_run {
+            self.confirm_delete(&targets)?;
+        }
+
+        self.execute_delete_phase(targets, &mut summary, &mut errors)
+            .await;
+
+        DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(BatchError {
+                summary: DeleteResourcesPrinter::batch_failure_summary(errors.len(), self.dry_run),
+                errors_with_context: errors,
+            }
+            .into())
+        }
+    }
+
     fn confirm_delete(&self, targets: &[DeleteResourceTarget]) -> Result<(), CLIError> {
         if self.force {
             return Ok(());
@@ -272,79 +349,15 @@ impl Command for DeleteResourcesCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        if !self.output_config.quiet {
-            self.resource_context_reporter.report_usage(
-                if self.dry_run {
-                    "Previewing resource deletion in context"
-                } else {
-                    "Deleting resources from context"
-                },
-                &self.resolved_context,
-            );
-        }
-
-        let PreparedDeleteTargets {
-            targets,
-            ignored_selectors,
-        } = self.prepare_targets().await?;
-
-        let mut summary = DeleteResourcesSummary::default();
-        let mut errors = Vec::new();
-
-        for ignored_selector in ignored_selectors {
-            summary.record_ignored();
-            DeleteResourcesPrinter::print_ignored(
-                &ignored_selector,
-                self.dry_run,
-                self.output_config.as_ref(),
-            );
-        }
-
-        if targets.is_empty() {
-            if summary.total_items == 0 {
-                eprintln!(
-                    "{}",
-                    console::style("There are no matching resources to delete").yellow()
-                );
-            }
-            DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
-
-            if errors.is_empty() {
-                return Ok(());
-            }
-
-            return Err(BatchError {
-                summary: DeleteResourcesPrinter::batch_failure_summary(errors.len(), self.dry_run),
-                errors_with_context: errors,
-            }
-            .into());
-        }
-
-        if !self.dry_run {
-            self.confirm_delete(&targets)?;
-        }
-
-        self.execute_delete_phase(targets, &mut summary, &mut errors)
-            .await;
-
-        DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(BatchError {
-                summary: DeleteResourcesPrinter::batch_failure_summary(errors.len(), self.dry_run),
-                errors_with_context: errors,
-            }
-            .into())
-        }
+        let prepared = self.prepare_targets().await?;
+        self.run_prepared(prepared).await
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-struct PreparedDeleteTargets {
+pub(super) struct PreparedDeleteTargets {
     targets: Vec<DeleteResourceTarget>,
     ignored_selectors: Vec<String>,
 }

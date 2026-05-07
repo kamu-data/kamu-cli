@@ -98,6 +98,64 @@ impl DeleteDatasetsCommand {
         })
     }
 
+    pub(super) async fn validate_and_prepare(&self) -> Result<PreparedDeleteDatasets, CLIError> {
+        self.validate_args().await?;
+        self.prepare_targets().await
+    }
+
+    pub(super) async fn run_prepared(
+        &self,
+        prepared: PreparedDeleteDatasets,
+    ) -> Result<(), CLIError> {
+        let PreparedDeleteDatasets {
+            planning_result,
+            ignored_patterns,
+        } = prepared;
+
+        let mut summary = DeleteDatasetsSummary::default();
+
+        for ignored_pattern in ignored_patterns {
+            summary.record_ignored();
+            DeleteDatasetsPrinter::print_ignored(&ignored_pattern, self.dry_run);
+        }
+
+        self.report_force_allowed_orphans(&planning_result, &mut summary);
+
+        self.ensure_plan_is_executable(&planning_result)?;
+
+        let plan = planning_result.into_executable_plan(self.force)?;
+
+        if plan.authorized_targets.is_empty() {
+            if summary.total_items == 0 {
+                eprintln!(
+                    "{}",
+                    console::style("There are no datasets matching the pattern").yellow()
+                );
+                return Ok(());
+            }
+
+            DeleteDatasetsPrinter::print_summary(&summary, self.dry_run);
+            return Ok(());
+        }
+
+        if !self.dry_run && !self.force {
+            let dataset_handles: Vec<_> = plan
+                .authorized_targets
+                .iter()
+                .map(|target| target.dataset_handle.clone())
+                .collect();
+            self.confirm_delete_service
+                .confirm_delete(&dataset_handles)
+                .await?;
+        }
+
+        self.execute_delete(plan, &mut summary).await?;
+
+        DeleteDatasetsPrinter::print_summary(&summary, self.dry_run);
+
+        Ok(())
+    }
+
     async fn prepare_input_handles(&self) -> Result<PreparedDeleteInputs, CLIError> {
         if self.all {
             let dataset_handles = match self.tenancy_config {
@@ -175,10 +233,7 @@ impl DeleteDatasetsCommand {
         }
 
         let mut seen_dataset_ids = HashSet::new();
-        for dangling_reference in &planning_result
-            .issues
-            .directly_dangling_references
-        {
+        for dangling_reference in &planning_result.issues.directly_dangling_references {
             for dataset_handle in &dangling_reference.children {
                 if seen_dataset_ids.insert(dataset_handle.id.clone()) {
                     summary.record_ignored();
@@ -294,53 +349,8 @@ impl Command for DeleteDatasetsCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        let PreparedDeleteDatasets {
-            planning_result,
-            ignored_patterns,
-        } = self.prepare_targets().await?;
-
-        let mut summary = DeleteDatasetsSummary::default();
-
-        for ignored_pattern in ignored_patterns {
-            summary.record_ignored();
-            DeleteDatasetsPrinter::print_ignored(&ignored_pattern, self.dry_run);
-        }
-
-        self.report_force_allowed_orphans(&planning_result, &mut summary);
-
-        self.ensure_plan_is_executable(&planning_result)?;
-
-        let plan = planning_result.into_executable_plan(self.force)?;
-
-        if plan.authorized_targets.is_empty() {
-            if summary.total_items == 0 {
-                eprintln!(
-                    "{}",
-                    console::style("There are no datasets matching the pattern").yellow()
-                );
-                return Ok(());
-            }
-
-            DeleteDatasetsPrinter::print_summary(&summary, self.dry_run);
-            return Ok(());
-        }
-
-        if !self.dry_run && !self.force {
-            let dataset_handles: Vec<_> = plan
-                .authorized_targets
-                .iter()
-                .map(|target| target.dataset_handle.clone())
-                .collect();
-            self.confirm_delete_service
-                .confirm_delete(&dataset_handles)
-                .await?;
-        }
-
-        self.execute_delete(plan, &mut summary).await?;
-
-        DeleteDatasetsPrinter::print_summary(&summary, self.dry_run);
-
-        Ok(())
+        let prepared = self.prepare_targets().await?;
+        self.run_prepared(prepared).await
     }
 }
 
@@ -355,7 +365,7 @@ struct PreparedDeleteInputs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-struct PreparedDeleteDatasets {
+pub(super) struct PreparedDeleteDatasets {
     planning_result: DeleteDatasetPlanningResult,
     ignored_patterns: Vec<String>,
 }

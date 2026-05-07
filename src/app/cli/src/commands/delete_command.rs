@@ -98,15 +98,25 @@ impl DeleteCommand {
         &self,
         request: &ResolvedDeleteRequest,
     ) -> Result<DeleteDatasetsCommand, CLIError> {
-        let ResolvedDeleteRequest::Datasets { dataset_args } = request else {
-            unreachable!();
+        let dataset_args = match request {
+            ResolvedDeleteRequest::Datasets { dataset_args }
+            | ResolvedDeleteRequest::Mixed { dataset_args, .. } => dataset_args,
+            ResolvedDeleteRequest::Resources { .. } => {
+                unreachable!();
+            }
         };
 
+        self.make_delete_datasets_command_from_args(dataset_args)
+    }
+
+    fn make_delete_datasets_command_from_args(
+        &self,
+        dataset_args: &[String],
+    ) -> Result<DeleteDatasetsCommand, CLIError> {
         let parsed_dataset_ref_patterns = dataset_args
-            .clone()
-            .into_iter()
+            .iter()
             .map(|raw_pattern| {
-                parsers::dataset_ref_pattern(&raw_pattern).map_err(CLIError::usage_error)
+                parsers::dataset_ref_pattern(raw_pattern).map_err(CLIError::usage_error)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -134,10 +144,21 @@ impl DeleteCommand {
         &self,
         request: &ResolvedDeleteRequest,
     ) -> Result<DeleteResourcesCommand, CLIError> {
-        let ResolvedDeleteRequest::Resources { syntax } = request else {
-            unreachable!();
+        let syntax = match request {
+            ResolvedDeleteRequest::Resources { syntax }
+            | ResolvedDeleteRequest::Mixed { syntax, .. } => syntax,
+            ResolvedDeleteRequest::Datasets { .. } => {
+                unreachable!();
+            }
         };
 
+        self.resolve_delete_resources_command_from_syntax(syntax.clone())
+    }
+
+    fn resolve_delete_resources_command_from_syntax(
+        &self,
+        syntax: ResourceSelectionSyntax,
+    ) -> Result<DeleteResourcesCommand, CLIError> {
         let resolved_context = self
             .resource_context_resolver
             .resolve(self.explicit_context_name.as_deref())?;
@@ -153,11 +174,30 @@ impl DeleteCommand {
             self.interact.clone(),
             self.output_config.clone(),
             resolved_context,
-            syntax.clone(),
+            syntax,
             self.force,
             self.ignore_not_found,
             self.dry_run,
         ))
+    }
+
+    async fn run_mixed(
+        &self,
+        dataset_args: &[String],
+        syntax: ResourceSelectionSyntax,
+    ) -> Result<(), CLIError> {
+        let delete_datasets_command = self.make_delete_datasets_command_from_args(dataset_args)?;
+        let delete_resources_command = self.resolve_delete_resources_command_from_syntax(syntax)?;
+
+        let prepared_datasets = delete_datasets_command.validate_and_prepare().await?;
+        let prepared_resources = delete_resources_command.validate_and_prepare().await?;
+
+        delete_datasets_command
+            .run_prepared(prepared_datasets)
+            .await?;
+        delete_resources_command
+            .run_prepared(prepared_resources)
+            .await
     }
 }
 
@@ -192,9 +232,20 @@ impl Command for DeleteCommand {
                     .await
             }
 
-            ResolvedDeleteRequest::Mixed => Err(CLIError::usage_error(
-                "Mixed dataset/resource deletion is not implemented",
-            )),
+            ResolvedDeleteRequest::Mixed { .. } => {
+                if self.explicit_context_name.is_some() {
+                    return Err(CLIError::usage_error(
+                        "--context is supported only for pure resource deletion",
+                    ));
+                }
+
+                self.make_delete_datasets_command(&request)?
+                    .validate_args()
+                    .await?;
+                self.resolve_delete_resources_command(&request)?
+                    .validate_args()
+                    .await
+            }
         }
     }
 
@@ -208,9 +259,18 @@ impl Command for DeleteCommand {
             ResolvedDeleteRequest::Resources { .. } => {
                 self.resolve_delete_resources_command(&request)?.run().await
             }
-            ResolvedDeleteRequest::Mixed => Err(CLIError::usage_error(
-                "Mixed dataset/resource deletion is not implemented",
-            )),
+            ResolvedDeleteRequest::Mixed {
+                dataset_args,
+                syntax,
+            } => {
+                if self.explicit_context_name.is_some() {
+                    return Err(CLIError::usage_error(
+                        "--context is supported only for pure resource deletion",
+                    ));
+                }
+
+                self.run_mixed(dataset_args, syntax.clone()).await
+            }
         }
     }
 }
@@ -219,9 +279,16 @@ impl Command for DeleteCommand {
 
 #[derive(Debug, Clone)]
 enum ResolvedDeleteRequest {
-    Datasets { dataset_args: Vec<String> },
-    Resources { syntax: ResourceSelectionSyntax },
-    Mixed,
+    Datasets {
+        dataset_args: Vec<String>,
+    },
+    Resources {
+        syntax: ResourceSelectionSyntax,
+    },
+    Mixed {
+        dataset_args: Vec<String>,
+        syntax: ResourceSelectionSyntax,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,7 +398,16 @@ impl<'a> DeleteRequestResolver<'a> {
             ClassifiedSlashDeleteRequest::Resources(raw_args) => {
                 self.resolve_resource_request(raw_args).await
             }
-            ClassifiedSlashDeleteRequest::Mixed => Ok(ResolvedDeleteRequest::Mixed),
+            ClassifiedSlashDeleteRequest::Mixed {
+                dataset_args,
+                resource_args,
+            } => {
+                let syntax = self.resolve_resource_syntax(resource_args).await?;
+                Ok(ResolvedDeleteRequest::Mixed {
+                    dataset_args,
+                    syntax,
+                })
+            }
         }
     }
 
@@ -407,7 +483,10 @@ impl<'a> DeleteRequestResolver<'a> {
         match (!dataset_args.is_empty(), !resource_args.is_empty()) {
             (true, false) => ClassifiedSlashDeleteRequest::Datasets(dataset_args),
             (false, true) => ClassifiedSlashDeleteRequest::Resources(resource_args),
-            (true, true) => ClassifiedSlashDeleteRequest::Mixed,
+            (true, true) => ClassifiedSlashDeleteRequest::Mixed {
+                dataset_args,
+                resource_args,
+            },
             (false, false) => unreachable!("slash request must contain at least one selector"),
         }
     }
@@ -416,6 +495,14 @@ impl<'a> DeleteRequestResolver<'a> {
         &self,
         raw_args: Vec<String>,
     ) -> Result<ResolvedDeleteRequest, CLIError> {
+        let syntax = self.resolve_resource_syntax(raw_args).await?;
+        Ok(ResolvedDeleteRequest::Resources { syntax })
+    }
+
+    async fn resolve_resource_syntax(
+        &self,
+        raw_args: Vec<String>,
+    ) -> Result<ResourceSelectionSyntax, CLIError> {
         // Delete reuses the `get` selector grammar, but broad selectors shadowing
         // narrower ones are rejected for destructive commands instead of
         // downgraded to warnings.
@@ -437,14 +524,17 @@ impl<'a> DeleteRequestResolver<'a> {
             )));
         }
 
-        Ok(ResolvedDeleteRequest::Resources { syntax })
+        Ok(syntax)
     }
 }
 
 enum ClassifiedSlashDeleteRequest {
     Datasets(Vec<String>),
     Resources(Vec<String>),
-    Mixed,
+    Mixed {
+        dataset_args: Vec<String>,
+        resource_args: Vec<String>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -502,8 +592,11 @@ mod tests {
             |prefix| prefix == "vs",
         );
 
-        assert!(matches!(request, ClassifiedSlashDeleteRequest::Mixed));
+        assert!(matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
+                if dataset_args == vec!["foo".to_owned()]
+                    && resource_args == vec!["vs/bar".to_owned()]
+        ));
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
