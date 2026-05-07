@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use kamu_resources::ResourceKindDescriptor;
 
@@ -22,10 +22,21 @@ use crate::resources::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn ResourceKindLookupService)]
 pub struct ResourceKindLookupServiceImpl {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+    cache: Mutex<HashMap<Option<String>, Vec<ResourceKindDescriptor>>>,
+}
+
+#[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
+#[dill::interface(dyn ResourceKindLookupService)]
+impl ResourceKindLookupServiceImpl {
+    pub fn new(resource_facade_factory: Arc<dyn ResourceFacadeFactory>) -> Self {
+        Self {
+            resource_facade_factory,
+            cache: Mutex::new(HashMap::new()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,12 +47,27 @@ impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
         &self,
         explicit_context_name: Option<&str>,
     ) -> Result<Vec<ResourceKindDescriptor>, CLIError> {
+        let cache_key = explicit_context_name.map(str::to_owned);
+
+        {
+            let cache = self.cache.lock().unwrap();
+            if let Some(kinds) = cache.get(&cache_key) {
+                return Ok(kinds.clone());
+            }
+        }
+
         let resource_facade = self
             .resource_facade_factory
             .get_resource_facade(explicit_context_name)?;
 
         let supported_kinds = resource_facade.list_supported_kinds().await?;
         Self::assert_unique_selectors(&supported_kinds);
+
+        self.cache
+            .lock()
+            .unwrap()
+            .insert(cache_key, supported_kinds.clone());
+
         Ok(supported_kinds)
     }
 
@@ -55,13 +81,7 @@ impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
 
         supported_kinds
             .iter()
-            .find(|descriptor| {
-                descriptor.name.eq_ignore_ascii_case(target)
-                    || descriptor
-                        .short_names
-                        .iter()
-                        .any(|short_name| short_name.eq_ignore_ascii_case(target))
-            })
+            .find(|descriptor| descriptor.matches_selector(target))
             .cloned()
             .ok_or_else(|| {
                 CLIError::usage_error(format!(

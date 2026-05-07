@@ -192,13 +192,7 @@ impl ResourceSelectionSyntaxServiceImpl {
     ) -> Result<ResourceKindDescriptor, CLIError> {
         supported_kinds
             .iter()
-            .find(|descriptor| {
-                descriptor.name.eq_ignore_ascii_case(target)
-                    || descriptor
-                        .short_names
-                        .iter()
-                        .any(|short_name| short_name.eq_ignore_ascii_case(target))
-            })
+            .find(|descriptor| descriptor.matches_selector(target))
             .cloned()
             .ok_or_else(|| {
                 CLIError::usage_error(format!(

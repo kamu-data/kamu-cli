@@ -7,45 +7,41 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use database_common::collect_all_pages;
-use internal_error::BoxedError;
-use kamu_resources::{ResourceKindDescriptor, ResourceSummaryView, ResourceUID, ResourceView};
+use internal_error::{BoxedError, InternalError};
+use kamu_resources::ResourceUID;
 use kamu_resources_facade::{
-    DeleteResourceError,
-    GetResourceError,
-    ListAllResourcesRequest,
-    ListResourcesRequest,
+    BatchResourceError,
+    ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceRef,
-    ResourceSelector,
 };
 
 use super::{BatchError, CLIError, Command};
 use crate::Interact;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResolvedResourceContext, ResourceContextReporter};
-use crate::resources::ResourceSelectorResolutionService;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const RESOURCE_PAGE_SIZE: usize = 100;
+use crate::resources::{
+    ResourceSelectionResolutionOptions,
+    ResourceSelectionResolutionService,
+    ResourceSelectionSyntax,
+    ResourceTarget,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DeleteResourcesCommand {
     resource_facade: Arc<dyn ResourceFacade>,
-    resource_selector_resolution_service: Arc<dyn ResourceSelectorResolutionService>,
+    resource_selection_resolution_service: Arc<dyn ResourceSelectionResolutionService>,
     resource_context_reporter: Arc<ResourceContextReporter>,
     interact: Arc<Interact>,
     output_config: Arc<OutputConfig>,
 
     resolved_context: ResolvedResourceContext,
-    scope: DeleteResourcesScope,
-    selector: Option<String>,
-    all: bool,
+    syntax: ResourceSelectionSyntax,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -55,39 +51,14 @@ pub struct DeleteResourcesCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DeleteResourcesCommand {
-    pub fn validate_scope_and_selector(
-        scope: &DeleteResourcesScope,
-        selector: Option<&str>,
-        all: bool,
-    ) -> Result<(), CLIError> {
-        match (scope, selector) {
-            (DeleteResourcesScope::All, Some(_)) => {
-                return Err(CLIError::usage_error(
-                    "Deleting all resources does not accept explicit selectors",
-                ));
-            }
-            (DeleteResourcesScope::All, None) | (DeleteResourcesScope::ByKind(_), Some(_)) => {}
-            (DeleteResourcesScope::ByKind(_), None) if all => {}
-            (DeleteResourcesScope::ByKind(_), None) => {
-                return Err(CLIError::usage_error(
-                    "Specify a resource selector or pass --all",
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn new(
         resource_facade: Arc<dyn ResourceFacade>,
-        resource_selector_resolution_service: Arc<dyn ResourceSelectorResolutionService>,
+        resource_selection_resolution_service: Arc<dyn ResourceSelectionResolutionService>,
         resource_context_reporter: Arc<ResourceContextReporter>,
         interact: Arc<Interact>,
         output_config: Arc<OutputConfig>,
         resolved_context: ResolvedResourceContext,
-        scope: DeleteResourcesScope,
-        selector: Option<String>,
-        all: bool,
+        syntax: ResourceSelectionSyntax,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -95,14 +66,12 @@ impl DeleteResourcesCommand {
     ) -> Self {
         Self {
             resource_facade,
-            resource_selector_resolution_service,
+            resource_selection_resolution_service,
             resource_context_reporter,
             interact,
             output_config,
             resolved_context,
-            scope,
-            selector,
-            all,
+            syntax,
             force,
             ignore_not_found,
             dry_run,
@@ -110,106 +79,33 @@ impl DeleteResourcesCommand {
         }
     }
 
-    async fn get_single_target(&self) -> Result<PreparedDeleteTargets, CLIError> {
-        let DeleteResourcesScope::ByKind(kind_descriptor) = &self.scope else {
-            unreachable!();
-        };
-
-        let selector = self.selector.as_ref().unwrap();
-        let resolved_selector = self
-            .resource_selector_resolution_service
-            .resolve_single_selector(selector)
+    async fn prepare_targets(&self) -> Result<PreparedDeleteTargets, CLIError> {
+        // Resolve once up front so dry-run, confirmation, and delete execution all
+        // operate on the same canonical target set.
+        let resolved = self
+            .resource_selection_resolution_service
+            .resolve(
+                self.syntax.clone(),
+                self.resource_facade.as_ref(),
+                ResourceSelectionResolutionOptions {
+                    ignore_not_found: self.ignore_not_found,
+                    max_expanded_results: None,
+                },
+            )
             .await?;
 
-        let resource = self
-            .resource_facade
-            .get(ResourceSelector {
-                account: None,
-                kind: kind_descriptor.kind.clone(),
-                api_version: Some(kind_descriptor.api_version.clone()),
-                resource_ref: resolved_selector.resource_ref,
-            })
-            .await;
-
-        match resource {
-            Ok(resource) => Ok(PreparedDeleteTargets {
-                targets: vec![DeleteResourceTarget::from_resource_view(resource)],
-                ignored_selectors: Vec::new(),
-            }),
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
-            )) if self.ignore_not_found => Ok(PreparedDeleteTargets {
-                targets: Vec::new(),
-                ignored_selectors: vec![selector.clone()],
-            }),
-            Err(error) => Err(error.into()),
-        }
-    }
-
-    async fn list_targets_by_kind(
-        &self,
-        kind_descriptor: &ResourceKindDescriptor,
-    ) -> Result<Vec<DeleteResourceTarget>, CLIError> {
-        let resources = collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-            self.resource_facade
-                .list(ListResourcesRequest {
-                    kind: kind_descriptor.kind.clone(),
-                    account: None,
-                    pagination,
-                })
-                .await
-                .map_err(CLIError::from)
+        Ok(PreparedDeleteTargets {
+            targets: resolved
+                .targets
+                .into_iter()
+                .map(DeleteResourceTarget::from_resource_target)
+                .collect(),
+            ignored_selectors: resolved
+                .ignored_selectors
+                .into_iter()
+                .map(|selector| selector.selector_input)
+                .collect(),
         })
-        .await?;
-
-        Ok(resources
-            .into_iter()
-            .map(DeleteResourceTarget::from_resource_summary_view)
-            .collect())
-    }
-
-    async fn list_all_targets(&self) -> Result<Vec<DeleteResourceTarget>, CLIError> {
-        let resources = collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-            self.resource_facade
-                .list_all(ListAllResourcesRequest {
-                    account: None,
-                    pagination,
-                })
-                .await
-                .map_err(CLIError::from)
-        })
-        .await?;
-
-        Ok(resources
-            .into_iter()
-            .map(DeleteResourceTarget::from_resource_summary_view)
-            .collect())
-    }
-
-    async fn prepare_targets(&self) -> Result<PreparedDeleteTargets, CLIError> {
-        match &self.scope {
-            DeleteResourcesScope::ByKind(kind_descriptor) => {
-                if self.selector.is_some() {
-                    self.get_single_target().await
-                } else {
-                    Ok(PreparedDeleteTargets {
-                        targets: self.list_targets_by_kind(kind_descriptor).await?,
-                        ignored_selectors: Vec::new(),
-                    })
-                }
-            }
-            DeleteResourcesScope::All => Ok(PreparedDeleteTargets {
-                targets: self.list_all_targets().await?,
-                ignored_selectors: Vec::new(),
-            }),
-        }
-    }
-
-    fn no_targets_message(&self) -> &'static str {
-        match &self.scope {
-            DeleteResourcesScope::ByKind(_) => "There are no matching resources to delete",
-            DeleteResourcesScope::All => "There are no resources to delete",
-        }
     }
 
     fn confirm_delete(&self, targets: &[DeleteResourceTarget]) -> Result<(), CLIError> {
@@ -237,56 +133,135 @@ impl DeleteResourcesCommand {
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
     ) {
-        for target in targets {
-            if self.dry_run {
+        if self.dry_run {
+            for target in targets {
                 summary.record_deleted();
                 DeleteResourcesPrinter::print_success(&target, true, self.output_config.as_ref());
-                continue;
             }
+            return;
+        }
 
+        // The facade batches by descriptor, so cross-kind selections are split into one
+        // `delete_many(...)` call per `(kind, api_version)` group.
+        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
             match self
                 .resource_facade
-                .delete(ResourceSelector {
-                    kind: target.kind.clone(),
+                .delete_many(ResourceBatchSelector {
                     account: None,
-                    api_version: Some(target.api_version.clone()),
-                    resource_ref: ResourceRef::ById(target.uid),
+                    kind: kind.clone(),
+                    api_version: Some(api_version.clone()),
+                    resource_refs: entries
+                        .iter()
+                        .map(|(_, target)| ResourceRef::ById(target.uid))
+                        .collect(),
                 })
                 .await
             {
-                Ok(_) => {
-                    summary.record_deleted();
-                    DeleteResourcesPrinter::print_success(
-                        &target,
-                        false,
-                        self.output_config.as_ref(),
-                    );
-                }
-                Err(DeleteResourceError::LookupProblem(
-                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
-                )) if self.ignore_not_found => {
-                    summary.record_ignored();
-                    DeleteResourcesPrinter::print_ignored(
-                        &target.display_name(),
-                        false,
+                Ok(response) => {
+                    self.handle_delete_many_result(
+                        &entries,
+                        response,
+                        summary,
+                        errors,
                         self.output_config.as_ref(),
                     );
                 }
                 Err(error) => {
-                    summary.record_failed();
-                    let message = error.to_string();
-                    DeleteResourcesPrinter::print_failed(&target.display_name(), &message, false);
-
-                    errors.push((
-                        Box::<dyn std::error::Error + Send + Sync>::from(error),
-                        format!("Failed to delete resource {}", target.display_name()),
-                    ));
-
-                    if !self.continue_on_error {
-                        break;
-                    }
+                    Self::record_delete_many_batch_error(
+                        &entries,
+                        &error,
+                        summary,
+                        errors,
+                        self.output_config.as_ref(),
+                    );
                 }
             }
+
+            if !self.continue_on_error && !errors.is_empty() {
+                break;
+            }
+        }
+    }
+
+    fn group_targets_by_descriptor(
+        targets: Vec<DeleteResourceTarget>,
+    ) -> BTreeMap<(String, String), Vec<(usize, DeleteResourceTarget)>> {
+        let mut groups = BTreeMap::new();
+
+        for (index, target) in targets.into_iter().enumerate() {
+            groups
+                .entry((target.kind.clone(), target.api_version.clone()))
+                .or_insert_with(Vec::new)
+                .push((index, target));
+        }
+
+        groups
+    }
+
+    fn handle_delete_many_result(
+        &self,
+        entries: &[(usize, DeleteResourceTarget)],
+        response: kamu_resources_facade::BatchResourceResponse<ResourceUID, ResourceLookupProblem>,
+        summary: &mut DeleteResourcesSummary,
+        errors: &mut Vec<(BoxedError, String)>,
+        output_config: &OutputConfig,
+    ) {
+        // Batch responses preserve request indexes, so we can report results in terms
+        // of the original resolved targets even though deletion happens per
+        // descriptor group.
+        for success in response.successes {
+            let (_, target) = &entries[success.request_index];
+            summary.record_deleted();
+            DeleteResourcesPrinter::print_success(target, false, output_config);
+        }
+
+        for problem in response.problems {
+            let (_, target) = &entries[problem.request_index];
+            let error = problem.error;
+
+            if self.ignore_not_found
+                && matches!(
+                    &error,
+                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
+                )
+            {
+                summary.record_ignored();
+                DeleteResourcesPrinter::print_ignored(&target.display_name(), false, output_config);
+                continue;
+            }
+
+            summary.record_failed();
+            let message = error.to_string();
+            DeleteResourcesPrinter::print_failed(&target.display_name(), &message, false);
+
+            errors.push((
+                Box::<dyn std::error::Error + Send + Sync>::from(error),
+                format!("Failed to delete resource {}", target.display_name()),
+            ));
+        }
+    }
+
+    fn record_delete_many_batch_error(
+        entries: &[(usize, DeleteResourceTarget)],
+        error: &BatchResourceError,
+        summary: &mut DeleteResourcesSummary,
+        errors: &mut Vec<(BoxedError, String)>,
+        _output_config: &OutputConfig,
+    ) {
+        // A transport- or facade-level batch failure applies to every item in the group
+        // because the backend did not return per-item outcomes.
+        let error_message = error.to_string();
+
+        for (_, target) in entries {
+            summary.record_failed();
+            DeleteResourcesPrinter::print_failed(&target.display_name(), &error_message, false);
+
+            errors.push((
+                Box::<dyn std::error::Error + Send + Sync>::from(InternalError::new(
+                    error_message.clone(),
+                )),
+                format!("Failed to delete resource {}", target.display_name()),
+            ));
         }
     }
 }
@@ -296,7 +271,7 @@ impl DeleteResourcesCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DeleteResourcesCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
-        Self::validate_scope_and_selector(&self.scope, self.selector.as_deref(), self.all)
+        Ok(())
     }
 
     async fn run(&self) -> Result<(), CLIError> {
@@ -330,7 +305,10 @@ impl Command for DeleteResourcesCommand {
 
         if targets.is_empty() {
             if summary.total_items == 0 {
-                eprintln!("{}", console::style(self.no_targets_message()).yellow());
+                eprintln!(
+                    "{}",
+                    console::style("There are no matching resources to delete").yellow()
+                );
             }
             DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
 
@@ -368,14 +346,6 @@ impl Command for DeleteResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub enum DeleteResourcesScope {
-    ByKind(ResourceKindDescriptor),
-    All,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug)]
 struct PreparedDeleteTargets {
     targets: Vec<DeleteResourceTarget>,
@@ -388,31 +358,24 @@ struct PreparedDeleteTargets {
 struct DeleteResourceTarget {
     kind: String,
     api_version: String,
+    canonical_kind_name: String,
     uid: ResourceUID,
     name: String,
 }
 
 impl DeleteResourceTarget {
-    fn from_resource_summary_view(resource: ResourceSummaryView) -> Self {
+    fn from_resource_target(target: ResourceTarget) -> Self {
         Self {
-            kind: resource.kind,
-            api_version: resource.api_version,
-            uid: resource.uid,
-            name: resource.name,
-        }
-    }
-
-    fn from_resource_view(resource: ResourceView) -> Self {
-        Self {
-            kind: resource.kind,
-            api_version: resource.api_version,
-            uid: resource.metadata.uid,
-            name: resource.metadata.name,
+            kind: target.kind,
+            api_version: target.api_version,
+            canonical_kind_name: target.canonical_kind_name,
+            uid: target.uid,
+            name: target.name,
         }
     }
 
     fn display_name(&self) -> String {
-        format!("{}/{}", self.kind, self.name)
+        format!("{}/{}", self.canonical_kind_name, self.name)
     }
 }
 
