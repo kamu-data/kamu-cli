@@ -18,7 +18,6 @@ use kamu_datasets::{
     CreateDatasetUseCaseOptions,
     DatasetRegistry,
     DatasetRegistryExt,
-    DeleteDatasetPlanningOptions,
     DeleteDatasetUseCase,
 };
 
@@ -268,12 +267,11 @@ impl Command for AddCommand {
             }
 
             if !already_exist.is_empty() {
-                let delete_options = DeleteDatasetPlanningOptions::default();
                 let delete_plan = self
                     .delete_dataset
                     .plan_delete(already_exist, false)
                     .await?
-                    .into_executable_plan(delete_options)?;
+                    .into_executable_plan(false)?;
 
                 let delete_dataset_handles = delete_plan
                     .authorized_targets

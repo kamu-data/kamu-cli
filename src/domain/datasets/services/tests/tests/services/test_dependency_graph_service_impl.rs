@@ -298,12 +298,11 @@ async fn test_service_dataset_deleted() {
         )
         .await
         .unwrap();
-    let delete_options = DeleteDatasetPlanningOptions::default();
     let delete_plan = delete_dataset
         .plan_delete(vec![dataset_handle], false)
         .await
         .unwrap()
-        .into_executable_plan(delete_options)
+        .into_executable_plan(false)
         .unwrap();
     delete_dataset.execute_plan(delete_plan).await.unwrap();
 

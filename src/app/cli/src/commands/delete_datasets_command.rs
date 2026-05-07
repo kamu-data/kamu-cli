@@ -19,7 +19,6 @@ use kamu_datasets::{
     DatasetRegistry,
     DeleteDatasetError,
     DeleteDatasetPlan,
-    DeleteDatasetPlanningOptions,
     DeleteDatasetPlanningResult,
     DeleteDatasetUseCase,
 };
@@ -158,27 +157,18 @@ impl DeleteDatasetsCommand {
         }
     }
 
-    fn execution_options(&self) -> DeleteDatasetPlanningOptions {
-        DeleteDatasetPlanningOptions {
-            allow_orphan_foreign_downstream: self.force && self.recursive,
-            allow_orphan_dangling_references: self.force,
-        }
-    }
-
     fn report_force_allowed_orphans(
         &self,
         planning_result: &DeleteDatasetPlanningResult,
         summary: &mut DeleteDatasetsSummary,
     ) {
-        let options = self.execution_options();
-
-        if !options.allow_orphan_foreign_downstream && !options.allow_orphan_dangling_references {
+        if !self.force {
             return;
         }
 
         let mut seen_dataset_ids = HashSet::new();
 
-        if options.allow_orphan_foreign_downstream {
+        if self.force && self.recursive {
             for (dataset_handle, _) in &planning_result.issues.unauthorized_recursive_handles {
                 if seen_dataset_ids.insert(dataset_handle.id.clone()) {
                     summary.record_ignored();
@@ -187,7 +177,7 @@ impl DeleteDatasetsCommand {
             }
         }
 
-        if options.allow_orphan_dangling_references {
+        if self.force {
             for dangling_reference in &planning_result.issues.dangling_references {
                 for dataset_handle in &dangling_reference.children {
                     if seen_dataset_ids.insert(dataset_handle.id.clone()) {
@@ -203,8 +193,6 @@ impl DeleteDatasetsCommand {
         &self,
         planning_result: &DeleteDatasetPlanningResult,
     ) -> Result<(), CLIError> {
-        let options = self.execution_options();
-
         if !planning_result
             .issues
             .unauthorized_selected_handles
@@ -226,9 +214,7 @@ impl DeleteDatasetsCommand {
             .into());
         }
 
-        if !options.allow_orphan_dangling_references
-            && !planning_result.issues.dangling_references.is_empty()
-        {
+        if !self.force && !planning_result.issues.dangling_references.is_empty() {
             return Err(BatchError::new(
                 "Some dataset(s) cannot be deleted due to dangling references",
                 planning_result
@@ -245,7 +231,7 @@ impl DeleteDatasetsCommand {
             .into());
         }
 
-        if !options.allow_orphan_foreign_downstream
+        if !self.force
             && !planning_result
                 .issues
                 .unauthorized_recursive_handles
@@ -333,7 +319,7 @@ impl Command for DeleteDatasetsCommand {
 
         self.ensure_plan_is_executable(&planning_result)?;
 
-        let plan = planning_result.into_executable_plan(self.execution_options())?;
+        let plan = planning_result.into_executable_plan(self.force)?;
 
         if plan.authorized_targets.is_empty() {
             if summary.total_items == 0 {

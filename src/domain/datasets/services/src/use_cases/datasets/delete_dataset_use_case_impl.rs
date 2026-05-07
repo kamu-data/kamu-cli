@@ -95,11 +95,22 @@ impl DeleteDatasetUseCaseImpl {
             .await
             .int_err()?;
 
-        if let Some((_, error)) = resolution.unresolved_datasets.into_iter().next() {
-            return Err(match error {
-                odf::DatasetRefUnresolvedError::NotFound(e) => e.into(),
-                odf::DatasetRefUnresolvedError::Internal(e) => e.into(),
-            });
+        // Check for internal errors and propagate them
+        let mut unresolved_dataset_ids = Vec::new();
+        for (dataset_id, error) in resolution.unresolved_datasets {
+            if let odf::DatasetRefUnresolvedError::Internal(e) = error {
+                return Err(e.into());
+            }
+            unresolved_dataset_ids.push(dataset_id);
+        }
+
+        // Report warn for not found errors, but continue
+        if !unresolved_dataset_ids.is_empty() {
+            tracing::warn!(
+                ?unresolved_dataset_ids,
+                "Some downstream datasets could not be resolved. This might be due to eventual \
+                 consistency of the dependency graph",
+            );
         }
 
         Ok(resolution.resolved_handles)

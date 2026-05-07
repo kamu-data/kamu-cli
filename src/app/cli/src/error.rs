@@ -214,7 +214,6 @@ impl From<DeleteDatasetError> for CLIError {
 impl From<DeleteDatasetPlanningError> for CLIError {
     fn from(v: DeleteDatasetPlanningError) -> Self {
         match v {
-            e @ DeleteDatasetPlanningError::NotFound(_) => Self::failure(e),
             e @ DeleteDatasetPlanningError::Internal(_) => Self::critical(e),
         }
     }

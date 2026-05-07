@@ -335,12 +335,11 @@ impl DatasetBaseUseCaseHarness {
             .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await
             .unwrap();
-        let options = DeleteDatasetPlanningOptions::default();
         let plan = use_case
             .plan_delete(vec![dataset_handle], false)
             .await
             .unwrap()
-            .into_executable_plan(options)
+            .into_executable_plan(false)
             .unwrap();
 
         use_case.execute_plan(plan).await.unwrap();

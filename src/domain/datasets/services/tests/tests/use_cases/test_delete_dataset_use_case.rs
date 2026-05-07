@@ -20,7 +20,6 @@ use kamu_datasets::{
     DeleteDatasetPlanEvaluationError,
     DeleteDatasetPlanTarget,
     DeleteDatasetPlanningError,
-    DeleteDatasetPlanningOptions,
     DeleteDatasetUseCase,
 };
 use kamu_datasets_services::DeleteDatasetUseCaseImpl;
@@ -53,10 +52,7 @@ async fn test_delete_dataset_success_via_plan() {
     harness.reset_collected_outbox_messages();
 
     harness
-        .execute_plan(
-            vec![foo.dataset_handle],
-            DeleteDatasetPlanningOptions::default(),
-        )
+        .execute_plan(vec![foo.dataset_handle], false)
         .await
         .unwrap();
 
@@ -102,10 +98,7 @@ async fn test_delete_dataset_success_via_resolved_handle_plan() {
     harness.reset_collected_outbox_messages();
 
     harness
-        .execute_plan(
-            vec![foo.dataset_handle.clone()],
-            DeleteDatasetPlanningOptions::default(),
-        )
+        .execute_plan(vec![foo.dataset_handle.clone()], false)
         .await
         .unwrap();
 
@@ -148,7 +141,7 @@ async fn test_execute_plan_is_idempotent_for_stale_plan() {
         .plan_delete(vec![foo.dataset_handle.clone()], false)
         .await
         .unwrap()
-        .into_executable_plan(DeleteDatasetPlanningOptions::default())
+        .into_executable_plan(false)
         .unwrap();
 
     let first_summary = harness.use_case.execute_plan(plan).await.unwrap();
@@ -224,12 +217,7 @@ async fn test_delete_unauthorized() {
     harness.reset_collected_outbox_messages();
 
     assert_matches!(
-        harness
-            .execute_plan(
-                vec![foo.dataset_handle],
-                DeleteDatasetPlanningOptions::default()
-            )
-            .await,
+        harness.execute_plan(vec![foo.dataset_handle], false,).await,
         Err(DeleteDatasetPlanEvaluationError::Access(_))
     );
 
@@ -259,7 +247,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
         harness
             .execute_plan(
                 vec![root.dataset_handle.clone()],
-                DeleteDatasetPlanningOptions::default(),
+                false,
             )
             .await,
         Err(DeleteDatasetPlanEvaluationError::DanglingReference(e)) if e.children == vec![derived.dataset_handle.clone()]
@@ -269,10 +257,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 
     harness
-        .execute_plan(
-            vec![derived.dataset_handle.clone()],
-            DeleteDatasetPlanningOptions::default(),
-        )
+        .execute_plan(vec![derived.dataset_handle.clone()], false)
         .await
         .unwrap();
 
@@ -283,10 +268,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     );
 
     harness
-        .execute_plan(
-            vec![root.dataset_handle.clone()],
-            DeleteDatasetPlanningOptions::default(),
-        )
+        .execute_plan(vec![root.dataset_handle.clone()], false)
         .await
         .unwrap();
 
@@ -350,7 +332,7 @@ async fn test_plan_delete_selected_unauthorized() {
     assert!(plan.issues.dangling_references.is_empty());
 
     assert_matches!(
-        plan.into_executable_plan(DeleteDatasetPlanningOptions::default()),
+        plan.into_executable_plan(false),
         Err(DeleteDatasetPlanEvaluationError::Access(_))
     );
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -429,7 +411,7 @@ async fn test_plan_delete_recursive_foreign_downstream_blocks_without_force() {
     assert!(plan.issues.dangling_references.is_empty());
 
     assert_matches!(
-        plan.into_executable_plan(DeleteDatasetPlanningOptions::default()),
+        plan.into_executable_plan(false),
         Err(DeleteDatasetPlanEvaluationError::Access(_))
     );
 
@@ -469,12 +451,7 @@ async fn test_plan_delete_recursive_force_orphans_foreign_downstream() {
         .await
         .unwrap();
 
-    let plan = plan
-        .into_executable_plan(DeleteDatasetPlanningOptions {
-            allow_orphan_foreign_downstream: true,
-            allow_orphan_dangling_references: false,
-        })
-        .unwrap();
+    let plan = plan.into_executable_plan(true).unwrap();
 
     harness.use_case.execute_plan(plan).await.unwrap();
 
@@ -510,12 +487,7 @@ async fn test_plan_delete_non_recursive_dangling_refs_allowed_with_force() {
     assert_eq!(plan.plan.authorized_targets.len(), 1);
     assert_eq!(plan.issues.dangling_references.len(), 1);
 
-    let plan = plan
-        .into_executable_plan(DeleteDatasetPlanningOptions {
-            allow_orphan_foreign_downstream: true,
-            allow_orphan_dangling_references: true,
-        })
-        .unwrap();
+    let plan = plan.into_executable_plan(true).unwrap();
 
     harness.use_case.execute_plan(plan).await.unwrap();
 
@@ -568,13 +540,18 @@ impl DeleteUseCaseHarness {
     async fn execute_plan(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        options: DeleteDatasetPlanningOptions,
+        allow_orphan: bool,
     ) -> Result<(), DeleteDatasetPlanEvaluationError> {
         let plan = self
             .use_case
             .plan_delete(dataset_handles, false)
-            .await?
-            .into_executable_plan(options)?;
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetPlanningError::Internal(e) => {
+                    DeleteDatasetPlanEvaluationError::Internal(e)
+                }
+            })?
+            .into_executable_plan(allow_orphan)?;
 
         self.use_case
             .execute_plan(plan)

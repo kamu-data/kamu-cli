@@ -30,14 +30,6 @@ pub trait DeleteDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DeleteDatasetPlanningOptions {
-    pub allow_orphan_foreign_downstream: bool,
-    pub allow_orphan_dangling_references: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Default)]
 pub struct DeleteDatasetPlanningResult {
     pub plan: DeleteDatasetPlan,
@@ -45,8 +37,8 @@ pub struct DeleteDatasetPlanningResult {
 }
 
 impl DeleteDatasetPlanningResult {
-    pub fn has_blocking_issues(&self, options: DeleteDatasetPlanningOptions) -> bool {
-        self.issues.has_blockers(options)
+    pub fn has_blocking_issues(&self, allow_orphan: bool) -> bool {
+        self.issues.has_blockers(allow_orphan)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -55,9 +47,9 @@ impl DeleteDatasetPlanningResult {
 
     pub fn into_executable_plan(
         self,
-        options: DeleteDatasetPlanningOptions,
+        allow_orphan: bool,
     ) -> Result<DeleteDatasetPlan, DeleteDatasetPlanEvaluationError> {
-        self.issues.evaluate_blockers(options)?;
+        self.issues.evaluate_blockers(allow_orphan)?;
         Ok(self.plan)
     }
 }
@@ -96,31 +88,28 @@ impl DeleteDatasetPlanIssues {
             && self.dangling_references.is_empty()
     }
 
-    pub fn has_blockers(&self, options: DeleteDatasetPlanningOptions) -> bool {
+    pub fn has_blockers(&self, allow_orphan: bool) -> bool {
         !self.unauthorized_selected_handles.is_empty()
-            || (!options.allow_orphan_dangling_references && !self.dangling_references.is_empty())
-            || (!options.allow_orphan_foreign_downstream
-                && !self.unauthorized_recursive_handles.is_empty())
+            || (!allow_orphan && !self.dangling_references.is_empty())
+            || (!allow_orphan && !self.unauthorized_recursive_handles.is_empty())
     }
 
     pub fn evaluate_blockers(
         mut self,
-        options: DeleteDatasetPlanningOptions,
+        allow_orphan: bool,
     ) -> Result<(), DeleteDatasetPlanEvaluationError> {
         if !self.unauthorized_selected_handles.is_empty() {
             let (_, error) = self.unauthorized_selected_handles.remove(0);
             return Err(classify_error_to_delete_plan_evaluation_error(error));
         }
 
-        if !self.dangling_references.is_empty() && !options.allow_orphan_dangling_references {
+        if !self.dangling_references.is_empty() && !allow_orphan {
             return Err(DeleteDatasetPlanEvaluationError::DanglingReference(
                 self.dangling_references.remove(0),
             ));
         }
 
-        if !options.allow_orphan_foreign_downstream
-            && !self.unauthorized_recursive_handles.is_empty()
-        {
+        if !allow_orphan && !self.unauthorized_recursive_handles.is_empty() {
             let (_, error) = self.unauthorized_recursive_handles.remove(0);
             return Err(classify_error_to_delete_plan_evaluation_error(error));
         }
@@ -140,9 +129,6 @@ pub struct DeleteDatasetExecutionSummary {
 
 #[derive(Error, Debug)]
 pub enum DeleteDatasetPlanningError {
-    #[error(transparent)]
-    NotFound(#[from] odf::DatasetNotFoundError),
-
     #[error(transparent)]
     Internal(
         #[from]
@@ -225,11 +211,4 @@ pub enum DeleteDatasetError {
     ),
 }
 
-impl From<DeleteDatasetPlanningError> for DeleteDatasetPlanEvaluationError {
-    fn from(value: DeleteDatasetPlanningError) -> Self {
-        match value {
-            DeleteDatasetPlanningError::NotFound(e) => Self::NotFound(e),
-            DeleteDatasetPlanningError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

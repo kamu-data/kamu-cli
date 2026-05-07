@@ -13,7 +13,6 @@ use kamu_datasets::{
     DeleteDatasetError,
     DeleteDatasetPlanEvaluationError,
     DeleteDatasetPlanningError,
-    DeleteDatasetPlanningOptions,
     RenameDatasetError,
 };
 
@@ -131,20 +130,16 @@ impl DatasetMut {
 
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let options = DeleteDatasetPlanningOptions::default();
-        let plan = delete_dataset_use_case
+        let planning_result = delete_dataset_use_case
             .plan_delete(vec![dataset_handle.clone()], false)
             .await
             .map_err(|e| -> GqlError {
                 match e {
-                    // "Not found" should not be reachable, since we've just resolved the dataset by
-                    // ID
-                    DeleteDatasetPlanningError::NotFound(e) => e.int_err().into(),
                     DeleteDatasetPlanningError::Internal(e) => e.into(),
                 }
             })?;
 
-        let plan = match plan.into_executable_plan(options) {
+        let plan = match planning_result.into_executable_plan(false) {
             Ok(plan) => plan,
             Err(DeleteDatasetPlanEvaluationError::DanglingReference(e)) => {
                 return Ok(DeleteResult::DanglingReference(
