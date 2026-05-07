@@ -469,38 +469,72 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        {
+        let deletion_result = self
+            .delete_dataset_entries(&[Cow::Borrowed(dataset_id)])
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => DeleteEntryDatasetError::Internal(e),
+            })?;
+
+        if deletion_result.deleted_dataset_ids.is_empty() {
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+        }
+
+        Ok(())
+    }
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError> {
+        if dataset_ids.is_empty() {
+            return Ok(DatasetEntriesDeletionResult::default());
+        }
+
+        let deleted_dataset_ids = {
             let mut tr = self.transaction.lock().await;
 
             let connection_mut = tr.connection_mut().await?;
 
-            let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+            let dataset_ids_search = dataset_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
 
-            let delete_result = sqlx::query!(
+            let deleted_dataset_id_rows = sqlx::query!(
                 r#"
                 DELETE
                 FROM dataset_entries
-                WHERE dataset_id = $1
+                WHERE dataset_id = ANY($1)
+                RETURNING dataset_id
                 "#,
-                stack_dataset_id.as_str(),
+                &dataset_ids_search,
             )
-            .execute(&mut *connection_mut)
+            .fetch_all(&mut *connection_mut)
             .await
             .int_err()?;
 
-            if delete_result.rows_affected() == 0 {
-                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            deleted_dataset_id_rows
+                .into_iter()
+                .map(|row| odf::DatasetID::from_did_str(&row.dataset_id).int_err())
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
+
+        if !deletion_result.deleted_dataset_ids.is_empty() {
+            for listener in &self.removal_listeners {
+                listener
+                    .on_dataset_entries_removed(&deletion_result.deleted_dataset_ids)
+                    .await
+                    .int_err()?;
             }
         }
 
-        for listener in &self.removal_listeners {
-            listener
-                .on_dataset_entry_removed(dataset_id)
-                .await
-                .int_err()?;
-        }
-
-        Ok(())
+        Ok(deletion_result)
     }
 }
 
