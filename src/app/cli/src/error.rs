@@ -206,7 +206,6 @@ impl From<GetAliasesError> for CLIError {
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ DeleteDatasetError::NotFound(_) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }

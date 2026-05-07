@@ -305,10 +305,7 @@ async fn test_service_dataset_deleted() {
         .unwrap()
         .into_executable_plan(delete_options)
         .unwrap();
-    delete_dataset
-        .execute_plan(&delete_plan, false)
-        .await
-        .unwrap();
+    delete_dataset.execute_plan(delete_plan).await.unwrap();
 
     assert_eq!(
         harness.dataset_dependencies_report("foo-bar").await,

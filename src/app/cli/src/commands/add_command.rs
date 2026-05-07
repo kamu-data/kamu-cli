@@ -285,9 +285,7 @@ impl Command for AddCommand {
                     .confirm_delete(&delete_dataset_handles)
                     .await?;
 
-                self.delete_dataset
-                    .execute_plan(&delete_plan, false)
-                    .await?;
+                self.delete_dataset.execute_plan(delete_plan).await?;
             }
         }
 

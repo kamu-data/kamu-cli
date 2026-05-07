@@ -24,8 +24,7 @@ pub trait DeleteDatasetUseCase: Send + Sync {
 
     async fn execute_plan(
         &self,
-        plan: &DeleteDatasetPlan,
-        ignore_not_found: bool,
+        plan: DeleteDatasetPlan,
     ) -> Result<DeleteDatasetExecutionSummary, DeleteDatasetError>;
 }
 
@@ -132,10 +131,9 @@ impl DeleteDatasetPlanIssues {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DeleteDatasetExecutionSummary {
-    pub deleted: usize,
-    pub ignored_not_found: usize,
+    pub deleted_dataset_handles: Vec<odf::DatasetHandle>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,23 +218,11 @@ impl std::fmt::Display for DanglingReferenceError {
 #[derive(Error, Debug)]
 pub enum DeleteDatasetError {
     #[error(transparent)]
-    NotFound(#[from] odf::DatasetNotFoundError),
-
-    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<odf::dataset::DeleteStoredDatasetError> for DeleteDatasetError {
-    fn from(value: odf::dataset::DeleteStoredDatasetError) -> Self {
-        match value {
-            odf::dataset::DeleteStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
-            odf::dataset::DeleteStoredDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 impl From<DeleteDatasetPlanningError> for DeleteDatasetPlanEvaluationError {
@@ -247,14 +233,3 @@ impl From<DeleteDatasetPlanningError> for DeleteDatasetPlanEvaluationError {
         }
     }
 }
-
-impl From<DeleteDatasetError> for DeleteDatasetPlanEvaluationError {
-    fn from(value: DeleteDatasetError) -> Self {
-        match value {
-            DeleteDatasetError::NotFound(e) => Self::NotFound(e),
-            DeleteDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

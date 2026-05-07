@@ -166,12 +166,10 @@ impl DatasetMut {
             Err(DeleteDatasetPlanEvaluationError::Internal(e)) => return Err(e.into()),
         };
 
-        match delete_dataset_use_case.execute_plan(&plan, false).await {
+        match delete_dataset_use_case.execute_plan(plan).await {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
                 deleted_dataset: (&dataset_handle.alias).into(),
             })),
-            // "Not found" should not be reachable, since we've just resolved the dataset by ID
-            Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }

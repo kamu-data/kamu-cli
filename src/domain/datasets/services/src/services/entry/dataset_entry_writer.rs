@@ -31,7 +31,10 @@ pub trait DatasetEntryWriter: Send + Sync {
         new_dataset_name: &odf::DatasetName,
     ) -> Result<(), RenameDatasetEntryError>;
 
-    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError>;
+    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
+        self.remove_entries(std::slice::from_ref(dataset_handle))
+            .await
+    }
 
     async fn remove_entries(
         &self,

@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use futures::TryStreamExt;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountLifecycleMessage,
     AccountLifecycleMessageDeleted,
@@ -63,28 +64,21 @@ impl DatasetAccountLifecycleHandler {
         &self,
         message: &AccountLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
-        let mut owned_dataset_stream = self
+        let owned_dataset_handles = self
             .dataset_registry
-            .all_dataset_handles_by_owner_id(&message.account_id);
+            .all_dataset_handles_by_owner_id(&message.account_id)
+            .try_collect::<Vec<_>>()
+            .await?;
 
-        use tokio_stream::StreamExt;
-
-        // TODO: PERF: Batch/concurrent processing
-        while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
-            match self
-                .delete_dataset_use_case
-                .execute_plan(
-                    &DeleteDatasetPlan {
-                        authorized_targets: vec![DeleteDatasetPlanTarget { dataset_handle }],
-                    },
-                    true, /* idempotent deletion */
-                )
-                .await
-            {
-                Ok(_) | Err(DeleteDatasetError::NotFound(_)) => { /* idempotent deletion */ }
-                Err(e) => return Err(e.int_err()),
-            }
-        }
+        self.delete_dataset_use_case
+            .execute_plan(DeleteDatasetPlan {
+                authorized_targets: owned_dataset_handles
+                    .into_iter()
+                    .map(|dataset_handle| DeleteDatasetPlanTarget { dataset_handle })
+                    .collect(),
+            })
+            .await
+            .int_err()?;
 
         Ok(())
     }

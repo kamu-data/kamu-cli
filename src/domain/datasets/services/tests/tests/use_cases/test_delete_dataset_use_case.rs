@@ -15,7 +15,10 @@ use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{
     DatasetAction,
+    DeleteDatasetError,
+    DeleteDatasetPlan,
     DeleteDatasetPlanEvaluationError,
+    DeleteDatasetPlanTarget,
     DeleteDatasetPlanningError,
     DeleteDatasetPlanningOptions,
     DeleteDatasetUseCase,
@@ -124,6 +127,52 @@ async fn test_delete_dataset_success_via_resolved_handle_plan() {
         )
         .replace("{foo_id}", foo_id.to_string().as_str()),
         harness.collected_outbox_messages()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_execute_plan_is_idempotent_for_stale_plan() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
+
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+    harness.reset_collected_outbox_messages();
+
+    let plan = harness
+        .use_case
+        .plan_delete(vec![foo.dataset_handle.clone()], false)
+        .await
+        .unwrap()
+        .into_executable_plan(DeleteDatasetPlanningOptions::default())
+        .unwrap();
+
+    let first_summary = harness.use_case.execute_plan(plan).await.unwrap();
+    let second_plan = DeleteDatasetPlan {
+        authorized_targets: first_summary
+            .deleted_dataset_handles
+            .iter()
+            .cloned()
+            .map(|dataset_handle| DeleteDatasetPlanTarget { dataset_handle })
+            .collect(),
+    };
+    let second_summary = harness.use_case.execute_plan(second_plan).await.unwrap();
+
+    assert_eq!(
+        vec![foo.dataset_handle.clone()],
+        first_summary.deleted_dataset_handles
+    );
+    assert_eq!(
+        vec![foo.dataset_handle],
+        second_summary.deleted_dataset_handles
+    );
+    assert_matches!(
+        harness.check_dataset_exists(&alias_foo).await,
+        Err(odf::DatasetRefUnresolvedError::NotFound(_))
     );
 }
 
@@ -427,7 +476,7 @@ async fn test_plan_delete_recursive_force_orphans_foreign_downstream() {
         })
         .unwrap();
 
-    harness.use_case.execute_plan(&plan, false).await.unwrap();
+    harness.use_case.execute_plan(plan).await.unwrap();
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
@@ -468,7 +517,7 @@ async fn test_plan_delete_non_recursive_dangling_refs_allowed_with_force() {
         })
         .unwrap();
 
-    harness.use_case.execute_plan(&plan, false).await.unwrap();
+    harness.use_case.execute_plan(plan).await.unwrap();
 
     assert_matches!(
         harness.check_dataset_exists(&alias_foo).await,
@@ -527,7 +576,12 @@ impl DeleteUseCaseHarness {
             .await?
             .into_executable_plan(options)?;
 
-        self.use_case.execute_plan(&plan, false).await?;
+        self.use_case
+            .execute_plan(plan)
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetError::Internal(e) => DeleteDatasetPlanEvaluationError::Internal(e),
+            })?;
 
         Ok(())
     }

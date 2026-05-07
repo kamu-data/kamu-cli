@@ -19,7 +19,6 @@ use kamu_datasets::{
     DatasetRegistry,
     DeleteDatasetError,
     DeleteDatasetPlan,
-    DeleteDatasetPlanTarget,
     DeleteDatasetPlanningOptions,
     DeleteDatasetPlanningResult,
     DeleteDatasetUseCase,
@@ -280,22 +279,22 @@ impl DeleteDatasetsCommand {
         if self.dry_run {
             for target in &plan.authorized_targets {
                 summary.record_deleted();
-                DeleteDatasetsPrinter::print_success(target, true);
+                DeleteDatasetsPrinter::print_success(&target.dataset_handle, true);
             }
             return Ok(());
         }
 
-        self.delete_dataset
-            .execute_plan(&plan, false)
-            .await
-            .map_err(|e| match e {
-                DeleteDatasetError::NotFound(e) => CLIError::failure(e),
-                DeleteDatasetError::Internal(e) => CLIError::critical(e),
-            })?;
+        let execution_summary =
+            self.delete_dataset
+                .execute_plan(plan)
+                .await
+                .map_err(|e| match e {
+                    DeleteDatasetError::Internal(e) => CLIError::critical(e),
+                })?;
 
-        for target in &plan.authorized_targets {
+        for dataset_handle in &execution_summary.deleted_dataset_handles {
             summary.record_deleted();
-            DeleteDatasetsPrinter::print_success(target, false);
+            DeleteDatasetsPrinter::print_success(dataset_handle, false);
         }
 
         Ok(())
@@ -410,14 +409,14 @@ impl DeleteDatasetsSummary {
 struct DeleteDatasetsPrinter;
 
 impl DeleteDatasetsPrinter {
-    fn print_success(target: &DeleteDatasetPlanTarget, dry_run: bool) {
+    fn print_success(dataset_handle: &odf::DatasetHandle, dry_run: bool) {
         let label = if dry_run {
             console::style("Would delete").cyan().bold()
         } else {
             console::style("Deleted").green().bold()
         };
 
-        eprintln!("{label}: {}", target.dataset_handle.alias);
+        eprintln!("{label}: {}", dataset_handle.alias);
     }
 
     fn print_left_behind(dataset_handle: &odf::DatasetHandle, dry_run: bool) {

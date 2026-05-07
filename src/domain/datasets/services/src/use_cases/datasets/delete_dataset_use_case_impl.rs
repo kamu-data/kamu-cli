@@ -34,19 +34,24 @@ pub struct DeleteDatasetUseCaseImpl {
 }
 
 impl DeleteDatasetUseCaseImpl {
-    async fn do_delete(
+    async fn delete_storage_unit_and_notify(
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), DeleteDatasetError> {
-        // Remove entry
-        self.dataset_entry_writer
-            .remove_entry(dataset_handle)
-            .await?;
-
-        // Do actual delete
-        self.dataset_storage_unit_writer
+        match self
+            .dataset_storage_unit_writer
             .delete_dataset(&dataset_handle.id)
-            .await?;
+            .await
+        {
+            Ok(()) => {}
+            Err(odf::dataset::DeleteStoredDatasetError::UnresolvedId(_)) => {
+                tracing::warn!(
+                    dataset_id = %dataset_handle.id,
+                    "Dataset storage unit is already absent. Continuing idempotent deletion"
+                );
+            }
+            Err(odf::dataset::DeleteStoredDatasetError::Internal(e)) => return Err(e.into()),
+        }
 
         // Notify interested parties
         self.outbox
@@ -272,19 +277,22 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     )]
     async fn execute_plan(
         &self,
-        plan: &DeleteDatasetPlan,
-        ignore_not_found: bool,
+        plan: DeleteDatasetPlan,
     ) -> Result<DeleteDatasetExecutionSummary, DeleteDatasetError> {
-        let mut summary = DeleteDatasetExecutionSummary::default();
+        let summary = DeleteDatasetExecutionSummary {
+            deleted_dataset_handles: plan
+                .authorized_targets
+                .into_iter()
+                .map(|target| target.dataset_handle)
+                .collect(),
+        };
 
-        for target in &plan.authorized_targets {
-            match Self::do_delete(&self, &target.dataset_handle).await {
-                Ok(_) => summary.deleted += 1,
-                Err(DeleteDatasetError::NotFound(_)) if ignore_not_found => {
-                    summary.ignored_not_found += 1;
-                }
-                Err(e) => return Err(e),
-            }
+        self.dataset_entry_writer
+            .remove_entries(&summary.deleted_dataset_handles)
+            .await?;
+
+        for dataset_handle in &summary.deleted_dataset_handles {
+            self.delete_storage_unit_and_notify(dataset_handle).await?;
         }
 
         Ok(summary)

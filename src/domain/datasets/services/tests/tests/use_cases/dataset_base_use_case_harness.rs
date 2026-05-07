@@ -343,7 +343,7 @@ impl DatasetBaseUseCaseHarness {
             .into_executable_plan(options)
             .unwrap();
 
-        use_case.execute_plan(&plan, false).await.unwrap();
+        use_case.execute_plan(plan).await.unwrap();
     }
 
     pub fn collected_outbox_messages(&self) -> String {
