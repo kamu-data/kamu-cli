@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase, DependencyGraphService};
+use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase};
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
 use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
@@ -37,13 +37,11 @@ const ALL_TARGET: &str = "all";
 #[dill::interface(dyn Command)]
 pub struct DeleteCommand {
     tenancy_config: TenancyConfig,
+    current_account_subject: Arc<CurrentAccountSubject>,
     workspace_service: Arc<WorkspaceService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
-    current_account_subject: Arc<CurrentAccountSubject>,
-    rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
     resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
@@ -121,10 +119,8 @@ impl DeleteCommand {
             self.tenancy_config,
             self.dataset_registry.clone(),
             self.delete_dataset.clone(),
-            self.dependency_graph_service.clone(),
             self.confirm_delete_service.clone(),
             self.current_account_subject.clone(),
-            self.rebac_service.clone(),
             dataset_ref_patterns,
             self.all,
             self.recursive,

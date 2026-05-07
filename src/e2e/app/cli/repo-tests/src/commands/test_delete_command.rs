@@ -9,7 +9,8 @@
 
 use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
+use odf::metadata::testing::MetadataFactory;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,21 +287,12 @@ pub async fn test_delete_dataset_all_respects_current_account(mut kamu: KamuCliP
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_dataset_all_allows_admin_to_delete_everything(mut kamu: KamuCliPuppet) {
+pub async fn test_delete_dataset_rejects_other_users_dataset(mut kamu: KamuCliPuppet) {
     let alice = odf::AccountName::new_unchecked("alice");
     let bob = odf::AccountName::new_unchecked("bob");
-    let admin = odf::AccountName::new_unchecked("kamu");
 
     kamu.create_account(&alice).await;
     kamu.create_account(&bob).await;
-
-    kamu.set_account(Some(alice.clone()));
-    kamu.execute_with_input(
-        ["add", "--stdin", "--name", "alice-root"],
-        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    )
-    .await
-    .success();
 
     kamu.set_account(Some(bob.clone()));
     kamu.execute_with_input(
@@ -310,15 +302,155 @@ pub async fn test_delete_dataset_all_allows_admin_to_delete_everything(mut kamu:
     .await
     .success();
 
-    kamu.set_account(Some(admin));
-    kamu.assert_success_command_execution(
-        ["--yes", "delete", "--all"],
+    kamu.set_account(Some(alice));
+    kamu.assert_failure_command_execution(
+        ["delete", "bob/bob-root"],
         None,
-        Some([r#"Summary 2 item\(s\): 2 deleted, 0 ignored, 0 failed"#]),
+        Some([
+            r#"Some selected dataset\(s\) cannot be deleted"#,
+            r#"User has no 'own' permission in dataset 'bob/bob-root'"#,
+        ]),
+    )
+    .await;
+
+    kamu.set_account(Some(bob));
+    let bob_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(vec!["bob-root"], bob_datasets);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_recursive_rejects_foreign_downstream(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    use odf::metadata::testing::alias;
+
+    let alice_root_alias = alias(&alice, &"alice-root");
+    let bob_derivative_alias = alias(&bob, &"bob-derivative");
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_root_alias.dataset_name.as_str())
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(bob_derivative_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![alice_root_alias.clone()])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
     )
     .await;
 
     kamu.set_account(Some(alice));
+    kamu.assert_failure_command_execution(
+        ["delete", "alice-root", "--recursive"],
+        None,
+        Some([
+            r#"Recursive delete would include downstream dataset\(s\) you are not allowed to delete"#,
+            r#"User has no 'own' permission in dataset 'bob/bob-derivative'"#,
+        ]),
+    )
+    .await;
+
+    let alice_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(vec!["alice-root"], alice_datasets);
+
+    kamu.set_account(Some(bob));
+    let bob_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(vec!["bob-derivative"], bob_datasets);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_recursive_force_orphans_foreign_downstream(
+    mut kamu: KamuCliPuppet,
+) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    use odf::metadata::testing::alias;
+
+    let alice_root_alias = alias(&alice, &"alice-root");
+    let bob_derivative_alias = alias(&bob, &"bob-derivative");
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_root_alias.dataset_name.as_str())
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(bob_derivative_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![alice_root_alias.clone()])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.set_account(Some(alice));
+    kamu.assert_success_command_execution(
+        ["delete", "alice-root", "--recursive", "--force"],
+        None,
+        Some([
+            r#"Left behind: bob/bob-derivative"#,
+            r#"Deleted: alice/alice-root"#,
+            r#"Summary 2 item\(s\): 1 deleted, 1 ignored, 0 failed"#,
+        ]),
+    )
+    .await;
+
     let alice_datasets = kamu
         .list_datasets()
         .await
@@ -334,7 +466,87 @@ pub async fn test_delete_dataset_all_allows_admin_to_delete_everything(mut kamu:
         .into_iter()
         .map(|dataset| dataset.name.to_string())
         .collect::<Vec<_>>();
-    pretty_assertions::assert_eq!(Vec::<String>::new(), bob_datasets);
+    pretty_assertions::assert_eq!(vec!["bob-derivative"], bob_datasets);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_recursive_force_dry_run_previews_foreign_downstream_orphan(
+    mut kamu: KamuCliPuppet,
+) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    use odf::metadata::testing::alias;
+
+    let alice_root_alias = alias(&alice, &"alice-root");
+    let bob_derivative_alias = alias(&bob, &"bob-derivative");
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(alice_root_alias.dataset_name.as_str())
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.add_dataset(
+        MetadataFactory::dataset_snapshot()
+            .name(bob_derivative_alias.dataset_name.as_str())
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs(vec![alice_root_alias.clone()])
+                    .build(),
+            )
+            .build(),
+        AddDatasetOptions::builder()
+            .visibility(odf::DatasetVisibility::Public)
+            .build(),
+    )
+    .await;
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.assert_success_command_execution(
+        [
+            "delete",
+            "alice-root",
+            "--recursive",
+            "--force",
+            "--dry-run",
+        ],
+        None,
+        Some([
+            r#"Would leave behind: bob/bob-derivative"#,
+            r#"Would delete: alice/alice-root"#,
+            r#"Summary 2 item\(s\): 1 would delete, 1 ignored, 0 failed"#,
+        ]),
+    )
+    .await;
+
+    let alice_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(vec!["alice-root"], alice_datasets);
+
+    kamu.set_account(Some(bob));
+    let bob_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(vec!["bob-derivative"], bob_datasets);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,11 @@ use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
-use kamu_datasets::DeleteDatasetError;
+use kamu_datasets::{
+    DeleteDatasetError,
+    DeleteDatasetPlanEvaluationError,
+    DeleteDatasetPlanningError,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     BatchResourceError,
@@ -202,10 +206,28 @@ impl From<GetAliasesError> for CLIError {
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ (DeleteDatasetError::NotFound(_)
-            | DeleteDatasetError::DanglingReference(_)
-            | DeleteDatasetError::Access(_)) => Self::failure(e),
+            e @ DeleteDatasetError::NotFound(_) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<DeleteDatasetPlanningError> for CLIError {
+    fn from(v: DeleteDatasetPlanningError) -> Self {
+        match v {
+            e @ DeleteDatasetPlanningError::NotFound(_) => Self::failure(e),
+            e @ DeleteDatasetPlanningError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<DeleteDatasetPlanEvaluationError> for CLIError {
+    fn from(v: DeleteDatasetPlanEvaluationError) -> Self {
+        match v {
+            e @ (DeleteDatasetPlanEvaluationError::NotFound(_)
+            | DeleteDatasetPlanEvaluationError::DanglingReference(_)
+            | DeleteDatasetPlanEvaluationError::Access(_)) => Self::failure(e),
+            e @ DeleteDatasetPlanEvaluationError::Internal(_) => Self::critical(e),
         }
     }
 }

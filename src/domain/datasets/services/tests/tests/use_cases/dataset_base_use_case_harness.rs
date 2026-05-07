@@ -330,10 +330,20 @@ impl DatasetBaseUseCaseHarness {
             Err(e) => panic!("Failed to get DeleteDatasetUseCase: {e}"),
         };
 
-        use_case
-            .execute_via_ref(&dataset_id.as_local_ref())
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        let dataset_handle = dataset_registry
+            .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await
             .unwrap();
+        let options = DeleteDatasetPlanningOptions::default();
+        let plan = use_case
+            .plan_delete(vec![dataset_handle], false)
+            .await
+            .unwrap()
+            .into_executable_plan(options)
+            .unwrap();
+
+        use_case.execute_plan(&plan, false).await.unwrap();
     }
 
     pub fn collected_outbox_messages(&self) -> String {

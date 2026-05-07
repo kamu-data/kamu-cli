@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountLifecycleMessage,
     AccountLifecycleMessageDeleted,
@@ -73,11 +73,16 @@ impl DatasetAccountLifecycleHandler {
         while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
             match self
                 .delete_dataset_use_case
-                .execute_via_handle_preauthorized(&dataset_handle)
+                .execute_plan(
+                    &DeleteDatasetPlan {
+                        authorized_targets: vec![DeleteDatasetPlanTarget { dataset_handle }],
+                    },
+                    true, /* idempotent deletion */
+                )
                 .await
             {
                 Ok(_) | Err(DeleteDatasetError::NotFound(_)) => { /* idempotent deletion */ }
-                e @ Err(_) => e.int_err()?,
+                Err(e) => return Err(e.int_err()),
             }
         }
 

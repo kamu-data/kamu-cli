@@ -100,7 +100,10 @@ pub async fn test_reset_with_change_of_dependencies(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["--yes", "delete", &DATASET_ROOT_PLAYER_NAME],
         None,
-        Some(["Error: Dataset player-scores is referenced by: leaderboard"]),
+        Some([
+            r#"Some dataset\(s\) cannot be deleted due to dangling references"#,
+            r#"Dataset player-scores is referenced by: leaderboard"#,
+        ]),
     )
     .await;
 

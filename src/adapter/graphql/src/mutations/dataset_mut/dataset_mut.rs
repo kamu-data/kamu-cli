@@ -9,7 +9,13 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
-use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
+use kamu_datasets::{
+    DeleteDatasetError,
+    DeleteDatasetPlanEvaluationError,
+    DeleteDatasetPlanningError,
+    DeleteDatasetPlanningOptions,
+    RenameDatasetError,
+};
 
 use crate::LoggedInGuard;
 use crate::mutations::*;
@@ -125,26 +131,45 @@ impl DatasetMut {
 
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        match delete_dataset_use_case
-            .execute_via_handle(dataset_handle)
+        let options = DeleteDatasetPlanningOptions::default();
+        let plan = delete_dataset_use_case
+            .plan_delete(vec![dataset_handle.clone()], false)
             .await
-        {
+            .map_err(|e| -> GqlError {
+                match e {
+                    // "Not found" should not be reachable, since we've just resolved the dataset by
+                    // ID
+                    DeleteDatasetPlanningError::NotFound(e) => e.int_err().into(),
+                    DeleteDatasetPlanningError::Internal(e) => e.into(),
+                }
+            })?;
+
+        let plan = match plan.into_executable_plan(options) {
+            Ok(plan) => plan,
+            Err(DeleteDatasetPlanEvaluationError::DanglingReference(e)) => {
+                return Ok(DeleteResult::DanglingReference(
+                    DeleteResultDanglingReference {
+                        not_deleted_dataset: (&dataset_handle.alias).into(),
+                        dangling_child_refs: e
+                            .children
+                            .iter()
+                            .map(|child_dataset| child_dataset.as_local_ref().into())
+                            .collect(),
+                    },
+                ));
+            }
+            Err(DeleteDatasetPlanEvaluationError::Access(_)) => {
+                return Err(utils::make_dataset_access_error(dataset_handle));
+            }
+            // "Not found" should not be reachable, since we've just resolved the dataset by ID
+            Err(DeleteDatasetPlanEvaluationError::NotFound(e)) => return Err(e.int_err().into()),
+            Err(DeleteDatasetPlanEvaluationError::Internal(e)) => return Err(e.into()),
+        };
+
+        match delete_dataset_use_case.execute_plan(&plan, false).await {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
                 deleted_dataset: (&dataset_handle.alias).into(),
             })),
-            Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
-                DeleteResultDanglingReference {
-                    not_deleted_dataset: (&dataset_handle.alias).into(),
-                    dangling_child_refs: e
-                        .children
-                        .iter()
-                        .map(|child_dataset| child_dataset.as_local_ref().into())
-                        .collect(),
-                },
-            )),
-            Err(DeleteDatasetError::Access(_)) => {
-                Err(utils::make_dataset_access_error(dataset_handle))
-            }
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),

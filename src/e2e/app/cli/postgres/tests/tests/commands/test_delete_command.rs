@@ -59,7 +59,43 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_all_allows_admin_to_delete_everything,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_dataset_rejects_other_users_dataset,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive_rejects_foreign_downstream,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive_force_orphans_foreign_downstream,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_delete_dataset_recursive_force_dry_run_previews_foreign_downstream_orphan,
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),

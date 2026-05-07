@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use internal_error::ResultIntoInternal;
 use kamu_datasets::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -24,9 +25,9 @@ use crate::DatasetEntryWriter;
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
@@ -58,54 +59,152 @@ impl DeleteDatasetUseCaseImpl {
         Ok(())
     }
 
-    async fn ensure_no_dangling_references(
+    async fn resolve_delete_candidate_handles(
+        &self,
+        seed_dataset_handles: Vec<odf::DatasetHandle>,
+        recursive: bool,
+    ) -> Result<Vec<odf::DatasetHandle>, DeleteDatasetPlanningError> {
+        if !recursive {
+            return Ok(seed_dataset_handles);
+        }
+
+        use tokio_stream::StreamExt;
+
+        let dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_recursive_downstream_dependencies(
+                seed_dataset_handles
+                    .into_iter()
+                    .map(|dataset_handle| dataset_handle.id)
+                    .collect(),
+            )
+            .await
+            .int_err()?
+            .map(Cow::Owned)
+            .collect::<Vec<_>>()
+            .await;
+
+        let resolution = self
+            .dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
+            .await
+            .int_err()?;
+
+        if let Some((_, error)) = resolution.unresolved_datasets.into_iter().next() {
+            return Err(match error {
+                odf::DatasetRefUnresolvedError::NotFound(e) => e.into(),
+                odf::DatasetRefUnresolvedError::Internal(e) => e.into(),
+            });
+        }
+
+        Ok(resolution.resolved_handles)
+    }
+
+    async fn resolve_direct_downstream_handles(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError> {
+    ) -> Result<Vec<odf::DatasetHandle>, DeleteDatasetPlanningError> {
         use tokio_stream::StreamExt;
+
         let downstream_dataset_ids: Vec<_> = self
             .dependency_graph_service
             .get_downstream_dependencies(&dataset_handle.id)
             .await
-            .collect()
+            .collect::<Vec<_>>()
             .await;
 
-        if !downstream_dataset_ids.is_empty() {
-            let mut dangling_children = Vec::with_capacity(downstream_dataset_ids.len());
-            for downstream_dataset_id in downstream_dataset_ids {
-                // Intentionally checking downstream datasets without considering dataset
-                // visibility
-                match self
-                    .dataset_registry
-                    .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
-                    .await
-                {
-                    Ok(hdl) => dangling_children.push(hdl),
-                    Err(odf::dataset::DatasetRefUnresolvedError::NotFound(_)) => {
-                        tracing::warn!(
-                            "Skipped unresolved downstream reference: {downstream_dataset_id}"
-                        );
-                        // Skip this not found error, as the dependency graph
-                        // in-memory is only updated at the end of the current
-                        // transaction, and in case of recursive or all delete
-                        // modes, we might have already deleted this dataset
-                    }
-                    Err(odf::dataset::DatasetRefUnresolvedError::Internal(e)) => {
-                        return Err(e.into());
-                    }
-                }
-            }
+        let mut downstream_handles = Vec::with_capacity(downstream_dataset_ids.len());
 
-            if !dangling_children.is_empty() {
-                return Err(DanglingReferenceError {
-                    dataset_handle: dataset_handle.clone(),
-                    children: dangling_children,
+        for downstream_dataset_id in downstream_dataset_ids {
+            // Intentionally checking downstream datasets without considering dataset
+            // visibility.
+            match self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
+                .await
+            {
+                Ok(hdl) => downstream_handles.push(hdl),
+                Err(odf::dataset::DatasetRefUnresolvedError::NotFound(_)) => {
+                    tracing::warn!(
+                        "Skipped unresolved downstream reference: {downstream_dataset_id}"
+                    );
+                    // Skip this not found error, as the dependency graph
+                    // in-memory is only updated at the end
+                    // of the current transaction, and in case
+                    // of recursive or all delete modes, we might have already
+                    // deleted this dataset.
                 }
-                .into());
+                Err(odf::dataset::DatasetRefUnresolvedError::Internal(e)) => {
+                    return Err(e.into());
+                }
             }
         }
 
-        Ok(())
+        Ok(downstream_handles)
+    }
+
+    async fn collect_dangling_references(
+        &self,
+        delete_targets: &[DeleteDatasetPlanTarget],
+        unauthorized_recursive_dataset_ids: &HashSet<odf::DatasetID>,
+    ) -> Result<Vec<DanglingReferenceError>, DeleteDatasetPlanningError> {
+        let target_dataset_ids: HashSet<_> = delete_targets
+            .iter()
+            .map(|target| target.dataset_handle.id.clone())
+            .collect();
+        let mut dangling_references = Vec::new();
+
+        for target in delete_targets {
+            let dangling_children = self
+                .resolve_direct_downstream_handles(&target.dataset_handle)
+                .await?
+                .into_iter()
+                .filter(|downstream_handle| !target_dataset_ids.contains(&downstream_handle.id))
+                .filter(|downstream_handle| {
+                    !unauthorized_recursive_dataset_ids.contains(&downstream_handle.id)
+                })
+                .collect::<Vec<_>>();
+
+            if !dangling_children.is_empty() {
+                dangling_references.push(DanglingReferenceError {
+                    dataset_handle: target.dataset_handle.clone(),
+                    children: dangling_children,
+                });
+            }
+        }
+
+        Ok(dangling_references)
+    }
+
+    async fn order_authorized_delete_targets(
+        &self,
+        authorized_handles: Vec<odf::DatasetHandle>,
+    ) -> Result<Vec<DeleteDatasetPlanTarget>, DeleteDatasetPlanningError> {
+        let dataset_ids = self
+            .dependency_graph_service
+            .in_dependency_order(
+                authorized_handles
+                    .iter()
+                    .map(|dataset_handle| dataset_handle.id.clone())
+                    .collect(),
+                DependencyOrder::DepthFirst,
+            )
+            .await
+            .int_err()?;
+
+        let mut handles_by_id: HashMap<_, _> = authorized_handles
+            .into_iter()
+            .map(|dataset_handle| (dataset_handle.id.clone(), dataset_handle))
+            .collect();
+
+        Ok(dataset_ids
+            .into_iter()
+            .map(|dataset_id| DeleteDatasetPlanTarget {
+                dataset_handle: handles_by_id
+                    .remove(&dataset_id)
+                    .expect("Dependency ordering must return only authorized dataset IDs"),
+            })
+            .collect())
     }
 }
 
@@ -114,63 +213,81 @@ impl DeleteDatasetUseCaseImpl {
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = DeleteDatasetUseCaseImpl_execute_via_ref,
+        name = DeleteDatasetUseCaseImpl_plan_delete,
         skip_all,
-        fields(dataset_ref)
+        fields(recursive)
     )]
-    async fn execute_via_ref(
+    async fn plan_delete(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<(), DeleteDatasetError> {
-        // Resolve handle
-        let dataset_handle = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, DatasetAction::Own)
-            .await
-            .map_err(|e| {
-                use RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::NotFound(e) => DeleteDatasetError::NotFound(e),
-                    E::Access(e) => DeleteDatasetError::Access(e),
-                    e @ E::Internal(_) => DeleteDatasetError::Internal(e.int_err()),
+        seed_dataset_handles: Vec<odf::DatasetHandle>,
+        recursive: bool,
+    ) -> Result<DeleteDatasetPlanningResult, DeleteDatasetPlanningError> {
+        let selected_dataset_ids: HashSet<_> = seed_dataset_handles
+            .iter()
+            .map(|dataset_handle| dataset_handle.id.clone())
+            .collect();
+
+        let candidate_handles = self
+            .resolve_delete_candidate_handles(seed_dataset_handles, recursive)
+            .await?;
+
+        let classification = self
+            .dataset_action_authorizer
+            .classify_dataset_handles_by_allowance(candidate_handles, DatasetAction::Own)
+            .await?;
+
+        let (unauthorized_selected_handles, unauthorized_recursive_handles): (Vec<_>, Vec<_>) =
+            classification
+                .unauthorized_handles_with_errors
+                .into_iter()
+                .partition(|(dataset_handle, _)| selected_dataset_ids.contains(&dataset_handle.id));
+
+        let authorized_targets = self
+            .order_authorized_delete_targets(classification.authorized_handles)
+            .await?;
+
+        let unauthorized_recursive_dataset_ids = unauthorized_recursive_handles
+            .iter()
+            .map(|(dataset_handle, _)| dataset_handle.id.clone())
+            .collect();
+
+        let dangling_references = self
+            .collect_dangling_references(&authorized_targets, &unauthorized_recursive_dataset_ids)
+            .await?;
+
+        Ok(DeleteDatasetPlanningResult {
+            plan: DeleteDatasetPlan { authorized_targets },
+            issues: DeleteDatasetPlanIssues {
+                unauthorized_selected_handles,
+                unauthorized_recursive_handles,
+                dangling_references,
+            },
+        })
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = DeleteDatasetUseCaseImpl_execute_plan,
+        skip_all
+    )]
+    async fn execute_plan(
+        &self,
+        plan: &DeleteDatasetPlan,
+        ignore_not_found: bool,
+    ) -> Result<DeleteDatasetExecutionSummary, DeleteDatasetError> {
+        let mut summary = DeleteDatasetExecutionSummary::default();
+
+        for target in &plan.authorized_targets {
+            match Self::do_delete(&self, &target.dataset_handle).await {
+                Ok(_) => summary.deleted += 1,
+                Err(DeleteDatasetError::NotFound(_)) if ignore_not_found => {
+                    summary.ignored_not_found += 1;
                 }
-            })?;
+                Err(e) => return Err(e),
+            }
+        }
 
-        // Validate against dangling ref
-        self.ensure_no_dangling_references(&dataset_handle).await?;
-
-        // Perform actual delete
-        Self::do_delete(&self, &dataset_handle).await?;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(
-        level = "info",
-        name = DeleteDatasetUseCaseImpl_execute_via_handle,
-        skip_all,
-        fields(dataset_handle)
-    )]
-    async fn execute_via_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError> {
-        // To enforce access control / dangling refs, resolve via ref
-        self.execute_via_ref(&dataset_handle.as_local_ref()).await
-    }
-
-    #[tracing::instrument(
-        level = "info",
-        name = DeleteDatasetUseCaseImpl_execute_via_handle_preauthorized,
-        skip_all,
-        fields(dataset_handle)
-    )]
-    async fn execute_via_handle_preauthorized(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError> {
-        // Directly delete without access control / dangling refs check
-        Self::do_delete(&self, dataset_handle).await
+        Ok(summary)
     }
 }
 
