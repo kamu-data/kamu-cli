@@ -70,28 +70,38 @@ pub struct DeleteDatasetPlanTarget {
 
 #[derive(Debug, Default)]
 pub struct DeleteDatasetPlanIssues {
+    /// Directly specified targets that we cannot delete (access denied or not
+    /// found), which are hard errors we can't proceed with even with --force.
     pub unauthorized_selected_handles: Vec<(
         odf::DatasetHandle,
         ClassifyByAllowanceDatasetActionUnauthorizedError,
     )>,
-    pub unauthorized_recursive_handles: Vec<(
+
+    /// Downstream datasets pulled in by recursive expansion that we cannot
+    /// delete (access denied). These will be left behind as orphans when
+    /// `--force` is used.
+    pub inaccessible_downstream_handles: Vec<(
         odf::DatasetHandle,
         ClassifyByAllowanceDatasetActionUnauthorizedError,
     )>,
-    pub dangling_references: Vec<DanglingReferenceError>,
+
+    /// Authorized targets whose direct downstream datasets will not be deleted
+    /// (and are not in `inaccessible_downstream_handles`), leaving them with a
+    /// broken upstream reference.
+    pub directly_dangling_references: Vec<DanglingReferenceError>,
 }
 
 impl DeleteDatasetPlanIssues {
     pub fn is_empty(&self) -> bool {
         self.unauthorized_selected_handles.is_empty()
-            && self.unauthorized_recursive_handles.is_empty()
-            && self.dangling_references.is_empty()
+            && self.inaccessible_downstream_handles.is_empty()
+            && self.directly_dangling_references.is_empty()
     }
 
     pub fn has_blockers(&self, allow_orphan: bool) -> bool {
         !self.unauthorized_selected_handles.is_empty()
-            || (!allow_orphan && !self.dangling_references.is_empty())
-            || (!allow_orphan && !self.unauthorized_recursive_handles.is_empty())
+            || (!allow_orphan && !self.directly_dangling_references.is_empty())
+            || (!allow_orphan && !self.inaccessible_downstream_handles.is_empty())
     }
 
     pub fn evaluate_blockers(
@@ -103,14 +113,14 @@ impl DeleteDatasetPlanIssues {
             return Err(classify_error_to_delete_plan_evaluation_error(error));
         }
 
-        if !self.dangling_references.is_empty() && !allow_orphan {
+        if !self.directly_dangling_references.is_empty() && !allow_orphan {
             return Err(DeleteDatasetPlanEvaluationError::DanglingReference(
-                self.dangling_references.remove(0),
+                self.directly_dangling_references.remove(0),
             ));
         }
 
-        if !allow_orphan && !self.unauthorized_recursive_handles.is_empty() {
-            let (_, error) = self.unauthorized_recursive_handles.remove(0);
+        if !allow_orphan && !self.inaccessible_downstream_handles.is_empty() {
+            let (_, error) = self.inaccessible_downstream_handles.remove(0);
             return Err(classify_error_to_delete_plan_evaluation_error(error));
         }
 

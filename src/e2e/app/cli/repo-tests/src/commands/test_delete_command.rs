@@ -370,10 +370,7 @@ pub async fn test_delete_dataset_recursive_rejects_foreign_downstream(mut kamu: 
     kamu.assert_failure_command_execution(
         ["delete", "alice-root", "--recursive"],
         None,
-        Some([
-            r#"Recursive delete would include downstream dataset\(s\) you are not allowed to delete"#,
-            r#"User has no 'own' permission in dataset 'bob/bob-derivative'"#,
-        ]),
+        Some([r#"Recursive delete would affect 1 downstream dataset\(s\) you cannot delete"#]),
     )
     .await;
 
@@ -444,7 +441,7 @@ pub async fn test_delete_dataset_recursive_force_orphans_foreign_downstream(
         ["delete", "alice-root", "--recursive", "--force"],
         None,
         Some([
-            r#"Left behind: bob/bob-derivative"#,
+            r#"Left behind: 1 inaccessible downstream dataset\(s\)"#,
             r#"Deleted: alice/alice-root"#,
             r#"Summary 2 item\(s\): 1 deleted, 1 ignored, 0 failed"#,
         ]),
@@ -524,7 +521,7 @@ pub async fn test_delete_dataset_recursive_force_dry_run_previews_foreign_downst
         ],
         None,
         Some([
-            r#"Would leave behind: bob/bob-derivative"#,
+            r#"Would leave behind: 1 inaccessible downstream dataset\(s\)"#,
             r#"Would delete: alice/alice-root"#,
             r#"Summary 2 item\(s\): 1 would delete, 1 ignored, 0 failed"#,
         ]),

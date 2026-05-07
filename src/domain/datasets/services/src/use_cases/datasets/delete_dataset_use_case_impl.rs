@@ -159,16 +159,16 @@ impl DeleteDatasetUseCaseImpl {
         Ok(downstream_handles)
     }
 
-    async fn collect_dangling_references(
+    async fn collect_directly_dangling_downstream_references(
         &self,
         delete_targets: &[DeleteDatasetPlanTarget],
-        unauthorized_recursive_dataset_ids: &HashSet<odf::DatasetID>,
+        inaccessible_downstream_ids: &HashSet<odf::DatasetID>,
     ) -> Result<Vec<DanglingReferenceError>, DeleteDatasetPlanningError> {
         let target_dataset_ids: HashSet<_> = delete_targets
             .iter()
             .map(|target| target.dataset_handle.id.clone())
             .collect();
-        let mut dangling_references = Vec::new();
+        let mut directly_dangling = Vec::new();
 
         for target in delete_targets {
             let dangling_children = self
@@ -177,19 +177,19 @@ impl DeleteDatasetUseCaseImpl {
                 .into_iter()
                 .filter(|downstream_handle| !target_dataset_ids.contains(&downstream_handle.id))
                 .filter(|downstream_handle| {
-                    !unauthorized_recursive_dataset_ids.contains(&downstream_handle.id)
+                    !inaccessible_downstream_ids.contains(&downstream_handle.id)
                 })
                 .collect::<Vec<_>>();
 
             if !dangling_children.is_empty() {
-                dangling_references.push(DanglingReferenceError {
+                directly_dangling.push(DanglingReferenceError {
                     dataset_handle: target.dataset_handle.clone(),
                     children: dangling_children,
                 });
             }
         }
 
-        Ok(dangling_references)
+        Ok(directly_dangling)
     }
 
     async fn order_authorized_delete_targets(
@@ -252,7 +252,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .classify_dataset_handles_by_allowance(candidate_handles, DatasetAction::Own)
             .await?;
 
-        let (unauthorized_selected_handles, unauthorized_recursive_handles): (Vec<_>, Vec<_>) =
+        let (unauthorized_selected_handles, inaccessible_downstream_handles): (Vec<_>, Vec<_>) =
             classification
                 .unauthorized_handles_with_errors
                 .into_iter()
@@ -262,21 +262,24 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .order_authorized_delete_targets(classification.authorized_handles)
             .await?;
 
-        let unauthorized_recursive_dataset_ids = unauthorized_recursive_handles
+        let inaccessible_downstream_ids = inaccessible_downstream_handles
             .iter()
             .map(|(dataset_handle, _)| dataset_handle.id.clone())
             .collect();
 
-        let dangling_references = self
-            .collect_dangling_references(&authorized_targets, &unauthorized_recursive_dataset_ids)
+        let directly_dangling_references = self
+            .collect_directly_dangling_downstream_references(
+                &authorized_targets,
+                &inaccessible_downstream_ids,
+            )
             .await?;
 
         Ok(DeleteDatasetPlanningResult {
             plan: DeleteDatasetPlan { authorized_targets },
             issues: DeleteDatasetPlanIssues {
                 unauthorized_selected_handles,
-                unauthorized_recursive_handles,
-                dangling_references,
+                inaccessible_downstream_handles,
+                directly_dangling_references,
             },
         })
     }

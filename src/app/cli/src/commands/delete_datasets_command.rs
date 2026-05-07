@@ -166,24 +166,23 @@ impl DeleteDatasetsCommand {
             return;
         }
 
-        let mut seen_dataset_ids = HashSet::new();
-
-        if self.force && self.recursive {
-            for (dataset_handle, _) in &planning_result.issues.unauthorized_recursive_handles {
-                if seen_dataset_ids.insert(dataset_handle.id.clone()) {
-                    summary.record_ignored();
-                    DeleteDatasetsPrinter::print_left_behind(dataset_handle, self.dry_run);
-                }
+        if self.recursive {
+            let count = planning_result.issues.inaccessible_downstream_handles.len();
+            if count > 0 {
+                summary.record_ignored_count(count);
+                DeleteDatasetsPrinter::print_inaccessible_downstream_count(count, self.dry_run);
             }
         }
 
-        if self.force {
-            for dangling_reference in &planning_result.issues.dangling_references {
-                for dataset_handle in &dangling_reference.children {
-                    if seen_dataset_ids.insert(dataset_handle.id.clone()) {
-                        summary.record_ignored();
-                        DeleteDatasetsPrinter::print_left_behind(dataset_handle, self.dry_run);
-                    }
+        let mut seen_dataset_ids = HashSet::new();
+        for dangling_reference in &planning_result
+            .issues
+            .directly_dangling_references
+        {
+            for dataset_handle in &dangling_reference.children {
+                if seen_dataset_ids.insert(dataset_handle.id.clone()) {
+                    summary.record_ignored();
+                    DeleteDatasetsPrinter::print_left_behind(dataset_handle, self.dry_run);
                 }
             }
         }
@@ -214,12 +213,17 @@ impl DeleteDatasetsCommand {
             .into());
         }
 
-        if !self.force && !planning_result.issues.dangling_references.is_empty() {
+        if !self.force
+            && !planning_result
+                .issues
+                .directly_dangling_references
+                .is_empty()
+        {
             return Err(BatchError::new(
                 "Some dataset(s) cannot be deleted due to dangling references",
                 planning_result
                     .issues
-                    .dangling_references
+                    .directly_dangling_references
                     .iter()
                     .map(|error| {
                         (
@@ -231,27 +235,14 @@ impl DeleteDatasetsCommand {
             .into());
         }
 
-        if !self.force
-            && !planning_result
-                .issues
-                .unauthorized_recursive_handles
-                .is_empty()
-        {
-            return Err(BatchError::new(
-                "Recursive delete would include downstream dataset(s) you are not allowed to \
-                 delete",
-                planning_result
-                    .issues
-                    .unauthorized_recursive_handles
-                    .iter()
-                    .map(|(dataset_handle, error)| {
-                        (
-                            std::io::Error::other(root_source_message(error)),
-                            dataset_handle.alias.to_string(),
-                        )
-                    }),
-            )
-            .into());
+        if !self.force {
+            let count = planning_result.issues.inaccessible_downstream_handles.len();
+            if count > 0 {
+                return Err(CLIError::usage_error(format!(
+                    "Recursive delete would affect {count} downstream dataset(s) you cannot \
+                     delete. Re-run with --force to proceed and leave them behind."
+                )));
+            }
         }
 
         Ok(())
@@ -388,6 +379,11 @@ impl DeleteDatasetsSummary {
         self.total_items += 1;
         self.ignored += 1;
     }
+
+    fn record_ignored_count(&mut self, count: usize) {
+        self.total_items += count;
+        self.ignored += count;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -403,6 +399,19 @@ impl DeleteDatasetsPrinter {
         };
 
         eprintln!("{label}: {}", dataset_handle.alias);
+    }
+
+    fn print_inaccessible_downstream_count(count: usize, dry_run: bool) {
+        let label = if dry_run {
+            "Would leave behind"
+        } else {
+            "Left behind"
+        };
+
+        eprintln!(
+            "{}: {count} inaccessible downstream dataset(s)",
+            console::style(label).yellow().bold(),
+        );
     }
 
     fn print_left_behind(dataset_handle: &odf::DatasetHandle, dry_run: bool) {
