@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase, DependencyGraphService};
-use tokio::sync::OnceCell;
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
 use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
@@ -49,9 +48,6 @@ pub struct DeleteCommand {
     interact: Arc<Interact>,
     output_config: Arc<OutputConfig>,
 
-    // Caches the resolved delete request to avoid redundant parsing in `validate_args` and `run`.
-    resolved_request: OnceCell<ResolvedDeleteRequest>,
-
     #[dill::component(explicit)]
     target: Option<String>,
 
@@ -83,24 +79,19 @@ pub struct DeleteCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DeleteCommand {
-    async fn resolved_request(&self) -> Result<&ResolvedDeleteRequest, CLIError> {
-        return self
-            .resolved_request
-            .get_or_try_init(|| async {
-                DeleteRequestResolver::new(
-                    self.resource_kind_lookup_service.as_ref(),
-                    self.resource_selection_syntax_service.as_ref(),
-                    DeleteRequestResolverParams {
-                        target: self.target.as_deref(),
-                        args: &self.args,
-                        explicit_context_name: self.explicit_context_name.as_deref(),
-                        all: self.all,
-                    },
-                )
-                .resolve()
-                .await
-            })
-            .await;
+    async fn resolved_request(&self) -> Result<ResolvedDeleteRequest, CLIError> {
+        DeleteRequestResolver::new(
+            self.resource_kind_lookup_service.as_ref(),
+            self.resource_selection_syntax_service.as_ref(),
+            DeleteRequestResolverParams {
+                target: self.target.as_deref(),
+                args: &self.args,
+                explicit_context_name: self.explicit_context_name.as_deref(),
+                all: self.all,
+            },
+        )
+        .resolve()
+        .await
     }
 
     fn make_delete_datasets_command(
@@ -198,7 +189,7 @@ impl Command for DeleteCommand {
                     ));
                 }
 
-                self.make_delete_datasets_command(request)?
+                self.make_delete_datasets_command(&request)?
                     .validate_args()
                     .await
             }
@@ -209,7 +200,7 @@ impl Command for DeleteCommand {
                         "--recursive is supported only when deleting datasets",
                     ));
                 }
-                self.resolve_delete_resources_command(request)?
+                self.resolve_delete_resources_command(&request)?
                     .validate_args()
                     .await
             }
@@ -225,10 +216,10 @@ impl Command for DeleteCommand {
 
         match &request {
             ResolvedDeleteRequest::Datasets { .. } => {
-                self.make_delete_datasets_command(request)?.run().await
+                self.make_delete_datasets_command(&request)?.run().await
             }
             ResolvedDeleteRequest::Resources { .. } => {
-                self.resolve_delete_resources_command(request)?.run().await
+                self.resolve_delete_resources_command(&request)?.run().await
             }
             ResolvedDeleteRequest::Mixed => Err(CLIError::usage_error(
                 "Mixed dataset/resource deletion is not implemented",

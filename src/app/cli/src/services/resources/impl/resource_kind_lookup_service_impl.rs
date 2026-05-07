@@ -28,7 +28,6 @@ pub struct ResourceKindLookupServiceImpl {
 }
 
 #[dill::component(pub)]
-#[dill::scope(dill::Singleton)]
 #[dill::interface(dyn ResourceKindLookupService)]
 impl ResourceKindLookupServiceImpl {
     pub fn new(resource_facade_factory: Arc<dyn ResourceFacadeFactory>) -> Self {
