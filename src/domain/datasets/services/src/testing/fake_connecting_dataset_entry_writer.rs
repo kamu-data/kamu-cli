@@ -51,10 +51,22 @@ impl DatasetEntryWriter for FakeConnectingDatasetEntryWriter {
         Ok(())
     }
 
-    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
+    async fn remove_entries(
+        &self,
+        dataset_handles: &[odf::DatasetHandle],
+    ) -> Result<(), InternalError> {
+        if dataset_handles.is_empty() {
+            return Ok(());
+        }
+
+        let dataset_ids = dataset_handles
+            .iter()
+            .map(|dataset_handle| dataset_handle.id.clone())
+            .collect::<Vec<_>>();
+
         for listener in &self.removal_listeners {
             listener
-                .on_dataset_entry_removed(&dataset_handle.id)
+                .on_dataset_entries_removed(&dataset_ids)
                 .await
                 .unwrap();
         }

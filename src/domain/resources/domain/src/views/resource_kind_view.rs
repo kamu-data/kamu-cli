@@ -21,4 +21,14 @@ pub struct ResourceKindDescriptor {
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
+impl ResourceKindDescriptor {
+    pub fn matches_selector(&self, selector: &str) -> bool {
+        self.name.eq_ignore_ascii_case(selector)
+            || self
+                .short_names
+                .iter()
+                .any(|short_name| short_name.eq_ignore_ascii_case(selector))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

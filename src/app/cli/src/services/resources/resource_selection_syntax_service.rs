@@ -32,6 +32,7 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct ResourceSelectionSyntax {
     pub items: Vec<ResourceSelectionItem>,
     pub shadowed_selectors: Vec<ResourceShadowedSelector>,
@@ -39,6 +40,7 @@ pub struct ResourceSelectionSyntax {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub enum ResourceSelectionItem {
     All,
     AllByKind {
@@ -50,6 +52,7 @@ pub enum ResourceSelectionItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct ResourceExactSelector {
     pub kind_descriptor: ResourceKindDescriptor,
     pub selector_input: String,
@@ -58,6 +61,7 @@ pub struct ResourceExactSelector {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct ResourceShadowedSelector {
     pub selector_input: String,
 }

@@ -81,6 +81,11 @@ pub trait DatasetEntryRepository: Send + Sync {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError>;
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +124,44 @@ impl DatasetEntriesResolution {
             debug_assert!(has_no_duplicate);
         }
         map
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct DatasetEntriesDeletionResult {
+    pub deleted_dataset_ids: Vec<odf::DatasetID>,
+    pub missing_dataset_ids: Vec<odf::DatasetID>,
+}
+
+impl DatasetEntriesDeletionResult {
+    pub fn from_deleted_dataset_ids(
+        requested_dataset_ids: &[Cow<'_, odf::DatasetID>],
+        deleted_dataset_ids: Vec<odf::DatasetID>,
+    ) -> Self {
+        let deleted_dataset_id_set: HashSet<_> = deleted_dataset_ids.into_iter().collect();
+
+        let mut seen_dataset_ids = HashSet::with_capacity(requested_dataset_ids.len());
+        let mut ordered_deleted_dataset_ids = Vec::new();
+        let mut missing_dataset_ids = Vec::new();
+
+        for dataset_id in requested_dataset_ids {
+            if !seen_dataset_ids.insert(dataset_id.as_ref().clone()) {
+                continue;
+            }
+
+            if deleted_dataset_id_set.contains(dataset_id.as_ref()) {
+                ordered_deleted_dataset_ids.push(dataset_id.as_ref().clone());
+            } else {
+                missing_dataset_ids.push(dataset_id.as_ref().clone());
+            }
+        }
+
+        Self {
+            deleted_dataset_ids: ordered_deleted_dataset_ids,
+            missing_dataset_ids,
+        }
     }
 }
 
@@ -261,12 +304,31 @@ pub enum DeleteEntryDatasetError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+pub enum DeleteDatasetEntriesError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 pub trait DatasetEntryRemovalListener: Send + Sync {
     async fn on_dataset_entry_removed(
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError>;
+
+    async fn on_dataset_entries_removed(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<(), InternalError> {
+        for dataset_id in dataset_ids {
+            self.on_dataset_entry_removed(dataset_id).await?;
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

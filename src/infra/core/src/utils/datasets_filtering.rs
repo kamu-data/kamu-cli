@@ -30,31 +30,108 @@ pub fn filter_datasets_by_local_pattern(
     dataset_registry: &dyn DatasetRegistry,
     dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
 ) -> FilteredDatasetHandleStream<'_> {
-    // We assume here that resolving specific references one by one is more
-    // efficient than iterating all datasets, so we iterate only if one of the
-    // inputs is a glob pattern
-    if !dataset_ref_patterns
+    filter_datasets_by_local_pattern_with_unmatched_handler(
+        dataset_registry,
+        dataset_ref_patterns,
+        move |dataset_ref_pattern, maybe_error| {
+            // Preserve historical behavior:
+            // - exact refs that cannot be resolved are errors
+            // - patterns that cannot be resolved are not errors
+            if !dataset_ref_pattern.is_pattern()
+                && let Some(error) = maybe_error
+            {
+                return Err(error);
+            }
+
+            Ok(())
+        },
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn filter_datasets_by_local_pattern_with_unmatched_handler<'a, F>(
+    dataset_registry: &'a dyn DatasetRegistry,
+    dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
+    on_unmatched_pattern: F,
+) -> FilteredDatasetHandleStream<'a>
+where
+    F: FnMut(
+            &odf::DatasetRefPattern,
+            Option<odf::DatasetRefUnresolvedError>,
+        ) -> Result<(), odf::DatasetRefUnresolvedError>
+        + Send
+        + 'a,
+{
+    let has_glob_patterns = dataset_ref_patterns
         .iter()
-        .any(odf::DatasetRefPattern::is_pattern)
-    {
+        .any(odf::DatasetRefPattern::is_pattern);
+
+    if !has_glob_patterns {
         Box::pin(async_stream::try_stream! {
+            let mut on_unmatched_pattern = on_unmatched_pattern;
+
+            // TODO: PERF: This could be optimized by using batch resolution
+            // `resolve_dataset_handles_by_refs`, but the batch API currently returns
+            // response keys that are re-normalized (e.g. `DatasetRef::Handle` instead of
+            // the input `DatasetRef::Alias`), so we cannot reliably correlate results back
+            // to the original input patterns without per-ref resolution.
             for dataset_ref_pattern in &dataset_ref_patterns {
-                // TODO: PERF: Create a batch version of `resolve_dataset_ref`
-                yield dataset_registry.resolve_dataset_handle_by_ref(dataset_ref_pattern.as_dataset_ref().unwrap()).await?;
+                let dataset_ref = dataset_ref_pattern.as_dataset_ref().unwrap();
+                match dataset_registry
+                    .resolve_dataset_handle_by_ref(dataset_ref)
+                    .await
+                {
+                    Ok(dataset_handle) => yield dataset_handle,
+                    Err(error @ odf::DatasetRefUnresolvedError::NotFound(_)) => {
+                        on_unmatched_pattern(dataset_ref_pattern, Some(error))?;
+                    }
+                    Err(error @ odf::DatasetRefUnresolvedError::Internal(_)) => {
+                        Err::<(), _>(error)?;
+                    }
+                }
             }
         })
     } else {
-        dataset_registry
-            .all_dataset_handles()
-            .try_filter(move |dataset_handle| {
-                future::ready(
-                    dataset_ref_patterns
-                        .iter()
-                        .any(|dataset_ref_pattern| dataset_ref_pattern.matches(dataset_handle)),
-                )
-            })
-            .map_err(Into::into)
-            .boxed()
+        Box::pin(async_stream::try_stream! {
+            let mut on_unmatched_pattern = on_unmatched_pattern;
+            let mut matched_patterns = vec![false; dataset_ref_patterns.len()];
+            let mut all_dataset_handles_stream = dataset_registry.all_dataset_handles();
+
+            while let Some(dataset_handle_result) = all_dataset_handles_stream.next().await {
+                let dataset_handle = dataset_handle_result
+                    .map_err(odf::DatasetRefUnresolvedError::Internal)?;
+
+                let mut has_match = false;
+
+                for (idx, pattern) in dataset_ref_patterns.iter().enumerate() {
+                    if pattern.matches(&dataset_handle) {
+                        matched_patterns[idx] = true;
+                        has_match = true;
+                    }
+                }
+
+                if has_match {
+                    yield dataset_handle;
+                }
+            }
+
+            for (idx, pattern) in dataset_ref_patterns.iter().enumerate() {
+                if !matched_patterns[idx] {
+                    let maybe_error = if pattern.is_pattern() {
+                        None
+                    } else {
+                        Some(odf::DatasetRefUnresolvedError::NotFound(
+                            odf::DatasetNotFoundError {
+                                dataset_ref: pattern.as_dataset_ref().unwrap().clone(),
+                            },
+                        ))
+                    };
+
+                    on_unmatched_pattern(pattern, maybe_error)?;
+                }
+            }
+        })
     }
 }
 

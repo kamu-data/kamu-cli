@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use database_common::PaginationOpts;
 use kamu_accounts::{Account, AccountRepository};
 use kamu_datasets::{
+    DatasetEntriesDeletionResult,
     DatasetEntriesResolution,
     DatasetEntry,
     DatasetEntryByNameNotFoundError,
@@ -940,6 +941,134 @@ pub async fn test_delete_dataset_entry(catalog: &dill::Catalog) {
         let count_res = dataset_entry_repo.dataset_entries_count().await;
 
         assert_matches!(count_res, Ok(0));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_multiple_dataset_entries(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    {
+        let delete_res = dataset_entry_repo.delete_dataset_entries(&[]).await;
+
+        assert_matches!(
+            delete_res,
+            Ok(DatasetEntriesDeletionResult {
+                deleted_dataset_ids,
+                missing_dataset_ids,
+            }) if deleted_dataset_ids.is_empty() && missing_dataset_ids.is_empty()
+        );
+    }
+
+    let dataset_entry_1 = new_dataset_entry_with(&account, "dataset1", odf::DatasetKind::Root);
+    let dataset_entry_2 = new_dataset_entry_with(&account, "dataset2", odf::DatasetKind::Root);
+    let dataset_entry_3 = new_dataset_entry_with(&account, "dataset3", odf::DatasetKind::Root);
+    let missing_dataset_id = odf::DatasetID::new_seeded_ed25519(b"missing-dataset-id");
+
+    assert_matches!(
+        dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_1)
+            .await,
+        Ok(_)
+    );
+    assert_matches!(
+        dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_2)
+            .await,
+        Ok(_)
+    );
+    assert_matches!(
+        dataset_entry_repo
+            .save_dataset_entry(&dataset_entry_3)
+            .await,
+        Ok(_)
+    );
+
+    {
+        let delete_res = dataset_entry_repo
+            .delete_dataset_entries(&[
+                Cow::Borrowed(&dataset_entry_1.id),
+                Cow::Borrowed(&missing_dataset_id),
+                Cow::Borrowed(&dataset_entry_2.id),
+                Cow::Borrowed(&dataset_entry_1.id),
+                Cow::Borrowed(&missing_dataset_id),
+            ])
+            .await;
+
+        assert_matches!(
+            delete_res,
+            Ok(DatasetEntriesDeletionResult {
+                deleted_dataset_ids,
+                missing_dataset_ids,
+            }) if deleted_dataset_ids == vec![dataset_entry_1.id.clone(), dataset_entry_2.id.clone()]
+                && missing_dataset_ids == vec![missing_dataset_id.clone()]
+        );
+    }
+
+    {
+        assert_eq!(dataset_entry_repo.dataset_entries_count().await.unwrap(), 1);
+        assert_eq!(
+            dataset_entry_repo
+                .dataset_entries_count_by_owner_id(&account.id)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+    {
+        assert_matches!(
+            dataset_entry_repo
+                .get_dataset_entry(&dataset_entry_1.id)
+                .await,
+            Err(GetDatasetEntryError::NotFound(DatasetEntryNotFoundError {
+                dataset_id
+            })) if dataset_id == dataset_entry_1.id
+        );
+        assert_matches!(
+            dataset_entry_repo
+                .get_dataset_entry_by_owner_and_name(&account.id, &dataset_entry_2.name)
+                .await,
+            Err(GetDatasetEntryByNameError::NotFound(
+                DatasetEntryByNameNotFoundError {
+                    owner_id,
+                    dataset_name,
+                }
+            )) if owner_id == account.id && dataset_name == dataset_entry_2.name
+        );
+        assert_matches!(
+            dataset_entry_repo
+                .get_dataset_entry(&dataset_entry_3.id)
+                .await,
+            Ok(actual_dataset_entry) if actual_dataset_entry == dataset_entry_3
+        );
+        assert_matches!(
+            dataset_entry_repo
+                .get_dataset_entry_by_owner_and_name(&account.id, &dataset_entry_3.name)
+                .await,
+            Ok(actual_dataset_entry) if actual_dataset_entry == dataset_entry_3
+        );
+    }
+    {
+        let delete_res = dataset_entry_repo
+            .delete_dataset_entries(&[
+                Cow::Borrowed(&dataset_entry_3.id),
+                Cow::Borrowed(&dataset_entry_3.id),
+            ])
+            .await;
+
+        assert_matches!(
+            delete_res,
+            Ok(DatasetEntriesDeletionResult {
+                deleted_dataset_ids,
+                missing_dataset_ids,
+            }) if deleted_dataset_ids == vec![dataset_entry_3.id.clone()]
+                && missing_dataset_ids.is_empty()
+        );
+        assert_eq!(dataset_entry_repo.dataset_entries_count().await.unwrap(), 0);
     }
 }
 

@@ -993,28 +993,36 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         Ok(())
     }
 
-    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
-        // Remove entry in repository
-        match self
-            .dataset_entry_repo
-            .delete_dataset_entry(&dataset_handle.id)
-            .await
-        {
-            Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
-            Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
-        }?;
+    async fn remove_entries(
+        &self,
+        dataset_handles: &[odf::DatasetHandle],
+    ) -> Result<(), InternalError> {
+        let dataset_ids = dataset_handles
+            .iter()
+            .map(|dataset_handle| Cow::Borrowed(&dataset_handle.id))
+            .collect::<Vec<_>>();
 
-        // Remove entry from cache
+        // Remove entry in repository
+        self.dataset_entry_repo
+            .delete_dataset_entries(&dataset_ids)
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => e,
+            })?;
+
+        // Remove entries from cache
         {
             let mut writable_cache = self.cache.write().unwrap();
-            writable_cache
-                .datasets
-                .datasets_by_id
-                .remove(&dataset_handle.id);
-            writable_cache
-                .datasets
-                .entries_by_id
-                .remove(&dataset_handle.id);
+            for dataset_handle in dataset_handles {
+                writable_cache
+                    .datasets
+                    .datasets_by_id
+                    .remove(&dataset_handle.id);
+                writable_cache
+                    .datasets
+                    .entries_by_id
+                    .remove(&dataset_handle.id);
+            }
         }
 
         Ok(())

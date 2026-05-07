@@ -671,7 +671,6 @@ Delete datasets or resources
 * `-f`, `--force` — Do not ask for confirmation
 * `--ignore-not-found` — Exit successfully when a selected resource does not exist
 * `--dry-run` — Preview the resolved resource deletions without deleting anything
-* `--continue-on-error` — Continue processing resource deletions after per-resource failures
 
 This command deletes datasets using the legacy dataset path by default, or
 resources when a resource target is specified explicitly.
@@ -685,6 +684,10 @@ Delete a local dataset using the legacy default:
 Delete datasets explicitly:
 
     kamu delete datasets my.dataset
+
+Delete a dataset using the dataset pseudo-kind selector:
+
+    kamu delete dataset/my.dataset
 
 Delete local datasets matching a pattern:
 
@@ -702,9 +705,25 @@ Delete all resources across kinds:
 
     kamu delete all
 
-Preview resource deletion:
+Delete resources using slash selectors:
 
-    kamu delete storages warehouse --dry-run
+    kamu delete vs/my-vars ss/my-secrets
+
+Delete all resources of a kind using a slash selector:
+
+    kamu delete storages/all
+
+Delete a dataset and a resource in one command:
+
+    kamu delete dataset/my.dataset vs/my-vars
+
+Force dataset interpretation when a dataset account collides with a resource prefix:
+
+    kamu delete datasets vs/my.dataset
+
+Preview deletion:
+
+    kamu delete dataset/my.dataset vs/my-vars --dry-run
 
 
 
