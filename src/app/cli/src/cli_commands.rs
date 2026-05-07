@@ -148,7 +148,6 @@ pub fn get_command(
                 c.force,
                 c.ignore_not_found,
                 c.dry_run,
-                c.continue_on_error,
             )
             .cast(),
         ),

@@ -671,7 +671,6 @@ Delete datasets or resources
 * `-f`, `--force` — Do not ask for confirmation
 * `--ignore-not-found` — Exit successfully when a selected resource does not exist
 * `--dry-run` — Preview the resolved resource deletions without deleting anything
-* `--continue-on-error` — Continue processing resource deletions after per-resource failures
 
 This command deletes datasets using the legacy dataset path by default, or
 resources when a resource target is specified explicitly.

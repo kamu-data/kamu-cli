@@ -125,7 +125,10 @@ pub async fn test_reset_with_change_of_dependencies(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", &DATASET_ROOT_PLAYER_NAME],
         None,
-        Some([r#"Deleted 1 dataset\(s\)"#]),
+        Some([
+            r#"Deleted: player-scores"#,
+            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+        ]),
     )
     .await;
 }

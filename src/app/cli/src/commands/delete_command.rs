@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use kamu::domain::TenancyConfig;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase, DependencyGraphService};
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
@@ -34,11 +36,14 @@ const ALL_TARGET: &str = "all";
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct DeleteCommand {
+    tenancy_config: TenancyConfig,
     workspace_service: Arc<WorkspaceService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+    rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
     resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
     resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
@@ -71,9 +76,6 @@ pub struct DeleteCommand {
 
     #[dill::component(explicit)]
     dry_run: bool,
-
-    #[dill::component(explicit)]
-    continue_on_error: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,14 +118,19 @@ impl DeleteCommand {
         )?;
 
         Ok(DeleteDatasetsCommand::new(
+            self.tenancy_config,
             self.dataset_registry.clone(),
             self.delete_dataset.clone(),
             self.dependency_graph_service.clone(),
             self.confirm_delete_service.clone(),
+            self.current_account_subject.clone(),
+            self.rebac_service.clone(),
             dataset_ref_patterns,
             self.all,
             self.recursive,
             self.force,
+            self.ignore_not_found,
+            self.dry_run,
         ))
     }
 
@@ -154,7 +161,6 @@ impl DeleteCommand {
             self.force,
             self.ignore_not_found,
             self.dry_run,
-            self.continue_on_error,
         ))
     }
 }
@@ -171,21 +177,6 @@ impl Command for DeleteCommand {
                 if self.explicit_context_name.is_some() {
                     return Err(CLIError::usage_error(
                         "--context is supported only when deleting resources",
-                    ));
-                }
-                if self.ignore_not_found {
-                    return Err(CLIError::usage_error(
-                        "--ignore-not-found is supported only when deleting resources",
-                    ));
-                }
-                if self.dry_run {
-                    return Err(CLIError::usage_error(
-                        "--dry-run is supported only when deleting resources",
-                    ));
-                }
-                if self.continue_on_error {
-                    return Err(CLIError::usage_error(
-                        "--continue-on-error is supported only when deleting resources",
                     ));
                 }
 

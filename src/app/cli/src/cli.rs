@@ -853,10 +853,6 @@ pub struct Delete {
     /// Preview the resolved resource deletions without deleting anything
     #[arg(long)]
     pub dry_run: bool,
-
-    /// Continue processing resource deletions after per-resource failures
-    #[arg(long)]
-    pub continue_on_error: bool,
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

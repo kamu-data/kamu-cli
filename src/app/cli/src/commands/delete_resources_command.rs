@@ -45,7 +45,6 @@ pub struct DeleteResourcesCommand {
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
-    continue_on_error: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +61,6 @@ impl DeleteResourcesCommand {
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
-        continue_on_error: bool,
     ) -> Self {
         Self {
             resource_facade,
@@ -75,7 +73,6 @@ impl DeleteResourcesCommand {
             force,
             ignore_not_found,
             dry_run,
-            continue_on_error,
         }
     }
 
@@ -177,7 +174,7 @@ impl DeleteResourcesCommand {
                 }
             }
 
-            if !self.continue_on_error && !errors.is_empty() {
+            if !errors.is_empty() {
                 break;
             }
         }

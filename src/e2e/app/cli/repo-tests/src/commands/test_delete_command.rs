@@ -29,7 +29,10 @@ pub async fn test_delete_dataset(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "player-scores"],
         None,
-        Some([r#"Deleted 1 dataset\(s\)"#]),
+        Some([
+            r#"Deleted: player-scores"#,
+            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+        ]),
     )
     .await;
 
@@ -87,7 +90,11 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "player-scores", "--recursive"],
         None,
-        Some([r#"Deleted 2 dataset\(s\)"#]),
+        Some([
+            r#"Deleted: leaderboard"#,
+            r#"Deleted: player-scores"#,
+            r#"Summary 2 item\(s\): 2 deleted, 0 ignored, 0 failed"#,
+        ]),
     )
     .await;
 
@@ -101,6 +108,67 @@ pub async fn test_delete_dataset_recursive(kamu: KamuCliPuppet) {
 
         pretty_assertions::assert_eq!(vec!["another-root"], dataset_names);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_dry_run(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.assert_success_command_execution(
+        ["delete", "player-scores", "--dry-run"],
+        None,
+        Some([
+            r#"Would delete: player-scores"#,
+            r#"Summary 1 item\(s\): 1 would delete, 0 ignored, 0 failed"#,
+        ]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(vec!["player-scores"], dataset_names);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_ignore_not_found(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.assert_success_command_execution(
+        [
+            "--yes",
+            "delete",
+            "player-scores",
+            "missing-dataset",
+            "--ignore-not-found",
+        ],
+        None,
+        Some([
+            r#"Ignored: missing-dataset"#,
+            r#"Deleted: player-scores"#,
+            r#"Summary 2 item\(s\): 1 deleted, 1 ignored, 0 failed"#,
+        ]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(Vec::<String>::new(), dataset_names);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +212,7 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["--yes", "delete", "--all"],
         None,
-        Some([r#"Deleted 3 dataset\(s\)"#]),
+        Some([r#"Summary 3 item\(s\): 3 deleted, 0 ignored, 0 failed"#]),
     )
     .await;
 
@@ -161,6 +229,112 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
             "Unexpected dataset names: {dataset_names:?}"
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_all_respects_current_account(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "alice-root"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "bob-root"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.set_account(Some(alice));
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", "--all"],
+        None,
+        Some([r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#]),
+    )
+    .await;
+
+    let alice_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(Vec::<String>::new(), alice_datasets);
+
+    kamu.set_account(Some(bob));
+    let bob_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(vec!["bob-root"], bob_datasets);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_dataset_all_allows_admin_to_delete_everything(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+    let admin = odf::AccountName::new_unchecked("kamu");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "alice-root"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "bob-root"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.set_account(Some(admin));
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", "--all"],
+        None,
+        Some([r#"Summary 2 item\(s\): 2 deleted, 0 ignored, 0 failed"#]),
+    )
+    .await;
+
+    kamu.set_account(Some(alice));
+    let alice_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(Vec::<String>::new(), alice_datasets);
+
+    kamu.set_account(Some(bob));
+    let bob_datasets = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name.to_string())
+        .collect::<Vec<_>>();
+    pretty_assertions::assert_eq!(Vec::<String>::new(), bob_datasets);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
