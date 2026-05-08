@@ -7,14 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ingest_handler;
-pub mod metadata_handler;
-mod query_handler;
-pub mod query_types;
+mod eip712;
 mod router;
-pub mod sign;
-mod tail_handler;
-mod verify_handler;
-pub mod verify_types;
 
+pub use eip712::*;
 pub use router::*;

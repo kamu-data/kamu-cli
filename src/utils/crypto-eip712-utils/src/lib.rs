@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ingest_handler;
-pub mod metadata_handler;
-mod query_handler;
-pub mod query_types;
-mod router;
-pub mod sign;
-mod tail_handler;
-mod verify_handler;
-pub mod verify_types;
+// Re-exports
+pub use alloy_primitives::{B256, b256};
+pub use k256::ecdsa::SigningKey;
 
-pub use router::*;
+mod eip712_typed_data;
+mod secp256k1;
+
+pub use eip712_typed_data::*;
+pub use secp256k1::*;

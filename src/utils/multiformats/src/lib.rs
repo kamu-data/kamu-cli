@@ -9,6 +9,9 @@
 
 #![feature(error_generic_member_access)]
 
+// Re-exports
+pub use ed25519_dalek as ed25519;
+
 mod did_key;
 mod errors;
 mod multibase;

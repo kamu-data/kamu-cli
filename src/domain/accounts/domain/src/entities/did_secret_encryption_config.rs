@@ -43,4 +43,14 @@ impl DidSecretEncryptionConfig {
         }
         false
     }
+
+    pub fn get_encryption_key(&self) -> Option<&str> {
+        if !self.enabled {
+            return None;
+        }
+
+        self.encryption_key.as_deref()
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
