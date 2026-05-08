@@ -138,6 +138,10 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     // 1. Validate request
     match request.proof.r#type {
         query::ProofType::Ed25519Signature2020 => {}
+        query::ProofType::EcdsaSecp256k1Signature2019 => {
+            // TODO: Molecule: Phase 3: implement
+            unimplemented!()
+        }
     }
 
     if request.commitment.input_hash

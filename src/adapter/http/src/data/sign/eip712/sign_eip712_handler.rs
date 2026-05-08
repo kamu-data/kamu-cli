@@ -9,10 +9,21 @@
 
 use axum::extract::{Extension, Query};
 use axum::response::Json;
+use crypto_eip712_utils::Eip712TypedData;
 use database_common_macros::transactional_handler;
 use http_common::{ApiError, ApiErrorResponse};
+use internal_error::ResultIntoInternal;
+use kamu_accounts::{DidEntity, DidSecretKeyRepository, GetDidSecretKeyError};
+use odf::metadata::ed25519::Signer;
 
-use super::sign_eip712_types::{SignEip712QueryParams, SignEip712Request, SignEip712Response};
+use super::sign_eip712_types::{
+    Eip712TypedDataRequestBody,
+    SignEip712QueryParams,
+    SignEip712Response,
+};
+use crate::data::query_handler::ResponseSigningNotConfigured;
+use crate::data::query_types::{ProofType, to_canonical_json};
+use crate::data::sign::SignEip712Proof;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +39,7 @@ use super::sign_eip712_types::{SignEip712QueryParams, SignEip712Request, SignEip
     post,
     path = "/sign/eip712",
     params(SignEip712QueryParams),
-    request_body = SignEip712Request,
+    request_body = Eip712TypedDataRequestBody,
     responses(
         (status = OK, body = SignEip712Response),
         (status = BAD_REQUEST, body = ApiErrorResponse),
@@ -45,10 +56,87 @@ use super::sign_eip712_types::{SignEip712QueryParams, SignEip712Request, SignEip
 pub async fn sign_eip712_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Query(params): Query<SignEip712QueryParams>,
-    Json(request): Json<SignEip712Request>,
+    Json(request): Json<Eip712TypedDataRequestBody>,
 ) -> Result<Json<SignEip712Response>, ApiError> {
-    let _ = (catalog, params, request);
-    todo!("Authorize managed key access and sign EIP-712 payload")
+    use kamu_accounts::*;
+
+    tracing::debug!(params = ?params, request = ?request, "EIP-712 sign request");
+
+    let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
+    let did_secret_encryption_config = catalog.get_one::<DidSecretEncryptionConfig>().unwrap();
+
+    let Some(encryption_key) = did_secret_encryption_config.get_encryption_key() else {
+        return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
+    };
+
+    let Some(secret_key) = get_secret_key(&params.key, did_secret_key_repo.as_ref())
+        .await
+        .int_err()?
+    else {
+        return Err(ApiError::not_found_without_reason());
+    };
+
+    let signature = {
+        // TODO: SEC: Molecule: Phase 3: zeroing?
+        // TODO: SEC: Molecule: Phase 3: auth checks (!!!)
+        let private_key = secret_key
+            .get_decrypted_private_key(encryption_key)
+            .int_err()?;
+
+        // TODO: Molecule: Phase 3: add verification key to response?
+        // let _verification_key =
+        // odf::metadata::DidKey::new_ed25519(&private_key.verifying_key());
+
+        private_key.sign(&to_canonical_json(&request))
+    };
+
+    // TODO: Molecule: Phase 3: remove back to json conversion
+    let request_as_json = serde_json::to_value(request).int_err()?;
+    let _typed_data = Eip712TypedData::from_json(request_as_json)?;
+
+    let proof = if params.include_node_proof {
+        Some(SignEip712Proof {
+            r#type: ProofType::EcdsaSecp256k1Signature2019,
+            // TODO
+            verification_method: "".to_string(),
+            signature: "".to_string(),
+        })
+    } else {
+        None
+    };
+
+    Ok(Json(SignEip712Response {
+        r#type: ProofType::Ed25519Signature2020,
+        signature: signature.into(),
+        proof,
+    }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn get_secret_key(
+    key: &str,
+    repo: &dyn DidSecretKeyRepository,
+) -> Result<Option<kamu_accounts::DidSecretKey>, GetDidSecretKeyError> {
+    // 1. Try for an account
+    let account = DidEntity::new_account(key);
+
+    match repo.get_did_secret_key(&account).await {
+        Ok(key) => return Ok(Some(key)),
+        Err(GetDidSecretKeyError::NotFound(_)) => { /* continue */ }
+        Err(e) => return Err(e),
+    };
+
+    // 2. Try for a dataset
+    let dataset = DidEntity::new_dataset(key);
+
+    match repo.get_did_secret_key(&dataset).await {
+        Ok(key) => Ok(Some(key)),
+        Err(GetDidSecretKeyError::NotFound(_)) => Ok(None),
+        Err(e) => Err(e),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

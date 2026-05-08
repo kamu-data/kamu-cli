@@ -28,18 +28,19 @@ e2e = []
 
 
 [dependencies]
+crypto-eip712-utils = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 file-utils = { workspace = true }
-internal-error = { workspace = true }
 http-common = { workspace = true }
+internal-error = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
-kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
+kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
 s3-utils = { workspace = true }
