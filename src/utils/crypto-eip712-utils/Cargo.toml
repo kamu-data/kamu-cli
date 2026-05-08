@@ -1,0 +1,63 @@
+[package]
+name = "crypto-eip712-utils"
+description = "Utility helpers for EIP-712 signing workflows"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+internal-error = { workspace = true }
+
+# TODO: Molecule: Phase 3: update umbrelly alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
+#alloy = { version = "2", default-features = false, features = [
+#    "dyn-abi",
+#    "eip712",
+#] }
+alloy-dyn-abi = { version = "1.5.7", default-features = false, features = ["eip712"] }
+alloy-primitives = { version = "1.5.7", default-features = false, features = [] }
+# TODO: Molecule: Phase 3: depend directly to smaller crates (k256?)
+alloy-signer = { version = "=1.7.3", default-features = false, features = ["eip712"] }
+alloy-signer-local = { version = "=1.7.3", default-features = false, features = [] }
+k256 = { version = "0.13", default-features = true, features = ["ecdsa-core", "ecdsa"] }
+nutype = { version = "0.6", default-features = false, features = [
+    "serde"
+] }
+serde = { version = "1", features = ["derive"], default-features = false }
+serde_json = { version = "1", default-features = false }
+
+
+[dev-dependencies]
+odf-metadata = { workspace = true }
+
+# TODO: Molecule: Phase 3: update umbrelly alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
+#alloy = { version = "2", default-features = false, features = [
+#    "signer-local",
+#    "signers",
+#] }
+eyre = { version = "0", default-features = false }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }

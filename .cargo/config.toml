@@ -10,3 +10,11 @@ feature-unification = true
 # Reduces recompilation due to feature permutations
 # See: https://www.reddit.com/r/rust/comments/1qzvkwf/workspace_feature_permutations_hell/
 feature-unification = "workspace"
+
+[alias]
+# Reduces recompilations due to invalidated cache between `cargo build` vs. `cargo clippy`
+# by separating `target` directories
+# See: https://github.com/rust-lang/cargo/issues/9280
+#      https://github.com/rust-lang/cargo/issues/15422
+#      (no solution, but there is a description of the root cause)
+clippy-target-dir = "clippy --target-dir target/clippy"

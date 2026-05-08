@@ -8,23 +8,11 @@
 // by the Apache License, Version 2.0.
 
 // Re-exports
-pub use ed25519_dalek as ed25519;
+pub use alloy_primitives::{B256, b256};
+pub use k256::ecdsa::SigningKey;
 
-mod did_key;
-mod errors;
-mod multibase;
-mod multicodec;
-mod multihash;
-mod private_key;
-mod signature;
-pub mod stack_string;
+mod eip712_typed_data;
+mod secp256k1;
 
-pub use did_key::*;
-pub use errors::*;
-pub use multibase::*;
-pub use multicodec::*;
-pub use multihash::*;
-pub use private_key::*;
-pub use signature::*;
-
-pub(crate) const MAX_VARINT_LEN: usize = 4;
+pub use eip712_typed_data::*;
+pub use secp256k1::*;
