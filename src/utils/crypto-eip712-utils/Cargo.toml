@@ -1,0 +1,53 @@
+[package]
+name = "crypto-eip712-utils"
+description = "Utility helpers for EIP-712 signing workflows"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+internal-error = { workspace = true }
+
+alloy = { version = "2", default-features = false, features = [
+    "dyn-abi",
+    "eip712",
+] }
+nutype = { version = "0.6", default-features = false, features = [
+    "serde"
+] }
+serde = { version = "1", features = ["derive"], default-features = false }
+serde_json = { version = "1", default-features = false }
+
+
+[dev-dependencies]
+odf-metadata = { workspace = true }
+
+alloy = { version = "2", default-features = false, features = [
+    "signer-local",
+    "signers",
+] }
+eyre = { version = "0", default-features = false }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
