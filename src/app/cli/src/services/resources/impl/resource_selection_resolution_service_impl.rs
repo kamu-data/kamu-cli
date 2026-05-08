@@ -156,8 +156,28 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
-                ResourceSelectionItem::KindPatternAll { selector_input, .. }
-                | ResourceSelectionItem::KindPatternNamePattern { selector_input, .. } => {
+                ResourceSelectionItem::KindPatternAll {
+                    kind_pattern,
+                    selector_input,
+                } => {
+                    let matched_supported_kinds = supported_kinds
+                        .as_deref()
+                        .expect("kind patterns require supported kinds");
+                    let new_targets = Self::process_kind_pattern_all_item(
+                        resource_facade,
+                        matched_supported_kinds,
+                        &seen_target_keys,
+                        kind_pattern,
+                        selector_input,
+                        expanded_results,
+                        options,
+                    )
+                    .await?;
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
+                }
+
+                ResourceSelectionItem::KindPatternNamePattern { selector_input, .. } => {
                     return Err(Self::patterns_not_supported_error(&selector_input));
                 }
             }
@@ -343,6 +363,58 @@ impl ResourceSelectionResolutionServiceImpl {
                     })
                     .await
                     .map_err(Into::into)
+            },
+        )
+        .await?;
+
+        Ok(collected
+            .identities
+            .into_iter()
+            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .collect())
+    }
+
+    async fn process_kind_pattern_all_item(
+        resource_facade: &dyn ResourceFacade,
+        supported_kinds: &[ResourceKindDescriptor],
+        seen_target_keys: &HashSet<ResourceTargetKey>,
+        kind_pattern: String,
+        selector_input: String,
+        expanded_results: usize,
+        options: ResourceSelectionResolutionOptions,
+    ) -> Result<Vec<ResourceTarget>, CLIError> {
+        let matched_kinds = Self::matched_kind_descriptors(supported_kinds, &kind_pattern);
+
+        if matched_kinds.is_empty() {
+            return Err(Self::unsupported_kind_pattern_error(
+                supported_kinds,
+                &kind_pattern,
+            ));
+        }
+
+        let matched_kind_names = matched_kinds
+            .iter()
+            .map(|descriptor| descriptor.kind.clone())
+            .collect::<Vec<_>>();
+
+        let collected = Self::collect_unique_bounded_identities(
+            Self::remaining_expanded_results(expanded_results, options),
+            options.max_expanded_results,
+            seen_target_keys,
+            |pagination| {
+                let request_kinds = matched_kind_names.clone();
+                async move {
+                    resource_facade
+                        .search_identities(SearchResourceIdentitiesRequest {
+                            kinds: request_kinds,
+                            exact_names: None,
+                            name_pattern: None,
+                            account: None,
+                            pagination,
+                        })
+                        .await
+                        .map_err(Into::into)
+                }
             },
         )
         .await?;

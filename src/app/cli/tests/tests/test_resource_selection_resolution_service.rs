@@ -244,6 +244,71 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_kinds(vec![
+        harness.secretset_kind_descriptor(),
+        harness.storage_kind_descriptor(),
+    ]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_identities(
+        1,
+        vec![
+            ResourceIdentityView {
+                kind: SECRETSET_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                name: "db-creds".to_string(),
+            },
+            ResourceIdentityView {
+                kind: STORAGE_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: STORAGES_NAME.to_string(),
+                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                name: "warehouse".to_string(),
+            },
+        ],
+        Arc::clone(&search_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::KindPatternAll {
+                    kind_pattern: KIND_PATTERN_S.to_string(),
+                    selector_input: "%".to_string(),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 2);
+    assert_eq!(result.targets[0].canonical_kind_name, SECRETSETS_NAME);
+    assert_eq!(result.targets[1].canonical_kind_name, STORAGES_NAME);
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].kinds,
+        vec![SECRETSET_KIND.to_string(), STORAGE_KIND.to_string()]
+    );
+    assert_eq!(requests[0].exact_names, None);
+    assert_eq!(requests[0].name_pattern, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn kind_pattern_exact_uuid_tries_every_matched_kind() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let uid = ResourceUID::new(uuid::Uuid::new_v4());
@@ -447,6 +512,81 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn deduplicates_kind_pattern_all_before_counting_max_results() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_identities(
+        1,
+        vec![ResourceIdentityView {
+            kind: SECRETSET_KIND.to_string(),
+            api_version: API_VERSION_V1.to_string(),
+            canonical_kind_name: SECRETSETS_NAME.to_string(),
+            uid: shared_uid,
+            name: RESOURCE_DB_CREDS.to_string(),
+        }],
+        Arc::clone(&search_requests),
+    );
+
+    let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_identity(
+        1,
+        HashMap::from([(
+            SECRETSET_KIND.to_string(),
+            Some(ResourceIdentityView {
+                kind: SECRETSET_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                uid: shared_uid,
+                name: RESOURCE_DB_CREDS.to_string(),
+            }),
+        )]),
+        Arc::clone(&get_identity_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![
+                    ResourceSelectionItem::KindPatternAll {
+                        kind_pattern: KIND_PATTERN_S.to_string(),
+                        selector_input: "%".to_string(),
+                    },
+                    ResourceSelectionItem::KindPatternExactName {
+                        kind_pattern: KIND_PATTERN_S.to_string(),
+                        selector_input: format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"),
+                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
+                            RESOURCE_DB_CREDS.to_string(),
+                        ),
+                    },
+                ],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(1),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+    assert_eq!(result.targets[0].uid, shared_uid);
+
+    let search_requests = search_requests.lock().unwrap();
+    assert_eq!(search_requests.len(), 1);
+
+    let get_identity_requests = get_identity_requests.lock().unwrap();
+    assert_eq!(get_identity_requests.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,7 @@ mod resource_kind_lookup_service_impl;
 mod resource_manifest_discovery_service_impl;
 mod resource_manifest_execution_service_impl;
 mod resource_selection_resolution_service_impl;
+mod resource_selection_syntax_parser;
 mod resource_selection_syntax_service_impl;
 mod resource_selector_resolution_service_impl;
 mod resource_summary_service_impl;

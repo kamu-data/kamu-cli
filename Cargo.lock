@@ -7768,6 +7768,7 @@ dependencies = [
  "dill",
  "dirs",
  "file-utils",
+ "fixedbitset 0.5.7",
  "fs_extra",
  "futures",
  "generic-array 0.14.7",

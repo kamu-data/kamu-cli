@@ -10,8 +10,14 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use fixedbitset::FixedBitSet;
 use kamu_resources::ResourceKindDescriptor;
 
+use super::resource_selection_syntax_parser::{
+    ALL_SELECTOR,
+    ParsedSyntax,
+    ResourceSelectionSyntaxParser,
+};
 use crate::CLIError;
 use crate::resources::{
     ResolvedResourceSelector,
@@ -43,7 +49,7 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
         explicit_context_name: Option<&str>,
         args: &[String],
     ) -> Result<ResourceSelectionSyntax, CLIError> {
-        let parsed = Self::parse_syntax(args)?;
+        let parsed = ResourceSelectionSyntaxParser::parse(args)?;
 
         let supported_kinds = self
             .resource_kind_lookup_service
@@ -58,31 +64,6 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const ALL_SELECTOR: &str = "all";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-enum ParsedSyntax<'a> {
-    /// `all` — all resources across supported kinds; other args are shadowed.
-    All {
-        shadowed_inputs: Vec<ShadowedParsedInput<'a>>,
-    },
-    /// `kind sel1 sel2 ...` — kind is a plain word, selectors have no `/`
-    SameKind {
-        kind_str: &'a str,
-        selector_inputs: Vec<&'a str>,
-    },
-    /// `kind/sel1 kind/sel2 ...` — every arg contains exactly one `/`
-    RefForm { pairs: Vec<(&'a str, &'a str)> },
-}
-
-#[derive(Debug)]
-struct ShadowedParsedInput<'a> {
-    kind_str: Option<&'a str>,
-    display: &'a str,
-}
 
 impl ResourceSelectionSyntaxServiceImpl {
     async fn interpret_parsed_syntax_with<F, Fut>(
@@ -114,19 +95,41 @@ impl ResourceSelectionSyntaxServiceImpl {
                 }
             }
 
+            // kind sel1 sel2 ..
             ParsedSyntax::SameKind {
                 kind_str,
                 selector_inputs,
             } => {
-                if selector_inputs.contains(&ALL_SELECTOR) {
+                // Same-kind syntax has a single explicit kind and only varies by
+                // selector names. The only broad token in this mode is `all`,
+                // so coverage checks are O(n) and local to the selector list.
+
+                // Note: parsing ensured `kind_str` is never "all" or "%", that goes to
+                // `ParsedSyntax::All`. `kind_str` can still be a pattern.
+
+                if selector_inputs
+                    .iter()
+                    .any(|selector_input| selector_input.eq_ignore_ascii_case(ALL_SELECTOR))
+                {
+                    // Keep the original `all` spelling as typed by user in
+                    // `selector_input` for diagnostics output.
                     items.push(Self::make_all_by_kind_item(
                         supported_kinds,
                         kind_str,
-                        ALL_SELECTOR.to_owned(),
+                        selector_inputs
+                            .iter()
+                            .find(|selector_input| {
+                                selector_input.eq_ignore_ascii_case(ALL_SELECTOR)
+                            })
+                            .expect("same-kind all selector should exist")
+                            .to_string(),
                     )?);
 
+                    // Any concrete selector for the same kind is fully covered
+                    // by `<kind>/all`, so record it as shadowed instead of
+                    // scheduling additional selector-resolution work.
                     for selector_input in selector_inputs {
-                        if selector_input != ALL_SELECTOR {
+                        if !selector_input.eq_ignore_ascii_case(ALL_SELECTOR) {
                             // Keep only the broad selector in `items`; narrower selectors
                             // move to `shadowed_selectors` so resolution and delete
                             // validation can treat them as already covered.
@@ -145,31 +148,80 @@ impl ResourceSelectionSyntaxServiceImpl {
                 }
             }
 
+            // kind1/sel1 kind2/sel2 ..
             ParsedSyntax::RefForm { pairs } => {
-                let all_by_kind: std::collections::BTreeSet<&str> = pairs
-                    .iter()
-                    .filter_map(|(kind_str, selector_input)| {
-                        (*selector_input == ALL_SELECTOR).then_some(*kind_str)
-                    })
-                    .collect();
+                // Broad selector coverage is represented as a bit mask over the
+                // fixed supported-kind ordering, so superset/equality checks do
+                // not allocate or compare string sets.
+                let mut broad_selector_coverages = Vec::new();
+                let mut broad_selector_union_coverage =
+                    KindCoverageMask::new(supported_kinds.len());
+                for (kind_str, selector_input) in &pairs {
+                    if let Some(coverage) = Self::ref_form_broad_kind_coverage(
+                        supported_kinds,
+                        kind_str,
+                        selector_input,
+                    ) {
+                        broad_selector_union_coverage.union_with(&coverage);
+                        Self::push_unique_coverage(&mut broad_selector_coverages, coverage);
+                    }
+                }
 
-                let mut emitted_all_by_kind = std::collections::BTreeSet::new();
+                // Avoid emitting duplicate broad selectors that expand to exactly
+                // the same set of target kinds (e.g. aliases or equivalent
+                // patterns), while still reporting shadowed specifics.
+                let mut emitted_broad_selectors = Vec::new();
 
                 for (kind_str, selector_input) in pairs {
-                    if selector_input == ALL_SELECTOR {
-                        if emitted_all_by_kind.insert(kind_str) {
-                            items.push(Self::make_all_by_kind_item(
+                    let selector_display = format!("{kind_str}/{selector_input}");
+                    // Compute the kind set this selector can possibly touch.
+                    // If kind lookup fails, treat it as a regular selector and
+                    // defer error handling to item construction.
+                    let Some(current_selector_matched_kinds) =
+                        Self::kind_coverage_for_selector_target(supported_kinds, kind_str)
+                    else {
+                        items.push(
+                            make_selector_item(kind_str.to_owned(), selector_input.to_owned())
+                                .await?,
+                        );
+                        continue;
+                    };
+
+                    let is_broad_selector = Self::is_ref_form_broad_selector(selector_input);
+                    // Broad selector is shadowed when some other broad selector
+                    // covers a strict superset of its matched kinds.
+                    let is_shadowed_by_broader_selector =
+                        broad_selector_coverages.iter().any(|broad_coverage| {
+                            broad_coverage != &current_selector_matched_kinds
+                                && broad_coverage.is_superset(&current_selector_matched_kinds)
+                        });
+
+                    if is_shadowed_by_broader_selector {
+                        shadowed_selectors.push(ResourceShadowedSelector {
+                            selector_input: selector_display,
+                        });
+                        continue;
+                    }
+
+                    if is_broad_selector {
+                        // Emit only once per covered kind-set to keep `items`
+                        // minimal and deterministic.
+                        let emission_key = current_selector_matched_kinds.clone();
+                        if Self::push_unique_coverage(&mut emitted_broad_selectors, emission_key) {
+                            items.push(Self::make_ref_form_broad_item(
                                 supported_kinds,
                                 kind_str,
                                 selector_input.to_owned(),
                             )?);
                         }
-                    } else if all_by_kind.contains(kind_str) {
-                        // Same idea for slash form: once `kind/all` is present we retain
-                        // only that broad item for resolution and record the rest as
-                        // shadowed diagnostics.
+                    } else if broad_selector_union_coverage
+                        .is_superset(&current_selector_matched_kinds)
+                    {
+                        // Narrow selector in ref-form is shadowed when its
+                        // matched kind-set is contained in the union of broad
+                        // selector coverages.
                         shadowed_selectors.push(ResourceShadowedSelector {
-                            selector_input: format!("{kind_str}/{selector_input}"),
+                            selector_input: selector_display,
                         });
                     } else {
                         items.push(
@@ -197,6 +249,9 @@ impl ResourceSelectionSyntaxServiceImpl {
         selector_input: String,
     ) -> Result<ResourceSelectionItem, CLIError> {
         if Self::is_pattern(kind_str) {
+            if kind_str == "%" {
+                return Ok(ResourceSelectionItem::All);
+            }
             return Ok(ResourceSelectionItem::KindPatternAll {
                 kind_pattern: kind_str.to_owned(),
                 selector_input,
@@ -213,6 +268,18 @@ impl ResourceSelectionSyntaxServiceImpl {
             kind_descriptor,
             selector_input,
         })
+    }
+
+    fn make_ref_form_broad_item(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: &str,
+        selector_input: String,
+    ) -> Result<ResourceSelectionItem, CLIError> {
+        if selector_input == "%" {
+            return Self::make_all_by_kind_item(supported_kinds, kind_str, selector_input);
+        }
+
+        Self::make_all_by_kind_item(supported_kinds, kind_str, selector_input)
     }
 
     fn validate_shadowed_kind_target(
@@ -344,100 +411,83 @@ impl ResourceSelectionSyntaxServiceImpl {
         targets
     }
 
-    /// Parses raw CLI `args` into a [`ParsedSyntax`] variant.
-    ///
-    /// Accepted forms:
-    /// - Same-kind: first arg has no `/`, remaining args have no `/`, at least
-    ///   two args total.
-    /// - Ref form: every arg contains exactly one `/` with non-empty parts on
-    ///   both sides.
-    /// - Mixed forms are rejected.
-    fn parse_syntax(args: &[String]) -> Result<ParsedSyntax<'_>, CLIError> {
-        if args.is_empty() {
-            return Err(CLIError::usage_error("Expected `kind name` or `kind/name`"));
-        }
+    fn is_ref_form_broad_selector(selector_input: &str) -> bool {
+        selector_input.eq_ignore_ascii_case(ALL_SELECTOR) || selector_input == "%"
+    }
 
-        let has_slash = args.iter().any(|a| a.contains('/'));
-        let has_plain = args.iter().any(|a| !a.contains('/'));
+    fn ref_form_broad_kind_coverage(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: &str,
+        selector_input: &str,
+    ) -> Option<KindCoverageMask> {
+        Self::is_ref_form_broad_selector(selector_input)
+            .then(|| Self::kind_coverage_for_selector_target(supported_kinds, kind_str))
+            .flatten()
+    }
 
-        if has_slash && has_plain {
-            if args.iter().any(|arg| arg == ALL_SELECTOR) {
-                let mut shadowed_inputs = Vec::new();
-                for arg in args {
-                    if arg == ALL_SELECTOR {
-                        continue;
-                    }
-
-                    if arg.contains('/') {
-                        let (kind_str, _) = Self::parse_ref_arg(arg)?;
-                        shadowed_inputs.push(ShadowedParsedInput {
-                            kind_str: Some(kind_str),
-                            display: arg,
-                        });
-                    } else {
-                        shadowed_inputs.push(ShadowedParsedInput {
-                            kind_str: None,
-                            display: arg,
-                        });
-                    }
-                }
-                return Ok(ParsedSyntax::All { shadowed_inputs });
-            }
-
-            return Err(CLIError::usage_error(
-                "Cannot mix positional `kind name` and slash `kind/name` syntax in the same \
-                 command",
-            ));
-        }
-
-        if has_slash {
-            // Ref form: every arg must be `kind/selector`
-            let mut pairs = Vec::with_capacity(args.len());
-            for arg in args {
-                pairs.push(Self::parse_ref_arg(arg)?);
-            }
-            Ok(ParsedSyntax::RefForm { pairs })
+    fn push_unique_coverage(
+        coverages: &mut Vec<KindCoverageMask>,
+        coverage: KindCoverageMask,
+    ) -> bool {
+        if coverages.iter().any(|existing| existing == &coverage) {
+            false
         } else {
-            if args[0] == ALL_SELECTOR {
-                let shadowed_inputs = args[1..]
-                    .iter()
-                    .map(|arg| ShadowedParsedInput {
-                        kind_str: None,
-                        display: arg.as_str(),
-                    })
-                    .collect();
-                return Ok(ParsedSyntax::All { shadowed_inputs });
-            }
-
-            // Same-kind form: `kind sel1 sel2 ...`
-            if args.len() < 2 {
-                return Err(CLIError::usage_error(format!(
-                    "Invalid resource reference `{}`. Expected `kind/name`",
-                    args[0]
-                )));
-            }
-            let kind_str = args[0].as_str();
-            let selector_inputs = args[1..].iter().map(String::as_str).collect();
-            Ok(ParsedSyntax::SameKind {
-                kind_str,
-                selector_inputs,
-            })
+            coverages.push(coverage);
+            true
         }
     }
 
-    fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {
-        let parts: Vec<&str> = arg.splitn(2, '/').collect();
-        if parts.len() == 2
-            && !parts[0].is_empty()
-            && !parts[1].is_empty()
-            && !parts[1].contains('/')
-        {
-            Ok((parts[0], parts[1]))
-        } else {
-            Err(CLIError::usage_error(format!(
-                "Invalid resource reference `{arg}`. Expected `kind/name`"
-            )))
+    fn kind_coverage_for_selector_target(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: &str,
+    ) -> Option<KindCoverageMask> {
+        if Self::is_pattern(kind_str) {
+            let mut matched_kinds = KindCoverageMask::new(supported_kinds.len());
+            for (index, descriptor) in supported_kinds.iter().enumerate() {
+                if descriptor.matches_selector_pattern(kind_str) {
+                    matched_kinds.insert(index);
+                }
+            }
+
+            return Some(matched_kinds);
         }
+
+        supported_kinds
+            .iter()
+            .enumerate()
+            .find(|(_, descriptor)| descriptor.matches_selector(kind_str))
+            .map(|(index, _)| {
+                let mut matched_kinds = KindCoverageMask::new(supported_kinds.len());
+                matched_kinds.insert(index);
+                matched_kinds
+            })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KindCoverageMask {
+    bits: FixedBitSet,
+}
+
+impl KindCoverageMask {
+    fn new(num_kinds: usize) -> Self {
+        Self {
+            bits: FixedBitSet::with_capacity(num_kinds),
+        }
+    }
+
+    fn insert(&mut self, index: usize) {
+        self.bits.insert(index);
+    }
+
+    fn is_superset(&self, other: &Self) -> bool {
+        self.bits.is_superset(&other.bits)
+    }
+
+    fn union_with(&mut self, other: &Self) {
+        self.bits.union_with(&other.bits);
     }
 }
 
@@ -445,8 +495,6 @@ impl ResourceSelectionSyntaxServiceImpl {
 
 #[cfg(test)]
 mod tests {
-    use std::assert_matches;
-
     use kamu_resources_facade::ResourceRef;
 
     use super::*;
@@ -481,192 +529,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_parse_syntax_two_plain() {
-        let a = args(&["vs", "my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
-                selector_inputs,
-            }) if selector_inputs == vec!["my-vars"]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_same_kind_multiple() {
-        let a = args(&["vs", "vars-a", "vars-b"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
-                selector_inputs,
-            }) if selector_inputs == vec!["vars-a", "vars-b"]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_single() {
-        let a = args(&["vs/my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "my-vars")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_multiple() {
-        let a = args(&["vs/vars-a", "ss/db-creds"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "vars-a"), ("ss", "db-creds")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_uuid() {
-        let a = args(&["vs/3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all() {
-        let a = args(&["all"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.is_empty()
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_shadowed_plain() {
-        let a = args(&["all", "some-name"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].kind_str.is_none()
-                && shadowed_inputs[0].display == "some-name"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_shadowed_ref_form() {
-        let a = args(&["all", "vs/my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].kind_str == Some("vs")
-                && shadowed_inputs[0].display == "vs/my-vars"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_mixed_shadowed() {
-        let a = args(&["all", "vs/my-vars", "some-name"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::All { shadowed_inputs })
-            if shadowed_inputs.len() == 2
-                && shadowed_inputs[0].kind_str == Some("vs")
-                && shadowed_inputs[0].display == "vs/my-vars"
-                && shadowed_inputs[1].kind_str.is_none()
-                && shadowed_inputs[1].display == "some-name"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_same_kind_all() {
-        let a = args(&["vs", "all", "my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
-                selector_inputs,
-            }) if selector_inputs == vec!["all", "my-vars"]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_all_by_kind_single() {
-        let a = args(&["vs/all"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_all_by_kind_with_shadowed() {
-        let a = args(&["vs/all", "vs/my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all"), ("vs", "my-vars")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_same_kind_name_pattern() {
-        let a = args(&["vs", "app-%"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
-                selector_inputs,
-            }) if selector_inputs == vec!["app-%"]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_same_kind_kind_pattern() {
-        let a = args(&["s%", "db-creds"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "s%",
-                selector_inputs,
-            }) if selector_inputs == vec!["db-creds"]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_name_pattern() {
-        let a = args(&["vs/app-%"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "app-%")]
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_slash_form_kind_pattern() {
-        let a = args(&["s%/db-creds"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("s%", "db-creds")]
-        );
-    }
-
-    #[tokio::test]
-    async fn test_interpret_same_kind_name_pattern_without_lookup_service() {
-        let selector_args = args(&["vs", "app-%"]);
-        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
+    async fn interpret(selector_args: &[&str]) -> ResourceSelectionSyntax {
+        let selector_args = args(selector_args);
+        let parsed = ResourceSelectionSyntaxParser::parse(&selector_args).unwrap();
         let supported_kinds = supported_kinds();
-        let supported_kinds_for_resolution = supported_kinds.clone();
 
-        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
+        ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
             &supported_kinds,
             parsed,
             |kind_str, selector_input| {
-                let supported_kinds = supported_kinds_for_resolution.clone();
+                let supported_kinds = supported_kinds.clone();
                 async move {
                     ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
                         &supported_kinds,
@@ -679,127 +551,269 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+    }
 
-        assert_matches!(
-            syntax.items.as_slice(),
-            [ResourceSelectionItem::NamePattern {
+    fn describe_item(item: &ResourceSelectionItem) -> String {
+        match item {
+            ResourceSelectionItem::All => "all".to_owned(),
+            ResourceSelectionItem::AllByKind {
                 kind_descriptor,
                 selector_input,
-                name_pattern,
-            }] if kind_descriptor.name == "variables"
-                && selector_input == "app-%"
-                && name_pattern == "app-%"
-        );
-        assert!(syntax.shadowed_selectors.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_interpret_slash_kind_pattern_exact_name_without_lookup_service() {
-        let selector_args = args(&["s%/db-creds"]);
-        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
-        let supported_kinds = supported_kinds();
-        let supported_kinds_for_resolution = supported_kinds.clone();
-
-        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
-            &supported_kinds,
-            parsed,
-            |kind_str, selector_input| {
-                let supported_kinds = supported_kinds_for_resolution.clone();
-                async move {
-                    ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
-                        &supported_kinds,
-                        kind_str,
-                        selector_input,
-                        |selector_input| async move { Ok(resolved_selector(&selector_input)) },
-                    )
-                    .await
-                }
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_matches!(
-            syntax.items.as_slice(),
-            [ResourceSelectionItem::KindPatternExactName {
+            } => format!("all-by-kind:{}:{selector_input}", kind_descriptor.name),
+            ResourceSelectionItem::KindPatternAll {
                 kind_pattern,
                 selector_input,
-                resource_ref: ResourceRef::ByName(resource_name),
-            }] if kind_pattern == "s%"
-                && selector_input == "s%/db-creds"
-                && resource_name == "db-creds"
-        );
-        assert!(syntax.shadowed_selectors.is_empty());
+            } => format!("kind-pattern-all:{kind_pattern}:{selector_input}"),
+            ResourceSelectionItem::Exact(ResourceExactSelector {
+                kind_descriptor,
+                selector_input,
+                ..
+            }) => format!("exact:{}:{selector_input}", kind_descriptor.name),
+            ResourceSelectionItem::NamePattern {
+                kind_descriptor,
+                selector_input,
+                ..
+            } => format!("name-pattern:{}:{selector_input}", kind_descriptor.name),
+            ResourceSelectionItem::KindPatternExactName {
+                kind_pattern,
+                selector_input,
+                ..
+            } => format!("kind-pattern-exact:{kind_pattern}:{selector_input}"),
+            ResourceSelectionItem::KindPatternNamePattern {
+                kind_pattern,
+                selector_input,
+                ..
+            } => format!("kind-pattern-name:{kind_pattern}:{selector_input}"),
+        }
+    }
+
+    fn describe_shadowed(syntax: &ResourceSelectionSyntax) -> Vec<String> {
+        syntax
+            .shadowed_selectors
+            .iter()
+            .map(|selector| selector.selector_input.clone())
+            .collect()
+    }
+
+    fn describe_items(syntax: &ResourceSelectionSyntax) -> Vec<String> {
+        syntax.items.iter().map(describe_item).collect()
     }
 
     #[tokio::test]
-    async fn test_interpret_all_with_shadowed_ref_uses_supported_kinds_without_lookup_service() {
-        let selector_args = args(&["all", "vs/app-%"]);
-        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
-        let supported_kinds = supported_kinds();
+    async fn test_interpret_ref_form_broad_selector_matrix() {
+        struct Case {
+            name: &'static str,
+            input: &'static [&'static str],
+            expected_items: &'static [&'static str],
+            expected_shadowed: &'static [&'static str],
+        }
 
-        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
-            &supported_kinds,
-            parsed,
-            |_kind_str, _selector_input| async move { panic!("unexpected selector resolution") },
-        )
-        .await
-        .unwrap();
+        let cases = [
+            Case {
+                name: "global broad shadows narrower broad",
+                input: &["%/%", "s%/%"],
+                expected_items: &["all"],
+                expected_shadowed: &["s%/%"],
+            },
+            Case {
+                name: "global broad shadows exact kind broad",
+                input: &["%/all", "ss/%"],
+                expected_items: &["all"],
+                expected_shadowed: &["ss/%"],
+            },
+            Case {
+                name: "equal broad coverages emit once without shadowing",
+                input: &["ss/%", "secrets/all"],
+                expected_items: &["all-by-kind:secrets:%"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "duplicate alias broad coverage emits once",
+                input: &["secrets/%", "ss/%"],
+                expected_items: &["all-by-kind:secrets:%"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "global wildcard normalizes to all",
+                input: &["%/%"],
+                expected_items: &["all"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "kind pattern wildcard emits kind-pattern-all",
+                input: &["s%/%"],
+                expected_items: &["kind-pattern-all:s%:%"],
+                expected_shadowed: &[],
+            },
+        ];
 
-        assert_matches!(syntax.items.as_slice(), [ResourceSelectionItem::All]);
-        assert_matches!(
-            syntax.shadowed_selectors.as_slice(),
-            [ResourceShadowedSelector { selector_input }] if selector_input == "vs/app-%"
-        );
+        for case in cases {
+            let syntax = interpret(case.input).await;
+
+            assert_eq!(
+                describe_items(&syntax),
+                case.expected_items,
+                "items mismatch for case: {}",
+                case.name,
+            );
+            assert_eq!(
+                describe_shadowed(&syntax),
+                case.expected_shadowed,
+                "shadowed mismatch for case: {}",
+                case.name,
+            );
+        }
     }
 
-    #[test]
-    fn test_parse_syntax_single_no_slash_is_error() {
-        let a = args(&["vs"]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
+    #[tokio::test]
+    async fn test_interpret_ref_form_narrow_selector_shadow_matrix() {
+        struct Case {
+            name: &'static str,
+            input: &'static [&'static str],
+            expected_items: &'static [&'static str],
+            expected_shadowed: &'static [&'static str],
+        }
+
+        let cases = [
+            Case {
+                name: "narrow exact is shadowed by matching broad pattern",
+                input: &["s%/%", "ss/db-creds"],
+                expected_items: &["kind-pattern-all:s%:%"],
+                expected_shadowed: &["ss/db-creds"],
+            },
+            Case {
+                name: "narrow exact is not shadowed by non superset broad pattern",
+                input: &["s%/%", "vs/my-vars"],
+                expected_items: &["kind-pattern-all:s%:%", "exact:variables:my-vars"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "global broad shadows exact selector",
+                input: &["%/%", "vs/my-vars"],
+                expected_items: &["all"],
+                expected_shadowed: &["vs/my-vars"],
+            },
+            Case {
+                name: "exact kind broad shadows exact selector of same kind",
+                input: &["ss/%", "ss/db-creds"],
+                expected_items: &["all-by-kind:secrets:%"],
+                expected_shadowed: &["ss/db-creds"],
+            },
+            Case {
+                name: "exact kind broad does not shadow selector of different kind",
+                input: &["ss/%", "vs/my-vars"],
+                expected_items: &["all-by-kind:secrets:%", "exact:variables:my-vars"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "kind pattern exact name is preserved",
+                input: &["s%/db-creds"],
+                expected_items: &["kind-pattern-exact:s%:s%/db-creds"],
+                expected_shadowed: &[],
+            },
+        ];
+
+        for case in cases {
+            let syntax = interpret(case.input).await;
+
+            assert_eq!(
+                describe_items(&syntax),
+                case.expected_items,
+                "items mismatch for case: {}",
+                case.name,
+            );
+            assert_eq!(
+                describe_shadowed(&syntax),
+                case.expected_shadowed,
+                "shadowed mismatch for case: {}",
+                case.name,
+            );
+        }
     }
 
-    #[test]
-    fn test_parse_syntax_slash_missing_name_is_error() {
-        let a = args(&["vs/"]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
+    #[tokio::test]
+    async fn test_interpret_same_kind_matrix() {
+        struct Case {
+            name: &'static str,
+            input: &'static [&'static str],
+            expected_items: &'static [&'static str],
+            expected_shadowed: &'static [&'static str],
+        }
+
+        let cases = [
+            Case {
+                name: "same-kind name pattern",
+                input: &["vs", "app-%"],
+                expected_items: &["name-pattern:variables:app-%"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "same-kind all remains case insensitive",
+                input: &["vs", "ALL", "my-vars"],
+                expected_items: &["all-by-kind:variables:ALL"],
+                expected_shadowed: &["my-vars"],
+            },
+        ];
+
+        for case in cases {
+            let syntax = interpret(case.input).await;
+
+            assert_eq!(
+                describe_items(&syntax),
+                case.expected_items,
+                "items mismatch for case: {}",
+                case.name,
+            );
+            assert_eq!(
+                describe_shadowed(&syntax),
+                case.expected_shadowed,
+                "shadowed mismatch for case: {}",
+                case.name,
+            );
+        }
     }
 
-    #[test]
-    fn test_parse_syntax_slash_form_malformed_second_arg_is_error() {
-        // First arg is valid but second is missing the name part
-        let a = args(&["vs/vars-a", "ss/"]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
-    }
+    #[tokio::test]
+    async fn test_interpret_all_variant_matrix() {
+        struct Case {
+            name: &'static str,
+            input: &'static [&'static str],
+            expected_items: &'static [&'static str],
+            expected_shadowed: &'static [&'static str],
+        }
 
-    #[test]
-    fn test_parse_syntax_slash_form_extra_slash_is_error() {
-        // `vs/foo/bar` has two slashes — the selector part itself contains `/`
-        let a = args(&["vs/foo/bar"]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
-    }
+        let cases = [
+            Case {
+                name: "global all keeps shadowed ref selector",
+                input: &["all", "vs/app-%"],
+                expected_items: &["all"],
+                expected_shadowed: &["vs/app-%"],
+            },
+            Case {
+                name: "global all keeps shadowed plain selector",
+                input: &["all", "my-vars"],
+                expected_items: &["all"],
+                expected_shadowed: &["my-vars"],
+            },
+        ];
 
-    #[test]
-    fn test_parse_syntax_slash_missing_kind_is_error() {
-        let a = args(&["/my-vars"]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
-    }
+        for case in cases {
+            let syntax = interpret(case.input).await;
 
-    #[test]
-    fn test_parse_syntax_mixed_syntax_is_error() {
-        // "vs my-vars ss/db-creds" mixes plain and slash forms
-        let a = args(&["vs", "my-vars", "ss/db-creds"]);
-        assert_matches!(
-            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
-            Err(ref e) if e.to_string().contains("mix")
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_empty_is_error() {
-        let a = args(&[]);
-        assert_matches!(ResourceSelectionSyntaxServiceImpl::parse_syntax(&a), Err(_));
+            assert_eq!(
+                describe_items(&syntax),
+                case.expected_items,
+                "items mismatch for case: {}",
+                case.name,
+            );
+            assert_eq!(
+                describe_shadowed(&syntax),
+                case.expected_shadowed,
+                "shadowed mismatch for case: {}",
+                case.name,
+            );
+        }
     }
 }
 
