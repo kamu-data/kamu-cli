@@ -140,7 +140,7 @@ async fn get_secret_key(
         Ok(key) => return Ok(Some(key)),
         Err(GetDidSecretKeyError::NotFound(_)) => { /* continue */ }
         Err(e) => return Err(e),
-    };
+    }
 
     // 2. Try for a dataset
     let dataset = DidEntity::new_dataset(key);
