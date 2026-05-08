@@ -473,6 +473,40 @@ async fn ignores_unmatched_kind_pattern_exact_selectors_when_requested() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn errors_on_unmatched_kind_pattern_exact_selectors_by_default() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_get_identity(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
+
+    let error = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::KindPatternExactName {
+                    kind_pattern: KIND_PATTERN_S.to_string(),
+                    selector_input: format!("{KIND_PATTERN_S}/missing"),
+                    resource_ref: kamu_resources_facade::ResourceRef::ByName("missing".to_string()),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        format!("Selector `missing` did not match any resource kind matched by `{KIND_PATTERN_S}`")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn ignores_unmatched_kind_pattern_name_patterns_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
@@ -791,6 +825,72 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let second_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_identities(
+        1,
+        vec![
+            ResourceIdentityView {
+                kind: VARIABLESET_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: VARIABLESETS_NAME.to_string(),
+                uid: shared_uid,
+                name: "app-alpha".to_string(),
+            },
+            ResourceIdentityView {
+                kind: VARIABLESET_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: VARIABLESETS_NAME.to_string(),
+                uid: second_uid,
+                name: "app-beta".to_string(),
+            },
+        ],
+        Arc::clone(&search_requests),
+    );
+
+    let error = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![
+                    ResourceSelectionItem::NamePattern {
+                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        selector_input: NAME_APP_PATTERN.to_string(),
+                        name_pattern: NAME_APP_PATTERN.to_string(),
+                    },
+                    ResourceSelectionItem::NamePattern {
+                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        selector_input: "%beta".to_string(),
+                        name_pattern: "%beta".to_string(),
+                    },
+                ],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(1),
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "Selection matched more than 1 resources; refine selectors, pass --max-results N, or pass \
+         --unbounded"
+    );
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

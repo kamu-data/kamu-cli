@@ -697,6 +697,10 @@ Delete a single resource:
 
     kamu delete storages warehouse
 
+Delete same-kind resources by name pattern:
+
+    kamu delete vs app-%
+
 Delete all resources of a kind:
 
     kamu delete storages --all
@@ -708,6 +712,14 @@ Delete all resources across kinds:
 Delete resources using slash selectors:
 
     kamu delete vs/my-vars ss/my-secrets
+
+Delete the same exact name across a matched kind pattern:
+
+    kamu delete s% db-creds
+
+Delete matched resources across a kind pattern and name pattern:
+
+    kamu delete s%/db-%
 
 Delete all resources of a kind using a slash selector:
 
@@ -811,9 +823,21 @@ Get multiple resources of the same kind:
 
     kamu get variablesets vars-a vars-b
 
+Get same-kind resources by name pattern:
+
+    kamu get vs app-%
+
 Get multiple resources by slash-separated ref form:
 
     kamu get vs/vars-a ss/db-creds
+
+Get the same exact name across a matched kind pattern:
+
+    kamu get s% db-creds
+
+Get matched resources across a kind pattern and name pattern:
+
+    kamu get s%/db-%
 
 Get a resource by UUID:
 
