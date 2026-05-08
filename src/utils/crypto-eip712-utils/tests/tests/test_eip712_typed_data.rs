@@ -9,9 +9,8 @@
 
 use alloy_primitives::{b256, hex};
 use alloy_signer::SignerSync;
-use alloy_signer::k256::ecdsa::SigningKey;
-use alloy_signer_local::LocalSigner;
-use crypto_eip712_utils::Eip712TypedData;
+use alloy_signer_local::PrivateKeySigner;
+use crypto_eip712_utils::eip712_typed_data;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -22,7 +21,7 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     // Adapted from:
     // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md
 
-    let typed_data = Eip712TypedData::from_json(json!({
+    let typed_data = eip712_typed_data::from_json(json!({
         "domain": {
             "name": "MoleculeOclDidRegistry",
             "version": "1",
@@ -96,11 +95,23 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     }
 
     // 5) Test private key + expected signature (w/ EIP-191 prefix)
-    // a) alloy
+    // a) alloy: via sign_dynamic_typed_data_sync()
     {
-        let signer: LocalSigner<SigningKey> =
+        let signer: PrivateKeySigner =
             "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601".parse()?;
+
         let actual_signature = signer.sign_dynamic_typed_data_sync(typed_data.as_ref())?;
+        let expected_signature = "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c";
+
+        assert_eq!(expected_signature, actual_signature.to_string());
+    }
+    // b) alloy: via sign_hash_sync()
+    {
+        let signer: PrivateKeySigner =
+            "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601".parse()?;
+        let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
+
+        let actual_signature = signer.sign_hash_sync(&signed_hash)?;
         let expected_signature = "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c";
 
         assert_eq!(expected_signature, actual_signature.to_string());

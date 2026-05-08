@@ -36,6 +36,9 @@ internal-error = { workspace = true }
 #] }
 alloy-dyn-abi = { version = "1.5.7", default-features = false, features = ["eip712"] }
 alloy-primitives = { version = "1.5.7", default-features = false, features = [] }
+# TODO: Molecule: Phase 3: depend directly to smaller crates
+alloy-signer = { version = "=1.7.3", default-features = false, features = ["eip712"] }
+alloy-signer-local = { version = "=1.7.3", default-features = false, features = [] }
 nutype = { version = "0.6", default-features = false, features = [
     "serde"
 ] }
@@ -52,8 +55,6 @@ odf-metadata = { workspace = true }
 #    "signer-local",
 #    "signers",
 #] }
-alloy-signer = { version = "=1.7.3", default-features = false, features = ["eip712"] }
-alloy-signer-local = { version = "=1.7.3", default-features = false, features = [] }
 eyre = { version = "0", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",

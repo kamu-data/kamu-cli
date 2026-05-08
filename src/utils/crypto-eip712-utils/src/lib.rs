@@ -9,7 +9,9 @@
 
 // Re-exports
 pub use alloy_primitives::B256;
+pub use alloy_signer::SignerSync;
+pub use alloy_signer_local::PrivateKeySigner;
 
-mod eip712_types;
+mod eip712_typed_data;
 
-pub use eip712_types::*;
+pub use eip712_typed_data::*;
