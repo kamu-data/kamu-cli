@@ -309,6 +309,78 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_kinds() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_kinds(vec![
+        harness.secretset_kind_descriptor(),
+        harness.storage_kind_descriptor(),
+    ]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_identities(
+        1,
+        vec![
+            ResourceIdentityView {
+                kind: SECRETSET_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                name: "db-creds".to_string(),
+            },
+            ResourceIdentityView {
+                kind: STORAGE_KIND.to_string(),
+                api_version: API_VERSION_V1.to_string(),
+                canonical_kind_name: STORAGES_NAME.to_string(),
+                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                name: "db-warehouse".to_string(),
+            },
+        ],
+        Arc::clone(&search_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::KindPatternNamePattern {
+                    kind_pattern: KIND_PATTERN_S.to_string(),
+                    selector_input: format!("{KIND_PATTERN_S}/db-%"),
+                    name_pattern: "db-%".to_string(),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 2);
+    assert_eq!(result.targets[0].canonical_kind_name, SECRETSETS_NAME);
+    assert_eq!(result.targets[1].canonical_kind_name, STORAGES_NAME);
+    assert!(
+        result
+            .targets
+            .iter()
+            .all(|target| target.selector_input == format!("{KIND_PATTERN_S}/db-%"))
+    );
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].kinds,
+        vec![SECRETSET_KIND.to_string(), STORAGE_KIND.to_string()]
+    );
+    assert_eq!(requests[0].exact_names, None);
+    assert_eq!(requests[0].name_pattern.as_deref(), Some("db-%"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn kind_pattern_exact_uuid_tries_every_matched_kind() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let uid = ResourceUID::new(uuid::Uuid::new_v4());
@@ -395,6 +467,79 @@ async fn ignores_unmatched_kind_pattern_exact_selectors_when_requested() {
     assert_eq!(
         result.ignored_selectors[0].selector_input,
         format!("{KIND_PATTERN_S}/missing")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn ignores_unmatched_kind_pattern_name_patterns_when_requested() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::KindPatternNamePattern {
+                    kind_pattern: KIND_PATTERN_S.to_string(),
+                    selector_input: format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}"),
+                    name_pattern: NAME_MISSING_PATTERN.to_string(),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: true,
+                max_expanded_results: Some(10),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert!(result.targets.is_empty());
+    assert_eq!(result.ignored_selectors.len(), 1);
+    assert_eq!(
+        result.ignored_selectors[0].selector_input,
+        format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn errors_on_unmatched_kind_pattern_name_patterns_by_default() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+
+    let error = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::KindPatternNamePattern {
+                    kind_pattern: KIND_PATTERN_S.to_string(),
+                    selector_input: format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}"),
+                    name_pattern: NAME_MISSING_PATTERN.to_string(),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "Pattern `{NAME_MISSING_PATTERN}` did not match any resource kind matched by \
+             `{KIND_PATTERN_S}`"
+        )
     );
 }
 
@@ -587,6 +732,65 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
 
     let get_identity_requests = get_identity_requests.lock().unwrap();
     assert_eq!(get_identity_requests.len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_identities(
+        2,
+        vec![ResourceIdentityView {
+            kind: SECRETSET_KIND.to_string(),
+            api_version: API_VERSION_V1.to_string(),
+            canonical_kind_name: SECRETSETS_NAME.to_string(),
+            uid: shared_uid,
+            name: RESOURCE_DB_CREDS.to_string(),
+        }],
+        Arc::clone(&search_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![
+                    ResourceSelectionItem::KindPatternNamePattern {
+                        kind_pattern: KIND_PATTERN_S.to_string(),
+                        selector_input: format!("{KIND_PATTERN_S}/db-%"),
+                        name_pattern: "db-%".to_string(),
+                    },
+                    ResourceSelectionItem::KindPatternNamePattern {
+                        kind_pattern: KIND_PATTERN_S.to_string(),
+                        selector_input: format!("{KIND_PATTERN_S}/%creds"),
+                        name_pattern: "%creds".to_string(),
+                    },
+                ],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(1),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+    assert_eq!(result.targets[0].uid, shared_uid);
+    assert_eq!(
+        result.targets[0].selector_input,
+        format!("{KIND_PATTERN_S}/db-%")
+    );
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

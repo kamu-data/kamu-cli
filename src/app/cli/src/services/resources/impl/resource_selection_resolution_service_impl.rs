@@ -177,8 +177,28 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
-                ResourceSelectionItem::KindPatternNamePattern { selector_input, .. } => {
-                    return Err(Self::patterns_not_supported_error(&selector_input));
+                ResourceSelectionItem::KindPatternNamePattern {
+                    kind_pattern,
+                    selector_input,
+                    name_pattern,
+                } => {
+                    let matched_supported_kinds = supported_kinds
+                        .as_deref()
+                        .expect("kind patterns require supported kinds");
+                    let new_targets = Self::process_kind_pattern_name_pattern_item(
+                        resource_facade,
+                        matched_supported_kinds,
+                        &seen_target_keys,
+                        kind_pattern,
+                        selector_input,
+                        name_pattern,
+                        expanded_results,
+                        &mut ignored_selectors,
+                        options,
+                    )
+                    .await?;
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
             }
         }
@@ -563,6 +583,79 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(targets)
     }
 
+    async fn process_kind_pattern_name_pattern_item(
+        resource_facade: &dyn ResourceFacade,
+        supported_kinds: &[ResourceKindDescriptor],
+        seen_target_keys: &HashSet<ResourceTargetKey>,
+        kind_pattern: String,
+        selector_input: String,
+        name_pattern: String,
+        expanded_results: usize,
+        ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
+        options: ResourceSelectionResolutionOptions,
+    ) -> Result<Vec<ResourceTarget>, CLIError> {
+        let matched_kinds = Self::matched_kind_descriptors(supported_kinds, &kind_pattern);
+
+        if matched_kinds.is_empty() {
+            return Err(Self::unsupported_kind_pattern_error(
+                supported_kinds,
+                &kind_pattern,
+            ));
+        }
+
+        let matched_kind_names = matched_kinds
+            .iter()
+            .map(|descriptor| descriptor.kind.clone())
+            .collect::<Vec<_>>();
+
+        let collected = Self::collect_unique_bounded_identities(
+            Self::remaining_expanded_results(expanded_results, options),
+            options.max_expanded_results,
+            seen_target_keys,
+            |pagination| {
+                let request_kinds = matched_kind_names.clone();
+                let request_name_pattern = name_pattern.clone();
+                async move {
+                    resource_facade
+                        .search_identities(SearchResourceIdentitiesRequest {
+                            kinds: request_kinds,
+                            exact_names: None,
+                            name_pattern: Some(request_name_pattern),
+                            account: None,
+                            pagination,
+                        })
+                        .await
+                        .map_err(Into::into)
+                }
+            },
+        )
+        .await?;
+
+        if collected.identities.is_empty() && !collected.had_any_match {
+            if options.ignore_not_found {
+                ignored_selectors.push(ResourceIgnoredSelector {
+                    kind_descriptor: matched_kinds
+                        .first()
+                        .expect("matched kinds should be non-empty")
+                        .clone(),
+                    selector_input,
+                });
+                return Ok(Vec::new());
+            }
+
+            return Err(Self::kind_pattern_name_pattern_not_found_error(
+                &kind_pattern,
+                &name_pattern,
+            ));
+        }
+
+        Ok(collected
+            .identities
+            .into_iter()
+            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .collect())
+    }
+
     fn process_exact_item(
         selector: crate::resources::ResourceExactSelector,
         exact_results: &mut std::vec::IntoIter<Result<ResourceIdentityView, GetResourceError>>,
@@ -668,12 +761,6 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
-    fn patterns_not_supported_error(selector_input: &str) -> CLIError {
-        CLIError::usage_error(format!(
-            "Resource selector patterns are not supported yet: `{selector_input}`"
-        ))
-    }
-
     fn matched_kind_descriptors(
         supported_kinds: &[ResourceKindDescriptor],
         kind_pattern: &str,
@@ -716,6 +803,15 @@ impl ResourceSelectionResolutionServiceImpl {
 
         CLIError::usage_error(format!(
             "Selector `{selector}` did not match any resource kind matched by `{kind_pattern}`"
+        ))
+    }
+
+    fn kind_pattern_name_pattern_not_found_error(
+        kind_pattern: &str,
+        name_pattern: &str,
+    ) -> CLIError {
+        CLIError::usage_error(format!(
+            "Pattern `{name_pattern}` did not match any resource kind matched by `{kind_pattern}`"
         ))
     }
 
