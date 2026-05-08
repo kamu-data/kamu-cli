@@ -56,6 +56,7 @@ use crate::{
     ResourcesSummaryError,
     ResourcesSummaryRequest,
     SearchResourceIdentitiesRequest,
+    SearchResourceIdentitiesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,6 +199,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     "#;
 
     const IDENTITY_LIST_FIELDS: &'static str = r#"
+        totalCount
         nodes {
           id
           apiVersion
@@ -619,7 +621,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     async fn search_resource_identities<E>(
         &self,
         request: &SearchResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, E>
+    ) -> Result<SearchResourceIdentitiesResponse, E>
     where
         E: From<GraphqlHttpRequestError> + From<InternalError>,
     {
@@ -629,14 +631,12 @@ impl RemoteGraphqlResourceFacadeImpl {
             Self::search_resource_identities_query(request, page, per_page).map_err(E::from)?;
         let response: fragments::SearchIdentitiesQueryDataFragment =
             self.execute_graphql(&query).await?;
+        let connection = response.resources.search_identities;
 
-        Ok(response
-            .resources
-            .search_identities
-            .nodes
-            .into_iter()
-            .map(Into::into)
-            .collect())
+        Ok(SearchResourceIdentitiesResponse {
+            items: connection.nodes.into_iter().map(Into::into).collect(),
+            total_count: connection.total_count,
+        })
     }
 
     fn selector_input(
@@ -1517,7 +1517,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn search_identities(
         &self,
         request: SearchResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
         self.search_resource_identities::<ListResourcesError>(&request)
             .await
     }

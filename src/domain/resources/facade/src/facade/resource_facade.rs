@@ -97,7 +97,7 @@ pub trait ResourceFacade: Send + Sync {
     async fn search_identities(
         &self,
         request: SearchResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
+    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError>;
 
     async fn list_all(
         &self,
@@ -219,6 +219,14 @@ pub struct SearchResourceIdentitiesRequest {
     pub name_pattern: Option<String>,
     pub account: Option<ResourceManifestAccount>,
     pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SearchResourceIdentitiesResponse {
+    pub items: Vec<ResourceIdentityView>,
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

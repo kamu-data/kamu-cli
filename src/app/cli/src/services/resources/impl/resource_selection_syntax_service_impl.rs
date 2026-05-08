@@ -287,7 +287,17 @@ impl ResourceSelectionSyntaxServiceImpl {
         kind_str: &str,
     ) -> Result<(), CLIError> {
         if Self::is_pattern(kind_str) {
-            return Ok(());
+            if supported_kinds
+                .iter()
+                .any(|descriptor| descriptor.matches_selector_pattern(kind_str))
+            {
+                return Ok(());
+            }
+
+            return Err(CLIError::usage_error(format!(
+                "Unsupported get target '{kind_str}'. Supported targets: {}",
+                Self::supported_targets(supported_kinds, &[]).join(", ")
+            )));
         }
 
         Self::resolve_kind_descriptor(
@@ -814,6 +824,33 @@ mod tests {
                 case.name,
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_interpret_all_rejects_unsupported_shadowed_kind_pattern() {
+        let selector_args = args(&["all", "unknown%/foo"]);
+        let parsed = ResourceSelectionSyntaxParser::parse(&selector_args).unwrap();
+        let supported_kinds = supported_kinds();
+
+        let result = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
+            &supported_kinds,
+            parsed,
+            |kind_str, selector_input| {
+                let supported_kinds = supported_kinds.clone();
+                async move {
+                    ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
+                        &supported_kinds,
+                        kind_str,
+                        selector_input,
+                        |selector_input| async move { Ok(resolved_selector(&selector_input)) },
+                    )
+                    .await
+                }
+            },
+        )
+        .await;
+
+        assert!(result.is_err());
     }
 }
 

@@ -274,7 +274,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn search_identities(
         &self,
         request: SearchResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
@@ -294,11 +294,23 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 request.pagination,
             )
             .await?;
+        let total_count = self
+            .generic_resource_query_service
+            .count_search_resource_identities(
+                &target_account.id,
+                &request.kinds,
+                request.exact_names.as_deref(),
+                request.name_pattern.as_deref(),
+            )
+            .await?;
 
         let descriptors_by_key = self.resource_kind_names_by_key();
-        rows.into_iter()
+        let items = rows
+            .into_iter()
             .map(|row| resource_identity_from_row::<ListResourcesError>(row, &descriptors_by_key))
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(SearchResourceIdentitiesResponse { items, total_count })
     }
 
     async fn list_all(

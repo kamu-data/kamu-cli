@@ -258,28 +258,12 @@ impl ResourceRepository for InMemoryResourceRepository {
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        let exact_names = exact_names.map(|ns| {
-            ns.iter()
-                .map(|n| n.to_ascii_lowercase())
-                .collect::<Vec<_>>()
-        });
-        let mut snapshots = guard
-            .snapshots_by_id
-            .values()
-            .filter(|snapshot| snapshot.metadata.account == *account_id)
-            .filter(|snapshot| kinds.contains(&snapshot.kind))
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
-            .filter(|snapshot| {
-                exact_names
-                    .as_ref()
-                    .is_none_or(|names| names.contains(&snapshot.metadata.name))
-            })
-            .filter(|snapshot| {
-                name_pattern.is_none_or(|pattern| {
-                    resource_name_matches_pattern(&snapshot.metadata.name, pattern)
-                })
-            })
-            .collect::<Vec<_>>();
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(Vec::new());
+        }
+
+        let mut snapshots =
+            filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern);
 
         snapshots.sort_by(|lhs, rhs| {
             rhs.metadata
@@ -299,6 +283,22 @@ impl ResourceRepository for InMemoryResourceRepository {
                 name: snapshot.metadata.name.clone(),
             })
             .collect())
+    }
+
+    async fn count_search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+    ) -> Result<usize, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(0);
+        }
+
+        Ok(filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern).len())
     }
 
     async fn find_resource_snapshot(
@@ -576,6 +576,41 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
     }
 
     pattern.ends_with('%') || remaining_name.is_empty()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn filter_search_snapshots<'a>(
+    guard: &'a State,
+    account_id: &odf::AccountID,
+    kinds: &[String],
+    exact_names: Option<&[ResourceName]>,
+    name_pattern: Option<&str>,
+) -> Vec<&'a ResourceSnapshot> {
+    let exact_names = exact_names.map(|names| {
+        names
+            .iter()
+            .map(|name| name.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+    });
+
+    guard
+        .snapshots_by_id
+        .values()
+        .filter(|snapshot| snapshot.metadata.account == *account_id)
+        .filter(|snapshot| kinds.contains(&snapshot.kind))
+        .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+        .filter(|snapshot| {
+            exact_names
+                .as_ref()
+                .is_none_or(|names| names.contains(&snapshot.metadata.name))
+        })
+        .filter(|snapshot| {
+            name_pattern.is_none_or(|pattern| {
+                resource_name_matches_pattern(&snapshot.metadata.name, pattern)
+            })
+        })
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

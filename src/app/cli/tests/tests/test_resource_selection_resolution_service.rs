@@ -30,6 +30,7 @@ use kamu_resources_facade::{
     ResourceRef,
     ResourceSelector,
     SearchResourceIdentitiesRequest,
+    SearchResourceIdentitiesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -973,7 +974,10 @@ impl ResourceSelectionResolutionHarness {
             .times(times)
             .returning(move |request| {
                 search_requests.lock().unwrap().push(request);
-                Ok(search_results.clone())
+                Ok(SearchResourceIdentitiesResponse {
+                    total_count: search_results.len(),
+                    items: search_results.clone(),
+                })
             });
     }
 

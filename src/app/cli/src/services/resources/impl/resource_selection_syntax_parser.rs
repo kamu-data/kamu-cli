@@ -59,8 +59,8 @@ impl ResourceSelectionSyntaxParser {
 
         if has_slash && has_plain {
             if args
-                .iter()
-                .any(|arg| arg.eq_ignore_ascii_case(ALL_SELECTOR))
+                .first()
+                .is_some_and(|arg| arg.eq_ignore_ascii_case(ALL_SELECTOR))
             {
                 let mut shadowed_inputs = Vec::new();
                 for arg in args {
@@ -397,6 +397,15 @@ mod tests {
     fn test_parse_syntax_mixed_syntax_is_error() {
         // "vs my-vars ss/db-creds" mixes plain and slash forms
         let a = args(&["vs", "my-vars", "ss/db-creds"]);
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Err(ref e) if e.to_string().contains("mix")
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_non_leading_all_in_mixed_syntax_is_error() {
+        let a = args(&["vs", "all", "ss/db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
             Err(ref e) if e.to_string().contains("mix")

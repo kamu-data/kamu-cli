@@ -325,13 +325,17 @@ impl Resources {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let items = resource_facade
+        let response = resource_facade
             .search_identities(query.into_facade_request(PaginationOpts::from_page(page, per_page)))
             .await
             .map_err(map_list_resources_error)?;
 
-        let total_count = items.len();
-        let items = items.into_iter().map(ResourceIdentity::from).collect();
+        let total_count = response.total_count;
+        let items = response
+            .items
+            .into_iter()
+            .map(ResourceIdentity::from)
+            .collect();
 
         Ok(ResourceIdentityConnection::new(
             items,

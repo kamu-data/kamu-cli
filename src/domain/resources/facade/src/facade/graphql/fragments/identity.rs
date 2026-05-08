@@ -103,6 +103,7 @@ pub(crate) struct SearchIdentitiesResourcesFragment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceIdentityConnectionFragment {
     pub nodes: Vec<ResourceIdentityFragment>,
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

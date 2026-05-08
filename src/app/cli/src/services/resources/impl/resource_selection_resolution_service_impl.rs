@@ -433,6 +433,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             pagination,
                         })
                         .await
+                        .map(|response| response.items)
                         .map_err(Into::into)
                 }
             },
@@ -472,6 +473,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             pagination,
                         })
                         .await
+                        .map(|response| response.items)
                         .map_err(Into::into)
                 }
             },
@@ -625,6 +627,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             pagination,
                         })
                         .await
+                        .map(|response| response.items)
                         .map_err(Into::into)
                 }
             },

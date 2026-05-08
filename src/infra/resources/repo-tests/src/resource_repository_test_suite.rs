@@ -216,20 +216,7 @@ pub async fn test_find_resource_snapshots_by_kind_and_uids(catalog: &Catalog) {
 pub async fn test_search_resource_identities(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
-
-    for (kind, name, account) in [
-        ("TestKind", "app-alpha", account_id.clone()),
-        ("TestKind", "app-beta", account_id.clone()),
-        ("TestKind", "db-alpha", account_id.clone()),
-        ("OtherKind", "app-gamma", account_id.clone()),
-        ("OtherKind", "app-delta", account_id.clone()),
-        ("TestKind", "app-other-account", other_account_id),
-    ] {
-        let mut snapshot = make_test_snapshot(account, kind, name);
-        snapshot.uid = repo.new_resource_uid().await.unwrap();
-        repo.create_resource(&snapshot).await.unwrap();
-    }
+    seed_search_resource_identities(repo.as_ref(), &account_id).await;
 
     // --- name_pattern: prefix wildcard matches only TestKind items for this
     // account ---
@@ -358,6 +345,65 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_count_search_resource_identities(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    seed_search_resource_identities(repo.as_ref(), &account_id).await;
+
+    let count = repo
+        .count_search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("app-%"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+
+    let count = repo
+        .count_search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            Some(&["App-Alpha".to_string(), "DB-ALPHA".to_string()]),
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+
+    let count = repo
+        .count_search_resource_identities(
+            &account_id,
+            &["TestKind".to_string(), "OtherKind".to_string()],
+            None,
+            Some("app-%"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 4);
+
+    let count = repo
+        .count_search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("app-other-%"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+
+    let count = repo
+        .count_search_resource_identities(&account_id, &["TestKind".to_string()], Some(&[]), None)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
@@ -431,6 +477,28 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .unwrap();
     let names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["my-resource"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn seed_search_resource_identities(
+    repo: &dyn ResourceRepository,
+    account_id: &odf::AccountID,
+) {
+    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    for (kind, name, account) in [
+        ("TestKind", "app-alpha", account_id.clone()),
+        ("TestKind", "app-beta", account_id.clone()),
+        ("TestKind", "db-alpha", account_id.clone()),
+        ("OtherKind", "app-gamma", account_id.clone()),
+        ("OtherKind", "app-delta", account_id.clone()),
+        ("TestKind", "app-other-account", other_account_id),
+    ] {
+        let mut snapshot = make_test_snapshot(account, kind, name);
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
+        repo.create_resource(&snapshot).await.unwrap();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

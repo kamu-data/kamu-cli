@@ -58,6 +58,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_count_search_resource_identities,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
     harness = SqliteResourceRepositoryHarness
 );
