@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use kamu_resources::ResourceKindDescriptor;
 
 use crate::CLIError;
 use crate::resources::{
+    ResolvedResourceSelector,
     ResourceExactSelector,
     ResourceKindLookupErrorOptions,
     ResourceKindLookupService,
@@ -48,112 +50,10 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
             .list_supported_kinds(explicit_context_name)
             .await?;
 
-        let mut items = Vec::new();
-        let mut shadowed_selectors = Vec::new();
-
-        match parsed {
-            ParsedSyntax::All { shadowed_inputs } => {
-                items.push(ResourceSelectionItem::All);
-
-                for shadowed_input in shadowed_inputs {
-                    if let Some(kind_str) = shadowed_input.kind_str {
-                        Self::resolve_kind_descriptor(
-                            &supported_kinds,
-                            kind_str,
-                            &ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                        )?;
-                    }
-                    shadowed_selectors.push(ResourceShadowedSelector {
-                        selector_input: shadowed_input.display.to_owned(),
-                    });
-                }
-            }
-
-            ParsedSyntax::SameKind {
-                kind_str,
-                selector_inputs,
-            } => {
-                let kind_descriptor = Self::resolve_kind_descriptor(
-                    &supported_kinds,
-                    kind_str,
-                    &ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                )?;
-
-                if selector_inputs.contains(&ALL_SELECTOR) {
-                    items.push(ResourceSelectionItem::AllByKind {
-                        kind_descriptor,
-                        selector_input: ALL_SELECTOR.to_owned(),
-                    });
-
-                    for selector_input in selector_inputs {
-                        if selector_input != ALL_SELECTOR {
-                            shadowed_selectors.push(ResourceShadowedSelector {
-                                selector_input: selector_input.to_owned(),
-                            });
-                        }
-                    }
-                } else {
-                    for selector_input in selector_inputs {
-                        let resolved = self
-                            .resource_selector_resolution_service
-                            .resolve_single_selector(selector_input)
-                            .await?;
-                        items.push(ResourceSelectionItem::Exact(ResourceExactSelector {
-                            kind_descriptor: kind_descriptor.clone(),
-                            selector_input: resolved.input,
-                            resource_ref: resolved.resource_ref,
-                        }));
-                    }
-                }
-            }
-
-            ParsedSyntax::RefForm { pairs } => {
-                let all_by_kind: std::collections::BTreeSet<&str> = pairs
-                    .iter()
-                    .filter_map(|(kind_str, selector_input)| {
-                        (*selector_input == ALL_SELECTOR).then_some(*kind_str)
-                    })
-                    .collect();
-
-                let mut emitted_all_by_kind = std::collections::BTreeSet::new();
-
-                for (kind_str, selector_input) in pairs {
-                    let kind_descriptor = Self::resolve_kind_descriptor(
-                        &supported_kinds,
-                        kind_str,
-                        &ResourceKindLookupErrorOptions::new("Unsupported get target"),
-                    )?;
-
-                    if selector_input == ALL_SELECTOR {
-                        if emitted_all_by_kind.insert(kind_str) {
-                            items.push(ResourceSelectionItem::AllByKind {
-                                kind_descriptor,
-                                selector_input: selector_input.to_owned(),
-                            });
-                        }
-                    } else if all_by_kind.contains(kind_str) {
-                        shadowed_selectors.push(ResourceShadowedSelector {
-                            selector_input: format!("{kind_str}/{selector_input}"),
-                        });
-                    } else {
-                        let resolved = self
-                            .resource_selector_resolution_service
-                            .resolve_single_selector(selector_input)
-                            .await?;
-                        items.push(ResourceSelectionItem::Exact(ResourceExactSelector {
-                            kind_descriptor,
-                            selector_input: resolved.input,
-                            resource_ref: resolved.resource_ref,
-                        }));
-                    }
-                }
-            }
-        }
-
-        Ok(ResourceSelectionSyntax {
-            items,
-            shadowed_selectors,
+        Self::interpret_parsed_syntax_with(&supported_kinds, parsed, |kind_str, selector_input| {
+            self.make_selector_item(&supported_kinds, kind_str, selector_input)
         })
+        .await
     }
 }
 
@@ -185,6 +85,221 @@ struct ShadowedParsedInput<'a> {
 }
 
 impl ResourceSelectionSyntaxServiceImpl {
+    async fn interpret_parsed_syntax_with<F, Fut>(
+        supported_kinds: &[ResourceKindDescriptor],
+        parsed: ParsedSyntax<'_>,
+        mut make_selector_item: F,
+    ) -> Result<ResourceSelectionSyntax, CLIError>
+    where
+        F: FnMut(String, String) -> Fut,
+        Fut: Future<Output = Result<ResourceSelectionItem, CLIError>>,
+    {
+        let mut items = Vec::new();
+        let mut shadowed_selectors = Vec::new();
+
+        match parsed {
+            ParsedSyntax::All { shadowed_inputs } => {
+                items.push(ResourceSelectionItem::All);
+
+                for shadowed_input in shadowed_inputs {
+                    if let Some(kind_str) = shadowed_input.kind_str {
+                        Self::validate_shadowed_kind_target(supported_kinds, kind_str)?;
+                    }
+                    shadowed_selectors.push(ResourceShadowedSelector {
+                        selector_input: shadowed_input.display.to_owned(),
+                    });
+                }
+            }
+
+            ParsedSyntax::SameKind {
+                kind_str,
+                selector_inputs,
+            } => {
+                if selector_inputs.contains(&ALL_SELECTOR) {
+                    items.push(Self::make_all_by_kind_item(
+                        supported_kinds,
+                        kind_str,
+                        ALL_SELECTOR.to_owned(),
+                    )?);
+
+                    for selector_input in selector_inputs {
+                        if selector_input != ALL_SELECTOR {
+                            shadowed_selectors.push(ResourceShadowedSelector {
+                                selector_input: selector_input.to_owned(),
+                            });
+                        }
+                    }
+                } else {
+                    for selector_input in selector_inputs {
+                        items.push(
+                            make_selector_item(kind_str.to_owned(), selector_input.to_owned())
+                                .await?,
+                        );
+                    }
+                }
+            }
+
+            ParsedSyntax::RefForm { pairs } => {
+                let all_by_kind: std::collections::BTreeSet<&str> = pairs
+                    .iter()
+                    .filter_map(|(kind_str, selector_input)| {
+                        (*selector_input == ALL_SELECTOR).then_some(*kind_str)
+                    })
+                    .collect();
+
+                let mut emitted_all_by_kind = std::collections::BTreeSet::new();
+
+                for (kind_str, selector_input) in pairs {
+                    if selector_input == ALL_SELECTOR {
+                        if emitted_all_by_kind.insert(kind_str) {
+                            items.push(Self::make_all_by_kind_item(
+                                supported_kinds,
+                                kind_str,
+                                selector_input.to_owned(),
+                            )?);
+                        }
+                    } else if all_by_kind.contains(kind_str) {
+                        shadowed_selectors.push(ResourceShadowedSelector {
+                            selector_input: format!("{kind_str}/{selector_input}"),
+                        });
+                    } else {
+                        items.push(
+                            make_selector_item(kind_str.to_owned(), selector_input.to_owned())
+                                .await?,
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(ResourceSelectionSyntax {
+            items,
+            shadowed_selectors,
+        })
+    }
+
+    fn is_pattern(input: &str) -> bool {
+        input.contains('%')
+    }
+
+    fn make_all_by_kind_item(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: &str,
+        selector_input: String,
+    ) -> Result<ResourceSelectionItem, CLIError> {
+        if Self::is_pattern(kind_str) {
+            return Ok(ResourceSelectionItem::KindPatternAll {
+                kind_pattern: kind_str.to_owned(),
+                selector_input,
+            });
+        }
+
+        let kind_descriptor = Self::resolve_kind_descriptor(
+            supported_kinds,
+            kind_str,
+            &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+        )?;
+
+        Ok(ResourceSelectionItem::AllByKind {
+            kind_descriptor,
+            selector_input,
+        })
+    }
+
+    fn validate_shadowed_kind_target(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: &str,
+    ) -> Result<(), CLIError> {
+        if Self::is_pattern(kind_str) {
+            return Ok(());
+        }
+
+        Self::resolve_kind_descriptor(
+            supported_kinds,
+            kind_str,
+            &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+        )?;
+
+        Ok(())
+    }
+
+    async fn make_selector_item(
+        &self,
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: String,
+        selector_input: String,
+    ) -> Result<ResourceSelectionItem, CLIError> {
+        Self::make_selector_item_with(
+            supported_kinds,
+            kind_str,
+            selector_input,
+            |selector_input| async move {
+                self.resource_selector_resolution_service
+                    .resolve_single_selector(selector_input.as_str())
+                    .await
+            },
+        )
+        .await
+    }
+
+    async fn make_selector_item_with<F, Fut>(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_str: String,
+        selector_input: String,
+        resolve_selector: F,
+    ) -> Result<ResourceSelectionItem, CLIError>
+    where
+        F: Fn(String) -> Fut,
+        Fut: Future<Output = Result<ResolvedResourceSelector, CLIError>>,
+    {
+        match (
+            Self::is_pattern(kind_str.as_str()),
+            Self::is_pattern(selector_input.as_str()),
+        ) {
+            (false, false) => {
+                let kind_descriptor = Self::resolve_kind_descriptor(
+                    supported_kinds,
+                    kind_str.as_str(),
+                    &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                )?;
+                let resolved = resolve_selector(selector_input).await?;
+
+                Ok(ResourceSelectionItem::Exact(ResourceExactSelector {
+                    kind_descriptor,
+                    selector_input: resolved.input,
+                    resource_ref: resolved.resource_ref,
+                }))
+            }
+            (false, true) => {
+                let kind_descriptor = Self::resolve_kind_descriptor(
+                    supported_kinds,
+                    kind_str.as_str(),
+                    &ResourceKindLookupErrorOptions::new("Unsupported get target"),
+                )?;
+
+                Ok(ResourceSelectionItem::NamePattern {
+                    kind_descriptor,
+                    selector_input: selector_input.clone(),
+                    name_pattern: selector_input,
+                })
+            }
+            (true, false) => {
+                let resolved = resolve_selector(selector_input.clone()).await?;
+
+                Ok(ResourceSelectionItem::KindPatternExactName {
+                    kind_pattern: kind_str.clone(),
+                    selector_input: format!("{kind_str}/{}", resolved.input),
+                    resource_ref: resolved.resource_ref,
+                })
+            }
+            (true, true) => Ok(ResourceSelectionItem::KindPatternNamePattern {
+                kind_pattern: kind_str.clone(),
+                selector_input: format!("{kind_str}/{selector_input}"),
+                name_pattern: selector_input,
+            }),
+        }
+    }
+
     fn resolve_kind_descriptor(
         supported_kinds: &[ResourceKindDescriptor],
         target: &str,
@@ -323,10 +438,38 @@ impl ResourceSelectionSyntaxServiceImpl {
 mod tests {
     use std::assert_matches;
 
+    use kamu_resources_facade::ResourceRef;
+
     use super::*;
 
     fn args(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()
+    }
+
+    fn supported_kinds() -> Vec<ResourceKindDescriptor> {
+        vec![
+            ResourceKindDescriptor {
+                name: "variables".to_owned(),
+                short_names: vec!["vs".to_owned()],
+                kind: "dev.kamu/variable".to_owned(),
+                api_version: "v1".to_owned(),
+                list_columns: Vec::new(),
+            },
+            ResourceKindDescriptor {
+                name: "secrets".to_owned(),
+                short_names: vec!["ss".to_owned()],
+                kind: "dev.kamu/secret".to_owned(),
+                api_version: "v1".to_owned(),
+                list_columns: Vec::new(),
+            },
+        ]
+    }
+
+    fn resolved_selector(input: &str) -> ResolvedResourceSelector {
+        ResolvedResourceSelector {
+            input: input.to_owned(),
+            resource_ref: ResourceRef::ByName(input.to_owned()),
+        }
     }
 
     #[test]
@@ -458,6 +601,147 @@ mod tests {
         assert_matches!(
             ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
             Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all"), ("vs", "my-vars")]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_same_kind_name_pattern() {
+        let a = args(&["vs", "app-%"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::SameKind {
+                kind_str: "vs",
+                selector_inputs,
+            }) if selector_inputs == vec!["app-%"]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_same_kind_kind_pattern() {
+        let a = args(&["s%", "db-creds"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::SameKind {
+                kind_str: "s%",
+                selector_inputs,
+            }) if selector_inputs == vec!["db-creds"]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_slash_form_name_pattern() {
+        let a = args(&["vs/app-%"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "app-%")]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_slash_form_kind_pattern() {
+        let a = args(&["s%/db-creds"]);
+        assert_matches!(
+            ResourceSelectionSyntaxServiceImpl::parse_syntax(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("s%", "db-creds")]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_interpret_same_kind_name_pattern_without_lookup_service() {
+        let selector_args = args(&["vs", "app-%"]);
+        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
+        let supported_kinds = supported_kinds();
+        let supported_kinds_for_resolution = supported_kinds.clone();
+
+        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
+            &supported_kinds,
+            parsed,
+            |kind_str, selector_input| {
+                let supported_kinds = supported_kinds_for_resolution.clone();
+                async move {
+                    ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
+                        &supported_kinds,
+                        kind_str,
+                        selector_input,
+                        |selector_input| async move { Ok(resolved_selector(&selector_input)) },
+                    )
+                    .await
+                }
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_matches!(
+            syntax.items.as_slice(),
+            [ResourceSelectionItem::NamePattern {
+                kind_descriptor,
+                selector_input,
+                name_pattern,
+            }] if kind_descriptor.name == "variables"
+                && selector_input == "app-%"
+                && name_pattern == "app-%"
+        );
+        assert!(syntax.shadowed_selectors.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_interpret_slash_kind_pattern_exact_name_without_lookup_service() {
+        let selector_args = args(&["s%/db-creds"]);
+        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
+        let supported_kinds = supported_kinds();
+        let supported_kinds_for_resolution = supported_kinds.clone();
+
+        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
+            &supported_kinds,
+            parsed,
+            |kind_str, selector_input| {
+                let supported_kinds = supported_kinds_for_resolution.clone();
+                async move {
+                    ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
+                        &supported_kinds,
+                        kind_str,
+                        selector_input,
+                        |selector_input| async move { Ok(resolved_selector(&selector_input)) },
+                    )
+                    .await
+                }
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_matches!(
+            syntax.items.as_slice(),
+            [ResourceSelectionItem::KindPatternExactName {
+                kind_pattern,
+                selector_input,
+                resource_ref: ResourceRef::ByName(resource_name),
+            }] if kind_pattern == "s%"
+                && selector_input == "s%/db-creds"
+                && resource_name == "db-creds"
+        );
+        assert!(syntax.shadowed_selectors.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_interpret_all_with_shadowed_ref_uses_supported_kinds_without_lookup_service() {
+        let selector_args = args(&["all", "vs/app-%"]);
+        let parsed = ResourceSelectionSyntaxServiceImpl::parse_syntax(&selector_args).unwrap();
+        let supported_kinds = supported_kinds();
+
+        let syntax = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
+            &supported_kinds,
+            parsed,
+            |_kind_str, _selector_input| async move { panic!("unexpected selector resolution") },
+        )
+        .await
+        .unwrap();
+
+        assert_matches!(syntax.items.as_slice(), [ResourceSelectionItem::All]);
+        assert_matches!(
+            syntax.shadowed_selectors.as_slice(),
+            [ResourceShadowedSelector { selector_input }] if selector_input == "vs/app-%"
         );
     }
 

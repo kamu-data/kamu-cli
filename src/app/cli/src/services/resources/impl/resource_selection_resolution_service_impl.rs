@@ -93,6 +93,13 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         options,
                     )?;
                 }
+
+                ResourceSelectionItem::NamePattern { selector_input, .. }
+                | ResourceSelectionItem::KindPatternExactName { selector_input, .. }
+                | ResourceSelectionItem::KindPatternAll { selector_input, .. }
+                | ResourceSelectionItem::KindPatternNamePattern { selector_input, .. } => {
+                    return Err(Self::patterns_not_supported_error(&selector_input));
+                }
             }
         }
 
@@ -121,7 +128,12 @@ impl ResourceSelectionResolutionServiceImpl {
                     selector.kind_descriptor.api_version.clone(),
                     selector.resource_ref.clone(),
                 )),
-                ResourceSelectionItem::All | ResourceSelectionItem::AllByKind { .. } => None,
+                ResourceSelectionItem::All
+                | ResourceSelectionItem::AllByKind { .. }
+                | ResourceSelectionItem::NamePattern { .. }
+                | ResourceSelectionItem::KindPatternExactName { .. }
+                | ResourceSelectionItem::KindPatternAll { .. }
+                | ResourceSelectionItem::KindPatternNamePattern { .. } => None,
             })
             .collect::<Vec<_>>();
 
@@ -317,6 +329,12 @@ impl ResourceSelectionResolutionServiceImpl {
         CLIError::usage_error(format!(
             "Selection matched more than {limit} resources; refine selectors, pass --max-results \
              N, or pass --unbounded"
+        ))
+    }
+
+    fn patterns_not_supported_error(selector_input: &str) -> CLIError {
+        CLIError::usage_error(format!(
+            "Resource selector patterns are not supported yet: `{selector_input}`"
         ))
     }
 

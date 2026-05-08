@@ -475,6 +475,11 @@ impl<'a> DeleteRequestResolver<'a> {
                 dataset_args.push(suffix.to_owned());
             } else if is_supported_resource_prefix(prefix) {
                 resource_args.push(arg);
+            } else if Self::is_potential_resource_kind_pattern(prefix) {
+                // Phase 1 only recognizes wildcard kind prefixes syntactically.
+                // They stay on the legacy dataset path until kind-pattern routing
+                // is implemented.
+                dataset_args.push(arg);
             } else {
                 dataset_args.push(arg);
             }
@@ -525,6 +530,10 @@ impl<'a> DeleteRequestResolver<'a> {
         }
 
         Ok(syntax)
+    }
+
+    fn is_potential_resource_kind_pattern(prefix: &str) -> bool {
+        prefix.contains('%')
     }
 }
 
@@ -597,6 +606,20 @@ mod tests {
             ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
                 if dataset_args == vec!["foo".to_owned()]
                     && resource_args == vec!["vs/bar".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn test_classify_slash_request_keeps_kind_patterns_on_dataset_path_in_phase_1() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["s%/db-creds".to_owned()],
+            |_| false,
+        );
+
+        assert!(matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Datasets(args)
+                if args == vec!["s%/db-creds".to_owned()]
         ));
     }
 }
