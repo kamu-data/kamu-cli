@@ -1,5 +1,5 @@
 [package]
-name = "eip-712"
+name = "sandbox-eip-712"
 publish = false
 edition = "2024"
 
@@ -8,7 +8,10 @@ edition = "2024"
 doctest = false
 
 [dependencies]
-alloy = { version = "2", default-features = false, features = ["dyn-abi", "eip712"] }
+alloy = { version = "2", default-features = false, features = [
+    "dyn-abi",
+    "eip712",
+] }
 eyre = "0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

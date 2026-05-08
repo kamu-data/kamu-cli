@@ -170,7 +170,10 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "53" }
+# TODO: Molecule: Phase 3: 1) Update molecule branch w/ fresh deps from master
+# TODO: Molecule: Phase 3: 2) Add eip712 to df53
+# https://github.com/kamu-data/datafusion-ethers/pull/13
+datafusion-ethers = { optional = true, git = "https://github.com/kamu-data/datafusion-ethers.git", branch = "v52_add_eip712_feature", features = ["eip712"] }
 datafusion-functions-json = { optional = true, version = "0.53" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
