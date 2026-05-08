@@ -49,7 +49,7 @@ pub(crate) fn make_metadata_input(
 ) -> Result<ResourceMetadataInput, ApplyManifestError> {
     ResourceMetadataInput::try_new(
         target_account.id.clone(),
-        manifest.metadata.name.clone(),
+        &manifest.metadata.name,
         manifest.metadata.description.clone(),
         manifest.metadata.labels.clone(),
         manifest.metadata.annotations.clone(),

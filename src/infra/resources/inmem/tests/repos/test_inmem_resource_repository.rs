@@ -48,7 +48,31 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_search_resource_identities,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_count_search_resource_identities,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = InMemoryResourceRepositoryHarness
 );
 
@@ -137,6 +161,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_resource_name_case_insensitive,
     harness = InMemoryResourceRepositoryHarness
 );
 

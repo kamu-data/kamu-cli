@@ -111,6 +111,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_search_accounts_by_name_pattern_special_chars,
+    harness = InMemoryAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_accounts_repo_tests::test_update_email_success,
     harness = InMemoryAccountRepositoryHarness
 );

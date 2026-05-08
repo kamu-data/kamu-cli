@@ -87,8 +87,23 @@ pub(crate) struct ListAllIdentitiesResourcesFragment {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct SearchIdentitiesQueryDataFragment {
+    pub resources: SearchIdentitiesResourcesFragment,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SearchIdentitiesResourcesFragment {
+    pub search_identities: ResourceIdentityConnectionFragment,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ResourceIdentityConnectionFragment {
     pub nodes: Vec<ResourceIdentityFragment>,
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

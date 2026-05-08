@@ -28,6 +28,7 @@ use crate::queries::{
     ResourceSelectorInput,
     ResourceSummary,
     ResourcesSummary,
+    SearchResourceIdentitiesInput,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,6 +302,40 @@ impl Resources {
 
         let total_count = items.len();
         let items = items.into_iter().map(ResourceIdentity::from).collect();
+
+        Ok(ResourceIdentityConnection::new(
+            items,
+            page,
+            per_page,
+            total_count,
+        ))
+    }
+
+    /// Searches resource identities across the specified exact kinds
+    #[tracing::instrument(level = "info", name = Resources_search_identities, skip_all, fields(?page, ?per_page))]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn search_identities(
+        &self,
+        ctx: &Context<'_>,
+        query: SearchResourceIdentitiesInput,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<ResourceIdentityConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
+        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
+
+        let response = resource_facade
+            .search_identities(query.into_facade_request(PaginationOpts::from_page(page, per_page)))
+            .await
+            .map_err(map_list_resources_error)?;
+
+        let total_count = response.total_count;
+        let items = response
+            .items
+            .into_iter()
+            .map(ResourceIdentity::from)
+            .collect();
 
         Ok(ResourceIdentityConnection::new(
             items,

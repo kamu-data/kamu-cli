@@ -37,6 +37,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
     async fn list_supported_kinds(
@@ -92,6 +93,11 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         request: ListResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
+
+    async fn search_identities(
+        &self,
+        request: SearchResourceIdentitiesRequest,
+    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError>;
 
     async fn list_all(
         &self,
@@ -202,6 +208,25 @@ pub struct ListResourceIdentitiesRequest {
     pub kind: String,
     pub account: Option<ResourceManifestAccount>,
     pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SearchResourceIdentitiesRequest {
+    pub kinds: Vec<String>,
+    pub exact_names: Option<Vec<ResourceName>>,
+    pub name_pattern: Option<String>,
+    pub account: Option<ResourceManifestAccount>,
+    pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SearchResourceIdentitiesResponse {
+    pub items: Vec<ResourceIdentityView>,
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

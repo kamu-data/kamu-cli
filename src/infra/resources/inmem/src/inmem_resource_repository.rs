@@ -188,7 +188,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .get(&ResourceLookupKey {
                 account_id: account_id.clone(),
                 kind: kind.to_owned(),
-                name: name.clone(),
+                name: name.to_ascii_lowercase(),
             })
             .and_then(|uid| guard.snapshots_by_id.get(uid))
             .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
@@ -227,6 +227,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         Ok(names
             .iter()
+            .map(|n| n.to_ascii_lowercase())
             .filter_map(|name| {
                 guard
                     .ids_by_lookup_key
@@ -245,6 +246,59 @@ impl ResourceRepository for InMemoryResourceRepository {
                 name: snapshot.metadata.name.clone(),
             })
             .collect())
+    }
+
+    async fn search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(Vec::new());
+        }
+
+        let mut snapshots =
+            filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern);
+
+        snapshots.sort_by(|lhs, rhs| {
+            rhs.metadata
+                .updated_at
+                .cmp(&lhs.metadata.updated_at)
+                .then_with(|| rhs.uid.cmp(&lhs.uid))
+        });
+
+        Ok(snapshots
+            .into_iter()
+            .skip(pagination.offset)
+            .take(pagination.limit)
+            .map(|snapshot| ResourceIdentityRow {
+                uid: *snapshot.uid.as_ref(),
+                kind: snapshot.kind.clone(),
+                api_version: snapshot.api_version.clone(),
+                name: snapshot.metadata.name.clone(),
+            })
+            .collect())
+    }
+
+    async fn count_search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+    ) -> Result<usize, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(0);
+        }
+
+        Ok(filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern).len())
     }
 
     async fn find_resource_snapshot(
@@ -478,6 +532,85 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         Ok(rows)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
+    // Since names are normalized to lowercase at write time, and callers may
+    // supply mixed-case patterns, we fold both sides to lowercase before matching
+    // to mirror Postgres ILIKE / SQLite LIKE ... COLLATE NOCASE behavior.
+    let name_lc = name.to_ascii_lowercase();
+    let pattern_lc = pattern.to_ascii_lowercase();
+    let name = name_lc.as_str();
+    let pattern = pattern_lc.as_str();
+
+    let mut parts = pattern.split('%').peekable();
+    let mut remaining_name = name;
+
+    if !pattern.starts_with('%') {
+        let Some(prefix) = parts.next() else {
+            return name.is_empty();
+        };
+
+        if !remaining_name.starts_with(prefix) {
+            return false;
+        }
+
+        remaining_name = &remaining_name[prefix.len()..];
+    }
+
+    while let Some(part) = parts.next() {
+        if part.is_empty() {
+            continue;
+        }
+
+        if parts.peek().is_none() && !pattern.ends_with('%') {
+            return remaining_name.ends_with(part);
+        }
+
+        let Some(index) = remaining_name.find(part) else {
+            return false;
+        };
+        remaining_name = &remaining_name[index + part.len()..];
+    }
+
+    pattern.ends_with('%') || remaining_name.is_empty()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn filter_search_snapshots<'a>(
+    guard: &'a State,
+    account_id: &odf::AccountID,
+    kinds: &[String],
+    exact_names: Option<&[ResourceName]>,
+    name_pattern: Option<&str>,
+) -> Vec<&'a ResourceSnapshot> {
+    let exact_names = exact_names.map(|names| {
+        names
+            .iter()
+            .map(|name| name.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+    });
+
+    guard
+        .snapshots_by_id
+        .values()
+        .filter(|snapshot| snapshot.metadata.account == *account_id)
+        .filter(|snapshot| kinds.contains(&snapshot.kind))
+        .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+        .filter(|snapshot| {
+            exact_names
+                .as_ref()
+                .is_none_or(|names| names.contains(&snapshot.metadata.name))
+        })
+        .filter(|snapshot| {
+            name_pattern.is_none_or(|pattern| {
+                resource_name_matches_pattern(&snapshot.metadata.name, pattern)
+            })
+        })
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

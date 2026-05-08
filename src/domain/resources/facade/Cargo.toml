@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -46,3 +47,5 @@ serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = f
 thiserror = { version = "2", default-features = false, features = ["std"] }
 strum = { version = "0.28", default-features = false, features = ["derive"] }
 url = { version = "2", default-features = false }
+
+mockall = { optional = true, version = "0.14", default-features = false }

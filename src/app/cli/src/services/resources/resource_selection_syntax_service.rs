@@ -48,6 +48,25 @@ pub enum ResourceSelectionItem {
         selector_input: String,
     },
     Exact(ResourceExactSelector),
+    NamePattern {
+        kind_descriptor: ResourceKindDescriptor,
+        selector_input: String,
+        name_pattern: String,
+    },
+    KindPatternExactName {
+        kind_pattern: String,
+        selector_input: String,
+        resource_ref: ResourceRef,
+    },
+    KindPatternAll {
+        kind_pattern: String,
+        selector_input: String,
+    },
+    KindPatternNamePattern {
+        kind_pattern: String,
+        selector_input: String,
+        name_pattern: String,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

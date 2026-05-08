@@ -12,6 +12,7 @@ use std::sync::Arc;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase};
+use kamu_resources::ResourceKindDescriptor;
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
 use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
@@ -358,7 +359,7 @@ impl<'a> DeleteRequestResolver<'a> {
         let contains_plain = raw_args.iter().any(|arg| !arg.contains('/'));
 
         let first_arg_is_resource_prefix = self
-            .is_supported_resource_prefix(raw_args.first().expect("target is present"))
+            .matches_resource_target_prefix(raw_args.first().expect("target is present"))
             .await?;
 
         if !contains_slash {
@@ -426,13 +427,16 @@ impl<'a> DeleteRequestResolver<'a> {
         raw_args
     }
 
-    async fn is_supported_resource_prefix(&self, prefix: &str) -> Result<bool, CLIError> {
-        Ok(self
+    async fn matches_resource_target_prefix(&self, prefix: &str) -> Result<bool, CLIError> {
+        let supported_kinds = self
             .resource_kind_lookup_service
             .list_supported_kinds(self.params.explicit_context_name)
-            .await?
-            .iter()
-            .any(|descriptor| descriptor.matches_selector(prefix)))
+            .await?;
+
+        Ok(Self::matches_resource_target_prefix_with(
+            &supported_kinds,
+            prefix,
+        ))
     }
 
     async fn classify_slash_request(
@@ -445,10 +449,21 @@ impl<'a> DeleteRequestResolver<'a> {
             .await?;
 
         Ok(Self::classify_slash_request_with(raw_args, |prefix| {
-            supported_kinds
-                .iter()
-                .any(|descriptor| descriptor.matches_selector(prefix))
+            Self::matches_resource_target_prefix_with(&supported_kinds, prefix)
         }))
+    }
+
+    fn matches_resource_target_prefix_with(
+        supported_kinds: &[ResourceKindDescriptor],
+        prefix: &str,
+    ) -> bool {
+        supported_kinds.iter().any(|descriptor| {
+            if Self::is_potential_resource_kind_pattern(prefix) {
+                descriptor.matches_selector_pattern(prefix)
+            } else {
+                descriptor.matches_selector(prefix)
+            }
+        })
     }
 
     fn classify_slash_request_with<F>(
@@ -526,6 +541,10 @@ impl<'a> DeleteRequestResolver<'a> {
 
         Ok(syntax)
     }
+
+    fn is_potential_resource_kind_pattern(prefix: &str) -> bool {
+        prefix.contains('%')
+    }
 }
 
 enum ClassifiedSlashDeleteRequest {
@@ -541,6 +560,8 @@ enum ClassifiedSlashDeleteRequest {
 
 #[cfg(test)]
 mod tests {
+    use kamu_resources::ResourceKindDescriptor;
+
     use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
 
     #[test]
@@ -597,6 +618,81 @@ mod tests {
             ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
                 if dataset_args == vec!["foo".to_owned()]
                     && resource_args == vec!["vs/bar".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn test_classify_slash_request_routes_matching_kind_patterns_to_resources() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["s%/db-creds".to_owned()],
+            |prefix| prefix.eq_ignore_ascii_case("s%"),
+        );
+
+        assert!(matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Resources(args)
+                if args == vec!["s%/db-creds".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn test_classify_slash_request_keeps_unknown_kind_patterns_on_dataset_path() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["unknown%/db-creds".to_owned()],
+            |_| false,
+        );
+
+        assert!(matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Datasets(args)
+                if args == vec!["unknown%/db-creds".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn test_classify_slash_request_accepts_uppercase_dataset_escape_hatch() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["DATASETs/foo".to_owned()],
+            |_| true,
+        );
+
+        assert!(matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Datasets(args)
+                if args == vec!["foo".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn test_matches_resource_target_prefix_with_kind_patterns_case_insensitively() {
+        let supported_kinds = vec![
+            ResourceKindDescriptor {
+                name: "variablesets".to_owned(),
+                short_names: vec!["vs".to_owned()],
+                kind: "dev.kamu/variableset".to_owned(),
+                api_version: "v1".to_owned(),
+                list_columns: Vec::new(),
+            },
+            ResourceKindDescriptor {
+                name: "secretsets".to_owned(),
+                short_names: vec!["ss".to_owned()],
+                kind: "dev.kamu/secretset".to_owned(),
+                api_version: "v1".to_owned(),
+                list_columns: Vec::new(),
+            },
+        ];
+
+        assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
+            &supported_kinds,
+            "VS",
+        ));
+        assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
+            &supported_kinds,
+            "S%",
+        ));
+        assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
+            &supported_kinds,
+            "X%",
         ));
     }
 }

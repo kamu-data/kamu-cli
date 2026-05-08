@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 
 use crate::prelude::*;
@@ -119,6 +120,37 @@ pub struct ResourceBatchSelectorInput {
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
     pub account: Option<ResourceAccountSelectorInput>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject, Debug, Clone)]
+pub struct SearchResourceIdentitiesInput {
+    pub kinds: Vec<ResourceKindInput>,
+    pub names: Option<Vec<String>>,
+    pub name_pattern: Option<String>,
+    pub account: Option<ResourceAccountSelectorInput>,
+}
+
+impl SearchResourceIdentitiesInput {
+    pub fn into_facade_request(
+        self,
+        pagination: PaginationOpts,
+    ) -> kamu_resources_facade::SearchResourceIdentitiesRequest {
+        kamu_resources_facade::SearchResourceIdentitiesRequest {
+            kinds: self
+                .kinds
+                .into_iter()
+                .map(ResourceKindInput::into_resource_type)
+                .collect(),
+            exact_names: self.names,
+            name_pattern: self.name_pattern,
+            account: self
+                .account
+                .map(ResourceAccountSelectorInput::into_manifest_account),
+            pagination,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

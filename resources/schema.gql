@@ -4022,6 +4022,10 @@ type Resources {
 	"""
 	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
 	"""
+	Searches resource identities across the specified exact kinds
+	"""
+	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	"""
 	Returns resources across all kinds
 	"""
 	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
@@ -4121,6 +4125,13 @@ type Search {
 enum SearchEntityName {
 	DATASETS
 	ACCOUNTS
+}
+
+input SearchResourceIdentitiesInput {
+	kinds: [ResourceKindInput!]!
+	names: [String!]
+	namePattern: String
+	account: ResourceAccountSelectorInput
 }
 
 union SearchResult = Dataset

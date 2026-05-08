@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT id           AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                WHERE (account_name ILIKE '%'||$1||'%'\n                    OR display_name ILIKE '%'||$1||'%')\n                  AND id != ALL($4)\n                ORDER BY account_name\n                LIMIT $2 OFFSET $3\n                ",
+  "query": "\n                SELECT id           AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                WHERE (account_name ILIKE '%'||$1||'%' ESCAPE '\\'\n                    OR display_name ILIKE '%'||$1||'%' ESCAPE '\\')\n                  AND id != ALL($4)\n                ORDER BY account_name\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -79,5 +79,5 @@
       false
     ]
   },
-  "hash": "17987d38cb01a6b9fabbb5840e33ef11c0fdc9b3b77a17f7a0ec58e6b8368986"
+  "hash": "c893d3f95ce62644401813be25989ff8a89c11cd2baeb23e47ad80225e4f3343"
 }

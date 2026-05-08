@@ -11,7 +11,12 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sql_like_escape_pattern,
+    sqlite_generate_placeholders_list,
+};
 use dill::{component, interface};
 use event_sourcing::EventID;
 use futures::TryStreamExt;
@@ -208,6 +213,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let name_lower = name.to_ascii_lowercase();
 
         let maybe_resource_uid = sqlx::query_scalar!(
             r#"
@@ -220,7 +226,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
             account_id_str,
             kind,
-            name,
+            name_lower,
         )
         .fetch_optional(connection_mut)
         .await
@@ -309,12 +315,139 @@ impl ResourceRepository for SqliteResourceRepository {
             .bind(account_id_str)
             .bind(kind);
         for name in names {
-            query = query.bind(name);
+            query = query.bind(name.to_ascii_lowercase());
         }
 
         let rows = query.fetch_all(connection_mut).await.int_err()?;
 
         Ok(rows)
+    }
+
+    async fn search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+        let limit = i64::try_from(pagination.limit).int_err()?;
+        let offset = i64::try_from(pagination.offset).int_err()?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            SELECT
+                resource_uid as uid,
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = "#,
+        );
+        query_builder
+            .push_bind(account_id_str)
+            .push(" AND deleted_at IS NULL AND resource_kind IN (");
+        {
+            let mut separated = query_builder.separated(", ");
+            for kind in kinds {
+                separated.push_bind(kind);
+            }
+        }
+        query_builder.push(")");
+
+        if let Some(exact_names) = exact_names {
+            query_builder.push(" AND resource_name IN (");
+            let mut separated = query_builder.separated(", ");
+            for name in exact_names {
+                separated.push_bind(name.to_ascii_lowercase());
+            }
+            query_builder.push(")");
+        }
+
+        if let Some(name_pattern) = name_pattern {
+            query_builder.push(" AND resource_name LIKE ");
+            query_builder.push_bind(sql_like_escape_pattern(name_pattern));
+            query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
+        }
+
+        query_builder
+            .push(" ORDER BY updated_at DESC, resource_uid DESC LIMIT ")
+            .push_bind(limit)
+            .push(" OFFSET ")
+            .push_bind(offset);
+
+        query_builder
+            .build_query_as::<ResourceIdentityRow>()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()
+    }
+
+    async fn count_search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+    ) -> Result<usize, InternalError> {
+        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+            return Ok(0);
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            SELECT COUNT(*) as count
+            FROM resources
+            WHERE account_id = "#,
+        );
+        query_builder
+            .push_bind(account_id_str)
+            .push(" AND deleted_at IS NULL AND resource_kind IN (");
+        {
+            let mut separated = query_builder.separated(", ");
+            for kind in kinds {
+                separated.push_bind(kind);
+            }
+        }
+        query_builder.push(")");
+
+        if let Some(exact_names) = exact_names {
+            query_builder.push(" AND resource_name IN (");
+            let mut separated = query_builder.separated(", ");
+            for name in exact_names {
+                separated.push_bind(name.to_ascii_lowercase());
+            }
+            query_builder.push(")");
+        }
+
+        if let Some(name_pattern) = name_pattern {
+            query_builder.push(" AND resource_name LIKE ");
+            query_builder.push_bind(sql_like_escape_pattern(name_pattern));
+            query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
+        }
+
+        let row = query_builder
+            .build_query_scalar::<i64>()
+            .fetch_one(connection_mut)
+            .await
+            .int_err()?;
+
+        usize::try_from(row).int_err()
     }
 
     async fn find_resource_snapshot(

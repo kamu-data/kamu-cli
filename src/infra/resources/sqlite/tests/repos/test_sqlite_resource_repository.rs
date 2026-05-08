@@ -50,7 +50,31 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_identities,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_count_search_resource_identities,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -139,6 +163,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_resource_name_case_insensitive,
     harness = SqliteResourceRepositoryHarness
 );
 

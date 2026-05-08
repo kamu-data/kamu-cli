@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRefT, mysql_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    mysql_generate_placeholders_list,
+    sql_like_escape_literal,
+};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -460,6 +465,7 @@ impl AccountRepository for MySqlAccountRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
+            let name_pattern = sql_like_escape_literal(name_pattern);
             let query_str = format!(
                 r#"
                 SELECT id,
@@ -472,8 +478,8 @@ impl AccountRepository for MySqlAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name LIKE CONCAT('%',?,'%')
-                    OR display_name LIKE CONCAT('%',?,'%'))
+                WHERE (account_name LIKE CONCAT('%',?,'%') ESCAPE '\\'
+                    OR display_name LIKE CONCAT('%',?,'%') ESCAPE '\\')
                   AND id NOT IN ({})
                 ORDER BY account_name
                 LIMIT ? OFFSET ?
@@ -485,8 +491,8 @@ impl AccountRepository for MySqlAccountRepository {
             // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
             let mut query = sqlx::query(&query_str)
                 // NOTE: it's intentionally twice
-                .bind(name_pattern)
-                .bind(name_pattern);
+                .bind(&name_pattern)
+                .bind(&name_pattern);
 
             for excluded_account_id in filters.exclude_accounts_by_ids {
                 query = query.bind(excluded_account_id.to_string());

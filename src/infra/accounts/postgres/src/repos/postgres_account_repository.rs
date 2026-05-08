@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT, sql_like_escape_literal};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -402,6 +402,7 @@ impl AccountRepository for PostgresAccountRepository {
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>();
+            let name_pattern = sql_like_escape_literal(name_pattern);
 
             let mut query_stream = sqlx::query_as!(
                 AccountRowModel,
@@ -416,8 +417,8 @@ impl AccountRepository for PostgresAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name ILIKE '%'||$1||'%'
-                    OR display_name ILIKE '%'||$1||'%')
+                WHERE (account_name ILIKE '%'||$1||'%' ESCAPE '\'
+                    OR display_name ILIKE '%'||$1||'%' ESCAPE '\')
                   AND id != ALL($4)
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
