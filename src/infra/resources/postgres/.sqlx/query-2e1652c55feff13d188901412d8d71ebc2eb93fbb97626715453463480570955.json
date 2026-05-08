@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                resource_uid as \"uid: uuid::Uuid\",\n                resource_kind as kind,\n                api_version,\n                resource_name as name\n            FROM resources\n            WHERE account_id = $1\n              AND resource_kind = ANY($2)\n              AND ($3::text[] IS NULL OR resource_name = ANY($3))\n              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\\')\n              AND deleted_at IS NULL\n            ORDER BY updated_at DESC, resource_uid DESC\n            LIMIT $5 OFFSET $6\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uid: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "api_version",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2e1652c55feff13d188901412d8d71ebc2eb93fbb97626715453463480570955"
+}

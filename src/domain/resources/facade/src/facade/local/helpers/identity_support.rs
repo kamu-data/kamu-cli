@@ -18,7 +18,7 @@ use kamu_resources::{
     UnsupportedResourceDescriptorError,
 };
 
-use crate::{BatchResourceError, ResourceLookupProblem};
+use crate::ResourceLookupProblem;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,10 +49,13 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_identity_from_row(
+pub(crate) fn resource_identity_from_row<E>(
     row: ResourceIdentityRow,
     descriptors_by_key: &HashMap<(String, String), String>,
-) -> Result<ResourceIdentityView, BatchResourceError> {
+) -> Result<ResourceIdentityView, E>
+where
+    E: From<UnsupportedResourceDescriptorError>,
+{
     let key = (row.kind.clone(), row.api_version.clone());
     let found = descriptors_by_key.get(&key);
     let canonical_kind_name = found

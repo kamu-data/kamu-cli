@@ -271,6 +271,36 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         map_snapshots_to_identities(snapshots, &descriptors_by_key).map_err(Into::into)
     }
 
+    async fn search_identities(
+        &self,
+        request: SearchResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        for kind in &request.kinds {
+            get_resource_crud_dispatcher_by_kind::<ListResourcesError>(&self.catalog, kind)?;
+        }
+
+        let rows = self
+            .generic_resource_query_service
+            .search_resource_identities(
+                &target_account.id,
+                &request.kinds,
+                request.exact_names.as_deref(),
+                request.name_pattern.as_deref(),
+                request.pagination,
+            )
+            .await?;
+
+        let descriptors_by_key = self.resource_kind_names_by_key();
+        rows.into_iter()
+            .map(|row| resource_identity_from_row::<ListResourcesError>(row, &descriptors_by_key))
+            .collect()
+    }
+
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
@@ -787,7 +817,8 @@ impl LocalResourceFacadeImpl {
                 )
             }) {
                 Ok(row) => {
-                    let identity = resource_identity_from_row(row, descriptors_by_key)?;
+                    let identity =
+                        resource_identity_from_row::<BatchResourceError>(row, descriptors_by_key)?;
                     identities.push(IndexedResource {
                         request_index,
                         item: identity,

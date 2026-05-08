@@ -93,6 +93,11 @@ pub trait ResourceFacade: Send + Sync {
         request: ListResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
 
+    async fn search_identities(
+        &self,
+        request: SearchResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
+
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
@@ -200,6 +205,17 @@ pub struct ListResourcesRequest {
 #[derive(Debug, Clone)]
 pub struct ListResourceIdentitiesRequest {
     pub kind: String,
+    pub account: Option<ResourceManifestAccount>,
+    pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct SearchResourceIdentitiesRequest {
+    pub kinds: Vec<String>,
+    pub exact_names: Option<Vec<ResourceName>>,
+    pub name_pattern: Option<String>,
     pub account: Option<ResourceManifestAccount>,
     pub pagination: PaginationOpts,
 }

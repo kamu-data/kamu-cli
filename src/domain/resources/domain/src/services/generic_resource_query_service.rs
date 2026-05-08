@@ -38,6 +38,15 @@ pub trait GenericResourceQueryService: Send + Sync {
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
+    async fn search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,

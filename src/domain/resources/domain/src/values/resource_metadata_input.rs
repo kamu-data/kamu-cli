@@ -54,14 +54,14 @@ impl ResourceMetadataInput {
 
     pub fn try_new(
         account: odf::AccountID,
-        name: ResourceName,
+        name: &ResourceName,
         description: Option<String>,
         labels: Vec<(String, String)>,
         annotations: Vec<(String, String)>,
     ) -> Result<Self, ResourceMetadataValidationError> {
         let metadata = Self {
             account,
-            name,
+            name: name.to_ascii_lowercase(),
             description,
             labels: Self::entries_to_map(labels, ResourceMetadataField::Labels)?,
             annotations: Self::entries_to_map(annotations, ResourceMetadataField::Annotations)?,

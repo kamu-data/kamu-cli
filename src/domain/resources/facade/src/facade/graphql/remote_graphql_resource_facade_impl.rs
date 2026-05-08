@@ -55,6 +55,7 @@ use crate::{
     ResourceSelector,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
+    SearchResourceIdentitiesRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -470,6 +471,61 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
+    fn search_resource_identities_query(
+        request: &SearchResourceIdentitiesRequest,
+        page: usize,
+        per_page: usize,
+    ) -> Result<String, InternalError> {
+        let kinds = request
+            .kinds
+            .iter()
+            .map(|kind| {
+                Ok(format!(
+                    "{{ custom: {} }}",
+                    serde_json::to_string(kind).int_err()?
+                ))
+            })
+            .collect::<Result<Vec<_>, InternalError>>()?
+            .join(", ");
+
+        let names = request
+            .exact_names
+            .as_ref()
+            .map(|names| serde_json::to_string(names).int_err())
+            .transpose()?;
+        let name_pattern = request
+            .name_pattern
+            .as_ref()
+            .map(|pattern| serde_json::to_string(pattern).int_err())
+            .transpose()?;
+        let account = Self::account_selector_input(request.account.as_ref())?
+            .map(|account| format!("account: {account},"))
+            .unwrap_or_default();
+        let names = names
+            .map(|names| format!("names: {names},"))
+            .unwrap_or_default();
+        let name_pattern = name_pattern
+            .map(|name_pattern| format!("namePattern: {name_pattern},"))
+            .unwrap_or_default();
+
+        Ok(format!(
+            r#"
+            query {{
+              resources {{
+                searchIdentities(
+                  query: {{ kinds: [{kinds}], {names}{name_pattern}{account} }},
+                  page: {page},
+                  perPage: {per_page}
+                ) {{
+                  {fields}
+                }}
+              }}
+            }}
+            "#,
+            fields = Self::IDENTITY_LIST_FIELDS,
+        ))
+    }
+
     fn graphql_page_params(offset: usize, limit: usize) -> (usize, usize) {
         let page = offset.checked_div(limit).unwrap_or(0);
         let per_page = if limit == 0 {
@@ -558,6 +614,29 @@ impl RemoteGraphqlResourceFacadeImpl {
         };
 
         Ok(nodes.into_iter().map(Into::into).collect())
+    }
+
+    async fn search_resource_identities<E>(
+        &self,
+        request: &SearchResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, E>
+    where
+        E: From<GraphqlHttpRequestError> + From<InternalError>,
+    {
+        let (page, per_page) =
+            Self::graphql_page_params(request.pagination.offset, request.pagination.limit);
+        let query =
+            Self::search_resource_identities_query(request, page, per_page).map_err(E::from)?;
+        let response: fragments::SearchIdentitiesQueryDataFragment =
+            self.execute_graphql(&query).await?;
+
+        Ok(response
+            .resources
+            .search_identities
+            .nodes
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 
     fn selector_input(
@@ -1433,6 +1512,14 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.pagination.limit,
         )
         .await
+    }
+
+    async fn search_identities(
+        &self,
+        request: SearchResourceIdentitiesRequest,
+    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+        self.search_resource_identities::<ListResourcesError>(&request)
+            .await
     }
 
     async fn list_all(

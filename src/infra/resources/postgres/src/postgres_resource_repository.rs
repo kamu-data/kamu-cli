@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT, sql_like_escape_pattern};
 use dill::{component, interface};
 use event_sourcing::EventID;
 use futures::TryStreamExt;
@@ -277,7 +277,7 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             account_id_stack.as_str(),
             kind,
-            name,
+            name.to_ascii_lowercase(),
         )
         .fetch_optional(connection_mut)
         .await
@@ -355,7 +355,66 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             account_id_stack.as_str(),
             kind,
-            names as _,
+            names
+                .iter()
+                .map(|n| n.to_ascii_lowercase())
+                .collect::<Vec<_>>() as _,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn search_resource_identities(
+        &self,
+        account_id: &odf::AccountID,
+        kinds: &[String],
+        exact_names: Option<&[ResourceName]>,
+        name_pattern: Option<&str>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+        if kinds.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let limit = i64::try_from(pagination.limit).int_err()?;
+        let offset = i64::try_from(pagination.offset).int_err()?;
+        let exact_names = exact_names.map(|ns| {
+            ns.iter()
+                .map(|n| n.to_ascii_lowercase())
+                .collect::<Vec<_>>()
+        });
+        let name_pattern = name_pattern.map(sql_like_escape_pattern);
+
+        let rows = sqlx::query_as!(
+            ResourceIdentityRow,
+            r#"
+            SELECT
+                resource_uid as "uid: uuid::Uuid",
+                resource_kind as kind,
+                api_version,
+                resource_name as name
+            FROM resources
+            WHERE account_id = $1
+              AND resource_kind = ANY($2)
+              AND ($3::text[] IS NULL OR resource_name = ANY($3))
+              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
+              AND deleted_at IS NULL
+            ORDER BY updated_at DESC, resource_uid DESC
+            LIMIT $5 OFFSET $6
+            "#,
+            account_id_stack.as_str(),
+            kinds as _,
+            exact_names.as_deref() as _,
+            name_pattern.as_deref(),
+            limit,
+            offset,
         )
         .fetch_all(connection_mut)
         .await

@@ -37,7 +37,7 @@ impl ResourceMetadata {
     pub fn from_input(now: DateTime<Utc>, input: ResourceMetadataInput) -> Self {
         Self {
             account: input.account,
-            name: input.name,
+            name: input.name.to_ascii_lowercase(),
             description: input.description,
             labels: input.labels,
             annotations: input.annotations,
@@ -58,7 +58,7 @@ impl ResourceMetadata {
 
     pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceMetadataInput) {
         self.account = input.account;
-        self.name = input.name;
+        self.name = input.name.to_ascii_lowercase();
         self.description = input.description;
         self.labels = input.labels;
         self.annotations = input.annotations;

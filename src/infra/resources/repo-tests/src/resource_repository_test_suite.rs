@@ -37,7 +37,7 @@ fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> Res
         api_version: "v1".to_string(),
         metadata: ResourceMetadata {
             account: account_id,
-            name: name.to_string(),
+            name: name.to_ascii_lowercase(),
             description: None,
             labels: BTreeMap::new(),
             annotations: BTreeMap::new(),
@@ -213,6 +213,228 @@ pub async fn test_find_resource_snapshots_by_kind_and_uids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_search_resource_identities(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    for (kind, name, account) in [
+        ("TestKind", "app-alpha", account_id.clone()),
+        ("TestKind", "app-beta", account_id.clone()),
+        ("TestKind", "db-alpha", account_id.clone()),
+        ("OtherKind", "app-gamma", account_id.clone()),
+        ("OtherKind", "app-delta", account_id.clone()),
+        ("TestKind", "app-other-account", other_account_id),
+    ] {
+        let mut snapshot = make_test_snapshot(account, kind, name);
+        snapshot.uid = repo.new_resource_uid().await.unwrap();
+        repo.create_resource(&snapshot).await.unwrap();
+    }
+
+    // --- name_pattern: prefix wildcard matches only TestKind items for this
+    // account ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("app-%"),
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["app-beta", "app-alpha"]);
+
+    // --- name_pattern is case-insensitive ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("APP-%"),
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["app-beta", "app-alpha"]);
+
+    // --- exact_names filter ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            Some(&["app-alpha".to_string(), "db-alpha".to_string()]),
+            None,
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["app-alpha", "db-alpha"]);
+
+    // --- exact_names filter is case-insensitive ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            Some(&["App-Alpha".to_string(), "DB-ALPHA".to_string()]),
+            None,
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["app-alpha", "db-alpha"]);
+
+    // --- multi-kind search ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string(), "OtherKind".to_string()],
+            None,
+            Some("app-%"),
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["app-alpha", "app-beta", "app-delta", "app-gamma"]
+    );
+
+    // --- no name_pattern and no exact_names returns all for the kind ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            None,
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 3);
+
+    // --- other account's resources are never returned ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("app-other-%"),
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    // Stored names are always lowercase (as produced by try_new).
+    let mut alpha = make_test_snapshot(account_id.clone(), "TestKind", "my-resource");
+    alpha.uid = repo.new_resource_uid().await.unwrap();
+    let uid = alpha.uid;
+    repo.create_resource(&alpha).await.unwrap();
+
+    let mut beta = make_test_snapshot(account_id.clone(), "TestKind", "other-resource");
+    beta.uid = repo.new_resource_uid().await.unwrap();
+    repo.create_resource(&beta).await.unwrap();
+
+    // --- find_resource_uid_by_name is case-insensitive ---
+    let found = repo
+        .find_resource_uid_by_name(&account_id, "TestKind", &"My-Resource".to_string())
+        .await
+        .unwrap();
+    assert_eq!(found, Some(uid));
+
+    let found = repo
+        .find_resource_uid_by_name(&account_id, "TestKind", &"MY-RESOURCE".to_string())
+        .await
+        .unwrap();
+    assert_eq!(found, Some(uid));
+
+    // --- find_resource_identities_by_names is case-insensitive ---
+    let rows = repo
+        .find_resource_identities_by_names(
+            &account_id,
+            "TestKind",
+            &["My-Resource".to_string(), "OTHER-RESOURCE".to_string()],
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["my-resource", "other-resource"]);
+
+    // --- search_resource_identities exact_names is case-insensitive ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            Some(&["MY-RESOURCE".to_string()]),
+            None,
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["my-resource"]);
+
+    // --- name_pattern search is case-insensitive ---
+    let rows = repo
+        .search_resource_identities(
+            &account_id,
+            &["TestKind".to_string()],
+            None,
+            Some("MY-%"),
+            PaginationOpts {
+                limit: 10,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["my-resource"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
@@ -221,10 +443,29 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     first.uid = repo.new_resource_uid().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
-    let mut second = make_test_snapshot(account_id, "TestKind", "duplicate-resource");
+    // Same name - should be considered duplicate
+    let mut second = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
     second.uid = repo.new_resource_uid().await.unwrap();
-    let result = repo.create_resource(&second).await;
 
+    let result = repo.create_resource(&second).await;
+    assert!(matches!(result, Err(CreateResourceError::Duplicate(_))));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
+    first.uid = repo.new_resource_uid().await.unwrap();
+    repo.create_resource(&first).await.unwrap();
+
+    // Same name but different case - should still be considered duplicate
+    let mut second = make_test_snapshot(account_id, "TestKind", "Duplicate-Resource");
+    second.uid = repo.new_resource_uid().await.unwrap();
+
+    let result = repo.create_resource(&second).await;
     assert!(matches!(result, Err(CreateResourceError::Duplicate(_))));
 }
 
