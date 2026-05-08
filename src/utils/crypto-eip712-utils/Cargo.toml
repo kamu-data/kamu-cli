@@ -36,9 +36,10 @@ internal-error = { workspace = true }
 #] }
 alloy-dyn-abi = { version = "1.5.7", default-features = false, features = ["eip712"] }
 alloy-primitives = { version = "1.5.7", default-features = false, features = [] }
-# TODO: Molecule: Phase 3: depend directly to smaller crates
+# TODO: Molecule: Phase 3: depend directly to smaller crates (k256?)
 alloy-signer = { version = "=1.7.3", default-features = false, features = ["eip712"] }
 alloy-signer-local = { version = "=1.7.3", default-features = false, features = [] }
+k256 = { version = "0.13", default-features = true, features = ["ecdsa-core", "ecdsa"] }
 nutype = { version = "0.6", default-features = false, features = [
     "serde"
 ] }

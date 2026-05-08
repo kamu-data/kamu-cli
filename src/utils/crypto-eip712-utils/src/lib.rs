@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 // Re-exports
-pub use alloy_primitives::B256;
-pub use alloy_signer::SignerSync;
-pub use alloy_signer_local::PrivateKeySigner;
+pub use alloy_primitives::{B256, b256};
+pub use k256::ecdsa::SigningKey;
 
 mod eip712_typed_data;
+mod secp256k1;
 
 pub use eip712_typed_data::*;
+pub use secp256k1::*;
