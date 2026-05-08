@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 // Re-exports
-pub use alloy::primitives::B256;
+pub use alloy_primitives::B256;
 
 mod eip712_types;
 

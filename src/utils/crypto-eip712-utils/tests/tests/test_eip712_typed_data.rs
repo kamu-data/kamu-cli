@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy::hex;
-use alloy::primitives::b256;
-use alloy::signers::SignerSync;
-use alloy::signers::k256::ecdsa::SigningKey;
-use alloy::signers::local::LocalSigner;
+use alloy_primitives::{b256, hex};
+use alloy_signer::SignerSync;
+use alloy_signer::k256::ecdsa::SigningKey;
+use alloy_signer_local::LocalSigner;
 use crypto_eip712_utils::Eip712TypedData;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -110,7 +109,7 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     {
         use odf_metadata::ed25519::Signer;
 
-        let pk = odf_metadata::PrivateKey::from_bytes(&alloy::hex!(
+        let pk = odf_metadata::PrivateKey::from_bytes(&hex!(
             "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601"
         ));
         let signing_hash = typed_data.signing_hash_with_eip191_prefix()?;

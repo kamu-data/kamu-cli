@@ -13,12 +13,12 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
-use ed25519_dalek::Signer;
 use kamu::domain::*;
 use kamu::*;
 use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf::metadata::ed25519::Signer;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 

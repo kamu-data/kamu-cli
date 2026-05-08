@@ -256,7 +256,7 @@ pub async fn query_handler_impl(
             proof: None,
         }
     } else if let Some(identity) = identity {
-        use ed25519_dalek::Signer;
+        use odf::metadata::ed25519::Signer;
 
         let sub_queries = Vec::new();
 

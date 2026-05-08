@@ -28,10 +28,14 @@ default = []
 [dependencies]
 internal-error = { workspace = true }
 
-alloy = { version = "2", default-features = false, features = [
-    "dyn-abi",
-    "eip712",
-] }
+# TODO: Molecule: Phase 3: update umbrelly alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
+#alloy = { version = "2", default-features = false, features = [
+#    "dyn-abi",
+#    "eip712",
+#] }
+alloy-dyn-abi = { version = "1.5.7", default-features = false, features = ["eip712"] }
+alloy-primitives = { version = "1.5.7", default-features = false, features = [] }
 nutype = { version = "0.6", default-features = false, features = [
     "serde"
 ] }
@@ -42,10 +46,14 @@ serde_json = { version = "1", default-features = false }
 [dev-dependencies]
 odf-metadata = { workspace = true }
 
-alloy = { version = "2", default-features = false, features = [
-    "signer-local",
-    "signers",
-] }
+# TODO: Molecule: Phase 3: update umbrelly alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
+#alloy = { version = "2", default-features = false, features = [
+#    "signer-local",
+#    "signers",
+#] }
+alloy-signer = { version = "=1.7.3", default-features = false, features = ["eip712"] }
+alloy-signer-local = { version = "=1.7.3", default-features = false, features = [] }
 eyre = { version = "0", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
