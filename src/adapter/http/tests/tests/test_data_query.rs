@@ -41,8 +41,7 @@ impl Harness {
         // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
-        let private_key: odf::metadata::PrivateKey =
-            ed25519_dalek::SigningKey::from_bytes(&[123; ed25519_dalek::SECRET_KEY_LENGTH]).into();
+        let private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
 
         let identity_config = IdentityConfig {
             private_key: private_key.clone(),

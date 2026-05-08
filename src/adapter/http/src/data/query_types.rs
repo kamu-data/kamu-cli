@@ -51,10 +51,7 @@ mod tests {
     #[test]
     fn authority_config_doesnt_leak_key() {
         let cfg = IdentityConfig {
-            private_key: ed25519_dalek::SigningKey::from_bytes(
-                &[123; ed25519_dalek::SECRET_KEY_LENGTH],
-            )
-            .into(),
+            private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
         };
 
         assert_eq!(
