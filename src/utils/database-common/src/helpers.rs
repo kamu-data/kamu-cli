@@ -86,6 +86,78 @@ fn test_sqlite_generate_placeholders_tuple_list_2() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LIKE pattern helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Escapes special SQL `LIKE` characters (`_` and `\`) while preserving `%` as
+/// a caller-controlled wildcard.
+///
+/// Use this when the caller intentionally supplies `%` wildcards in the
+/// pattern (e.g. `"prefix%"` for a prefix search).
+///
+/// The resulting string should be paired with `ESCAPE '\'` in the SQL query.
+pub fn sql_like_escape_pattern(pattern: &str) -> String {
+    let mut out = String::with_capacity(pattern.len());
+    for ch in pattern.chars() {
+        match ch {
+            '%' => out.push('%'),
+            '_' | '\\' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+/// Escapes all special SQL `LIKE` characters (`%`, `_`, and `\`) so the input
+/// is treated as a literal search term.
+///
+/// Use this for substring searches where the surrounding `%` wildcards are
+/// added by the SQL itself (e.g. `LIKE '%' || $1 || '%'`).
+///
+/// The resulting string should be paired with `ESCAPE '\'` in the SQL query.
+pub fn sql_like_escape_literal(pattern: &str) -> String {
+    let mut out = String::with_capacity(pattern.len());
+    for ch in pattern.chars() {
+        match ch {
+            '%' | '_' | '\\' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sql_like_escape_pattern() {
+    use sql_like_escape_pattern as f;
+
+    pretty_assertions::assert_eq!("foo%", f("foo%"));
+    pretty_assertions::assert_eq!("foo\\_bar", f("foo_bar"));
+    pretty_assertions::assert_eq!("foo\\\\bar", f("foo\\bar"));
+    pretty_assertions::assert_eq!("foo\\_bar%", f("foo_bar%"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sql_like_escape_literal() {
+    use sql_like_escape_literal as f;
+
+    pretty_assertions::assert_eq!("foo", f("foo"));
+    pretty_assertions::assert_eq!("foo\\_bar", f("foo_bar"));
+    pretty_assertions::assert_eq!("foo\\%bar", f("foo%bar"));
+    pretty_assertions::assert_eq!("foo\\\\bar", f("foo\\bar"));
+    pretty_assertions::assert_eq!("foo\\_\\%\\\\bar", f("foo_%\\bar"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MySQL
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

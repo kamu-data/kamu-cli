@@ -9,7 +9,12 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sql_like_escape_literal,
+    sqlite_generate_placeholders_list,
+};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
@@ -467,6 +472,7 @@ impl AccountRepository for SqliteAccountRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
+            let name_pattern = sql_like_escape_literal(name_pattern);
             let query_str = format!(
                 r#"
                 SELECT id,
@@ -479,8 +485,8 @@ impl AccountRepository for SqliteAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name LIKE '%'||$1||'%' COLLATE nocase
-                    OR display_name LIKE '%'||$1||'%' COLLATE nocase)
+                WHERE (account_name LIKE '%'||$1||'%' ESCAPE '\' COLLATE nocase
+                    OR display_name LIKE '%'||$1||'%' ESCAPE '\' COLLATE nocase)
                   AND id NOT IN ({})
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
