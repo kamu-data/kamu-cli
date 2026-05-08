@@ -101,6 +101,9 @@ impl ResourceSelectionSyntaxServiceImpl {
             ParsedSyntax::All { shadowed_inputs } => {
                 items.push(ResourceSelectionItem::All);
 
+                // Shadowed selectors are reported separately instead of being kept in
+                // `items`, so downstream resolution never wastes backend lookups on
+                // selectors whose scope is already covered by `all`.
                 for shadowed_input in shadowed_inputs {
                     if let Some(kind_str) = shadowed_input.kind_str {
                         Self::validate_shadowed_kind_target(supported_kinds, kind_str)?;
@@ -124,6 +127,9 @@ impl ResourceSelectionSyntaxServiceImpl {
 
                     for selector_input in selector_inputs {
                         if selector_input != ALL_SELECTOR {
+                            // Keep only the broad selector in `items`; narrower selectors
+                            // move to `shadowed_selectors` so resolution and delete
+                            // validation can treat them as already covered.
                             shadowed_selectors.push(ResourceShadowedSelector {
                                 selector_input: selector_input.to_owned(),
                             });
@@ -159,6 +165,9 @@ impl ResourceSelectionSyntaxServiceImpl {
                             )?);
                         }
                     } else if all_by_kind.contains(kind_str) {
+                        // Same idea for slash form: once `kind/all` is present we retain
+                        // only that broad item for resolution and record the rest as
+                        // shadowed diagnostics.
                         shadowed_selectors.push(ResourceShadowedSelector {
                             selector_input: format!("{kind_str}/{selector_input}"),
                         });

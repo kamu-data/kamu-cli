@@ -13,5 +13,6 @@ mod test_di_graph;
 mod test_generate_cli_markdown;
 mod test_new_dataset_command;
 mod test_output;
+mod test_resource_selection_resolution_service;
 mod test_system_info_command;
 mod test_workspace_svc;

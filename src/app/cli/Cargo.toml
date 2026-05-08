@@ -283,6 +283,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
+kamu-resources-facade = { workspace = true, features = ["testing"] }
 
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }

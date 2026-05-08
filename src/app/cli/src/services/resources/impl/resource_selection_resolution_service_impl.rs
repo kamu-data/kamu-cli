@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::future::Future;
 
 use database_common::PaginationOpts;
@@ -19,6 +19,7 @@ use kamu_resources_facade::{
     ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
+    ResourceSelector,
     SearchResourceIdentitiesRequest,
 };
 
@@ -56,17 +57,31 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         let mut targets = Vec::with_capacity(selection.items.len());
         let mut ignored_selectors = Vec::new();
         let mut expanded_results = 0;
+        let mut seen_target_keys = HashSet::new();
 
+        let supported_kinds =
+            Self::supported_kinds_for_patterns(&selection, resource_facade).await?;
+
+        // Exact selectors are prefetched in batches before the main loop so we can
+        // collapse many single-item lookups into grouped backend calls while still
+        // replaying results in the original selector order below. At this point
+        // shadowed selectors are already absent from `selection.items`, because the
+        // syntax layer moved them into `shadowed_selectors` instead.
         let exact_results = Self::fetch_exact_identities(&selection, resource_facade).await?;
         let mut exact_results = exact_results.into_iter();
 
         for item in selection.items {
             match item {
                 ResourceSelectionItem::All => {
-                    let new_targets =
-                        Self::process_all_item(resource_facade, expanded_results, options).await?;
-                    expanded_results += new_targets.len();
-                    targets.extend(new_targets);
+                    let new_targets = Self::process_all_item(
+                        resource_facade,
+                        &seen_target_keys,
+                        expanded_results,
+                        options,
+                    )
+                    .await?;
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
                 ResourceSelectionItem::AllByKind {
@@ -76,19 +91,21 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                     let new_targets = Self::process_all_by_kind_item(
                         resource_facade,
                         &kind_descriptor,
+                        &seen_target_keys,
                         selector_input,
                         expanded_results,
                         options,
                     )
                     .await?;
-                    expanded_results += new_targets.len();
-                    targets.extend(new_targets);
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
                 ResourceSelectionItem::Exact(selector) => {
                     Self::process_exact_item(
                         selector,
                         &mut exact_results,
+                        &mut seen_target_keys,
                         &mut targets,
                         &mut ignored_selectors,
                         options,
@@ -103,6 +120,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                     let new_targets = Self::process_name_pattern_item(
                         resource_facade,
                         &kind_descriptor,
+                        &seen_target_keys,
                         selector_input,
                         name_pattern,
                         expanded_results,
@@ -110,12 +128,35 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         options,
                     )
                     .await?;
-                    expanded_results += new_targets.len();
-                    targets.extend(new_targets);
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
-                ResourceSelectionItem::KindPatternExactName { selector_input, .. }
-                | ResourceSelectionItem::KindPatternAll { selector_input, .. }
+                ResourceSelectionItem::KindPatternExactName {
+                    kind_pattern,
+                    selector_input,
+                    resource_ref,
+                } => {
+                    let matched_supported_kinds = supported_kinds
+                        .as_deref()
+                        .expect("kind patterns require supported kinds");
+                    let new_targets = Self::process_kind_pattern_exact_name_item(
+                        resource_facade,
+                        matched_supported_kinds,
+                        &seen_target_keys,
+                        kind_pattern,
+                        selector_input,
+                        resource_ref,
+                        expanded_results,
+                        &mut ignored_selectors,
+                        options,
+                    )
+                    .await?;
+                    expanded_results +=
+                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
+                }
+
+                ResourceSelectionItem::KindPatternAll { selector_input, .. }
                 | ResourceSelectionItem::KindPatternNamePattern { selector_input, .. } => {
                     return Err(Self::patterns_not_supported_error(&selector_input));
                 }
@@ -132,6 +173,55 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSelectionResolutionServiceImpl {
+    fn target_key_from_identity(identity: &ResourceIdentityView) -> ResourceTargetKey {
+        (
+            identity.kind.clone(),
+            identity.api_version.clone(),
+            identity.uid,
+        )
+    }
+
+    fn target_key(target: &ResourceTarget) -> ResourceTargetKey {
+        (target.kind.clone(), target.api_version.clone(), target.uid)
+    }
+
+    fn append_new_targets(
+        targets: &mut Vec<ResourceTarget>,
+        seen_target_keys: &mut HashSet<ResourceTargetKey>,
+        new_targets: Vec<ResourceTarget>,
+    ) -> usize {
+        let mut appended = 0;
+
+        for target in new_targets {
+            if seen_target_keys.insert(Self::target_key(&target)) {
+                targets.push(target);
+                appended += 1;
+            }
+        }
+
+        appended
+    }
+
+    async fn supported_kinds_for_patterns(
+        selection: &ResourceSelectionSyntax,
+        resource_facade: &dyn ResourceFacade,
+    ) -> Result<Option<Vec<ResourceKindDescriptor>>, CLIError> {
+        let needs_supported_kinds = selection.items.iter().any(|item| {
+            matches!(
+                item,
+                ResourceSelectionItem::KindPatternExactName { .. }
+                    | ResourceSelectionItem::KindPatternAll { .. }
+                    | ResourceSelectionItem::KindPatternNamePattern { .. }
+            )
+        });
+
+        if needs_supported_kinds {
+            Ok(Some(resource_facade.list_supported_kinds().await?))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
@@ -205,12 +295,14 @@ impl ResourceSelectionResolutionServiceImpl {
 
     async fn process_all_item(
         resource_facade: &dyn ResourceFacade,
+        seen_target_keys: &HashSet<ResourceTargetKey>,
         expanded_results: usize,
         options: ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let identities = Self::collect_bounded_pages(
+        let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
+            seen_target_keys,
             |pagination| async move {
                 resource_facade
                     .list_all_identities(ListAllResourceIdentitiesRequest {
@@ -223,7 +315,8 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        Ok(identities
+        Ok(collected
+            .identities
             .into_iter()
             .map(|identity| Self::target_from_identity(identity, "all".to_owned()))
             .collect())
@@ -232,13 +325,15 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn process_all_by_kind_item(
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: &ResourceKindDescriptor,
+        seen_target_keys: &HashSet<ResourceTargetKey>,
         selector_input: String,
         expanded_results: usize,
         options: ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let identities = Self::collect_bounded_pages(
+        let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
+            seen_target_keys,
             |pagination| async move {
                 resource_facade
                     .list_identities(ListResourceIdentitiesRequest {
@@ -252,7 +347,8 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        Ok(identities
+        Ok(collected
+            .identities
             .into_iter()
             .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
             .collect())
@@ -261,15 +357,17 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn process_name_pattern_item(
         resource_facade: &dyn ResourceFacade,
         kind_descriptor: &ResourceKindDescriptor,
+        seen_target_keys: &HashSet<ResourceTargetKey>,
         selector_input: String,
         name_pattern: String,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let identities = Self::collect_bounded_pages(
+        let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
+            seen_target_keys,
             |pagination| {
                 let request_name_pattern = name_pattern.clone();
                 async move {
@@ -288,7 +386,7 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        if identities.is_empty() {
+        if collected.identities.is_empty() && !collected.had_any_match {
             if options.ignore_not_found {
                 ignored_selectors.push(ResourceIgnoredSelector {
                     kind_descriptor: kind_descriptor.clone(),
@@ -303,15 +401,100 @@ impl ResourceSelectionResolutionServiceImpl {
             ));
         }
 
-        Ok(identities
+        Ok(collected
+            .identities
             .into_iter()
             .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
             .collect())
     }
 
+    async fn process_kind_pattern_exact_name_item(
+        resource_facade: &dyn ResourceFacade,
+        supported_kinds: &[ResourceKindDescriptor],
+        seen_target_keys: &HashSet<ResourceTargetKey>,
+        kind_pattern: String,
+        selector_input: String,
+        resource_ref: kamu_resources_facade::ResourceRef,
+        expanded_results: usize,
+        ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
+        options: ResourceSelectionResolutionOptions,
+    ) -> Result<Vec<ResourceTarget>, CLIError> {
+        let matched_kinds = Self::matched_kind_descriptors(supported_kinds, &kind_pattern);
+
+        if matched_kinds.is_empty() {
+            return Err(Self::unsupported_kind_pattern_error(
+                supported_kinds,
+                &kind_pattern,
+            ));
+        }
+
+        let mut targets = Vec::new();
+        let mut local_seen_target_keys = HashSet::new();
+        let remaining_limit = Self::remaining_expanded_results(expanded_results, options);
+        let mut had_any_match = false;
+
+        for kind_descriptor in &matched_kinds {
+            match resource_facade
+                .get_identity(ResourceSelector {
+                    account: None,
+                    kind: kind_descriptor.kind.clone(),
+                    api_version: Some(kind_descriptor.api_version.clone()),
+                    resource_ref: resource_ref.clone(),
+                })
+                .await
+            {
+                Ok(identity) => {
+                    had_any_match = true;
+                    let target_key = Self::target_key_from_identity(&identity);
+
+                    if seen_target_keys.contains(&target_key)
+                        || !local_seen_target_keys.insert(target_key)
+                    {
+                        continue;
+                    }
+
+                    targets.push(Self::target_from_identity(identity, selector_input.clone()));
+
+                    if let Some(limit) = remaining_limit
+                        && targets.len() > limit
+                    {
+                        return Err(Self::max_expanded_results_exceeded_error(
+                            options.max_expanded_results.unwrap_or(limit),
+                        ));
+                    }
+                }
+                Err(GetResourceError::LookupProblem(
+                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+                )) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+
+        if targets.is_empty() && !had_any_match {
+            if options.ignore_not_found {
+                ignored_selectors.push(ResourceIgnoredSelector {
+                    kind_descriptor: matched_kinds
+                        .first()
+                        .expect("matched kinds should be non-empty")
+                        .clone(),
+                    selector_input,
+                });
+                return Ok(Vec::new());
+            }
+
+            return Err(Self::kind_pattern_exact_selector_not_found_error(
+                &kind_pattern,
+                &resource_ref,
+            ));
+        }
+
+        Ok(targets)
+    }
+
     fn process_exact_item(
         selector: crate::resources::ResourceExactSelector,
         exact_results: &mut std::vec::IntoIter<Result<ResourceIdentityView, GetResourceError>>,
+        seen_target_keys: &mut HashSet<ResourceTargetKey>,
         targets: &mut Vec<ResourceTarget>,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: ResourceSelectionResolutionOptions,
@@ -321,10 +504,11 @@ impl ResourceSelectionResolutionServiceImpl {
             .expect("Every exact selector must have a batch result")
         {
             Ok(identity) => {
-                targets.push(Self::target_from_identity(
-                    identity,
-                    selector.selector_input,
-                ));
+                let target = Self::target_from_identity(identity, selector.selector_input);
+
+                if seen_target_keys.insert(Self::target_key(&target)) {
+                    targets.push(target);
+                }
             }
             Err(GetResourceError::LookupProblem(
                 ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
@@ -339,33 +523,20 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(())
     }
 
-    async fn collect_bounded_pages<T, F, Fut>(
+    async fn collect_unique_bounded_identities<F, Fut>(
         remaining_limit: Option<usize>,
         error_limit: Option<usize>,
+        seen_target_keys: &HashSet<ResourceTargetKey>,
         mut fetch_page: F,
-    ) -> Result<Vec<T>, CLIError>
+    ) -> Result<CollectedUniqueIdentities, CLIError>
     where
         F: FnMut(PaginationOpts) -> Fut,
-        Fut: Future<Output = Result<Vec<T>, CLIError>>,
+        Fut: Future<Output = Result<Vec<ResourceIdentityView>, CLIError>>,
     {
-        if let Some(limit) = remaining_limit {
-            let items = fetch_page(PaginationOpts {
-                limit: limit.saturating_add(1),
-                offset: 0,
-            })
-            .await?;
-
-            if items.len() > limit {
-                return Err(Self::max_expanded_results_exceeded_error(
-                    error_limit.unwrap_or(limit),
-                ));
-            }
-
-            return Ok(items);
-        }
-
         let mut offset = 0;
         let mut items = Vec::new();
+        let mut local_seen_target_keys = HashSet::new();
+        let mut had_any_match = false;
 
         loop {
             let page_items = fetch_page(PaginationOpts {
@@ -374,7 +545,27 @@ impl ResourceSelectionResolutionServiceImpl {
             })
             .await?;
             let fetched = page_items.len();
-            items.extend(page_items);
+            had_any_match |= fetched > 0;
+
+            for identity in page_items {
+                let target_key = Self::target_key_from_identity(&identity);
+
+                if seen_target_keys.contains(&target_key)
+                    || !local_seen_target_keys.insert(target_key)
+                {
+                    continue;
+                }
+
+                items.push(identity);
+
+                if let Some(limit) = remaining_limit
+                    && items.len() > limit
+                {
+                    return Err(Self::max_expanded_results_exceeded_error(
+                        error_limit.unwrap_or(limit),
+                    ));
+                }
+            }
 
             if fetched < RESOURCE_PAGE_SIZE {
                 break;
@@ -383,7 +574,10 @@ impl ResourceSelectionResolutionServiceImpl {
             offset += fetched;
         }
 
-        Ok(items)
+        Ok(CollectedUniqueIdentities {
+            identities: items,
+            had_any_match,
+        })
     }
 
     fn remaining_expanded_results(
@@ -408,6 +602,27 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
+    fn matched_kind_descriptors(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_pattern: &str,
+    ) -> Vec<ResourceKindDescriptor> {
+        supported_kinds
+            .iter()
+            .filter(|descriptor| descriptor.matches_selector_pattern(kind_pattern))
+            .cloned()
+            .collect()
+    }
+
+    fn unsupported_kind_pattern_error(
+        supported_kinds: &[ResourceKindDescriptor],
+        kind_pattern: &str,
+    ) -> CLIError {
+        CLIError::usage_error(format!(
+            "Unsupported get target '{kind_pattern}'. Supported targets: {}",
+            Self::supported_targets(supported_kinds).join(", ")
+        ))
+    }
+
     fn name_pattern_not_found_error(
         kind_descriptor: &ResourceKindDescriptor,
         name_pattern: &str,
@@ -416,6 +631,33 @@ impl ResourceSelectionResolutionServiceImpl {
             "Pattern `{name_pattern}` did not match any {}",
             kind_descriptor.name
         ))
+    }
+
+    fn kind_pattern_exact_selector_not_found_error(
+        kind_pattern: &str,
+        resource_ref: &kamu_resources_facade::ResourceRef,
+    ) -> CLIError {
+        let selector = match resource_ref {
+            kamu_resources_facade::ResourceRef::ById(uid) => uid.to_string(),
+            kamu_resources_facade::ResourceRef::ByName(name) => name.clone(),
+        };
+
+        CLIError::usage_error(format!(
+            "Selector `{selector}` did not match any resource kind matched by `{kind_pattern}`"
+        ))
+    }
+
+    fn supported_targets(supported_kinds: &[ResourceKindDescriptor]) -> Vec<String> {
+        let mut targets = Vec::new();
+
+        for descriptor in supported_kinds {
+            targets.push(descriptor.name.clone());
+            targets.extend(descriptor.short_names.iter().cloned());
+        }
+
+        targets.sort();
+        targets.dedup();
+        targets
     }
 
     fn target_from_identity(
@@ -435,295 +677,13 @@ impl ResourceSelectionResolutionServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-mod tests {
-    use kamu_resources::{
-        ResourceIdentityView,
-        ResourceKindDescriptor,
-        ResourceUID,
-        ResourcesSummary,
-    };
-    use kamu_resources_facade::{
-        ApplyManifestError,
-        ApplyManifestRequest,
-        BatchResourceError,
-        BatchResourceResponse,
-        DeleteResourceError,
-        ListAllResourcesError,
-        ListAllResourcesRequest,
-        ListResourcesError,
-        ListResourcesRequest,
-        ListSupportedResourceKindsError,
-        RenderResourceManifestError,
-        RenderResourceManifestResult,
-        ResourceManifestFormat,
-        ResourceSelector,
-        ResourcesSummaryError,
-        ResourcesSummaryRequest,
-        SearchResourceIdentitiesRequest,
-    };
+type ResourceTargetKey = (String, String, kamu_resources::ResourceUID);
 
-    use super::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    #[derive(Default)]
-    struct FakeResourceFacade {
-        search_results: Vec<ResourceIdentityView>,
-        search_requests: std::sync::Mutex<Vec<SearchResourceIdentitiesRequest>>,
-    }
-
-    #[async_trait::async_trait]
-    impl ResourceFacade for FakeResourceFacade {
-        async fn list_supported_kinds(
-            &self,
-        ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError> {
-            unimplemented!()
-        }
-
-        async fn summary(
-            &self,
-            _request: ResourcesSummaryRequest,
-        ) -> Result<ResourcesSummary, ResourcesSummaryError> {
-            unimplemented!()
-        }
-
-        async fn get(
-            &self,
-            _selector: ResourceSelector,
-        ) -> Result<kamu_resources::ResourceView, GetResourceError> {
-            unimplemented!()
-        }
-
-        async fn get_many(
-            &self,
-            _selector: ResourceBatchSelector,
-        ) -> Result<
-            BatchResourceResponse<kamu_resources::ResourceView, ResourceLookupProblem>,
-            BatchResourceError,
-        > {
-            unimplemented!()
-        }
-
-        async fn get_identity(
-            &self,
-            _selector: ResourceSelector,
-        ) -> Result<ResourceIdentityView, GetResourceError> {
-            unimplemented!()
-        }
-
-        async fn get_identities(
-            &self,
-            _selector: ResourceBatchSelector,
-        ) -> Result<
-            BatchResourceResponse<ResourceIdentityView, ResourceLookupProblem>,
-            BatchResourceError,
-        > {
-            Ok(BatchResourceResponse {
-                successes: Vec::new(),
-                problems: Vec::new(),
-            })
-        }
-
-        async fn render_manifest(
-            &self,
-            _selector: ResourceSelector,
-            _format: ResourceManifestFormat,
-        ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-            unimplemented!()
-        }
-
-        async fn render_manifests(
-            &self,
-            _selector: ResourceBatchSelector,
-            _format: ResourceManifestFormat,
-        ) -> Result<
-            BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
-            BatchResourceError,
-        > {
-            unimplemented!()
-        }
-
-        async fn list(
-            &self,
-            _request: ListResourcesRequest,
-        ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListResourcesError> {
-            unimplemented!()
-        }
-
-        async fn list_identities(
-            &self,
-            _request: ListResourceIdentitiesRequest,
-        ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
-            unimplemented!()
-        }
-
-        async fn search_identities(
-            &self,
-            request: SearchResourceIdentitiesRequest,
-        ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
-            self.search_requests.lock().unwrap().push(request);
-            Ok(self.search_results.clone())
-        }
-
-        async fn list_all(
-            &self,
-            _request: ListAllResourcesRequest,
-        ) -> Result<Vec<kamu_resources::ResourceSummaryView>, ListAllResourcesError> {
-            unimplemented!()
-        }
-
-        async fn list_all_identities(
-            &self,
-            _request: ListAllResourceIdentitiesRequest,
-        ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError> {
-            unimplemented!()
-        }
-
-        async fn plan_apply_manifest(
-            &self,
-            _request: ApplyManifestRequest,
-        ) -> Result<kamu_resources::ApplyManifestPlanningDecision, ApplyManifestError> {
-            unimplemented!()
-        }
-
-        async fn apply_manifest(
-            &self,
-            _request: ApplyManifestRequest,
-        ) -> Result<kamu_resources::ApplyManifestApplicationDecision, ApplyManifestError> {
-            unimplemented!()
-        }
-
-        async fn delete(
-            &self,
-            _selector: ResourceSelector,
-        ) -> Result<ResourceUID, DeleteResourceError> {
-            unimplemented!()
-        }
-
-        async fn delete_many(
-            &self,
-            _selector: ResourceBatchSelector,
-        ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError>
-        {
-            unimplemented!()
-        }
-    }
-
-    #[tokio::test]
-    async fn resolves_exact_kind_name_patterns_via_search() {
-        let service = ResourceSelectionResolutionServiceImpl;
-        let facade = FakeResourceFacade {
-            search_results: vec![ResourceIdentityView {
-                kind: "kamu.dev/variableset".to_string(),
-                api_version: "v1".to_string(),
-                canonical_kind_name: "variablesets".to_string(),
-                uid: ResourceUID::new(uuid::Uuid::new_v4()),
-                name: "app-alpha".to_string(),
-            }],
-            ..FakeResourceFacade::default()
-        };
-
-        let result = service
-            .resolve(
-                ResourceSelectionSyntax {
-                    items: vec![ResourceSelectionItem::NamePattern {
-                        kind_descriptor: ResourceKindDescriptor {
-                            name: "variablesets".to_string(),
-                            short_names: vec!["vs".to_string()],
-                            kind: "kamu.dev/variableset".to_string(),
-                            api_version: "v1".to_string(),
-                            list_columns: Vec::new(),
-                        },
-                        selector_input: "app-%".to_string(),
-                        name_pattern: "app-%".to_string(),
-                    }],
-                    shadowed_selectors: Vec::new(),
-                },
-                &facade,
-                ResourceSelectionResolutionOptions {
-                    ignore_not_found: false,
-                    max_expanded_results: Some(10),
-                },
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(result.targets.len(), 1);
-        assert_eq!(result.targets[0].selector_input, "app-%");
-
-        let requests = facade.search_requests.lock().unwrap();
-        assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0].kinds, vec!["kamu.dev/variableset"]);
-        assert_eq!(requests[0].name_pattern.as_deref(), Some("app-%"));
-    }
-
-    #[tokio::test]
-    async fn ignores_unmatched_name_patterns_when_requested() {
-        let service = ResourceSelectionResolutionServiceImpl;
-        let facade = FakeResourceFacade::default();
-
-        let result = service
-            .resolve(
-                ResourceSelectionSyntax {
-                    items: vec![ResourceSelectionItem::NamePattern {
-                        kind_descriptor: ResourceKindDescriptor {
-                            name: "variablesets".to_string(),
-                            short_names: vec!["vs".to_string()],
-                            kind: "kamu.dev/variableset".to_string(),
-                            api_version: "v1".to_string(),
-                            list_columns: Vec::new(),
-                        },
-                        selector_input: "missing-%".to_string(),
-                        name_pattern: "missing-%".to_string(),
-                    }],
-                    shadowed_selectors: Vec::new(),
-                },
-                &facade,
-                ResourceSelectionResolutionOptions {
-                    ignore_not_found: true,
-                    max_expanded_results: Some(10),
-                },
-            )
-            .await
-            .unwrap();
-
-        assert!(result.targets.is_empty());
-        assert_eq!(result.ignored_selectors.len(), 1);
-        assert_eq!(result.ignored_selectors[0].selector_input, "missing-%");
-    }
-
-    #[tokio::test]
-    async fn errors_on_unmatched_name_patterns_by_default() {
-        let service = ResourceSelectionResolutionServiceImpl;
-        let facade = FakeResourceFacade::default();
-
-        let error = service
-            .resolve(
-                ResourceSelectionSyntax {
-                    items: vec![ResourceSelectionItem::NamePattern {
-                        kind_descriptor: ResourceKindDescriptor {
-                            name: "variablesets".to_string(),
-                            short_names: vec!["vs".to_string()],
-                            kind: "kamu.dev/variableset".to_string(),
-                            api_version: "v1".to_string(),
-                            list_columns: Vec::new(),
-                        },
-                        selector_input: "missing-%".to_string(),
-                        name_pattern: "missing-%".to_string(),
-                    }],
-                    shadowed_selectors: Vec::new(),
-                },
-                &facade,
-                ResourceSelectionResolutionOptions {
-                    ignore_not_found: false,
-                    max_expanded_results: Some(10),
-                },
-            )
-            .await
-            .unwrap_err();
-
-        assert_eq!(
-            error.to_string(),
-            "Pattern `missing-%` did not match any variablesets"
-        );
-    }
+struct CollectedUniqueIdentities {
+    identities: Vec<ResourceIdentityView>,
+    had_any_match: bool,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
