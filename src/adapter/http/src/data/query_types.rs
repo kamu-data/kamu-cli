@@ -30,33 +30,47 @@ pub struct IdentityConfig {
     /// Root private key that corresponds to the `authority` and is used to sign
     /// responses
     ///
-    /// To generate use:
+    /// To generate, use:
     ///
     /// ```sh
     /// ssh-keygen -t ed25519 -C "coo@abc.com"
     /// ```
-    pub private_key: odf::metadata::PrivateKey,
+    pub ed25519_private_key: odf::metadata::PrivateKey,
+
+    // TODO: Molecule: Phase 3: wrap w/ new type
+    pub secp256k1_private_key: crypto_eip712_utils::SigningKey,
 }
 
 impl IdentityConfig {
     pub fn did(&self) -> odf::metadata::DidKey {
-        odf::metadata::DidKey::new_ed25519(&self.private_key.verifying_key())
+        odf::metadata::DidKey::new_ed25519(&self.ed25519_private_key.verifying_key())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]
-    fn authority_config_doesnt_leak_key() {
+    fn authority_config_doesnt_leak_keys() {
+        use crypto_eip712_utils::*;
+
         let cfg = IdentityConfig {
-            private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
+            ed25519_private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
+            secp256k1_private_key: SigningKey::from_bytes(&[124; _].into()).unwrap(),
         };
 
         assert_eq!(
-            format!("{cfg:?}"),
-            "IdentityConfig { private_key: PrivateKey(***) }"
+            indoc::indoc! {
+                r#"
+                IdentityConfig {
+                    ed25519_private_key: PrivateKey(***),
+                    secp256k1_private_key: SigningKey { .. },
+                }"#
+            },
+            format!("{cfg:#?}"),
         );
     }
 }

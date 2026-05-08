@@ -9,7 +9,6 @@
 
 use axum::extract::{Extension, Query};
 use axum::response::Json;
-use crypto_eip712_utils::Eip712TypedData;
 use database_common_macros::transactional_handler;
 use http_common::{ApiError, ApiErrorResponse};
 use internal_error::ResultIntoInternal;
@@ -22,7 +21,7 @@ use super::sign_eip712_types::{
     SignEip712Response,
 };
 use crate::data::query_handler::ResponseSigningNotConfigured;
-use crate::data::query_types::{ProofType, to_canonical_json};
+use crate::data::query_types::{IdentityConfig, ProofType};
 use crate::data::sign::SignEip712Proof;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,8 +61,13 @@ pub async fn sign_eip712_handler(
 
     tracing::debug!(params = ?params, request = ?request, "EIP-712 sign request");
 
+    let identity = catalog.get_one::<IdentityConfig>().ok();
     let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
     let did_secret_encryption_config = catalog.get_one::<DidSecretEncryptionConfig>().unwrap();
+
+    let Some(identity) = identity else {
+        Err(ApiError::not_implemented(ResponseSigningNotConfigured))?
+    };
 
     let Some(encryption_key) = did_secret_encryption_config.get_encryption_key() else {
         return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
@@ -76,30 +80,39 @@ pub async fn sign_eip712_handler(
         return Err(ApiError::not_found_without_reason());
     };
 
+    // TODO: Molecule: Phase 3: remove back to json conversion
+    let request_as_json = serde_json::to_value(request).int_err()?;
+    let typed_data = crypto_eip712_utils::Eip712TypedData::from_json(request_as_json)?;
     let signature = {
-        // TODO: SEC: Molecule: Phase 3: zeroing?
-        // TODO: SEC: Molecule: Phase 3: auth checks (!!!)
-        let private_key = secret_key
+        // TODO: SEC: Molecule: Phase 3: auth checks:
+        // - molecule account can only access its own keys and projects
+        // - while others can only access their own account and their own datasets
+        let ed25519_private_key = secret_key
             .get_decrypted_private_key(encryption_key)
             .int_err()?;
+        // TODO: SEC: Molecule: Phase 3: PK zeroing after usage
+
+        let request_hash = typed_data.signing_hash_with_eip191_prefix()?;
 
         // TODO: Molecule: Phase 3: add verification key to response?
         // let _verification_key =
         // odf::metadata::DidKey::new_ed25519(&private_key.verifying_key());
 
-        private_key.sign(&to_canonical_json(&request))
+        ed25519_private_key.sign(request_hash.as_slice())
     };
 
-    // TODO: Molecule: Phase 3: remove back to json conversion
-    let request_as_json = serde_json::to_value(request).int_err()?;
-    let _typed_data = Eip712TypedData::from_json(request_as_json)?;
-
     let proof = if params.include_node_proof {
+        let signature = crypto_eip712_utils::sign_prefixed(
+            &identity.secp256k1_private_key,
+            signature.to_bytes().as_slice(),
+        )?;
+
         Some(SignEip712Proof {
             r#type: ProofType::EcdsaSecp256k1Signature2019,
-            // TODO
-            verification_method: "".to_string(),
-            signature: "".to_string(),
+            verification_method: crypto_eip712_utils::verification_key_prefixed(
+                &identity.secp256k1_private_key,
+            ),
+            signature,
         })
     } else {
         None

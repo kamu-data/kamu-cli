@@ -3544,6 +3544,7 @@ dependencies = [
  "alloy-signer-local",
  "eyre",
  "internal-error",
+ "k256",
  "nutype",
  "opendatafabric-metadata",
  "pretty_assertions",

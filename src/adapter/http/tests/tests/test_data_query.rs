@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use crypto_eip712_utils::SigningKey;
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
@@ -33,7 +34,7 @@ struct Harness {
     root_url: url::Url,
     dataset_handle: odf::DatasetHandle,
     dataset_url: url::Url,
-    private_key: odf::metadata::PrivateKey,
+    ed25519_private_key: odf::metadata::PrivateKey,
 }
 
 impl Harness {
@@ -41,10 +42,10 @@ impl Harness {
         // TODO: Need access to these from harness level
         let run_info_dir = tempfile::tempdir().unwrap();
 
-        let private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
-
+        let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
         let identity_config = IdentityConfig {
-            private_key: private_key.clone(),
+            ed25519_private_key: ed25519_private_key.clone(),
+            secp256k1_private_key: SigningKey::from_bytes(&[124; _].into()).unwrap(),
         };
 
         let catalog = dill::CatalogBuilder::new()
@@ -204,7 +205,7 @@ impl Harness {
             root_url,
             dataset_handle: create_result.dataset_handle,
             dataset_url,
-            private_key,
+            ed25519_private_key,
         }
     }
 }
@@ -770,7 +771,7 @@ async fn test_data_verify_handler() {
         invalid_request["commitment"]["outputHash"] =
             "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2d".into();
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -813,7 +814,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl
@@ -856,7 +857,7 @@ async fn test_data_verify_handler() {
         .into();
 
         let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
-        let sig: odf::metadata::Signature = harness.private_key.sign(c.as_bytes()).into();
+        let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
         let res = cl

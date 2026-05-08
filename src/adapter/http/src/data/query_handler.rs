@@ -271,7 +271,9 @@ pub async fn query_handler_impl(
             )),
         };
 
-        let signature = identity.private_key.sign(&to_canonical_json(&commitment));
+        let signature = identity
+            .ed25519_private_key
+            .sign(&to_canonical_json(&commitment));
 
         QueryResponse {
             input,

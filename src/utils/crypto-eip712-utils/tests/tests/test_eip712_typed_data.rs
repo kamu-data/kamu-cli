@@ -10,7 +10,7 @@
 use alloy_primitives::{b256, hex};
 use alloy_signer::SignerSync;
 use alloy_signer_local::PrivateKeySigner;
-use crypto_eip712_utils::{Eip712TypedData, sign};
+use crypto_eip712_utils::{Eip712TypedData, sign_prefixed};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -124,15 +124,12 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
             let signing_key = SigningKey::from_bytes(private_key.as_slice().into())?;
             let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
 
-            // TODO: wrap w/ method
-            let actual_signature = {
-                let signature_bytes = sign(&signing_key, signed_hash.as_slice())?;
-                hex::encode_prefixed(signature_bytes)
-            };
+            let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
 
             assert_eq!(expected_signature, actual_signature);
         }
     }
+    // TODO: not needed?
     // d) odf
     {
         use odf_metadata::ed25519::Signer;

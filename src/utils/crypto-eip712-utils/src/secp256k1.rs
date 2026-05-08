@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use alloy_primitives::hex;
 use internal_error::{InternalError, ResultIntoInternal};
 use k256::ecdsa::SigningKey;
 
@@ -14,8 +15,8 @@ use k256::ecdsa::SigningKey;
 
 pub type EthereumSignatureBytes = [u8; 65];
 
-pub fn sign(key: &SigningKey, hash: &[u8]) -> Result<EthereumSignatureBytes, InternalError> {
-    let (signature, recovery_id) = key.sign_prehash_recoverable(hash).int_err()?;
+pub fn sign(key: &SigningKey, data: &[u8]) -> Result<EthereumSignatureBytes, InternalError> {
+    let (signature, recovery_id) = key.sign_prehash_recoverable(data).int_err()?;
 
     let mut buf = [0u8; 65];
     buf[..64].copy_from_slice(&signature.to_bytes());
@@ -23,6 +24,15 @@ pub fn sign(key: &SigningKey, hash: &[u8]) -> Result<EthereumSignatureBytes, Int
     buf[64] = recovery_id.to_byte() + 27;
 
     Ok(buf)
+}
+
+pub fn sign_prefixed(key: &SigningKey, data: &[u8]) -> Result<String, InternalError> {
+    let signature_bytes = sign(key, data)?;
+    Ok(hex::encode_prefixed(signature_bytes))
+}
+
+pub fn verification_key_prefixed(key: &SigningKey) -> String {
+    hex::encode_prefixed(key.verifying_key().to_sec1_bytes())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

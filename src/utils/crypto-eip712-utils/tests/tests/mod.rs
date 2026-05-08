@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_eip712_typed_data;
+mod test_secp256k1;
