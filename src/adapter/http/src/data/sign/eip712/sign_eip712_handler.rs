@@ -83,8 +83,6 @@ pub async fn sign_eip712_handler(
     // TODO: Molecule: Phase 3: remove back to json conversion
     let request_as_json = serde_json::to_value(request).int_err()?;
     let typed_data = crypto_eip712_utils::Eip712TypedData::from_json(request_as_json)?;
-    let proof_hash = typed_data.signing_hash_with_eip191_prefix()?;
-
     let signature = {
         // TODO: SEC: Molecule: Phase 3: auth checks:
         // - molecule account can only access its own keys and projects
@@ -94,14 +92,19 @@ pub async fn sign_eip712_handler(
             .int_err()?;
         // TODO: SEC: Molecule: Phase 3: PK zeroing after usage
 
+        let request_hash = typed_data.signing_hash_with_eip191_prefix()?;
+
         // TODO: Molecule: Phase 3: add verification key to response?
         // let _verification_key =
         // odf::metadata::DidKey::new_ed25519(&private_key.verifying_key());
 
-        ed25519_private_key.sign(proof_hash.as_slice())
+        ed25519_private_key.sign(request_hash.as_slice())
     };
 
     let proof_response_node = if params.include_node_proof {
+        let proof = signature.to_bytes();
+        let proof_hash = crypto_eip712_utils::keccak256(proof.as_slice());
+
         let signature = crypto_eip712_utils::sign_prefixed(
             &identity.secp256k1_private_key,
             proof_hash.as_slice(),
