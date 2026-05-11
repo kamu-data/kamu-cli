@@ -7,17 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy_primitives::hex;
-use crypto_eip712_utils::{SigningKey, verification_key_prefixed};
+use crypto_eip712_utils::{SigningKey, b256, verification_key_prefixed};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_verification_key_prefixed() -> eyre::Result<()> {
-    let private_key =
-        hex::decode("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601")?;
-    let signing_key = SigningKey::from_bytes(private_key.as_slice().into())?;
+    // kamu-attester
+    let private_key = b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
+    let signing_key = SigningKey::from_slice(private_key.as_slice())?;
 
     assert_eq!(
         "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",

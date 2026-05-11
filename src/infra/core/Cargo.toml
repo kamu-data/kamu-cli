@@ -134,6 +134,8 @@ url = { version = "2", features = ["serde"] }
 # Optional dependencies
 kamu-datasets-services = { optional = true, workspace = true, features = ["testing"] }
 
+# TODO: Molecule: Phase 3: update to alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
 alloy = { optional = true, version = "1.5", default-features = false, features = [
     "std",
     "provider-http",

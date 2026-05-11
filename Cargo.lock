@@ -3538,15 +3538,11 @@ dependencies = [
 name = "crypto-eip712-utils"
 version = "0.260.2"
 dependencies = [
- "alloy-dyn-abi",
- "alloy-primitives",
- "alloy-signer",
- "alloy-signer-local",
+ "alloy",
  "eyre",
  "internal-error",
  "k256",
  "nutype",
- "opendatafabric-metadata",
  "pretty_assertions",
  "serde",
  "serde_json",
