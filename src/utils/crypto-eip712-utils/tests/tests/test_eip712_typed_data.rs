@@ -7,10 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy_primitives::{b256, hex};
-use alloy_signer::SignerSync;
-use alloy_signer_local::PrivateKeySigner;
-use crypto_eip712_utils::{Eip712TypedData, sign_prefixed};
+use crypto_eip712_utils::{Eip712TypedData, b256, sign_prefixed};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -96,55 +93,19 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
 
     // 5) Test private key + expected signature (w/ EIP-191 prefix)
     {
-        let private_key_str = "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601";
+        use crypto_eip712_utils::SigningKey;
+
+        // kamu-attester
+        let private_key =
+            b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
+        let signing_key = SigningKey::from_slice(private_key.as_slice())?;
+
+        let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
+
+        let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
         let expected_signature = "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c";
 
-        // a) alloy: via sign_dynamic_typed_data_sync()
-        {
-            let signer: PrivateKeySigner = private_key_str.parse()?;
-
-            let actual_signature = signer.sign_dynamic_typed_data_sync(typed_data.as_ref())?;
-
-            assert_eq!(expected_signature, actual_signature.to_string());
-        }
-        // b) alloy: via sign_hash_sync()
-        {
-            let signer: PrivateKeySigner = private_key_str.parse()?;
-            let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
-
-            let actual_signature = signer.sign_hash_sync(&signed_hash)?;
-
-            assert_eq!(expected_signature, actual_signature.to_string());
-        }
-        // c) k256
-        {
-            use crypto_eip712_utils::SigningKey;
-
-            let private_key = hex::decode(private_key_str)?;
-            let signing_key = SigningKey::from_bytes(private_key.as_slice().into())?;
-            let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
-
-            let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
-
-            assert_eq!(expected_signature, actual_signature);
-        }
-    }
-    // TODO: not needed?
-    // d) odf
-    {
-        use odf_metadata::ed25519::Signer;
-
-        let pk = odf_metadata::PrivateKey::from_bytes(&hex!(
-            "0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601"
-        ));
-        let signing_hash = typed_data.signing_hash_with_eip191_prefix()?;
-
-        // TODO: Molecule: Phase 3: verify that the signature is correct
-        //                 Find an example in the Molecule documentation?
-        let actual_signature = hex::encode_prefixed(pk.sign(signing_hash.as_ref()).to_bytes());
-        let expected_signature = "0xb4351e080c62d210b90d2eac67f079efce28c6eb16278c73a51c65f431c2dac65dda66edb4aef6180d77dfee74d02991996fdfb6671272b391d9ba34ea188407";
-
-        assert_eq!(actual_signature, expected_signature);
+        assert_eq!(expected_signature, actual_signature);
     }
 
     // ---
