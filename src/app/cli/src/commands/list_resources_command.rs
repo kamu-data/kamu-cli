@@ -10,7 +10,7 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::collect_all_pages;
+use database_common::{PaginationOpts, collect_all_pages};
 use datafusion::arrow::array::{
     ArrayRef,
     BooleanArray,
@@ -278,10 +278,7 @@ impl ListResourcesCommand {
                 .list(kamu_resources_facade::ListResourcesRequest {
                     kind: kind.to_string(),
                     account: None,
-                    pagination: database_common::PaginationOpts {
-                        offset: 0,
-                        limit: max_results.get(),
-                    },
+                    pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await
                 .map_err(Into::into)
@@ -305,10 +302,7 @@ impl ListResourcesCommand {
             self.resource_facade
                 .list_all(kamu_resources_facade::ListAllResourcesRequest {
                     account: None,
-                    pagination: database_common::PaginationOpts {
-                        offset: 0,
-                        limit: max_results.get(),
-                    },
+                    pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await
                 .map_err(Into::into)

@@ -69,10 +69,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
         .list_resource_uids(
             account_id.clone(),
             "TestKind",
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
@@ -80,13 +77,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     assert!(ids.is_empty());
 
     let snapshots: Vec<_> = repo
-        .list_all_resource_snapshots(
-            account_id,
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
-        )
+        .list_all_resource_snapshots(account_id, PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -226,10 +217,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             None,
             Some("app-%"),
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -243,10 +231,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             None,
             Some("APP-%"),
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -260,10 +245,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             Some(&["app-alpha".to_string(), "db-alpha".to_string()]),
             None,
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -278,10 +260,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             Some(&["App-Alpha".to_string(), "DB-ALPHA".to_string()]),
             None,
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -296,10 +275,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string(), "OtherKind".to_string()],
             None,
             Some("app-%"),
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -317,10 +293,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             None,
             None,
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -333,10 +306,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
             &["TestKind".to_string()],
             None,
             Some("app-other-%"),
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -451,10 +421,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
             &["TestKind".to_string()],
             Some(&["MY-RESOURCE".to_string()]),
             None,
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -468,10 +435,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
             &["TestKind".to_string()],
             None,
             Some("MY-%"),
-            PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
@@ -797,10 +761,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
         .list_resource_uids(
             account_id.clone(),
             "TestKind",
-            PaginationOpts {
-                limit: 3,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(3),
         )
         .try_collect()
         .await
@@ -811,10 +772,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
         .list_resource_uids(
             account_id.clone(),
             "TestKind",
-            PaginationOpts {
-                limit: 3,
-                offset: 3,
-            },
+            PaginationOpts::from_page(1, 3),
         )
         .try_collect()
         .await
@@ -853,10 +811,7 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
         .list_resource_snapshots_by_kind(
             account_id.clone(),
             "KindA",
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
@@ -868,10 +823,7 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
         .list_resource_snapshots_by_kind(
             account_id.clone(),
             "KindB",
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
@@ -880,14 +832,7 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
     assert!(kind_b.iter().all(|s| s.kind == "KindB"));
 
     let kind_c: Vec<_> = repo
-        .list_resource_snapshots_by_kind(
-            account_id,
-            "KindC",
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
-        )
+        .list_resource_snapshots_by_kind(account_id, "KindC", PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -920,13 +865,7 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     repo.create_resource(&other).await.unwrap();
 
     let all: Vec<_> = repo
-        .list_all_resource_snapshots(
-            account_id,
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
-        )
+        .list_all_resource_snapshots(account_id, PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -1101,10 +1040,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
         .list_resource_uids(
             account_id.clone(),
             "TestKind",
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await

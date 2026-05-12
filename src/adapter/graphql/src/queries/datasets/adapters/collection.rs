@@ -142,10 +142,7 @@ impl CollectionProjection<'_> {
                 path_prefix.map(Into::into),
                 max_depth,
                 None,
-                Some(PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                }),
+                Some(PaginationOpts::from_page(page, per_page)),
             )
             .await
             .map_err(|e| -> GqlError {

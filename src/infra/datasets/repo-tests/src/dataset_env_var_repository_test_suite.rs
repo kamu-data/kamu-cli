@@ -54,10 +54,7 @@ pub async fn test_missing_dataset_env_var_not_found(catalog: &Catalog) {
     let dataset_env_vars = dataset_env_var_repo
         .get_all_dataset_env_vars_by_dataset_id(
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
+            &PaginationOpts::from_max_results(5),
         )
         .await
         .unwrap();
@@ -110,13 +107,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
     assert_eq!(db_dataset_env_var, new_dataset_env_var);
 
     let db_dataset_env_vars = dataset_env_var_repo
-        .get_all_dataset_env_vars_by_dataset_id(
-            &entry_foo.id,
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
-        )
+        .get_all_dataset_env_vars_by_dataset_id(&entry_foo.id, &PaginationOpts::from_max_results(5))
         .await
         .unwrap();
     assert_eq!(db_dataset_env_vars, vec![new_dataset_env_var]);
@@ -175,13 +166,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     assert!(save_result.is_ok());
 
     let mut db_dataset_env_vars = dataset_env_var_repo
-        .get_all_dataset_env_vars_by_dataset_id(
-            &entry_foo.id,
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
-        )
+        .get_all_dataset_env_vars_by_dataset_id(&entry_foo.id, &PaginationOpts::from_max_results(5))
         .await
         .unwrap();
     db_dataset_env_vars.sort_by_key(|a| a.created_at);
@@ -252,13 +237,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     assert!(delete_result.is_ok());
 
     let db_dataset_env_vars = dataset_env_var_repo
-        .get_all_dataset_env_vars_by_dataset_id(
-            &entry_foo.id,
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
-        )
+        .get_all_dataset_env_vars_by_dataset_id(&entry_foo.id, &PaginationOpts::from_max_results(5))
         .await
         .unwrap();
 
@@ -367,13 +346,7 @@ pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
     assert!(save_result.is_ok());
 
     let db_dataset_env_vars = dataset_env_var_repo
-        .get_all_dataset_env_vars_by_dataset_id(
-            &entry_foo.id,
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
-        )
+        .get_all_dataset_env_vars_by_dataset_id(&entry_foo.id, &PaginationOpts::from_max_results(5))
         .await
         .unwrap();
 
@@ -386,13 +359,7 @@ pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
     assert_matches!(res, Ok(()));
 
     let db_dataset_env_vars = dataset_env_var_repo
-        .get_all_dataset_env_vars_by_dataset_id(
-            &entry_foo.id,
-            &PaginationOpts {
-                offset: 0,
-                limit: 5,
-            },
-        )
+        .get_all_dataset_env_vars_by_dataset_id(&entry_foo.id, &PaginationOpts::from_max_results(5))
         .await
         .unwrap();
 

@@ -414,14 +414,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
         use futures::TryStreamExt;
 
         let accounts = repo
-            .search_accounts_by_name_pattern(
-                query,
-                filters,
-                PaginationOpts {
-                    limit: 20,
-                    offset: 0,
-                },
-            )
+            .search_accounts_by_name_pattern(query, filters, PaginationOpts::from_max_results(20))
             .try_collect::<Vec<_>>()
             .await
             .unwrap();
@@ -542,10 +535,7 @@ pub async fn test_search_accounts_by_name_pattern_special_chars(catalog: &Catalo
             .search_accounts_by_name_pattern(
                 query,
                 SearchAccountsByNamePatternFilters::default(),
-                PaginationOpts {
-                    limit: 20,
-                    offset: 0,
-                },
+                PaginationOpts::from_max_results(20),
             )
             .try_collect::<Vec<_>>()
             .await

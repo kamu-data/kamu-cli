@@ -86,10 +86,7 @@ pub async fn test_stream_many_entries(catalog: &dill::Catalog) {
 
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entries(PaginationOpts {
-                limit: 100,
-                offset: 0,
-            })
+            .get_dataset_entries(PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -136,10 +133,7 @@ pub async fn test_stream_many_entries(catalog: &dill::Catalog) {
 
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entries(PaginationOpts {
-                limit: 100,
-                offset: 0,
-            })
+            .get_dataset_entries(PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -531,13 +525,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
         );
 
         let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(
-                &account_1.id,
-                PaginationOpts {
-                    limit: 100,
-                    offset: 0,
-                },
-            )
+            .get_dataset_entries_by_owner_id(&account_1.id, PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -551,13 +539,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(
-                &account_2.id,
-                PaginationOpts {
-                    limit: 100,
-                    offset: 0,
-                },
-            )
+            .get_dataset_entries_by_owner_id(&account_2.id, PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -599,13 +581,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(
-                &account_1.id,
-                PaginationOpts {
-                    limit: 100,
-                    offset: 0,
-                },
-            )
+            .get_dataset_entries_by_owner_id(&account_1.id, PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -634,13 +610,7 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
     }
     {
         let get_res = dataset_entry_repo
-            .get_dataset_entries_by_owner_id(
-                &account_2.id,
-                PaginationOpts {
-                    limit: 100,
-                    offset: 0,
-                },
-            )
+            .get_dataset_entries_by_owner_id(&account_2.id, PaginationOpts::from_max_results(100))
             .await
             .try_collect::<Vec<_>>()
             .await;
@@ -879,10 +849,7 @@ pub async fn test_owner_of_entries_renamed(catalog: &dill::Catalog) {
 
     use futures::TryStreamExt;
     let get_res = dataset_entry_repo
-        .get_dataset_entries(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_dataset_entries(PaginationOpts::from_max_results(100))
         .await
         .try_collect::<Vec<_>>()
         .await;

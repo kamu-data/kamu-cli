@@ -93,13 +93,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     assert_eq!(db_bar_access_token, bar_access_token);
 
     let mut db_access_tokens = access_token_repo
-        .get_access_tokens_by_account_id(
-            &account.id,
-            &PaginationOpts {
-                limit: 10,
-                offset: 0,
-            },
-        )
+        .get_access_tokens_by_account_id(&account.id, &PaginationOpts::from_max_results(10))
         .await
         .unwrap();
 

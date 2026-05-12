@@ -124,10 +124,8 @@ impl DatasetEnvVarService for DatasetEnvVarServiceImpl {
                 list: vec![],
             });
         }
-        let database_pagination = pagination.unwrap_or(PaginationOpts {
-            limit: total_count,
-            offset: 0,
-        });
+        let database_pagination =
+            pagination.unwrap_or(PaginationOpts::from_max_results(total_count));
 
         let dataset_env_var_list = self
             .dataset_env_var_repository
