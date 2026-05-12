@@ -47,7 +47,11 @@ serde = { optional = true, version = "1", features = ["derive"], default-feature
 
 
 [dev-dependencies]
-eyre = { version = "0", default-features = false }
+eyre = { version = "0", default-features = false, features = [
+    "auto-install",
+    "track-caller",
+] }
+indoc = { version = "2", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",

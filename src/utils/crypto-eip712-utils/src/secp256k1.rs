@@ -14,6 +14,9 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: SigningKey is ZeroizeOnDrop,
+//       so we don't need to worry about zeroing it manually
+#[derive(PartialEq)]
 pub struct Secp256k1Signer(LocalSigner<SigningKey>);
 
 impl Secp256k1Signer {
@@ -46,9 +49,12 @@ impl Secp256k1Signer {
     }
 }
 
-impl Drop for Secp256k1Signer {
-    fn drop(&mut self) {
-        unsafe { zeroize::zeroize_flat_type(self as *mut Self) }
+impl std::str::FromStr for Secp256k1Signer {
+    type Err = InternalError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let key: LocalSigner<SigningKey> = s.parse().int_err()?;
+        Ok(Secp256k1Signer(key))
     }
 }
 
@@ -56,14 +62,35 @@ impl zeroize::ZeroizeOnDrop for Secp256k1Signer {}
 
 impl std::fmt::Debug for Secp256k1Signer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // NOTE: Default implementation outputs address, but we go further
+        // NOTE: SigningKey implementation outputs address, but we go further
         f.write_str("Secp256k1Signer(***)")
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Secp256k1Signer {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = Secp256k1Signer;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a secp256k1 private key")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                v.parse().map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(Debug, Deref, Copy, Clone, Hash, PartialEq, Eq))]
+#[nutype::nutype(derive(Debug, Deref, Copy, Clone, Hash, PartialEq, Eq, FromStr))]
 pub struct Secp256k1Signature(Signature);
 
 impl Secp256k1Signature {
