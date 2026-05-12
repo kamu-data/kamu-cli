@@ -37,25 +37,29 @@ pub trait ResourceContextStore: Send + Sync {
         registry: &resource_context::ResourceContextRegistry,
     ) -> Result<(), InternalError>;
 
-    fn read_context_runtime_state(
+    fn read_account_runtime_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
-    ) -> Result<resource_context::ResourceContextsRuntimeState, InternalError>;
+        account_name: &odf::AccountName,
+    ) -> Result<resource_context::AccountContextRuntimeState, InternalError>;
 
-    fn write_context_runtime_state(
+    fn write_account_runtime_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
-        state: &resource_context::ResourceContextsRuntimeState,
+        account_name: &odf::AccountName,
+        state: &resource_context::AccountContextRuntimeState,
     ) -> Result<(), InternalError>;
 
     fn read_current_context_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
+        account_name: &odf::AccountName,
     ) -> Result<resource_context::CurrentResourceContextState, InternalError>;
 
     fn write_current_context_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
+        account_name: &odf::AccountName,
         state: &resource_context::CurrentResourceContextState,
     ) -> Result<(), InternalError>;
 }
@@ -237,41 +241,51 @@ impl ResourceContextStore for CLIResourceContextStore {
         self.write_config_state(scope, &state)
     }
 
-    fn read_context_runtime_state(
+    fn read_account_runtime_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
-    ) -> Result<resource_context::ResourceContextsRuntimeState, InternalError> {
-        self.read_runtime_state(scope)
+        account_name: &odf::AccountName,
+    ) -> Result<resource_context::AccountContextRuntimeState, InternalError> {
+        let key: &str = account_name.as_ref();
+        self.read_runtime_state(scope).map(|state| {
+            state.accounts.get(key).cloned().unwrap_or_default()
+        })
     }
 
-    fn write_context_runtime_state(
+    fn write_account_runtime_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
-        state: &resource_context::ResourceContextsRuntimeState,
+        account_name: &odf::AccountName,
+        account_state: &resource_context::AccountContextRuntimeState,
     ) -> Result<(), InternalError> {
-        self.write_runtime_state(scope, state)
+        let key: &str = account_name.as_ref();
+        let mut state = self.read_runtime_state(scope)?;
+        state.accounts.insert(key.to_owned(), account_state.clone());
+        self.write_runtime_state(scope, &state)
     }
 
     fn read_current_context_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
+        account_name: &odf::AccountName,
     ) -> Result<resource_context::CurrentResourceContextState, InternalError> {
-        self.read_runtime_state(scope)
-            .map(|state| resource_context::CurrentResourceContextState {
-                current_context_name: state.current_context_name,
+        self.read_account_runtime_state(scope, account_name)
+            .map(|account_state| resource_context::CurrentResourceContextState {
+                current_context_name: account_state.current_context_name,
             })
     }
 
     fn write_current_context_state(
         &self,
         scope: resource_context::ResourceContextStoreScope,
+        account_name: &odf::AccountName,
         state: &resource_context::CurrentResourceContextState,
     ) -> Result<(), InternalError> {
-        let mut stored_state = self.read_runtime_state(scope)?;
-        stored_state
+        let mut account_state = self.read_account_runtime_state(scope, account_name)?;
+        account_state
             .current_context_name
             .clone_from(&state.current_context_name);
-        self.write_runtime_state(scope, &stored_state)
+        self.write_account_runtime_state(scope, account_name, &account_state)
     }
 }
 

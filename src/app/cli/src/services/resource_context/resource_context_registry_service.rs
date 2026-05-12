@@ -11,6 +11,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use internal_error::InternalError;
+use kamu_accounts::CurrentAccountSubject;
 
 use crate::resource_context;
 
@@ -18,17 +19,19 @@ use crate::resource_context;
 
 pub struct ResourceContextRegistryService {
     store: Arc<dyn resource_context::ResourceContextStore>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     workspace_registry: Mutex<resource_context::ResourceContextRegistry>,
     user_registry: Mutex<resource_context::ResourceContextRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[dill::component(pub)]
 impl ResourceContextRegistryService {
-    pub fn new(store: Arc<dyn resource_context::ResourceContextStore>) -> Self {
+    pub fn new(
+        store: Arc<dyn resource_context::ResourceContextStore>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+    ) -> Self {
         let workspace_registry = store
             .read_context_registry(resource_context::ResourceContextStoreScope::Workspace)
             .unwrap();
@@ -38,9 +41,14 @@ impl ResourceContextRegistryService {
 
         Self {
             store,
+            current_account_subject,
             workspace_registry: Mutex::new(workspace_registry),
             user_registry: Mutex::new(user_registry),
         }
+    }
+
+    fn account_name(&self) -> &odf::AccountName {
+        self.current_account_subject.account_name_or_default()
     }
 
     pub fn get_context_in_scope(
@@ -93,6 +101,7 @@ impl ResourceContextRegistryService {
     pub fn list_effective_contexts_with_scope(
         &self,
     ) -> Vec<resource_context::ScopedResourceContextRecord> {
+        let account_name = self.account_name();
         let workspace_registry = self
             .workspace_registry
             .lock()
@@ -103,11 +112,17 @@ impl ResourceContextRegistryService {
             .expect("Could not lock resource context registry");
         let workspace_runtime_state = self
             .store
-            .read_context_runtime_state(resource_context::ResourceContextStoreScope::Workspace)
+            .read_account_runtime_state(
+                resource_context::ResourceContextStoreScope::Workspace,
+                account_name,
+            )
             .unwrap();
         let user_runtime_state = self
             .store
-            .read_context_runtime_state(resource_context::ResourceContextStoreScope::User)
+            .read_account_runtime_state(
+                resource_context::ResourceContextStoreScope::User,
+                account_name,
+            )
             .unwrap();
 
         let mut seen = HashSet::new();
@@ -186,12 +201,13 @@ impl ResourceContextRegistryService {
             }
         }
 
-        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
-        runtime_state
+        let account_name = self.account_name();
+        let mut account_state = self.store.read_account_runtime_state(scope, account_name)?;
+        account_state
             .contexts
             .insert(name.to_string(), last_test_result);
         self.store
-            .write_context_runtime_state(scope, &runtime_state)?;
+            .write_account_runtime_state(scope, account_name, &account_state)?;
 
         Ok(true)
     }
@@ -201,14 +217,15 @@ impl ResourceContextRegistryService {
         scope: resource_context::ResourceContextStoreScope,
         name: &str,
     ) -> Result<bool, InternalError> {
-        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
+        let account_name = self.account_name();
+        let mut account_state = self.store.read_account_runtime_state(scope, account_name)?;
 
-        if runtime_state.contexts.remove(name).is_none() {
+        if account_state.contexts.remove(name).is_none() {
             return Ok(false);
         }
 
         self.store
-            .write_context_runtime_state(scope, &runtime_state)?;
+            .write_account_runtime_state(scope, account_name, &account_state)?;
 
         Ok(true)
     }
@@ -217,15 +234,16 @@ impl ResourceContextRegistryService {
         &self,
         scope: resource_context::ResourceContextStoreScope,
     ) -> Result<(), InternalError> {
-        let mut runtime_state = self.store.read_context_runtime_state(scope)?;
+        let account_name = self.account_name();
+        let mut account_state = self.store.read_account_runtime_state(scope, account_name)?;
 
-        if runtime_state.contexts.is_empty() {
+        if account_state.contexts.is_empty() {
             return Ok(());
         }
 
-        runtime_state.contexts.clear();
+        account_state.contexts.clear();
         self.store
-            .write_context_runtime_state(scope, &runtime_state)?;
+            .write_account_runtime_state(scope, account_name, &account_state)?;
 
         Ok(())
     }
