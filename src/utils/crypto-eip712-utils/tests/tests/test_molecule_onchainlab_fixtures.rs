@@ -108,7 +108,7 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     let private_key = b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
     let address = "0xcb687F3f6Ae1fF2E65CfA6423c533E0Fc82FB356";
     let verification_key = "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31";
-    let signer = Secp256k1Signer::from_bytes(&private_key)?;
+    let signer = Secp256k1Signer::from_bytes(zeroize::Zeroizing::new(*private_key))?;
 
     {
         let signing_hash = typed_data.eip712_signing_hash()?;

@@ -23,14 +23,10 @@ impl Secp256k1Signer {
         Secp256k1Signer(LocalSigner::from_signing_key(key))
     }
 
-    pub fn from_slice(data: &[u8]) -> Result<Self, InternalError> {
-        SigningKey::from_slice(data)
+    pub fn from_bytes(data: zeroize::Zeroizing<[u8; 32]>) -> Result<Self, InternalError> {
+        SigningKey::from_slice(data.as_slice())
             .map(Self::from_signing_key)
             .int_err()
-    }
-
-    pub fn from_bytes(bytes: &B256) -> Result<Self, InternalError> {
-        Self::from_slice(bytes.as_slice())
     }
 
     pub fn sign_prehash(&self, hash: &B256) -> Result<Signature, InternalError> {

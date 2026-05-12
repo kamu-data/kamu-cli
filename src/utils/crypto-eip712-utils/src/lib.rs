@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 // Re-exports
+pub use zeroize;
+
 mod eip712_typed_data;
 mod secp256k1;
 
