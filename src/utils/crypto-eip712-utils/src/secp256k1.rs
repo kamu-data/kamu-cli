@@ -74,6 +74,13 @@ impl Secp256k1Signature {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Secp256k1Signature {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self.as_encoded_stack_buf().as_str())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
