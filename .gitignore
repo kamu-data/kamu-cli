@@ -9,4 +9,5 @@ target/
 /kamu.sqlite.db*
 .local/
 .codex
+.claude/settings.local.json
 .spec

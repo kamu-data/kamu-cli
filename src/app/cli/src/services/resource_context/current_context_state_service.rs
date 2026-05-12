@@ -10,6 +10,7 @@
 use std::sync::{Arc, Mutex};
 
 use internal_error::InternalError;
+use kamu_accounts::CurrentAccountSubject;
 
 use crate::resource_context;
 
@@ -17,6 +18,7 @@ use crate::resource_context;
 
 pub struct CurrentContextStateService {
     store: Arc<dyn resource_context::ResourceContextStore>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     workspace_state: Mutex<resource_context::CurrentResourceContextState>,
     user_state: Mutex<resource_context::CurrentResourceContextState>,
 }
@@ -25,16 +27,27 @@ pub struct CurrentContextStateService {
 
 #[dill::component(pub)]
 impl CurrentContextStateService {
-    pub fn new(store: Arc<dyn resource_context::ResourceContextStore>) -> Self {
+    pub fn new(
+        store: Arc<dyn resource_context::ResourceContextStore>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+    ) -> Self {
+        let account_name = current_account_subject.account_name_or_default();
         let workspace_state = store
-            .read_current_context_state(resource_context::ResourceContextStoreScope::Workspace)
+            .read_current_context_state(
+                resource_context::ResourceContextStoreScope::Workspace,
+                account_name,
+            )
             .unwrap();
         let user_state = store
-            .read_current_context_state(resource_context::ResourceContextStoreScope::User)
+            .read_current_context_state(
+                resource_context::ResourceContextStoreScope::User,
+                account_name,
+            )
             .unwrap();
 
         Self {
             store,
+            current_account_subject,
             workspace_state: Mutex::new(workspace_state),
             user_state: Mutex::new(user_state),
         }
@@ -63,12 +76,19 @@ impl CurrentContextStateService {
         scope: resource_context::ResourceContextStoreScope,
         context_name: Option<String>,
     ) -> Result<(), InternalError> {
-        let mut state = self
+        let new_state = resource_context::CurrentResourceContextState {
+            current_context_name: context_name,
+        };
+        self.store.write_current_context_state(
+            scope,
+            self.current_account_subject.account_name_or_default(),
+            &new_state,
+        )?;
+        *self
             .state_for_scope(scope)
             .lock()
-            .expect("Could not lock current resource context state");
-        state.current_context_name = context_name;
-        self.store.write_current_context_state(scope, &state)
+            .expect("Could not lock current resource context state") = new_state;
+        Ok(())
     }
 
     fn state_for_scope(

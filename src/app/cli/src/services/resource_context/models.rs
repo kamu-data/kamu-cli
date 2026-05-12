@@ -76,14 +76,25 @@ pub struct ResourceContextsState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Per-account slice of the runtime state stored under `.kamucontexts.state`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ResourceContextsRuntimeState {
-    #[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountContextRuntimeState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_context_name: Option<String>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub contexts: BTreeMap<String, ResourceContextLastTestResult>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// File-level runtime state keyed by account name.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceContextsRuntimeState {
+    #[serde(default)]
+    pub accounts: BTreeMap<String, AccountContextRuntimeState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
