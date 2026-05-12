@@ -33,11 +33,10 @@ internal-error = { workspace = true }
 alloy = { version = "1", default-features = false, features = [
     "dyn-abi",
     "eip712",
+    "signers",
+    "signer-local",
 ] }
-k256 = { version = "0.13", default-features = true, features = ["ecdsa-core", "ecdsa"] }
-nutype = { version = "0.6", default-features = false, features = [
-    "serde"
-] }
+nutype = { version = "0.6", default-features = false, features = [] }
 serde = { version = "1", features = ["derive"], default-features = false }
 serde_json = { version = "1", default-features = false }
 

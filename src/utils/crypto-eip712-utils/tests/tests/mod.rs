@@ -7,5 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_eip712_typed_data;
-mod test_secp256k1;
+mod test_molecule_onchainlab_fixtures;

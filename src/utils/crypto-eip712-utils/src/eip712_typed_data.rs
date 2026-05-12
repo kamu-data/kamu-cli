@@ -8,10 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use alloy::dyn_abi::TypedData as AlloyEip712TypedData;
-use alloy::primitives::keccak256;
+use alloy::primitives::B256;
 use internal_error::{InternalError, ResultIntoInternal};
-
-use crate::B256;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,15 +30,8 @@ impl Eip712TypedData {
         self.as_ref().domain.separator()
     }
 
-    pub fn signing_hash_with_eip191_prefix(&self) -> Result<B256, InternalError> {
+    pub fn eip712_signing_hash(&self) -> Result<B256, InternalError> {
         self.as_ref().eip712_signing_hash().int_err()
-    }
-
-    pub fn signing_hash_without_eip191_prefix(&self) -> Result<B256, InternalError> {
-        let mut buf = [0u8; 64];
-        buf[0..32].copy_from_slice(self.domain_separator().as_slice());
-        buf[32..64].copy_from_slice(self.hash_struct()?.as_slice());
-        Ok(keccak256(buf))
     }
 }
 

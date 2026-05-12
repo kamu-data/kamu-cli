@@ -3541,7 +3541,6 @@ dependencies = [
  "alloy",
  "eyre",
  "internal-error",
- "k256",
  "nutype",
  "pretty_assertions",
  "serde",

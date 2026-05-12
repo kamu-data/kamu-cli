@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crypto_eip712_utils::{Eip712TypedData, b256, sign_prefixed};
-use pretty_assertions::assert_eq;
+use alloy::hex;
+use alloy::primitives::{b256, keccak256};
+use crypto_eip712_utils::{Eip712TypedData, Secp256k1Signer};
+use pretty_assertions::{assert_eq, assert_matches};
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +71,7 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     }))?;
 
     // 4.) Test fixture — reproduce these values
-    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md#5-test-private-key--expected-signature
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md#4-test-fixture--reproduce-these-values
 
     // 4.2) Struct hash
     {
@@ -89,61 +91,85 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
         assert_eq!(expected_hash, actual_hash);
     }
 
-    // 4.4) EIP-712 digest (w/ EIP-191 prefix)
+    // 4.4) EIP-712 digest
     {
         let expected_signing_hash =
             b256!("0xfc67633d930b129099d4600295c3676b35c191d90dd4b59274fb2dfd70396c9c");
-        let actual_signing_hash = typed_data.signing_hash_with_eip191_prefix()?;
+        let actual_signing_hash = typed_data.eip712_signing_hash()?;
 
         assert_eq!(expected_signing_hash, actual_signing_hash);
     }
 
-    // 5) Test private key + expected signature (w/ EIP-191 prefix)
+    // 5) Test private key + expected signature
     // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md#5-test-private-key--expected-signature
+
+    // Label: "kamu-attester"
+    //        privateKey = uint256(keccak256(abi.encodePacked(label)))
+    let private_key = b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
+    let address = "0xcb687F3f6Ae1fF2E65CfA6423c533E0Fc82FB356";
+    let verification_key = "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31";
+    let signer = Secp256k1Signer::from_bytes(&private_key)?;
+
     {
-        use crypto_eip712_utils::SigningKey;
-
-        // kamu-attester
-        let private_key =
-            b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
-        let signing_key = SigningKey::from_slice(private_key.as_slice())?;
-
-        let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
+        let signing_hash = typed_data.eip712_signing_hash()?;
 
         let expected_signature = "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c";
-        let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
+        let actual_signature = signer.sign_prehash(&signing_hash)?;
 
-        assert_eq!(expected_signature, actual_signature);
+        assert_eq!(expected_signature, actual_signature.to_string());
     }
 
     // II. BE DID-Linking — EIP-712 Fixture Vectors
 
+    // 2.2) Intermediate & final hashes
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/be-did-linking-eip712-fixtures.md#22-intermediate--final-hashes
+
+    let proof = hex!("0xed2551900aabbcc0");
+    let proof_hash = b256!("0x0e270ea3c4029b14e3ca5f8c38ada678d9076889d3f3f1b7a8a6a5596124175c");
+    let proof_signature = "0x2c135e2f43fe14d8f5027bf91e4bb4207f1aa9edcfc74031f1e4d6945293ca9d55216a0fe19964d2b6420b6c2f4bfd759db55f9bb95850d17f9e0ab8569f5c3f1b";
+
+    {
+        let expected_proof_hash = proof_hash;
+        let actual_proof_hash = keccak256(proof);
+
+        assert_eq!(actual_proof_hash, expected_proof_hash);
+
+        let expected_signature = proof_signature;
+        let actual_signature = signer.sign(&proof)?;
+
+        assert_eq!(expected_signature, actual_signature.to_string());
+    }
+
     // 3.2) Expected 65-byte signatures
     // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/be-did-linking-eip712-fixtures.md#32-expected-65-byte-signatures-rsv
     {
-        use alloy::primitives::Signature;
-        use crypto_eip712_utils::SigningKey;
+        let expected_signature = proof_signature;
+        let actual_signature = signer.sign_prehash(&proof_hash)?;
 
-        // kamu-attester
-        let private_key =
-            b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
-        let signing_key = SigningKey::from_slice(private_key.as_slice())?;
-        let proof_hash =
-            b256!("0x0e270ea3c4029b14e3ca5f8c38ada678d9076889d3f3f1b7a8a6a5596124175c");
-
-        let expected_signature =
-            "0x2c135e2f43fe14d8f5027bf91e4bb4207f1aa9edcfc74031f1e4d6945293ca9d55216a0fe19964d2b6420b6c2f4bfd759db55f9bb95850d17f9e0ab8569f5c3f1b";
-        let actual_signature = sign_prefixed(&signing_key, proof_hash.as_slice())?;
-
-        assert_eq!(expected_signature, actual_signature);
+        assert_eq!(expected_signature, actual_signature.to_string());
+        assert_matches!(
+            signer
+                .verification_key()
+                .verify_prehash(&proof_hash, &actual_signature),
+            Ok(_)
+        );
 
         // We additionally verify the address recovery
-        let signature: Signature = actual_signature.parse()?;
-
-        let expected_address = "0xcb687F3f6Ae1fF2E65CfA6423c533E0Fc82FB356";
-        let actual_address = signature.recover_address_from_prehash(&proof_hash)?;
+        let expected_address = address;
+        let actual_address = actual_signature.recover_address_from_prehash(&proof_hash)?;
 
         assert_eq!(expected_address, actual_address.to_checksum(None));
+        assert_eq!(
+            expected_address,
+            signer.verification_key().as_address().to_string()
+        );
+
+        let expected_verification_key = verification_key;
+
+        assert_eq!(
+            expected_verification_key,
+            signer.verification_key().to_string()
+        );
     }
 
     Ok(())
