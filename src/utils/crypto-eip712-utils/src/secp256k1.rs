@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy::hex;
 use alloy::primitives::{Address, B256, Signature, keccak256};
 use alloy::signers::k256::ecdsa::{SigningKey, VerifyingKey};
 use alloy::signers::local::LocalSigner;
@@ -83,7 +82,7 @@ impl std::fmt::Display for Secp256k1VerifyingKey<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let bytes = self.0.to_sec1_bytes();
 
-        write!(f, "{}", hex::encode_prefixed(bytes))
+        write!(f, "{}", const_hex::encode_prefixed(bytes))
     }
 }
 

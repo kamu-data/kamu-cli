@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(Debug, Deserialize, AsRef))]
+#[nutype::nutype(derive(Debug, AsRef))]
 pub struct Eip712TypedData(AlloyEip712TypedData);
 
 impl Eip712TypedData {

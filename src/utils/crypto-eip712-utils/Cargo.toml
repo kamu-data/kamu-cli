@@ -24,6 +24,7 @@ doctest = false
 [features]
 default = []
 
+serde = ["dep:serde"]
 
 [dependencies]
 internal-error = { workspace = true }
@@ -36,10 +37,13 @@ alloy = { version = "1", default-features = false, features = [
     "signers",
     "signer-local",
 ] }
+const-hex = { version = "1", default-features = true, features = [] }
 nutype = { version = "0.6", default-features = false, features = [] }
-serde = { version = "1", features = ["derive"], default-features = false }
 serde_json = { version = "1", default-features = false }
 zeroize = { version = "1", default-features = false, features = [] }
+
+# Optional
+serde = { optional = true, version = "1", features = ["derive"], default-features = false }
 
 
 [dev-dependencies]

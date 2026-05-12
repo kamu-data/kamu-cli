@@ -3539,6 +3539,7 @@ name = "crypto-eip712-utils"
 version = "0.260.2"
 dependencies = [
  "alloy",
+ "const-hex",
  "eyre",
  "internal-error",
  "nutype",
