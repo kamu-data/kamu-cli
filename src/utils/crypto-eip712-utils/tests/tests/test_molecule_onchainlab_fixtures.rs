@@ -117,6 +117,10 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
         let actual_signature = signer.sign_prehash(&signing_hash)?;
 
         assert_eq!(expected_signature, actual_signature.to_string());
+        assert_eq!(
+            expected_signature,
+            actual_signature.as_encoded_stack_buf().as_str()
+        );
     }
 
     // II. BE DID-Linking — EIP-712 Fixture Vectors
@@ -138,6 +142,10 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
         let actual_signature = signer.sign(&proof)?;
 
         assert_eq!(expected_signature, actual_signature.to_string());
+        assert_eq!(
+            expected_signature,
+            actual_signature.as_encoded_stack_buf().as_str()
+        );
     }
 
     // 3.2) Expected 65-byte signatures

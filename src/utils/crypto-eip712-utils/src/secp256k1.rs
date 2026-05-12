@@ -27,13 +27,15 @@ impl Secp256k1Signer {
             .int_err()
     }
 
-    pub fn sign_prehash(&self, hash: &B256) -> Result<Signature, InternalError> {
+    pub fn sign_prehash(&self, hash: &B256) -> Result<Secp256k1Signature, InternalError> {
         use alloy::signers::SignerSync;
 
-        self.0.sign_hash_sync(hash).int_err()
+        let signature = self.0.sign_hash_sync(hash).int_err()?;
+
+        Ok(Secp256k1Signature::new(signature))
     }
 
-    pub fn sign(&self, data: &[u8]) -> Result<Signature, InternalError> {
+    pub fn sign(&self, data: &[u8]) -> Result<Secp256k1Signature, InternalError> {
         let hash = keccak256(data);
 
         self.sign_prehash(&hash)
@@ -56,6 +58,19 @@ impl std::fmt::Debug for Secp256k1Signer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // NOTE: Default implementation outputs address, but we go further
         f.write_str("Secp256k1Signer(***)")
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype::nutype(derive(Debug, Deref, Copy, Clone, Hash, PartialEq, Eq))]
+pub struct Secp256k1Signature(Signature);
+
+impl Secp256k1Signature {
+    pub fn as_encoded_stack_buf(&self) -> const_hex::Buffer<65, true> {
+        let mut buf = const_hex::Buffer::new();
+        buf.format(&self.as_bytes());
+        buf
     }
 }
 
