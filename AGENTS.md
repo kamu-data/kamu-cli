@@ -35,6 +35,8 @@ cargo nextest run -E 'test(test_name_here)'
 
 Repo-local skills live in `.agents/skills/`. Load them only when the task matches their trigger:
 
+- `.agents/skills/kamu-dill-di`: defining dill components, interfaces, scopes, catalog building and chaining.
+- `.agents/skills/kamu-test-harness`: test harness structs, per-account catalog wiring, in-memory test doubles, singleton scope.
 - `.agents/skills/kamu-repository-tests`: storage-backed repository trait test suites, `repo-tests` crates, storage harnesses, `database_transactional_test!`.
 - `.agents/skills/kamu-sqlx-database-work`: Postgres/SQLite repositories, SQLx macros, migrations, SQLx offline data, local DB validation.
 - `.agents/skills/kamu-graphql-api`: GraphQL queries, mutations, roots, resolvers, models, enum mappings, schema regeneration.
