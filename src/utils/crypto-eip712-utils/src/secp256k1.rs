@@ -16,7 +16,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 // NOTE: SigningKey is ZeroizeOnDrop,
 //       so we don't need to worry about zeroing it manually
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Secp256k1Signer(LocalSigner<SigningKey>);
 
 impl Secp256k1Signer {
@@ -64,6 +64,24 @@ impl std::fmt::Debug for Secp256k1Signer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // NOTE: SigningKey implementation outputs address, but we go further
         f.write_str("Secp256k1Signer(***)")
+    }
+}
+
+// NOTE: needed for setty::Config
+#[cfg(feature = "serde")]
+impl serde::Serialize for Secp256k1Signer {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use zeroize::Zeroize;
+
+        let bytes = zeroize::Zeroizing::new(self.0.to_bytes().0);
+        let mut buf = const_hex::Buffer::<_, true>::new();
+
+        let res = serializer.collect_str(buf.format(&bytes));
+
+        // NOTE: encoded buf cleanup
+        buf.as_mut_str().zeroize();
+
+        res
     }
 }
 
