@@ -24,6 +24,7 @@ doctest = false
 [features]
 default = []
 
+schemars = ["dep:schemars"]
 serde = ["dep:serde"]
 
 [dependencies]
@@ -43,6 +44,7 @@ serde_json = { version = "1", default-features = false }
 zeroize = { version = "1", default-features = false, features = [] }
 
 # Optional
+schemars = { optional = true, version = "1", default-features = false, features = [] }
 serde = { optional = true, version = "1", features = ["derive"], default-features = false }
 
 

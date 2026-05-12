@@ -88,6 +88,21 @@ impl<'de> serde::Deserialize<'de> for Secp256k1Signer {
     }
 }
 
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Secp256k1Signer {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Secp256k1Signer".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::Secp256k1Signer").into()
+    }
+
+    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        str::json_schema(g)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[nutype::nutype(derive(Debug, Deref, Copy, Clone, Hash, PartialEq, Eq, FromStr))]
