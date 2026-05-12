@@ -16,8 +16,12 @@ use serde_json::json;
 #[test]
 fn test_molecule_provided_test_data() -> eyre::Result<()> {
     // Adapted from:
+    // I. EIP-712 LinkDidRequest — Handoff for Kamu
     // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md
+    // II. BE DID-Linking — EIP-712 Fixture Vectors
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/be-did-linking-eip712-fixtures.md
 
+    // I. EIP-712 LinkDidRequest — Handoff for Kamu
     let typed_data = Eip712TypedData::from_json(json!({
         "domain": {
             "name": "MoleculeOclDidRegistry",
@@ -64,6 +68,9 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
         },
     }))?;
 
+    // 4.) Test fixture — reproduce these values
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md#5-test-private-key--expected-signature
+
     // 4.2) Struct hash
     {
         let expected_hash =
@@ -92,6 +99,7 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
     }
 
     // 5) Test private key + expected signature (w/ EIP-191 prefix)
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md#5-test-private-key--expected-signature
     {
         use crypto_eip712_utils::SigningKey;
 
@@ -102,15 +110,41 @@ fn test_molecule_provided_test_data() -> eyre::Result<()> {
 
         let signed_hash = typed_data.signing_hash_with_eip191_prefix()?;
 
-        let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
         let expected_signature = "0xf3073c2f0a3512fc896cb98d9a93c014f25c1dd758dd2c8e27d31aa6d6d2bc4756b739978bf784b52718653a46b9283b10f47359fee686bde8b70882e305eadc1c";
+        let actual_signature = sign_prefixed(&signing_key, signed_hash.as_slice())?;
 
         assert_eq!(expected_signature, actual_signature);
     }
 
-    // ---
+    // II. BE DID-Linking — EIP-712 Fixture Vectors
 
-    // TODO: Molecule: Phase 3: EIP-712 digest (w/o EIP-191 prefix)
+    // 3.2) Expected 65-byte signatures
+    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/be-did-linking-eip712-fixtures.md#32-expected-65-byte-signatures-rsv
+    {
+        use alloy::primitives::Signature;
+        use crypto_eip712_utils::SigningKey;
+
+        // kamu-attester
+        let private_key =
+            b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
+        let signing_key = SigningKey::from_slice(private_key.as_slice())?;
+        let proof_hash =
+            b256!("0x0e270ea3c4029b14e3ca5f8c38ada678d9076889d3f3f1b7a8a6a5596124175c");
+
+        let expected_signature =
+            "0x2c135e2f43fe14d8f5027bf91e4bb4207f1aa9edcfc74031f1e4d6945293ca9d55216a0fe19964d2b6420b6c2f4bfd759db55f9bb95850d17f9e0ab8569f5c3f1b";
+        let actual_signature = sign_prefixed(&signing_key, proof_hash.as_slice())?;
+
+        assert_eq!(expected_signature, actual_signature);
+
+        // We additionally verify the address recovery
+        let signature: Signature = actual_signature.parse()?;
+
+        let expected_address = "0xcb687F3f6Ae1fF2E65CfA6423c533E0Fc82FB356";
+        let actual_address = signature.recover_address_from_prehash(&proof_hash)?;
+
+        assert_eq!(expected_address, actual_address.to_checksum(None));
+    }
 
     Ok(())
 }
