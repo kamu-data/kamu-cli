@@ -50,6 +50,16 @@ impl Secp256k1Signer {
     }
 }
 
+impl Drop for Secp256k1Signer {
+    fn drop(&mut self) {
+        unsafe { zeroize::zeroize_flat_type(self as *mut Self) }
+    }
+}
+
+impl zeroize::ZeroizeOnDrop for Secp256k1Signer {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct Secp256k1VerifyingKey<'a>(&'a VerifyingKey);
 
