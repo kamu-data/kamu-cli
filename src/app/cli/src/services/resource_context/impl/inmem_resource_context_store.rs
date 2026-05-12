@@ -126,11 +126,16 @@ impl resource_context::ResourceContextStore for InMemoryResourceContextStore {
         account_name: &odf::AccountName,
         state: &resource_context::CurrentResourceContextState,
     ) -> Result<(), InternalError> {
-        let mut account_state = self.read_account_runtime_state(scope, account_name)?;
-        account_state
+        let key: &str = account_name.as_ref();
+        self.runtime_for(scope)
+            .lock()
+            .unwrap()
+            .accounts
+            .entry(key.to_owned())
+            .or_default()
             .current_context_name
             .clone_from(&state.current_context_name);
-        self.write_account_runtime_state(scope, account_name, &account_state)
+        Ok(())
     }
 }
 

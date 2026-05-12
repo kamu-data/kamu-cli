@@ -102,8 +102,18 @@ impl CLIResourceContextStore {
         let manifest: Manifest<resource_context::ResourceContextsState> =
             serde_yaml::from_reader(file).int_err()?;
 
-        assert_eq!(manifest.kind, KAMU_CONTEXTS_STORE_MANIFEST_KIND);
-        assert_eq!(manifest.version, KAMU_CONTEXTS_STORE_VERSION);
+        if manifest.kind != KAMU_CONTEXTS_STORE_MANIFEST_KIND {
+            return InternalError::bail(format!(
+                "Unexpected contexts manifest kind '{}', expected '{}'",
+                manifest.kind, KAMU_CONTEXTS_STORE_MANIFEST_KIND
+            ));
+        }
+        if manifest.version != KAMU_CONTEXTS_STORE_VERSION {
+            return InternalError::bail(format!(
+                "Unsupported contexts manifest version {}, expected {}",
+                manifest.version, KAMU_CONTEXTS_STORE_VERSION
+            ));
+        }
 
         Ok(manifest.content)
     }
@@ -149,8 +159,18 @@ impl CLIResourceContextStore {
         let manifest: Manifest<resource_context::ResourceContextsRuntimeState> =
             serde_yaml::from_reader(file).int_err()?;
 
-        assert_eq!(manifest.kind, KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND);
-        assert_eq!(manifest.version, KAMU_CONTEXTS_STATE_STORE_VERSION);
+        if manifest.kind != KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND {
+            return InternalError::bail(format!(
+                "Unexpected contexts state manifest kind '{}', expected '{}'",
+                manifest.kind, KAMU_CONTEXTS_STATE_STORE_MANIFEST_KIND
+            ));
+        }
+        if manifest.version != KAMU_CONTEXTS_STATE_STORE_VERSION {
+            return InternalError::bail(format!(
+                "Unsupported contexts state manifest version {}, expected {}",
+                manifest.version, KAMU_CONTEXTS_STATE_STORE_VERSION
+            ));
+        }
 
         Ok(manifest.content)
     }
@@ -241,11 +261,15 @@ impl resource_context::ResourceContextStore for CLIResourceContextStore {
         account_name: &odf::AccountName,
         state: &resource_context::CurrentResourceContextState,
     ) -> Result<(), InternalError> {
-        let mut account_state = self.read_account_runtime_state(scope, account_name)?;
-        account_state
+        let key: &str = account_name.as_ref();
+        let mut runtime_state = self.read_runtime_state(scope)?;
+        runtime_state
+            .accounts
+            .entry(key.to_owned())
+            .or_default()
             .current_context_name
             .clone_from(&state.current_context_name);
-        self.write_account_runtime_state(scope, account_name, &account_state)
+        self.write_runtime_state(scope, &runtime_state)
     }
 }
 

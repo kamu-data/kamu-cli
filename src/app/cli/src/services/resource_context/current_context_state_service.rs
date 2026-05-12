@@ -76,16 +76,19 @@ impl CurrentContextStateService {
         scope: resource_context::ResourceContextStoreScope,
         context_name: Option<String>,
     ) -> Result<(), InternalError> {
-        let mut state = self
-            .state_for_scope(scope)
-            .lock()
-            .expect("Could not lock current resource context state");
-        state.current_context_name = context_name;
+        let new_state = resource_context::CurrentResourceContextState {
+            current_context_name: context_name,
+        };
         self.store.write_current_context_state(
             scope,
             self.current_account_subject.account_name_or_default(),
-            &state,
-        )
+            &new_state,
+        )?;
+        *self
+            .state_for_scope(scope)
+            .lock()
+            .expect("Could not lock current resource context state") = new_state;
+        Ok(())
     }
 
     fn state_for_scope(
