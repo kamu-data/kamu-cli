@@ -7,13 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_access_token_registry_svc;
-mod test_config;
-mod test_di_graph;
-mod test_generate_cli_markdown;
-mod test_new_dataset_command;
-mod test_output;
-mod test_resource_context_service;
-mod test_resource_selection_resolution_service;
-mod test_system_info_command;
-mod test_workspace_svc;
+mod cli_resource_context_store;
+mod inmem_resource_context_store;
+
+pub use cli_resource_context_store::*;
+pub use inmem_resource_context_store::*;
