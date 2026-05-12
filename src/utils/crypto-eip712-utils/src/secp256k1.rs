@@ -15,7 +15,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
 pub struct Secp256k1Signer(LocalSigner<SigningKey>);
 
 impl Secp256k1Signer {
@@ -53,6 +52,13 @@ impl Drop for Secp256k1Signer {
 }
 
 impl zeroize::ZeroizeOnDrop for Secp256k1Signer {}
+
+impl std::fmt::Debug for Secp256k1Signer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // NOTE: Default implementation outputs address, but we go further
+        f.write_str("Secp256k1Signer(***)")
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
