@@ -12,9 +12,12 @@ use std::sync::Arc;
 use dill::{CatalogBuilder, Component as _};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_cli::resource_context::{
+    CLIResourceContextStore,
     CurrentContextStateService,
     InMemoryResourceContextStore,
     ResolvedResourceContext,
+    ResourceContextLastTestResult,
+    ResourceContextLastTestStatus,
     ResourceContextRecord,
     ResourceContextRegistryService,
     ResourceContextResolver,
@@ -213,6 +216,177 @@ async fn test_resolver_unknown_context_returns_error() {
         h.resolver("alice")
             .resolve(Some("no-such-context"))
             .is_err()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceContextResolver – "local" keyword account isolation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_local_context_selection_is_account_specific() {
+    let h = ResourceContextHarness::new();
+    h.add_remote_context(ResourceContextStoreScope::Workspace, "remote");
+
+    // Alice explicitly selects "local"; Bob selects a remote context
+    h.state_svc("alice")
+        .set_current_context(ResourceContextStoreScope::Workspace, Some("local".into()))
+        .unwrap();
+    h.state_svc("bob")
+        .set_current_context(ResourceContextStoreScope::Workspace, Some("remote".into()))
+        .unwrap();
+
+    // Alice resolves to local workspace via the explicit "local" name
+    assert_eq!(
+        h.resolver("alice").resolve(None).unwrap(),
+        ResolvedResourceContext::LocalWorkspace,
+    );
+
+    // Bob resolves to his remote context; Alice's "local" selection did not affect
+    // him
+    assert!(
+        matches!(
+            h.resolver("bob").resolve(None).unwrap(),
+            ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "remote"
+        ),
+        "Bob should resolve to 'remote', not LocalWorkspace"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceContextRegistryService – last-test results isolated per account
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_last_test_results_isolated_per_account() {
+    let h = ResourceContextHarness::new();
+    h.add_remote_context(ResourceContextStoreScope::Workspace, "prod");
+
+    // Bob sees no cached result before any check is recorded
+    let bob_contexts = h.registry_svc("bob").list_effective_contexts_with_scope();
+    assert!(
+        bob_contexts[0].last_test_result.is_none(),
+        "Bob should see no cached result yet"
+    );
+
+    // Alice records a successful check result
+    h.registry_svc("alice")
+        .set_context_last_test_result(
+            ResourceContextStoreScope::Workspace,
+            "prod",
+            ResourceContextLastTestResult {
+                status: ResourceContextLastTestStatus::ReachableValid,
+                checked_at: chrono::Utc::now(),
+                detail: None,
+            },
+        )
+        .unwrap();
+
+    // Bob still sees no result — Alice's check did not pollute Bob's state
+    let bob_contexts = h.registry_svc("bob").list_effective_contexts_with_scope();
+    assert!(
+        bob_contexts[0].last_test_result.is_none(),
+        "Bob should still see no result after Alice's check"
+    );
+
+    // Bob records an unreachable result
+    h.registry_svc("bob")
+        .set_context_last_test_result(
+            ResourceContextStoreScope::Workspace,
+            "prod",
+            ResourceContextLastTestResult {
+                status: ResourceContextLastTestStatus::Unreachable,
+                checked_at: chrono::Utc::now(),
+                detail: None,
+            },
+        )
+        .unwrap();
+
+    // Alice still sees her own valid result — Bob's write did not overwrite it
+    let alice_contexts = h.registry_svc("alice").list_effective_contexts_with_scope();
+    assert_eq!(
+        alice_contexts[0]
+            .last_test_result
+            .as_ref()
+            .map(|r| &r.status),
+        Some(&ResourceContextLastTestStatus::ReachableValid),
+        "Alice's result should be unchanged after Bob's check"
+    );
+
+    // Bob sees his own unreachable result
+    let bob_contexts = h.registry_svc("bob").list_effective_contexts_with_scope();
+    assert_eq!(
+        bob_contexts[0].last_test_result.as_ref().map(|r| &r.status),
+        Some(&ResourceContextLastTestStatus::Unreachable),
+        "Bob should see his own unreachable result"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CLIResourceContextStore – legacy runtime-state file (no accounts map) is
+// tolerated
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_legacy_runtime_state_file_is_tolerated() {
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace_dir = tmp.path().to_owned();
+
+    // Write a pre-Phase1 runtime-state file: flat layout without the accounts map
+    std::fs::write(
+        workspace_dir.join(".kamucontexts.state"),
+        r#"kind: KamuResourceContextsState
+version: 1
+content:
+  currentContextName: legacy-ctx
+  contexts:
+    legacy-ctx:
+      status: reachableValid
+      checkedAt: "2024-01-01T00:00:00Z"
+"#,
+    )
+    .unwrap();
+
+    let base = {
+        let mut b = CatalogBuilder::new();
+        b.add_value(WorkspaceLayout::new(&workspace_dir));
+        b.add::<CLIResourceContextStore>();
+        b.build()
+    };
+
+    let make_state_svc = |account: &str| {
+        CatalogBuilder::new_chained(&base)
+            .add_value(CurrentAccountSubject::new_test_with(&account))
+            .add::<resource_context::CurrentContextStateService>()
+            .build()
+            .get_one::<CurrentContextStateService>()
+            .unwrap()
+    };
+
+    // The legacy file is readable without panic; unknown top-level fields are
+    // ignored
+    let alice_svc = make_state_svc("alice");
+    assert_eq!(
+        alice_svc.get_current_context_in_scope(ResourceContextStoreScope::Workspace),
+        None,
+        "Legacy file should be read as empty (unknown fields silently ignored)"
+    );
+
+    // Writing Alice's new-format state round-trips correctly
+    alice_svc
+        .set_current_context(ResourceContextStoreScope::Workspace, Some("prod".into()))
+        .unwrap();
+    assert_eq!(
+        alice_svc.get_current_context_in_scope(ResourceContextStoreScope::Workspace),
+        Some("prod".into()),
+    );
+
+    // A fresh service for Bob reads the rewritten file and sees no context for Bob
+    let bob_svc = make_state_svc("bob");
+    assert_eq!(
+        bob_svc.get_current_context_in_scope(ResourceContextStoreScope::Workspace),
+        None,
+        "Bob should see no context after Alice's write"
     );
 }
 
