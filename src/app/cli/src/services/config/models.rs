@@ -586,9 +586,8 @@ pub struct IdentityConfig {
     #[config(combine(replace))]
     pub private_key: Option<odf::metadata::PrivateKey>,
 
-    // TODO: Molecule: Phase 3: replace & wrap w/ new type
     #[config(combine(replace))]
-    pub secp256k1_private_key: Option<odf::metadata::PrivateKey>,
+    pub secp256k1_private_key: Option<crypto_eip712_utils::Secp256k1Signer>,
 }
 
 impl IdentityConfig {
@@ -596,15 +595,9 @@ impl IdentityConfig {
         if let Some(ed25519_private_key) = &self.private_key
             && let Some(secp256k1_private_key) = &self.secp256k1_private_key
         {
-            // TODO: SEC: Molecule: Phase 3: replace wrap w/ new type
-            let secp256k1_private_key = hex::encode(secp256k1_private_key.to_bytes())
-                .parse()
-                .unwrap();
-            // TODO: zeroing
-
             Some(kamu_adapter_http::data::query_types::IdentityConfig {
                 ed25519_private_key: ed25519_private_key.clone(),
-                secp256k1_private_key,
+                secp256k1_private_key: secp256k1_private_key.clone(),
             })
         } else {
             None
