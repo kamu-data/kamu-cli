@@ -18,7 +18,7 @@ pub trait SignEip712UseCase: Send + Sync {
     async fn execute(
         &self,
         key: odf::metadata::DidKey,
-        request: crypto_eip712_utils::Eip712TypedData,
+        typed_data: crypto_eip712_utils::Eip712TypedData,
         options: SignEip712UseCaseOptions,
     ) -> Result<SignEip712Response, SignEip712UseCaseError>;
 }

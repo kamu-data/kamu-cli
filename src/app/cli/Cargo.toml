@@ -46,7 +46,6 @@ crypto-utils = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 file-utils = { workspace = true }
-http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 observability = { workspace = true, features = ["dill", "prometheus"] }
@@ -127,6 +126,9 @@ kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }
 kamu-auth-web3-services = { workspace = true }
 kamu-auth-web3-sqlite = { workspace = true }
+
+kamu-signing = { workspace = true }
+kamu-signing-services = { workspace = true }
 
 kamu-molecule-services = { workspace = true }
 

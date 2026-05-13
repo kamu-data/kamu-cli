@@ -591,11 +591,11 @@ pub struct IdentityConfig {
 }
 
 impl IdentityConfig {
-    pub fn to_infra_cfg(&self) -> Option<kamu_adapter_http::data::query_types::IdentityConfig> {
+    pub fn to_infra_cfg(&self) -> Option<kamu_signing::entities::IdentityConfig> {
         if let Some(ed25519_private_key) = &self.private_key
             && let Some(secp256k1_private_key) = &self.secp256k1_private_key
         {
-            Some(kamu_adapter_http::data::query_types::IdentityConfig {
+            Some(kamu_signing::entities::IdentityConfig {
                 ed25519_private_key: ed25519_private_key.clone(),
                 secp256k1_private_key: secp256k1_private_key.clone(),
             })
