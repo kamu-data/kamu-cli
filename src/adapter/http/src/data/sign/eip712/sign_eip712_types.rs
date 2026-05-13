@@ -68,6 +68,7 @@ pub struct Eip712TypeDetails {
 #[serde(rename_all = "camelCase")]
 pub struct SignEip712Response {
     pub r#type: ProofType,
+    pub verification_method: odf::metadata::DidKey,
     pub signature: odf::metadata::Signature,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<SignEip712Proof>,

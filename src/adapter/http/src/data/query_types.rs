@@ -40,12 +40,6 @@ pub struct IdentityConfig {
     pub secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer,
 }
 
-impl IdentityConfig {
-    pub fn did(&self) -> odf::metadata::DidKey {
-        odf::metadata::DidKey::new_ed25519(&self.ed25519_private_key.verifying_key())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
