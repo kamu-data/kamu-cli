@@ -18,7 +18,7 @@ use std::collections::HashMap;
 #[into_params(parameter_in = Query)]
 pub struct SignEip712QueryParams {
     /// DID of the managed key to sign with
-    pub key: odf::metadata::DidKey,
+    pub key: odf::metadata::DidOdf,
 
     /// Include a node proof over the resulting signature
     #[serde(default)]

@@ -39,7 +39,7 @@ pub struct SignEip712UseCaseImpl {
 impl SignEip712UseCaseImpl {
     async fn get_secret_key(
         &self,
-        key: odf::metadata::DidKey,
+        key: odf::metadata::DidOdf,
         repo: &dyn DidSecretKeyRepository,
     ) -> Result<kamu_accounts::DidSecretKey, SignEip712UseCaseError> {
         let key_stack = key.as_did_str().to_stack_string();
@@ -70,7 +70,7 @@ impl SignEip712UseCaseImpl {
 impl SignEip712UseCase for SignEip712UseCaseImpl {
     async fn execute(
         &self,
-        key: odf::metadata::DidKey,
+        key: odf::metadata::DidOdf,
         typed_data: crypto_eip712_utils::Eip712TypedData,
         options: SignEip712UseCaseOptions,
     ) -> Result<SignEip712Response, SignEip712UseCaseError> {

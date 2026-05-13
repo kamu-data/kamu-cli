@@ -165,7 +165,7 @@ impl serde::de::Visitor<'_> for DidKeyVisitor {
     type Value = DidKey;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a canonical DID")
+        formatter.write_str("a canonical DID key")
     }
 
     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {

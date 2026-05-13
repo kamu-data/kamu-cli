@@ -17,7 +17,7 @@ use crate::common::ProofType;
 pub trait SignEip712UseCase: Send + Sync {
     async fn execute(
         &self,
-        key: odf::metadata::DidKey,
+        key: odf::metadata::DidOdf,
         typed_data: crypto_eip712_utils::Eip712TypedData,
         options: SignEip712UseCaseOptions,
     ) -> Result<SignEip712Response, SignEip712UseCaseError>;
@@ -61,7 +61,7 @@ pub enum SignEip712UseCaseError {
     NotConfigured,
 
     #[error("Secret key was not found for DID '{did_str}'", did_str = did.as_did_str())]
-    SecretKeyNotFound { did: odf::metadata::DidKey },
+    SecretKeyNotFound { did: odf::metadata::DidOdf },
 
     #[error(transparent)]
     Internal(#[from] InternalError),
