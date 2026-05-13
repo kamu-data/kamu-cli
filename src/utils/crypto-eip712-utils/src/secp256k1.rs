@@ -44,8 +44,10 @@ impl Secp256k1Signer {
         self.sign_prehash(&hash)
     }
 
-    pub fn verification_key(&self) -> Secp256k1VerifyingKey<'_> {
-        Secp256k1VerifyingKey(self.0.credential().verifying_key())
+    pub fn verification_key(&self) -> Secp256k1VerifyingKey {
+        let verifying_key_ref = self.0.credential().verifying_key();
+
+        Secp256k1VerifyingKey::new(*verifying_key_ref)
     }
 }
 
@@ -54,6 +56,7 @@ impl std::str::FromStr for Secp256k1Signer {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let key: LocalSigner<SigningKey> = s.parse().int_err()?;
+
         Ok(Secp256k1Signer(key))
     }
 }
@@ -128,9 +131,9 @@ pub struct Secp256k1Signature(Signature);
 
 impl Secp256k1Signature {
     pub fn as_encoded_stack_buf(&self) -> const_hex::Buffer<65, true> {
-        let mut buf = const_hex::Buffer::new();
-        buf.format(&self.as_bytes());
-        buf
+        let mut stack_buf = const_hex::Buffer::new();
+        stack_buf.format(&self.as_bytes());
+        stack_buf
     }
 }
 
@@ -141,30 +144,114 @@ impl serde::Serialize for Secp256k1Signature {
     }
 }
 
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for Secp256k1Signature {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for Secp256k1Signature {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        let signature: Secp256k1Signature = "0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b".parse().unwrap();
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(signature)])
+                .build(),
+        )
+        .into()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct Secp256k1VerifyingKey<'a>(&'a VerifyingKey);
+#[nutype::nutype(derive(Debug, Deref, Copy, Clone, PartialEq, Eq))]
+pub struct Secp256k1VerifyingKey(VerifyingKey);
 
-impl Secp256k1VerifyingKey<'_> {
-    pub fn as_address(&self) -> Address {
-        Address::from_public_key(self.0)
+impl Secp256k1VerifyingKey {
+    const COMPRESSED_ENCODED_POINT_LENGTH: usize = 33;
+
+    pub fn from_sec1_bytes(data: &[u8]) -> Result<Self, InternalError> {
+        let verifying_key = VerifyingKey::from_sec1_bytes(data).int_err()?;
+
+        Ok(Secp256k1VerifyingKey::new(verifying_key))
     }
 
-    pub fn verify_prehash(&self, hash: &B256, signature: &Signature) -> Result<(), InternalError> {
+    pub fn from_sec1_bytes_str(s: &str) -> Result<Self, InternalError> {
+        let data = const_hex::decode(s).int_err()?;
+
+        Self::from_sec1_bytes(&data)
+    }
+
+    pub fn as_address(&self) -> Address {
+        Address::from_public_key(&*self)
+    }
+
+    pub fn verify_prehash(
+        &self,
+        hash: &B256,
+        signature: &Secp256k1Signature,
+    ) -> Result<(), InternalError> {
+        use std::ops::Deref;
+
         use alloy::signers::k256::ecdsa::signature::hazmat::PrehashVerifier;
 
         let signature = signature.to_k256().int_err()?;
 
-        self.0.verify_prehash(hash.as_slice(), &signature).int_err()
+        self.deref()
+            .verify_prehash(hash.as_slice(), &signature)
+            .int_err()
+    }
+
+    pub fn as_encoded_stack_buf(
+        &self,
+    ) -> const_hex::Buffer<{ Self::COMPRESSED_ENCODED_POINT_LENGTH }, true> {
+        let compressed_encoded_point = self.to_encoded_point(true);
+
+        let Ok(bytes) = compressed_encoded_point.as_bytes().try_into() else {
+            unreachable!()
+        };
+
+        let mut stack_buf = const_hex::Buffer::new();
+        stack_buf.format(bytes);
+        stack_buf
     }
 }
 
-impl std::fmt::Display for Secp256k1VerifyingKey<'_> {
+impl std::fmt::Display for Secp256k1VerifyingKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let bytes = self.0.to_sec1_bytes();
+        write!(f, "{}", self.as_encoded_stack_buf().as_str())
+    }
+}
 
-        write!(f, "{}", const_hex::encode_prefixed(bytes))
+#[cfg(feature = "serde")]
+impl serde::Serialize for Secp256k1VerifyingKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self.as_encoded_stack_buf().as_str())
+    }
+}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for Secp256k1VerifyingKey {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for Secp256k1VerifyingKey {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        let verifying_key = Secp256k1VerifyingKey::from_sec1_bytes_str(
+            "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+        )
+        .unwrap();
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(verifying_key)])
+                .build(),
+        )
+        .into()
     }
 }
 

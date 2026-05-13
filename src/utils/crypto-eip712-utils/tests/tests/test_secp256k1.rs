@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use alloy::primitives::b256;
-use crypto_eip712_utils::{Secp256k1Signature, Secp256k1Signer};
+use crypto_eip712_utils::{Secp256k1Signature, Secp256k1Signer, Secp256k1VerifyingKey};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -19,9 +19,9 @@ fn test_signer_does_not_leak_keys() -> eyre::Result<()> {
     // Label: "kamu-attester"
     //        privateKey = uint256(keccak256(abi.encodePacked(label)))
     let private_key = b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
-    let signer = Secp256k1Signer::from_bytes(zeroize::Zeroizing::new(*private_key))?;
+    let signer = Secp256k1Signer::from_bytes((*private_key).into())?;
 
-    assert_eq!("Secp256k1Signer(***)", format!("{:?}", signer),);
+    assert_eq!("Secp256k1Signer(***)", format!("{:?}", signer));
 
     Ok(())
 }
@@ -75,6 +75,29 @@ fn test_signature_serde() -> eyre::Result<()> {
     assert_eq!(
         indoc::formatdoc!("\"{expected_signature}\""),
         serde_json::to_string(&actual_signature)?
+    );
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "serde")]
+#[test]
+fn test_verifying_key_serde() -> eyre::Result<()> {
+    let expected_verifying_key =
+        "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31";
+    let actual_verifying_key = Secp256k1VerifyingKey::from_sec1_bytes_str(expected_verifying_key)?;
+
+    assert_eq!(expected_verifying_key, actual_verifying_key.to_string());
+    assert_eq!(
+        expected_verifying_key,
+        actual_verifying_key.as_encoded_stack_buf().as_str()
+    );
+
+    assert_eq!(
+        indoc::formatdoc!("\"{expected_verifying_key}\""),
+        serde_json::to_string(&actual_verifying_key)?
     );
 
     Ok(())
