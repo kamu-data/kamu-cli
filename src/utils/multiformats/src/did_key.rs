@@ -26,7 +26,7 @@ pub const DEFAULT_DID_MULTIBASE_ENCODING: Multibase = Multibase::Base58Btc;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Decentralized identifier that follows W3C [`did:key` method](https://w3c-ccg.github.io/did-method-key/)
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DidKey {
     public_key: [u8; MAX_DID_KEY_LEN],
 }

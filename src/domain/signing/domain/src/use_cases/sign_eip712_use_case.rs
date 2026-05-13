@@ -61,7 +61,7 @@ pub enum SignEip712UseCaseError {
     NotConfigured,
 
     #[error("Secret key was not found for DID '{did_str}'", did_str = did.as_did_str())]
-    SecretKeyNotFound { did: odf::metadata::DidOdf },
+    SecretKeyNotFound { did: odf::metadata::DidKey },
 
     #[error(transparent)]
     Internal(#[from] InternalError),
