@@ -45,6 +45,7 @@ members = [
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
     "src/domain/auth-web3/domain",
+    "src/domain/signing/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
@@ -185,6 +186,7 @@ tracing-perfetto = { version = "0.260.2", path = "src/utils/tracing-perfetto", d
 kamu-accounts = { version = "0.260.2", path = "src/domain/accounts/domain", default-features = false }
 kamu-auth-rebac = { version = "0.260.2", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-auth-web3 = { version = "0.260.2", path = "src/domain/auth-web3/domain", default-features = false }
+kamu-signing = { version = "0.260.2", path = "src/domain/signing/domain", default-features = false }
 kamu-core = { version = "0.260.2", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.260.2", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.260.2", path = "src/domain/flow-system/domain", default-features = false }
