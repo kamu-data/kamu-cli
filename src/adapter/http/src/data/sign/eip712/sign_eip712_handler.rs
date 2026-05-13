@@ -12,7 +12,12 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use http_common::{ApiError, ApiErrorResponse};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{DidEntity, DidSecretKeyRepository, GetDidSecretKeyError};
+use kamu_accounts::{
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKeyRepository,
+    GetDidSecretKeyError,
+};
 use odf::metadata::ed25519::Signer;
 
 use super::sign_eip712_types::{
@@ -105,8 +110,8 @@ pub async fn sign_eip712_handler(
             let signer = &identity.secp256k1_private_key;
 
             let proof = signature.to_bytes();
-            let signature = signer.sign(proof.as_slice())?;
             let verification_method = signer.verification_key();
+            let signature = signer.sign(proof.as_slice())?;
 
             Some(SignEip712Proof {
                 r#type: ProofType::EcdsaSecp256k1Signature2019,
