@@ -9,13 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_accounts::{
-    DidEntity,
-    DidSecretEncryptionConfig,
-    DidSecretKeyRepository,
-    GetDidSecretKeyError,
-};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -31,36 +25,66 @@ use kamu_signing::use_cases::{
 #[dill::component]
 #[dill::interface(dyn SignEip712UseCase)]
 pub struct SignEip712UseCaseImpl {
-    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
-    did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+    did_secret_key_repo: Arc<dyn kamu_accounts::DidSecretKeyRepository>,
+    did_secret_encryption_config: Arc<kamu_accounts::DidSecretEncryptionConfig>,
+    dataset_action_authorizer: Arc<dyn kamu_datasets::DatasetActionAuthorizer>,
     identity_config: Option<IdentityConfig>,
 }
 
 impl SignEip712UseCaseImpl {
+    async fn get_secret_key_for_dataset(
+        &self,
+        dataset_id: odf::DatasetID,
+    ) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
+        use kamu_datasets::DatasetActionAuthorizerExt;
+
+        let has_read_access = self
+            .dataset_action_authorizer
+            .is_action_allowed(&dataset_id, kamu_datasets::DatasetAction::Read)
+            .await?;
+
+        if !has_read_access {
+            return Ok(None);
+        }
+
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = kamu_accounts::DidEntity::new_dataset(dataset_id.as_str());
+
+        get_did_secret_key(self.did_secret_key_repo.as_ref(), dataset_entity).await
+    }
+
+    async fn get_secret_key_for_account(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
+        let Some(account_id) = account_id.as_did_odf() else {
+            // Only odf account ids at the moment
+            return Ok(None);
+        };
+
+        let account_id = account_id.as_did_str().to_stack_string();
+        let account_entity = kamu_accounts::DidEntity::new_account(account_id.as_str());
+
+        get_did_secret_key(self.did_secret_key_repo.as_ref(), account_entity).await
+    }
+
     async fn get_secret_key(
         &self,
         key: odf::metadata::DidOdf,
-        repo: &dyn DidSecretKeyRepository,
     ) -> Result<kamu_accounts::DidSecretKey, SignEip712UseCaseError> {
-        let key_stack = key.as_did_str().to_stack_string();
+        let dataset_id = key.into();
 
-        let dataset = DidEntity::new_dataset(key_stack.as_str());
-
-        match repo.get_did_secret_key(&dataset).await {
-            Ok(key) => return Ok(key),
-            Err(GetDidSecretKeyError::NotFound(_)) => { /* continue */ }
-            Err(e) => return Err(e.int_err().into()),
+        if let Some(key) = self.get_secret_key_for_dataset(dataset_id).await? {
+            return Ok(key);
         }
 
-        let account = DidEntity::new_account(key_stack.as_str());
+        let account_id = key.into();
 
-        match repo.get_did_secret_key(&account).await {
-            Ok(key) => Ok(key),
-            Err(GetDidSecretKeyError::NotFound(_)) => {
-                Err(SignEip712UseCaseError::SecretKeyNotFound { did: key })
-            }
-            Err(e) => Err(e.int_err().into()),
+        if let Some(key) = self.get_secret_key_for_account(account_id).await? {
+            return Ok(key);
         }
+
+        Err(SignEip712UseCaseError::SecretKeyNotFound { did: key })
     }
 }
 
@@ -81,9 +105,7 @@ impl SignEip712UseCase for SignEip712UseCaseImpl {
             return Err(SignEip712UseCaseError::NotConfigured);
         };
 
-        let secret_key = self
-            .get_secret_key(key, self.did_secret_key_repo.as_ref())
-            .await?;
+        let secret_key = self.get_secret_key(key).await?;
 
         let (signature, verification_method) = {
             use odf::metadata::ed25519::Signer;
@@ -118,6 +140,21 @@ impl SignEip712UseCase for SignEip712UseCaseImpl {
                 None
             },
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn get_did_secret_key(
+    did_secret_key_repo: &dyn kamu_accounts::DidSecretKeyRepository,
+    entity: kamu_accounts::DidEntity<'_>,
+) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
+    match did_secret_key_repo.get_did_secret_key(&entity).await {
+        Ok(key) => Ok(Some(key)),
+        Err(kamu_accounts::GetDidSecretKeyError::NotFound(_)) => Ok(None),
+        Err(e) => Err(e.int_err().into()),
     }
 }
 

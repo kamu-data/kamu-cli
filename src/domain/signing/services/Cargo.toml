@@ -26,17 +26,12 @@ default = []
 
 
 [dependencies]
-# todo ?
-common-macros = { workspace = true }
 crypto-eip712-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-signing = { workspace = true }
-# todo featrues?
-odf = { workspace = true, default-features = false }
+odf = { workspace = true, default-features = false, features = [] }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
-serde_json = { version = "1", default-features = false }
-# todo ?
-thiserror = { version = "2", default-features = false }

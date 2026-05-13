@@ -19,7 +19,7 @@ pub const DID_ODF_PREFIX: &str = "did:odf:";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents DID in a custom `did:odf` method
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DidOdf {
     did: DidKey,
 }
