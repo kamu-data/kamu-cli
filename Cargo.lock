@@ -7687,6 +7687,7 @@ dependencies = [
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "kamu-signing",
  "messaging-outbox",
  "mockall",
  "observability",
@@ -9088,6 +9089,38 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "kamu-signing"
+version = "0.260.2"
+dependencies = [
+ "async-trait",
+ "bon",
+ "crypto-eip712-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "thiserror 2.0.18",
+ "utoipa",
+]
+
+[[package]]
+name = "kamu-signing-services"
+version = "0.260.2"
+dependencies = [
+ "async-trait",
+ "common-macros",
+ "crypto-eip712-utils",
+ "dill",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-signing",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
