@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following format:
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format
   - DDL source schema can still be specified via `read.ddlSchema` but we recommend upgrading your datasets
   - GQL endpoints support reading ODF source schema
+  - GQL `ReadStep::schema` now returns ODF schema, converting from `ddlSchema` if necessary
   - GQL `createCollection` and `createVersionedFile` endpoints now support `extraSchema` field that accepts ODF schema, the `extraColumns` field was deprecated in its favor
 - GQL `Collection::entries` now support `maxDepth` for navigating entries as directory hierarchy
 ### Changed

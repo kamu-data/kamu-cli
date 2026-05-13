@@ -1421,9 +1421,18 @@ impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
 impl ReadStepCsv {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1466,9 +1475,18 @@ impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
 impl ReadStepEsriShapefile {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1505,9 +1523,18 @@ impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
 impl ReadStepGeoJson {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1572,9 +1599,18 @@ impl From<odf::metadata::ReadStepJson> for ReadStepJson {
 impl ReadStepJson {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1610,9 +1646,18 @@ impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
 impl ReadStepNdGeoJson {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1672,9 +1717,18 @@ impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
 impl ReadStepNdJson {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1708,9 +1762,18 @@ impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
 impl ReadStepParquet {
     /// Schema used to coerce values into more appropriate data types.
     async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
-        self.schema.clone().map(|s| {
-            crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
-        })
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
