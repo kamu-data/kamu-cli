@@ -7,5 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_sqlite_dataset_secret_set_binding_repository;
+mod test_sqlite_dataset_variable_set_binding_repository;
 mod test_sqlite_secret_set_projection_repository;
 mod test_sqlite_variable_set_projection_repository;

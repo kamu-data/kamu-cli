@@ -43,7 +43,9 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
+kamu-accounts-sqlite = { workspace = true }
 kamu-configuration-repo-tests = { workspace = true }
+kamu-datasets-sqlite = { workspace = true }
 kamu-resources-sqlite = { workspace = true }
 
 test-group = { version = "1" }

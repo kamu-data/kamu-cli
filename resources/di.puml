@@ -55,10 +55,12 @@ interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
 interface "DatasetSearchService" <<i>>
+interface "DatasetSecretSetBindingRepository" <<i>>
 interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
+interface "DatasetVariableSetBindingRepository" <<i>>
 interface "DeleteAccountResourcesUseCase" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
@@ -206,6 +208,7 @@ class "CompactDatasetUseCaseImpl"
 class "CompactionExecutorImpl"
 class "CompactionPlannerImpl"
 class "ConfigService"
+class "ConfigurationDatasetLifecycleMessageConsumer"
 class "ConfigurationResourceLifecycleMessageConsumer"
 class "ConfirmDeleteService"
 class "ContainerRuntime"
@@ -405,7 +408,9 @@ class "SqliteDatasetEntryRepository"
 class "SqliteDatasetEnvVarRepository"
 class "SqliteDatasetKeyBlockRepository"
 class "SqliteDatasetReferenceRepository"
+class "SqliteDatasetSecretSetBindingRepository"
 class "SqliteDatasetStatisticsRepository"
+class "SqliteDatasetVariableSetBindingRepository"
 class "SqliteDidSecretKeyRepository"
 class "SqliteEmbeddingsCacheRepository"
 class "SqliteFlowConfigurationEventStore"
@@ -817,6 +822,8 @@ class "WsSmartTransferProtocolClient"
 "ResourceSummaryServiceImpl"  --> "ResourceContextResolver"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
+"MessageConsumer" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ConfigurationResourceLifecycleMessageConsumer"
 "Reconciler" <|-- "SecretSetReconcilerImpl"
@@ -900,6 +907,10 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
 "VariableSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
+"DatasetSecretSetBindingRepository" <|-- "SqliteDatasetSecretSetBindingRepository"
+"SqliteDatasetSecretSetBindingRepository"  --> "TransactionRefT"
+"DatasetVariableSetBindingRepository" <|-- "SqliteDatasetVariableSetBindingRepository"
+"SqliteDatasetVariableSetBindingRepository"  --> "TransactionRefT"
 "SecretSetProjectionRepository" <|-- "SqliteSecretSetProjectionRepository"
 "SqliteSecretSetProjectionRepository"  --> "TransactionRefT"
 "VariableSetProjectionRepository" <|-- "SqliteVariableSetProjectionRepository"

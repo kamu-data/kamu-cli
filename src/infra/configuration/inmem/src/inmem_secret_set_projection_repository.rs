@@ -91,6 +91,23 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
             .unwrap_or_default())
     }
 
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<SecretSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .entries_by_resource_uid_generation
+            .iter()
+            .filter(|((stored_resource_uid, stored_generation), _)| {
+                stored_resource_uid == resource_uid && *stored_generation < resource_generation
+            })
+            .max_by_key(|((_, stored_generation), _)| *stored_generation)
+            .map(|(_, entries)| entries.clone())
+            .unwrap_or_default())
+    }
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &kamu_resources::ResourceUID,

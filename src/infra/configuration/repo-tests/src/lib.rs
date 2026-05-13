@@ -7,5 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod dataset_secret_set_binding_repository_test_suite;
+pub mod dataset_variable_set_binding_repository_test_suite;
 pub mod secret_set_projection_repository_test_suite;
 pub mod variable_set_projection_repository_test_suite;

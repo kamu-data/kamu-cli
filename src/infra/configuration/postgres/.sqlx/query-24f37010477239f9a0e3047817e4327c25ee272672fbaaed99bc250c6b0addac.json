@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO config_dataset_secret_set_bindings(dataset_id, resource_uid, binding_order)\n            SELECT * FROM UNNEST($1::text[], $2::uuid[], $3::int8[])\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "UuidArray",
+        "Int8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "24f37010477239f9a0e3047817e4327c25ee272672fbaaed99bc250c6b0addac"
+}

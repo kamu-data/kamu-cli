@@ -36,6 +36,12 @@ pub trait SecretSetProjectionRepository: Send + Sync {
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError>;
 
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<SecretSetEntry>, InternalError>;
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &ResourceUID,

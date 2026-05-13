@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                entry_id as \"entry_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                secret_key as key,\n                value as \"value: Vec<u8>\",\n                secret_nonce as \"secret_nonce: Vec<u8>\",\n                updated_at\n            FROM config_secret_set_entries\n            WHERE resource_uid = $1\n              AND resource_generation = $2\n              AND secret_key = $3\n            ",
+  "query": "\n            SELECT\n                entry_id as \"entry_id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                variable_key as key,\n                value,\n                created_at,\n                updated_at\n            FROM config_variable_set_entries\n            WHERE resource_uid = $1\n              AND resource_generation = $2\n              AND variable_key = $3\n            ",
   "describe": {
     "columns": [
       {
@@ -20,13 +20,13 @@
       },
       {
         "ordinal": 3,
-        "name": "value: Vec<u8>",
-        "type_info": "Bytea"
+        "name": "value",
+        "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "secret_nonce: Vec<u8>",
-        "type_info": "Bytea"
+        "name": "created_at",
+        "type_info": "Timestamptz"
       },
       {
         "ordinal": 5,
@@ -50,5 +50,5 @@
       false
     ]
   },
-  "hash": "3767d03fd67835c806d266e3bf8dab64545c6060a7fd66bf7d7e05fc25e36f8f"
+  "hash": "a95897213537a9cc19775d3bf141337bf9f2eee4c0673b6ab193acaaea6ac522"
 }

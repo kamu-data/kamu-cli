@@ -35,45 +35,50 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
-        for entry in entries {
-            let account_id = entry.account_id.to_string();
-
-            let insert_result = sqlx::query!(
-                r#"
-                INSERT INTO config_variable_set_entries (
-                    entry_id,
-                    resource_uid,
-                    resource_generation,
-                    account_id,
-                    variable_key,
-                    value,
-                    updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
-                entry.entry_id,
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            INSERT INTO config_variable_set_entries (
+                entry_id,
                 resource_uid,
                 resource_generation,
                 account_id,
-                entry.key,
-                entry.value,
-                entry.updated_at,
+                variable_key,
+                value,
+                created_at,
+                updated_at
             )
-            .execute(&mut *connection_mut)
-            .await;
+            "#,
+        );
 
-            match insert_result {
-                Ok(_) => {}
-                Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                    return Err(ReplaceProjectionEntriesError::concurrent_modification());
-                }
-                Err(e) => return Err(e.int_err().into()),
+        query_builder.push_values(entries, |mut b, entry| {
+            b.push_bind(entry.entry_id);
+            b.push_bind(*resource_uid);
+            b.push_bind(resource_generation);
+            b.push_bind(entry.account_id.to_string());
+            b.push_bind(&entry.key);
+            b.push_bind(&entry.value);
+            b.push_bind(entry.created_at);
+            b.push_bind(entry.updated_at);
+        });
+
+        let insert_result = query_builder.build().execute(&mut *connection_mut).await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
             }
+            Err(e) => return Err(e.int_err().into()),
         }
 
         Ok(())
@@ -87,6 +92,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
     ) -> Result<Option<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -98,6 +104,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 account_id as "account_id: odf::AccountID",
                 variable_key as key,
                 value,
+                created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_variable_set_entries
             WHERE resource_uid = $1
@@ -122,6 +129,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -133,10 +141,52 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
                 account_id as "account_id: odf::AccountID",
                 variable_key as key,
                 value,
+                created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_variable_set_entries
             WHERE resource_uid = $1
               AND resource_generation = $2
+            ORDER BY variable_key
+            "#,
+            resource_uid,
+            resource_generation,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: Uuid",
+                account_id as "account_id: odf::AccountID",
+                variable_key as key,
+                value,
+                created_at as "created_at: DateTime<Utc>",
+                updated_at as "updated_at: DateTime<Utc>"
+            FROM config_variable_set_entries
+            WHERE resource_uid = $1
+              AND resource_generation = (
+                  SELECT MAX(resource_generation)
+                  FROM config_variable_set_entries
+                  WHERE resource_uid = $1
+                    AND resource_generation < $2
+              )
             ORDER BY variable_key
             "#,
             resource_uid,
@@ -156,6 +206,7 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 

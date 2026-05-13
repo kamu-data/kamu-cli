@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use kamu_configuration::{
@@ -21,6 +22,8 @@ use kamu_configuration::{
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
+
+use crate::PreviousConfigurationEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,18 +49,30 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
         let now = self.time_source.now();
         let resource_uid = *resource.uid();
         let resource_generation = resource.metadata().generation;
-        let account_id = resource.metadata().account.clone();
+        let account_id = &resource.metadata().account;
+
+        let previous_entries_by_key = self
+            .load_previous_entries_by_key(&resource_uid, resource_generation)
+            .await?;
 
         let entries: Vec<_> = resource
             .spec()
             .variables
             .iter()
-            .map(|(key, variable)| VariableSetEntry {
-                entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
-                key: key.clone(),
-                value: variable.literal_value().to_string(),
-                updated_at: now,
+            .map(|(key, variable)| {
+                let (entry_id, created_at) = previous_entries_by_key
+                    .get(key)
+                    .map(|entry| (entry.entry_id, entry.created_at))
+                    .unwrap_or_else(|| (Uuid::new_v4(), now));
+
+                VariableSetEntry {
+                    entry_id,
+                    account_id: account_id.clone(),
+                    key: key.clone(),
+                    value: variable.literal_value().to_string(),
+                    created_at,
+                    updated_at: now,
+                }
             })
             .collect();
 
@@ -80,6 +95,39 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
                 invalid_variables: 0,
             },
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl VariableSetReconcilerImpl {
+    async fn load_previous_entries_by_key(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+    ) -> Result<HashMap<String, PreviousConfigurationEntry>, VariableSetReconcileError> {
+        if resource_generation == 0 {
+            return Ok(HashMap::new());
+        }
+
+        let entries = self
+            .variable_set_projection_repository
+            .get_latest_entries_before_generation(resource_uid, resource_generation)
+            .await
+            .map_err(VariableSetReconcileError::Internal)?;
+
+        Ok(entries
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.key,
+                    PreviousConfigurationEntry {
+                        entry_id: entry.entry_id,
+                        created_at: entry.created_at,
+                    },
+                )
+            })
+            .collect())
     }
 }
 

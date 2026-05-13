@@ -24,7 +24,9 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 kamu-configuration = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-resources = { workspace = true }
+odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
@@ -32,7 +34,9 @@ dill = { version = "0.15", default-features = false }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
 kamu-configuration-repo-tests = { workspace = true }
+kamu-datasets-inmem = { workspace = true }
 kamu-resources-inmem = { workspace = true }
 
 test-group = { version = "1" }

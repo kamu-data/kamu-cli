@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM config_dataset_variable_set_bindings\n                WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "119110fef5a8f7a3871338bbfbdffa726f1529cf907811ae2d6699ae74528986"
+}

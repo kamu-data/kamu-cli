@@ -43,7 +43,9 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
+kamu-accounts-postgres = { workspace = true }
 kamu-configuration-repo-tests = { workspace = true }
+kamu-datasets-postgres = { workspace = true }
 kamu-resources-postgres = { workspace = true }
 
 test-group = { version = "1" }

@@ -59,6 +59,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = secret_set_repo::test_get_latest_entries_before_generation,
+    harness = PostgresSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = secret_set_repo::test_replace_entries_concurrent_modification,
     harness = PostgresSecretSetProjectionRepositoryHarness
 );
@@ -76,6 +84,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = secret_set_repo::test_cleanup_does_not_affect_other_resources,
+    harness = PostgresSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = secret_set_repo::test_replace_preserves_stable_identity_and_creation_time,
     harness = PostgresSecretSetProjectionRepositoryHarness
 );
 

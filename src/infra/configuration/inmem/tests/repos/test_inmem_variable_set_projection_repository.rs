@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = variable_set_repo::test_get_latest_entries_before_generation,
+    harness = InMemoryVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = variable_set_repo::test_replace_entries_concurrent_modification,
     harness = InMemoryVariableSetProjectionRepositoryHarness
 );
@@ -74,6 +82,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = variable_set_repo::test_cleanup_does_not_affect_other_resources,
+    harness = InMemoryVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = variable_set_repo::test_replace_preserves_stable_identity_and_creation_time,
     harness = InMemoryVariableSetProjectionRepositoryHarness
 );
 

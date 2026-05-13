@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crypto_utils::{AesGcmEncryptor, Encryptor};
@@ -25,6 +26,8 @@ use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
+
+use crate::PreviousConfigurationEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +54,11 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
         let now = self.time_source.now();
         let resource_uid = *resource.uid();
         let resource_generation = resource.metadata().generation;
-        let account_id = resource.metadata().account.clone();
+        let account_id = &resource.metadata().account;
+
+        let previous_entries_by_key = self
+            .load_previous_entries_by_key(&resource_uid, resource_generation)
+            .await?;
 
         let encryption_key = SecretString::from(
             self.dataset_env_var_config
@@ -67,12 +74,18 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
             let (value, secret_nonce) = encryptor
                 .encrypt_bytes(secret.literal_value().as_bytes())
                 .int_err()?;
+            let (entry_id, created_at) = previous_entries_by_key
+                .get(key)
+                .map(|entry| (entry.entry_id, entry.created_at))
+                .unwrap_or_else(|| (Uuid::new_v4(), now));
+
             entries.push(SecretSetEntry {
-                entry_id: Uuid::new_v4(),
+                entry_id,
                 account_id: account_id.clone(),
                 key: key.clone(),
                 value,
                 secret_nonce,
+                created_at,
                 updated_at: now,
             });
         }
@@ -96,6 +109,39 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
                 invalid_secrets: 0,
             },
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl SecretSetReconcilerImpl {
+    async fn load_previous_entries_by_key(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+    ) -> Result<HashMap<String, PreviousConfigurationEntry>, SecretSetReconcileError> {
+        if resource_generation == 0 {
+            return Ok(HashMap::new());
+        }
+
+        let entries = self
+            .secret_set_projection_repository
+            .get_latest_entries_before_generation(resource_uid, resource_generation)
+            .await
+            .map_err(SecretSetReconcileError::Internal)?;
+
+        Ok(entries
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.key,
+                    PreviousConfigurationEntry {
+                        entry_id: entry.entry_id,
+                        created_at: entry.created_at,
+                    },
+                )
+            })
+            .collect())
     }
 }
 

@@ -10,8 +10,12 @@
 // Re-exports
 pub use kamu_configuration as domain;
 
+mod postgres_dataset_secret_set_binding_repository;
+mod postgres_dataset_variable_set_binding_repository;
 mod postgres_secret_set_projection_repository;
 mod postgres_variable_set_projection_repository;
 
+pub use postgres_dataset_secret_set_binding_repository::*;
+pub use postgres_dataset_variable_set_binding_repository::*;
 pub use postgres_secret_set_projection_repository::*;
 pub use postgres_variable_set_projection_repository::*;

@@ -14,6 +14,13 @@ Use this skill for domain-level decisions that are not specific to a storage eng
 - After deciding to emit, re-query current state for the outgoing message.
 - In tests with `MockOutbox`, hide message expectation setup in harness/helper methods instead of inline closures in each test.
 
+## Bounded Contexts and Foreign Keys
+
+- Never use database foreign keys to reference tables that belong to a different bounded context (e.g., `dataset_entries` from the datasets domain referenced by a configuration or flow table). Such FKs create hard schema coupling that blocks future service splits.
+- Instead, implement asynchronous cleanup: subscribe to the relevant lifecycle outbox message (e.g., `DatasetLifecycleMessage::Deleted`) from a `MessageConsumerT` in the dependent bounded context's services layer, and perform the cleanup in a new transaction.
+- Foreign keys that stay within the same bounded context (e.g., configuration projections referencing `resources`) are fine and should be kept.
+- See `ConfigurationDatasetLifecycleMessageConsumer` and `FlowDatasetsEventBridge` as examples of the cross-context async deletion pattern.
+
 ## Repositories
 
 - Keep repositories simple when possible.

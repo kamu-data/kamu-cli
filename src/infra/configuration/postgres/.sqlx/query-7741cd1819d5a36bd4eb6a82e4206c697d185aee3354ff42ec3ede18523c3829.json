@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                dataset_id as \"dataset_id: odf::DatasetID\",\n                resource_uid as \"resource_uid: Uuid\",\n                binding_order\n            FROM config_dataset_secret_set_bindings\n            WHERE dataset_id = $1\n            ORDER BY binding_order\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dataset_id: odf::DatasetID",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "resource_uid: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "binding_order",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7741cd1819d5a36bd4eb6a82e4206c697d185aee3354ff42ec3ede18523c3829"
+}
