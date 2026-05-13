@@ -92,7 +92,7 @@ pub async fn sign_eip712_handler(
             .int_err()?;
         // TODO: SEC: Molecule: Phase 3: PK zeroing after usage
 
-        let request_hash = typed_data.signing_hash_with_eip191_prefix()?;
+        let request_hash = typed_data.eip712_signing_hash()?;
 
         // TODO: Molecule: Phase 3: add verification key to response?
         // let _verification_key =
@@ -102,19 +102,15 @@ pub async fn sign_eip712_handler(
     };
 
     let proof_response_node = if params.include_node_proof {
-        let proof = signature.to_bytes();
-        let proof_hash = crypto_eip712_utils::keccak256(proof.as_slice());
+        let signer = &identity.secp256k1_private_key;
 
-        let signature = crypto_eip712_utils::sign_prefixed(
-            &identity.secp256k1_private_key,
-            proof_hash.as_slice(),
-        )?;
+        let proof = signature.to_bytes();
+        let signature = signer.sign(proof.as_slice())?;
+        let verification_method = signer.verification_key();
 
         Some(SignEip712Proof {
             r#type: ProofType::EcdsaSecp256k1Signature2019,
-            verification_method: crypto_eip712_utils::verification_key_prefixed(
-                &identity.secp256k1_private_key,
-            ),
+            verification_method,
             signature,
         })
     } else {

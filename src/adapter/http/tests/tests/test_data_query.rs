@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use crypto_eip712_utils::SigningKey;
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
@@ -45,7 +44,10 @@ impl Harness {
         let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
         let identity_config = IdentityConfig {
             ed25519_private_key: ed25519_private_key.clone(),
-            secp256k1_private_key: SigningKey::from_bytes(&[124; _].into()).unwrap(),
+            secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer::from_bytes(
+                [124; _].into(),
+            )
+            .unwrap(),
         };
 
         let catalog = dill::CatalogBuilder::new()

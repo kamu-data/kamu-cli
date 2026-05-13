@@ -79,8 +79,8 @@ pub struct SignEip712Response {
 #[serde(rename_all = "camelCase")]
 pub struct SignEip712Proof {
     pub r#type: ProofType,
-    pub verification_method: String,
-    pub signature: String,
+    pub verification_method: crypto_eip712_utils::Secp256k1VerifyingKey,
+    pub signature: crypto_eip712_utils::Secp256k1Signature,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

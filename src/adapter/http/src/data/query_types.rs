@@ -37,8 +37,7 @@ pub struct IdentityConfig {
     /// ```
     pub ed25519_private_key: odf::metadata::PrivateKey,
 
-    // TODO: Molecule: Phase 3: wrap w/ new type
-    pub secp256k1_private_key: crypto_eip712_utils::SigningKey,
+    pub secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer,
 }
 
 impl IdentityConfig {
@@ -55,11 +54,12 @@ mod tests {
 
     #[test]
     fn authority_config_doesnt_leak_keys() {
-        use crypto_eip712_utils::*;
-
         let cfg = IdentityConfig {
             ed25519_private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
-            secp256k1_private_key: SigningKey::from_bytes(&[124; _].into()).unwrap(),
+            secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer::from_bytes(
+                [124; _].into(),
+            )
+            .unwrap(),
         };
 
         assert_eq!(
@@ -67,7 +67,7 @@ mod tests {
                 r#"
                 IdentityConfig {
                     ed25519_private_key: PrivateKey(***),
-                    secp256k1_private_key: SigningKey { .. },
+                    secp256k1_private_key: Secp256k1Signer(***),
                 }"#
             },
             format!("{cfg:#?}"),

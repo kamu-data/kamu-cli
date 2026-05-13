@@ -28,7 +28,11 @@ e2e = []
 
 
 [dependencies]
-crypto-eip712-utils = { workspace = true }
+crypto-eip712-utils = { workspace = true, features = [
+    "schemars",
+    "serde",
+    "utoipa",
+] }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
