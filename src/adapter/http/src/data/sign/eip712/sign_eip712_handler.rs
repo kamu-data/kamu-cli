@@ -90,7 +90,6 @@ pub async fn sign_eip712_handler(
         let ed25519_private_key = secret_key
             .get_decrypted_private_key(encryption_key)
             .int_err()?;
-        // TODO: SEC: Molecule: Phase 3: PK zeroing after usage
 
         let request_hash = typed_data.eip712_signing_hash()?;
         let signature = ed25519_private_key.sign(request_hash.as_slice());
