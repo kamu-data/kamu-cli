@@ -282,7 +282,7 @@ pub async fn query_handler_impl(
             commitment: Some(commitment),
             proof: Some(Proof {
                 r#type: ProofType::Ed25519Signature2020,
-                verification_method: identity.did(),
+                verification_method: identity.ed25519_private_key.verifying_key(),
                 proof_value: signature.into(),
             }),
         }

@@ -98,27 +98,25 @@ pub async fn sign_eip712_handler(
         (signature, ed25519_private_key.verifying_key())
     };
 
-    let proof_response_node = if params.include_node_proof {
-        let signer = &identity.secp256k1_private_key;
-
-        let proof = signature.to_bytes();
-        let signature = signer.sign(proof.as_slice())?;
-        let verification_method = signer.verification_key();
-
-        Some(SignEip712Proof {
-            r#type: ProofType::EcdsaSecp256k1Signature2019,
-            verification_method,
-            signature,
-        })
-    } else {
-        None
-    };
-
     Ok(Json(SignEip712Response {
         r#type: ProofType::Ed25519Signature2020,
         verification_method,
         signature: signature.into(),
-        proof: proof_response_node,
+        proof: if params.include_node_proof {
+            let signer = &identity.secp256k1_private_key;
+
+            let proof = signature.to_bytes();
+            let signature = signer.sign(proof.as_slice())?;
+            let verification_method = signer.verification_key();
+
+            Some(SignEip712Proof {
+                r#type: ProofType::EcdsaSecp256k1Signature2019,
+                verification_method,
+                signature,
+            })
+        } else {
+            None
+        },
     }))
 }
 
