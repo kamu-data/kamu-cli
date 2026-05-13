@@ -10,6 +10,20 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::{
+    Account,
+    AccountService,
+    CurrentAccountSubject,
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+    GetDidSecretKeyError,
+    LoggedAccount,
+};
+use kamu_auth_rebac::RebacService;
+use kamu_datasets::DatasetActionAuthorizer;
+use kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS;
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -25,9 +39,12 @@ use kamu_signing::use_cases::{
 #[dill::component]
 #[dill::interface(dyn SignEip712UseCase)]
 pub struct SignEip712UseCaseImpl {
-    did_secret_key_repo: Arc<dyn kamu_accounts::DidSecretKeyRepository>,
-    did_secret_encryption_config: Arc<kamu_accounts::DidSecretEncryptionConfig>,
-    dataset_action_authorizer: Arc<dyn kamu_datasets::DatasetActionAuthorizer>,
+    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
+    did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+    account_service: Arc<dyn AccountService>,
+    rebac_service: Arc<dyn RebacService>,
     identity_config: Option<IdentityConfig>,
 }
 
@@ -35,7 +52,7 @@ impl SignEip712UseCaseImpl {
     async fn get_secret_key_for_dataset(
         &self,
         dataset_id: odf::DatasetID,
-    ) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
+    ) -> Result<Option<DidSecretKey>, InternalError> {
         use kamu_datasets::DatasetActionAuthorizerExt;
 
         let has_read_access = self
@@ -48,7 +65,7 @@ impl SignEip712UseCaseImpl {
         }
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = kamu_accounts::DidEntity::new_dataset(dataset_id.as_str());
+        let dataset_entity = DidEntity::new_dataset(dataset_id.as_str());
 
         get_did_secret_key(self.did_secret_key_repo.as_ref(), dataset_entity).await
     }
@@ -56,22 +73,82 @@ impl SignEip712UseCaseImpl {
     async fn get_secret_key_for_account(
         &self,
         account_id: odf::AccountID,
-    ) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
-        let Some(account_id) = account_id.as_did_odf() else {
+    ) -> Result<Option<DidSecretKey>, InternalError> {
+        use kamu_accounts::AccountServiceExt;
+
+        let Some(account_id_did) = account_id.as_did_odf() else {
             // Only odf account ids at the moment
             return Ok(None);
         };
 
-        let account_id = account_id.as_did_str().to_stack_string();
-        let account_entity = kamu_accounts::DidEntity::new_account(account_id.as_str());
+        let CurrentAccountSubject::Logged(logged_account) = self.current_account_subject.as_ref()
+        else {
+            // NOTE: Only logged can search for other accounts
+            return Ok(None);
+        };
+
+        let Some(account) = self
+            .account_service
+            .try_get_account_by_id(&account_id)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        let has_access = self
+            .has_access_for_account(&logged_account, &account)
+            .await?;
+
+        if !has_access {
+            return Ok(None);
+        }
+
+        let account_id = account_id_did.as_did_str().to_stack_string();
+        let account_entity = DidEntity::new_account(account_id.as_str());
 
         get_did_secret_key(self.did_secret_key_repo.as_ref(), account_entity).await
+    }
+
+    async fn has_access_for_account(
+        &self,
+        logged_account: &LoggedAccount,
+        account: &Account,
+    ) -> Result<bool, InternalError> {
+        use kamu_auth_rebac::RebacServiceExt;
+
+        // 1. Admin can access any account
+        if self
+            .rebac_service
+            .is_account_admin(&logged_account.account_id)
+            .await
+            .int_err()?
+        {
+            return Ok(true);
+        }
+
+        // TODO: HACK: SEC: subject account has permissions to target account
+        //                  Currently only allowing cross-account access
+        //                  for and `molecule` / `molecule.dev`.
+        //
+        //                  See: https://github.com/kamu-data/kamu-node/issues/233
+
+        // 2. Molecule account can access to any own project accounts
+        let subject_name = &logged_account.account_name;
+
+        if MOLECULE_ORG_ACCOUNTS.contains(&subject_name.as_str())
+            && account.account_name.starts_with(subject_name.as_str())
+        {
+            return Ok(true);
+        }
+
+        // 3. Overwise, access only for an own account
+        Ok(account.id == logged_account.account_id)
     }
 
     async fn get_secret_key(
         &self,
         key: odf::metadata::DidOdf,
-    ) -> Result<kamu_accounts::DidSecretKey, SignEip712UseCaseError> {
+    ) -> Result<DidSecretKey, SignEip712UseCaseError> {
         let dataset_id = key.into();
 
         if let Some(key) = self.get_secret_key_for_dataset(dataset_id).await? {
@@ -148,12 +225,12 @@ impl SignEip712UseCase for SignEip712UseCaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn get_did_secret_key(
-    did_secret_key_repo: &dyn kamu_accounts::DidSecretKeyRepository,
-    entity: kamu_accounts::DidEntity<'_>,
-) -> Result<Option<kamu_accounts::DidSecretKey>, InternalError> {
+    did_secret_key_repo: &dyn DidSecretKeyRepository,
+    entity: DidEntity<'_>,
+) -> Result<Option<DidSecretKey>, InternalError> {
     match did_secret_key_repo.get_did_secret_key(&entity).await {
         Ok(key) => Ok(Some(key)),
-        Err(kamu_accounts::GetDidSecretKeyError::NotFound(_)) => Ok(None),
+        Err(GetDidSecretKeyError::NotFound(_)) => Ok(None),
         Err(e) => Err(e.int_err().into()),
     }
 }

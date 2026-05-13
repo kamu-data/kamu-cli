@@ -9113,15 +9113,15 @@ name = "kamu-signing-services"
 version = "0.260.2"
 dependencies = [
  "async-trait",
- "common-macros",
  "crypto-eip712-utils",
  "dill",
  "internal-error",
  "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-datasets",
+ "kamu-molecule-domain",
  "kamu-signing",
  "opendatafabric",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
