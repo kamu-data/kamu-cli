@@ -32,6 +32,7 @@ pub trait DatasetEnvVarService: Sync + Send {
 
     async fn get_dataset_env_var_by_id(
         &self,
+        dataset_id: &odf::DatasetID,
         dataset_env_var_id: &Uuid,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError>;
 

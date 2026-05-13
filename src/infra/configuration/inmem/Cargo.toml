@@ -30,7 +30,7 @@ odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
-
+uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }

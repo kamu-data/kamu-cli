@@ -24,6 +24,7 @@ pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
     ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
     ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
+    Deleted(ResourceLifecycleMessageDeleted),
 }
 
 impl ResourceLifecycleMessage {
@@ -48,6 +49,13 @@ impl ResourceLifecycleMessage {
 
     pub fn reconciliation_failed(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
         Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
+            event_time,
+            resource,
+        })
+    }
+
+    pub fn deleted(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
+        Self::Deleted(ResourceLifecycleMessageDeleted {
             event_time,
             resource,
         })
@@ -91,6 +99,14 @@ pub struct ResourceLifecycleMessageReconciliationSucceeded {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageReconciliationFailed {
+    pub event_time: DateTime<Utc>,
+    pub resource: ResourceSnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,
     pub resource: ResourceSnapshot,
 }

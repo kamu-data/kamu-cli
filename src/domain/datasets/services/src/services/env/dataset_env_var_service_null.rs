@@ -57,6 +57,7 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
 
     async fn get_dataset_env_var_by_id(
         &self,
+        _dataset_id: &odf::DatasetID,
         _dataset_env_var_id: &Uuid,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         unreachable!()

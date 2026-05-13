@@ -87,6 +87,10 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                     .handle_reconciliation_failed(&failed_message.resource)
                     .await
             }
+            ResourceLifecycleMessage::Deleted(_) => {
+                // Nothing to do here
+                Ok(())
+            }
         }
     }
 }

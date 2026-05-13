@@ -10,6 +10,8 @@
 use std::collections::HashSet;
 
 use internal_error::ErrorIntoInternal;
+use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -36,6 +38,7 @@ where
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+    outbox: &'a dyn Outbox,
     time_source: &'a dyn SystemTimeSource,
 }
 
@@ -51,12 +54,14 @@ where
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+        outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             generic_resource_query_service,
             resource_aggregate_loader,
             resource_persistence_service,
+            outbox,
             time_source,
         }
     }
@@ -66,6 +71,8 @@ where
         account_id: odf::AccountID,
         uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError> {
+        let now = self.time_source.now();
+
         let unique_uids = uids
             .into_iter()
             .collect::<HashSet<_>>()
@@ -91,7 +98,7 @@ where
 
         match self
             .resource_persistence_service
-            .delete_many(&mut resources, self.time_source.now())
+            .delete_many(&mut resources, now)
             .await
         {
             Ok(()) => Ok(()),
@@ -104,7 +111,25 @@ where
             Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
                 err.with_context("Failed to persist deleted resources"),
             )),
+        }?;
+
+        // TODO: batch?
+        for resource in resources {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                    ResourceLifecycleMessage::deleted(
+                        now,
+                        resource
+                            .make_resource_snapshot()
+                            .map_err(DeleteResourcesError::Internal)?,
+                    ),
+                )
+                .await
+                .map_err(DeleteResourcesError::Internal)?;
         }
+
+        Ok(())
     }
 
     async fn load_resources(&self, uids: &[ResourceUID]) -> Result<Vec<R>, DeleteResourcesError> {
@@ -150,6 +175,7 @@ macro_rules! declare_delete_resources_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            outbox: std::sync::Arc<dyn messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
@@ -164,6 +190,7 @@ macro_rules! declare_delete_resources_use_case {
                     self.generic_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
+                    self.outbox.as_ref(),
                     self.time_source.as_ref(),
                 );
 

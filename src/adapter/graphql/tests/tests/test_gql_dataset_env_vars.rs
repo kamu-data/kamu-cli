@@ -9,10 +9,18 @@
 
 use async_graphql::value;
 use indoc::indoc;
+use kamu_configuration_inmem::{
+    InMemoryDatasetSecretSetBindingRepository,
+    InMemoryDatasetVariableSetBindingRepository,
+    InMemorySecretSetProjectionRepository,
+    InMemoryVariableSetProjectionRepository,
+};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
-use kamu_datasets_services::*;
+use kamu_datasets_services::DatasetEnvVarCompatServiceImpl;
+use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
+use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
@@ -278,14 +286,30 @@ impl DatasetEnvVarsHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .build();
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add_value(DatasetEnvVarsConfig::sample())
-                .add::<DatasetEnvVarServiceImpl>()
-                .add::<InMemoryDatasetEnvVarRepository>();
+                .add::<DatasetEnvVarCompatServiceImpl>()
+                .add::<InMemoryDatasetVariableSetBindingRepository>()
+                .add::<InMemoryDatasetSecretSetBindingRepository>()
+                .add::<InMemoryVariableSetProjectionRepository>()
+                .add::<InMemorySecretSetProjectionRepository>()
+                .add::<InMemoryResourceRepository>()
+                .add::<InMemoryRawResourceEventStore>();
+
+            kamu_resources_services::register_dependencies(&mut b);
+            kamu_configuration_services::register_dependencies(&mut b);
+
+            register_message_dispatcher::<ResourceLifecycleMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+            );
 
             b.build()
         };
@@ -439,3 +463,5 @@ impl DatasetEnvVarsHarness {
         .replace("<env_var_id>", env_var_id)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

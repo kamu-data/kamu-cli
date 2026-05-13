@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM config_secret_set_entries\n            WHERE resource_uid = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7045e0cb9db025426b83620686f1293a053b4843d6737e2c5abc1820ecd63c97"
+}

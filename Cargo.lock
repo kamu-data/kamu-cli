@@ -7335,6 +7335,8 @@ dependencies = [
  "kamu-auth-rebac-services",
  "kamu-auth-web3",
  "kamu-configuration",
+ "kamu-configuration-inmem",
+ "kamu-configuration-services",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -7344,6 +7346,8 @@ dependencies = [
  "kamu-flow-system-services",
  "kamu-resources",
  "kamu-resources-facade",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
@@ -8084,6 +8088,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -9096,6 +9101,7 @@ dependencies = [
  "kamu-resources",
  "kamu-resources-services",
  "kamu-storage",
+ "messaging-outbox",
  "opendatafabric",
  "paste",
  "serde",

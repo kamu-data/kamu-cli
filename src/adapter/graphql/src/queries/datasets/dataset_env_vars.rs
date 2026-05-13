@@ -47,7 +47,10 @@ impl<'a> DatasetEnvVars<'a> {
     ) -> Result<String> {
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
-            .get_dataset_env_var_by_id(&dataset_env_var_id)
+            .get_dataset_env_var_by_id(
+                &self.dataset_request_state.dataset_handle().id,
+                &dataset_env_var_id,
+            )
             .await
             .map_err(|err| match err {
                 GetDatasetEnvVarError::NotFound(err) => GqlError::Gql(err.into()),

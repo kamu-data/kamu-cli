@@ -17,6 +17,7 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
 };
+use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +48,19 @@ struct State {
 
 #[async_trait::async_trait]
 impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
+    async fn find_resource_uid_by_entry_id(
+        &self,
+        entry_id: &Uuid,
+    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        for ((uid, _generation), entries) in &guard.entries_by_resource_uid_generation {
+            if let Some(entry) = entries.iter().find(|e| &e.entry_id == entry_id) {
+                return Ok(Some((*uid, entry.key.clone())));
+            }
+        }
+        Ok(None)
+    }
+
     async fn replace_entries(
         &self,
         resource_uid: &kamu_resources::ResourceUID,
@@ -91,6 +105,27 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
             .unwrap_or_default())
     }
 
+    async fn get_latest_entries(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+    ) -> Result<Vec<SecretSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        let max_gen = guard
+            .entries_by_resource_uid_generation
+            .keys()
+            .filter(|(uid, _)| uid == resource_uid)
+            .map(|(_, generation)| *generation)
+            .max();
+        Ok(max_gen
+            .and_then(|generation| {
+                guard
+                    .entries_by_resource_uid_generation
+                    .get(&(*resource_uid, generation))
+            })
+            .cloned()
+            .unwrap_or_default())
+    }
+
     async fn get_latest_entries_before_generation(
         &self,
         resource_uid: &kamu_resources::ResourceUID,
@@ -119,6 +154,17 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
                 stored_resource_uid != resource_uid || *stored_generation >= resource_generation
             },
         );
+        Ok(())
+    }
+
+    async fn delete_all_entries(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard
+            .entries_by_resource_uid_generation
+            .retain(|(stored_resource_uid, _), _| stored_resource_uid != resource_uid);
         Ok(())
     }
 }
