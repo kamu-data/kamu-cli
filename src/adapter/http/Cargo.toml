@@ -41,6 +41,7 @@ http-common = { workspace = true }
 internal-error = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
+kamu-signing = { workspace = true, default-features = false, features = ["utoipa"] }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
