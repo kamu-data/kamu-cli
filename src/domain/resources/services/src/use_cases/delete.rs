@@ -24,6 +24,7 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceNotOwnedByAccountError,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceStatusLike,
@@ -80,19 +81,28 @@ where
             .into_iter()
             .collect::<Vec<_>>();
 
-        let owned_snapshots = self
+        let outcome = self
             .generic_resource_query_service
             .find_owned_snapshots(&account_id, R::DESCRIPTOR.resource_type, &unique_uids)
-            .await?;
+            .await
+            .map_err(DeleteResourcesError::Internal)?;
 
-        let owned_uids = owned_snapshots
+        if let Some(&uid) = outcome.access_denied.first() {
+            return Err(DeleteResourcesError::Access(
+                odf::AccessError::Unauthorized(
+                    ResourceNotOwnedByAccountError {
+                        uid,
+                        resource_type: R::DESCRIPTOR.resource_type,
+                    }
+                    .into(),
+                ),
+            ));
+        }
+
+        let owned_resource_uids = outcome
+            .found
             .into_iter()
             .map(|snapshot| snapshot.uid)
-            .collect::<HashSet<_>>();
-
-        let owned_resource_uids = unique_uids
-            .into_iter()
-            .filter(|uid| owned_uids.contains(uid))
             .collect::<Vec<_>>();
 
         let mut resources = self.load_resources(&owned_resource_uids).await?;

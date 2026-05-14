@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -15,12 +15,14 @@ use internal_error::InternalError;
 
 use crate::domain::{
     FindOwnedResourceError,
+    FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
     ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSummaryRow,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,42 +136,52 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         kind: &'static str,
         uids: &[crate::domain::ResourceUID],
-    ) -> Result<Vec<ResourceSnapshot>, FindOwnedResourceError> {
-        let resource_snapshots = self
+    ) -> Result<FindOwnedSnapshotsOutcome, InternalError> {
+        let owned_any_kind: HashMap<ResourceUID, ResourceSnapshot> = self
             .resource_repository
             .find_resource_snapshots_by_uids(account_id, uids)
-            .await?;
-        let owned_uids = resource_snapshots
-            .iter()
-            .map(|snapshot| snapshot.uid)
-            .collect::<HashSet<_>>();
-        let missing_uids = uids
-            .iter()
-            .copied()
-            .filter(|uid| !owned_uids.contains(uid))
-            .collect::<Vec<_>>();
-
-        if let Some(resource_snapshot) = self
-            .resource_repository
-            .find_resource_snapshots_by_kind_and_uids(kind, &missing_uids)
             .await?
             .into_iter()
-            .next()
-        {
-            return Err(odf::AccessError::Unauthorized(
-                ResourceNotOwnedByAccountError {
-                    uid: resource_snapshot.uid,
-                    resource_type: kind,
-                }
-                .into(),
-            )
-            .into());
-        }
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect();
 
-        Ok(resource_snapshots
+        let kind_mismatch: Vec<ResourceUID> = owned_any_kind
+            .values()
+            .filter(|snapshot| snapshot.kind != kind)
+            .map(|snapshot| snapshot.uid)
+            .collect();
+
+        let missing_uids: Vec<ResourceUID> = uids
+            .iter()
+            .copied()
+            .filter(|uid| !owned_any_kind.contains_key(uid))
+            .collect();
+
+        let access_denied_snapshots = self
+            .resource_repository
+            .find_resource_snapshots_by_kind_and_uids(kind, &missing_uids)
+            .await?;
+        let access_denied_uids: std::collections::HashSet<ResourceUID> =
+            access_denied_snapshots.iter().map(|s| s.uid).collect();
+
+        let access_denied: Vec<ResourceUID> = access_denied_uids.iter().copied().collect();
+
+        let not_found: Vec<ResourceUID> = missing_uids
             .into_iter()
+            .filter(|uid| !access_denied_uids.contains(uid))
+            .collect();
+
+        let found: Vec<ResourceSnapshot> = owned_any_kind
+            .into_values()
             .filter(|snapshot| snapshot.kind == kind)
-            .collect())
+            .collect();
+
+        Ok(FindOwnedSnapshotsOutcome {
+            found,
+            not_found,
+            kind_mismatch,
+            access_denied,
+        })
     }
 
     async fn get_snapshot_by_uid(

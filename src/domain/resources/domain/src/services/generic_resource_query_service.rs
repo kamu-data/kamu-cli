@@ -67,7 +67,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         kind: &'static str,
         uids: &[ResourceUID],
-    ) -> Result<Vec<ResourceSnapshot>, FindOwnedResourceError>;
+    ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
     async fn get_snapshot_by_uid(
         &self,
@@ -97,6 +97,15 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct FindOwnedSnapshotsOutcome {
+    pub found: Vec<ResourceSnapshot>,
+    pub not_found: Vec<ResourceUID>,
+    pub kind_mismatch: Vec<ResourceUID>,
+    pub access_denied: Vec<ResourceUID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
