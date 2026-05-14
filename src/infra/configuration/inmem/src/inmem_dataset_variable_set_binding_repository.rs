@@ -50,21 +50,6 @@ struct State {
 
 #[async_trait::async_trait]
 impl DatasetVariableSetBindingRepository for InMemoryDatasetVariableSetBindingRepository {
-    async fn replace_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-        resource_uids: &[ResourceUID],
-    ) -> Result<(), ReplaceDatasetBindingsError> {
-        validate_unique_bindings(dataset_id, resource_uids)?;
-
-        let mut guard = self.state.lock().unwrap();
-        guard
-            .resource_uids_by_dataset_id
-            .insert(dataset_id.clone(), resource_uids.to_vec());
-
-        Ok(())
-    }
-
     async fn list_bindings(
         &self,
         dataset_id: &odf::DatasetID,
@@ -85,6 +70,21 @@ impl DatasetVariableSetBindingRepository for InMemoryDatasetVariableSetBindingRe
                 },
             )
             .collect())
+    }
+
+    async fn replace_bindings(
+        &self,
+        dataset_id: &odf::DatasetID,
+        resource_uids: &[ResourceUID],
+    ) -> Result<(), ReplaceDatasetBindingsError> {
+        validate_unique_bindings(dataset_id, resource_uids)?;
+
+        let mut guard = self.state.lock().unwrap();
+        guard
+            .resource_uids_by_dataset_id
+            .insert(dataset_id.clone(), resource_uids.to_vec());
+
+        Ok(())
     }
 
     async fn delete_bindings_for_dataset(

@@ -15,16 +15,16 @@ use crate::{DatasetConfigurationSetBinding, ReplaceDatasetBindingsError};
 
 #[async_trait::async_trait]
 pub trait DatasetVariableSetBindingRepository: Send + Sync {
+    async fn list_bindings(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError>;
+
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
         resource_uids: &[kamu_resources::ResourceUID],
     ) -> Result<(), ReplaceDatasetBindingsError>;
-
-    async fn list_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError>;
 
     async fn delete_bindings_for_dataset(
         &self,

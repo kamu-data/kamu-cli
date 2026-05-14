@@ -33,6 +33,35 @@ pub struct PostgresDatasetVariableSetBindingRepository {
 
 #[async_trait::async_trait]
 impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRepository {
+    async fn list_bindings(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+
+        let rows = sqlx::query_as!(
+            DatasetConfigurationSetBindingRowModel,
+            r#"
+            SELECT
+                dataset_id as "dataset_id: odf::DatasetID",
+                resource_uid as "resource_uid: Uuid",
+                binding_order
+            FROM config_dataset_variable_set_bindings
+            WHERE dataset_id = $1
+            ORDER BY binding_order
+            "#,
+            stack_dataset_id.as_str(),
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
@@ -79,35 +108,6 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
         })?;
 
         Ok(())
-    }
-
-    async fn list_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-
-        let rows = sqlx::query_as!(
-            DatasetConfigurationSetBindingRowModel,
-            r#"
-            SELECT
-                dataset_id as "dataset_id: odf::DatasetID",
-                resource_uid as "resource_uid: Uuid",
-                binding_order
-            FROM config_dataset_variable_set_bindings
-            WHERE dataset_id = $1
-            ORDER BY binding_order
-            "#,
-            stack_dataset_id.as_str(),
-        )
-        .fetch_all(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(rows.into_iter().map(Into::into).collect())
     }
 
     async fn delete_bindings_for_dataset(

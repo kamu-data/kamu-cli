@@ -34,6 +34,35 @@ pub struct SqliteDatasetSecretSetBindingRepository {
 
 #[async_trait::async_trait]
 impl DatasetSecretSetBindingRepository for SqliteDatasetSecretSetBindingRepository {
+    async fn list_bindings(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+        let stack_dataset_id_as_str = stack_dataset_id.as_str();
+
+        let rows = sqlx::query_as!(
+            DatasetConfigurationSetBindingRowModel,
+            r#"
+            SELECT
+                dataset_id as "dataset_id: odf::DatasetID",
+                resource_uid as "resource_uid: Uuid",
+                binding_order as "binding_order: i64"
+            FROM config_dataset_secret_set_bindings
+            WHERE dataset_id = $1
+            ORDER BY binding_order
+            "#,
+            stack_dataset_id_as_str,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
@@ -91,35 +120,6 @@ impl DatasetSecretSetBindingRepository for SqliteDatasetSecretSetBindingReposito
             })?;
 
         Ok(())
-    }
-
-    async fn list_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<DatasetConfigurationSetBinding>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-        let stack_dataset_id_as_str = stack_dataset_id.as_str();
-
-        let rows = sqlx::query_as!(
-            DatasetConfigurationSetBindingRowModel,
-            r#"
-            SELECT
-                dataset_id as "dataset_id: odf::DatasetID",
-                resource_uid as "resource_uid: Uuid",
-                binding_order as "binding_order: i64"
-            FROM config_dataset_secret_set_bindings
-            WHERE dataset_id = $1
-            ORDER BY binding_order
-            "#,
-            stack_dataset_id_as_str,
-        )
-        .fetch_all(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(rows.into_iter().map(Into::into).collect())
     }
 
     async fn delete_bindings_for_dataset(

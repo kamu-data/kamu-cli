@@ -152,6 +152,37 @@ impl DatasetEnvVarMutationAdapterImpl {
         format!("legacy-secrets-{}", dataset_id.as_multibase())
     }
 
+    fn get_dispatcher<E>(
+        &self,
+        resource_type: &str,
+    ) -> Result<Arc<dyn kamu_resources::ResourceCrudDispatcher>, E>
+    where
+        E: From<InternalError>,
+    {
+        get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(&self.catalog, resource_type)
+            .map_err(InternalError::from)
+            .map_err(E::from)
+    }
+
+    async fn apply_and_handle_rejection<E>(
+        &self,
+        dispatcher: &Arc<dyn kamu_resources::ResourceCrudDispatcher>,
+        request: ResourceCrudDispatcherApplyRequest,
+        resource_type_name: &str,
+    ) -> Result<kamu_resources::ResourceUID, E>
+    where
+        E: From<InternalError>,
+    {
+        let apply_decision = dispatcher.apply(request).await.int_err().map_err(E::from)?;
+
+        match apply_decision {
+            ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.metadata.uid),
+            ApplyManifestApplicationDecision::Rejected(rejection) => Err(E::from(
+                format!("{resource_type_name} apply rejected: {}", rejection.message).int_err(),
+            )),
+        }
+    }
+
     async fn upsert_variable(
         &self,
         dataset_id: &odf::DatasetID,
@@ -184,27 +215,20 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
         let metadata = self.make_metadata(account_id.clone(), resource_name);
 
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            VariableSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
+        let dispatcher =
+            self.get_dispatcher::<InternalError>(VariableSetResource::RESOURCE_TYPE)?;
 
-        let apply_decision = dispatcher
-            .apply(ResourceCrudDispatcherApplyRequest {
-                uid: existing_uid,
-                metadata,
-                spec: new_spec,
-            })
-            .await
-            .int_err()?;
-
-        let resource_uid = match apply_decision {
-            ApplyManifestApplicationDecision::Applied(result) => result.resource.metadata.uid,
-            ApplyManifestApplicationDecision::Rejected(rejection) => {
-                return Err(format!("VariableSet apply rejected: {}", rejection.message).int_err());
-            }
-        };
+        let resource_uid = self
+            .apply_and_handle_rejection::<InternalError>(
+                &dispatcher,
+                ResourceCrudDispatcherApplyRequest {
+                    uid: existing_uid,
+                    metadata,
+                    spec: new_spec,
+                },
+                "VariableSet",
+            )
+            .await?;
 
         self.variable_set_binding_repo
             .replace_bindings(dataset_id, &[resource_uid])
@@ -257,27 +281,19 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
         let metadata = self.make_metadata(account_id.clone(), resource_name);
 
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            SecretSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
+        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::RESOURCE_TYPE)?;
 
-        let apply_decision = dispatcher
-            .apply(ResourceCrudDispatcherApplyRequest {
-                uid: existing_uid,
-                metadata,
-                spec: new_spec,
-            })
-            .await
-            .int_err()?;
-
-        let resource_uid = match apply_decision {
-            ApplyManifestApplicationDecision::Applied(result) => result.resource.metadata.uid,
-            ApplyManifestApplicationDecision::Rejected(rejection) => {
-                return Err(format!("SecretSet apply rejected: {}", rejection.message).int_err());
-            }
-        };
+        let resource_uid = self
+            .apply_and_handle_rejection::<InternalError>(
+                &dispatcher,
+                ResourceCrudDispatcherApplyRequest {
+                    uid: existing_uid,
+                    metadata,
+                    spec: new_spec,
+                },
+                "SecretSet",
+            )
+            .await?;
 
         self.secret_set_binding_repo
             .replace_bindings(dataset_id, &[resource_uid])
@@ -330,11 +346,9 @@ impl DatasetEnvVarMutationAdapterImpl {
         let mut spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
         spec.variables.remove(key);
 
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            VariableSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
+        let dispatcher = self
+            .get_dispatcher(VariableSetResource::RESOURCE_TYPE)
+            .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if spec.variables.is_empty() {
             dispatcher
@@ -352,14 +366,17 @@ impl DatasetEnvVarMutationAdapterImpl {
                 labels: snapshot.metadata.labels,
                 annotations: snapshot.metadata.annotations,
             };
-            dispatcher
-                .apply(ResourceCrudDispatcherApplyRequest {
+            self.apply_and_handle_rejection(
+                &dispatcher,
+                ResourceCrudDispatcherApplyRequest {
                     uid: Some(resource_uid),
                     metadata,
                     spec: serde_json::to_value(spec).int_err()?,
-                })
-                .await
-                .int_err()?;
+                },
+                "VariableSet",
+            )
+            .await
+            .map_err(DeleteDatasetEnvVarError::Internal)?;
         }
 
         Ok(())
@@ -385,11 +402,9 @@ impl DatasetEnvVarMutationAdapterImpl {
         let mut decrypted = self.decrypt_secret_entries(&resource_uid).await.int_err()?;
         decrypted.remove(key);
 
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            SecretSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
+        let dispatcher = self
+            .get_dispatcher(SecretSetResource::RESOURCE_TYPE)
+            .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if decrypted.is_empty() {
             dispatcher
@@ -413,14 +428,17 @@ impl DatasetEnvVarMutationAdapterImpl {
                 labels: snapshot.metadata.labels,
                 annotations: snapshot.metadata.annotations,
             };
-            dispatcher
-                .apply(ResourceCrudDispatcherApplyRequest {
+            self.apply_and_handle_rejection(
+                &dispatcher,
+                ResourceCrudDispatcherApplyRequest {
                     uid: Some(resource_uid),
                     metadata,
                     spec: serde_json::to_value(new_spec).int_err()?,
-                })
-                .await
-                .int_err()?;
+                },
+                "SecretSet",
+            )
+            .await
+            .map_err(DeleteDatasetEnvVarError::Internal)?;
         }
 
         Ok(())
