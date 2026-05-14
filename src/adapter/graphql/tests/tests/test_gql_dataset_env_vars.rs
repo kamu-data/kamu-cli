@@ -9,22 +9,14 @@
 
 use async_graphql::value;
 use indoc::indoc;
-use kamu_configuration_inmem::{
-    InMemoryDatasetSecretSetBindingRepository,
-    InMemoryDatasetVariableSetBindingRepository,
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::DatasetEnvVarCompatServiceImpl;
-use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
-use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
-use messaging_outbox::{OutboxProvider, register_message_dispatcher};
+use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{BaseGQLResourceHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -916,49 +908,36 @@ async fn test_delete_non_existent_dataset_env_var() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+#[oop::extend(BaseGQLResourceHarness, base_gql_resource_harness)]
 struct DatasetEnvVarsHarness {
-    base_gql_harness: BaseGQLDatasetHarness,
+    base_gql_resource_harness: BaseGQLResourceHarness,
     catalog_authorized: dill::Catalog,
 }
 
 impl DatasetEnvVarsHarness {
     async fn new() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
-            .outbox_provider(OutboxProvider::Immediate {
+        let base_gql_resource_harness = BaseGQLResourceHarness::new_with_config(
+            TenancyConfig::SingleTenant,
+            OutboxProvider::Immediate {
                 force_immediate: true,
-            })
-            .build();
+            },
+        );
 
-        let catalog_base = {
-            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+        let catalog_dataset_env_vars = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_gql_resource_harness.catalog_base);
 
             b.add_value(DatasetEnvVarsConfig::sample())
-                .add::<DatasetEnvVarCompatServiceImpl>()
-                .add::<InMemoryDatasetVariableSetBindingRepository>()
-                .add::<InMemoryDatasetSecretSetBindingRepository>()
-                .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>()
-                .add::<InMemoryResourceRepository>()
-                .add::<InMemoryRawResourceEventStore>();
-
-            kamu_resources_services::register_dependencies(&mut b);
-            kamu_configuration_services::register_dependencies(&mut b);
-
-            register_message_dispatcher::<ResourceLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-            );
+                .add::<DatasetEnvVarCompatServiceImpl>();
 
             b.build()
         };
 
         let (_, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+            authentication_catalogs(&catalog_dataset_env_vars, PredefinedAccountOpts::default())
+                .await;
 
         Self {
-            base_gql_harness,
+            base_gql_resource_harness,
             catalog_authorized,
         }
     }
