@@ -375,3 +375,8 @@ FROM ins_succeeded
 WHERE resources.resource_uid = ins_succeeded.resource_uid;
 
 /* ------------------------------ */
+
+/* Drop legacy table — all data has been promoted to resources above */
+DROP TABLE dataset_env_vars;
+
+/* ------------------------------ */

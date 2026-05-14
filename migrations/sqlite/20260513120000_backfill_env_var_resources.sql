@@ -363,3 +363,8 @@ WHERE resource_kind  = 'SecretSet'
   AND last_event_id  IS NULL;
 
 /* ------------------------------ */
+
+/* Drop legacy table — all data has been promoted to resources above */
+DROP TABLE dataset_env_vars;
+
+/* ------------------------------ */
