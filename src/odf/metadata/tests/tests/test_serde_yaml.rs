@@ -8,20 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
-use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
 use indoc::indoc;
 use opendatafabric_metadata::ext::*;
-use opendatafabric_metadata::serde::yaml::*;
+use opendatafabric_metadata::serde::yaml::IntoDto;
+use opendatafabric_metadata::serde::{yaml as serde, *};
 use opendatafabric_metadata::*;
+use serde_json::json;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_enum_tagging() {
-    #[derive(Deserialize, Serialize, Debug)]
-    struct Wrapper(#[serde(with = "ReadStepDef")] ReadStep);
-
     let value = ReadStep::NdJson(ReadStepNdJson {
         encoding: Some("utf-8".to_string()),
         ..Default::default()
@@ -29,7 +30,7 @@ fn serde_enum_tagging() {
 
     // Check produces PascalCase tags on serialize
     assert_eq!(
-        serde_yaml::to_string(&Wrapper(value.clone())).unwrap(),
+        serde_yaml::to_string(&serde::ReadStep::from(value.clone())).unwrap(),
         indoc::indoc!(
             "
             kind: NdJson
@@ -39,95 +40,222 @@ fn serde_enum_tagging() {
     );
 
     // Check deserialize with exact tag match
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: NdJson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto(), value);
 
     // Check deserialize with old camelCase tag
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndJson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto(), value);
 
     // Check deserialize with lowercase tag
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndjson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto(), value);
 
     // Check rejects other case permutations
-    assert_matches!(
-        serde_yaml::from_str::<Wrapper>(indoc::indoc!(
-            "
-            kind: nDjson
-            encoding: utf-8
-            "
-        )),
-        Err(_)
-    );
+    serde_yaml::from_str::<serde::ReadStep>(indoc::indoc!(
+        "
+        kind: nDjson
+        encoding: utf-8
+        "
+    ))
+    .map(serde::IntoDto::into_dto)
+    .expect_err("Should fail");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_string_enum_names() {
-    #[derive(Deserialize, Serialize, Debug)]
-    struct Wrapper {
-        #[serde(with = "SourceOrderingDef")]
-        kind: SourceOrdering,
-    }
-
     let value = SourceOrdering::ByEventTime;
 
     // Check produces PascalCase values on serialize as in spec schemas
     assert_eq!(
-        serde_yaml::to_string(&Wrapper { kind: value }).unwrap(),
+        serde_yaml::to_string(&serde::SourceOrdering::from(value)).unwrap(),
         indoc::indoc!(
             "
-            kind: ByEventTime
+            ByEventTime
             "
         )
     );
 
     // Can deserialize from camelCase
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
-        kind: byEventTime
+        byEventTime
         "
     ))
     .unwrap();
-    assert_eq!(de_value.kind, value);
+    assert_eq!(de_value.into_dto(), value);
 
     // Can deserialize from lowercase
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
-        kind: byeventtime
+        byeventtime
         "
     ))
     .unwrap();
-    assert_eq!(de_value.kind, value);
+    assert_eq!(de_value.into_dto(), value);
 
     // Check rejects other case permutations
-    assert_matches!(
-        serde_yaml::from_str::<Wrapper>(indoc::indoc!(
-            "
-            kind: bYeventtime
-            "
-        )),
-        Err(_)
+    serde_yaml::from_str::<serde::SourceOrdering>(indoc::indoc!(
+        "
+        bYeventtime
+        "
+    ))
+    .map(serde::IntoDto::into_dto)
+    .expect_err("Should fail");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_maps() {
+    // String -> Struct
+    let data = indoc!(
+        r#"
+        password:
+          value: swordfish
+        tls:
+          value: aabbcc
+          contentEncoding: base64
+        username:
+          value: 'true'
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::Secrets>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Secrets {
+            entries: BTreeMap::from_iter([
+                (
+                    "password".to_string(),
+                    Secret {
+                        value: "swordfish".into(),
+                        content_encoding: None
+                    }
+                ),
+                (
+                    "username".to_string(),
+                    Secret {
+                        value: "true".into(),
+                        content_encoding: None
+                    }
+                ),
+                (
+                    "tls".to_string(),
+                    Secret {
+                        value: "aabbcc".into(),
+                        content_encoding: Some("base64".into())
+                    }
+                )
+            ])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Secrets::from(val)).unwrap(),
+        data
+    );
+
+    // String -> Struct + FromString
+    let data = indoc!(
+        r#"
+        password: swordfish
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::Secrets>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Secrets {
+            entries: BTreeMap::from_iter([(
+                "password".to_string(),
+                Secret {
+                    value: "swordfish".into(),
+                    content_encoding: None
+                }
+            )])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Secrets::from(val)).unwrap(),
+        indoc!(
+            r#"
+            password:
+              value: swordfish
+            "#
+        )
+    );
+
+    // String -> AnyJson
+    let data = indoc!(
+        r#"
+        arrow.apache.org/offsetBitWidth: 32
+        opendatafabric.org/description: foobar
+        opendatafabric.org/type:
+          kind: ObjectLink
+          linkType:
+            kind: Multihash
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::ExtraAttributes>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        ExtraAttributes {
+            entries: BTreeMap::from_iter([
+                ("arrow.apache.org/offsetBitWidth".to_string(), json!(32)),
+                (
+                    "opendatafabric.org/description".to_string(),
+                    json!("foobar")
+                ),
+                (
+                    "opendatafabric.org/type".to_string(),
+                    json!({
+                        "kind": "ObjectLink",
+                        "linkType": { "kind": "Multihash" }
+                    })
+                )
+            ])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::ExtraAttributes::from(val)).unwrap(),
+        data
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_set_data_schema() {
@@ -155,7 +283,7 @@ fn serde_set_data_schema() {
         event,
     };
 
-    let actual_data = YamlMetadataBlockSerializer
+    let actual_data = serde::YamlMetadataBlockSerializer
         .write_manifest(&expected_block)
         .unwrap();
 
@@ -203,7 +331,7 @@ fn serde_set_data_schema() {
 
     pretty_assertions::assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
 
-    let actual_block = YamlMetadataBlockDeserializer
+    let actual_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(&actual_data)
         .unwrap();
 
@@ -219,6 +347,8 @@ fn serde_set_data_schema() {
 
     assert_eq!(expected_schema, actual_schema);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "arrow")]
 #[test]
@@ -240,7 +370,7 @@ fn serde_set_data_schema_legacy() {
         event,
     };
 
-    let actual_data = YamlMetadataBlockSerializer
+    let actual_data = serde::YamlMetadataBlockSerializer
         .write_manifest(&expected_block)
         .unwrap();
 
@@ -260,7 +390,7 @@ fn serde_set_data_schema_legacy() {
 
     assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
 
-    let actual_block = YamlMetadataBlockDeserializer
+    let actual_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(&actual_data)
         .unwrap();
 
@@ -276,12 +406,14 @@ fn serde_set_data_schema_legacy() {
     assert_eq!(expected_schema, actual_schema);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[ignore = "Requires improving validation. See https://github.com/open-data-fabric/open-data-fabric/issues/112"]
 #[test]
 fn serde_set_data_schema_validation() {
     // Valid
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -299,7 +431,7 @@ fn serde_set_data_schema_validation() {
 
     // Invalid bit width
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -319,7 +451,7 @@ fn serde_set_data_schema_validation() {
 
     // Invalid arrow encoding type
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -338,6 +470,8 @@ fn serde_set_data_schema_validation() {
         Err(_)
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_root() {
@@ -414,18 +548,20 @@ fn serde_dataset_snapshot_root() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_derivative() {
@@ -476,18 +612,20 @@ fn serde_dataset_snapshot_derivative() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
@@ -534,18 +672,20 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_metadata_block() {
@@ -617,16 +757,20 @@ fn serde_metadata_block() {
         "
     );
 
-    let actual = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
+    let actual = serde::YamlMetadataBlockSerializer
+        .write_manifest(&block)
+        .unwrap();
 
     assert_eq!(expected, std::str::from_utf8(&actual).unwrap());
 
-    let de_block = YamlMetadataBlockDeserializer
+    let de_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(expected.as_bytes())
         .unwrap();
 
     assert_eq!(block, de_block);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_metadata_block_obsolete_version() {
@@ -669,12 +813,14 @@ fn serde_metadata_block_obsolete_version() {
         supported_version_range: METADATA_BLOCK_SUPPORTED_VERSION_RANGE,
     });
 
-    let actual_error = YamlMetadataBlockDeserializer
+    let actual_error = serde::YamlMetadataBlockDeserializer
         .read_manifest(data.as_bytes())
         .unwrap_err();
 
     assert_eq!(expected_error.to_string(), actual_error.to_string());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_fetch_step_files_glob() {
@@ -688,10 +834,9 @@ fn serde_fetch_step_files_glob() {
         "
     );
 
-    #[derive(Serialize, Deserialize)]
-    struct Helper(#[serde(with = "FetchStepDef")] FetchStep);
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::FetchStep>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
 
     let expected = FetchStep::FilesGlob(FetchStepFilesGlob {
         path: "/opt/x/*.txt".to_owned(),
@@ -702,8 +847,13 @@ fn serde_fetch_step_files_glob() {
 
     assert_eq!(expected, actual);
 
-    assert_eq!(serde_yaml::to_string(&Helper(actual)).unwrap(), data);
+    assert_eq!(
+        serde_yaml::to_string(&serde::FetchStep::from(actual)).unwrap(),
+        data
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_transform() {
@@ -721,10 +871,9 @@ fn serde_transform() {
         "
     );
 
-    #[derive(Serialize, Deserialize)]
-    struct Helper(#[serde(with = "TransformDef")] Transform);
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::Transform>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
 
     let expected = Transform::Sql(TransformSql {
         engine: "flink".to_owned(),
@@ -742,8 +891,13 @@ fn serde_transform() {
 
     assert_eq!(expected, actual);
 
-    assert_eq!(serde_yaml::to_string(&Helper(actual)).unwrap(), data);
+    assert_eq!(
+        serde_yaml::to_string(&serde::Transform::from(actual)).unwrap(),
+        data
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_enum_short_form() {
@@ -763,12 +917,10 @@ fn serde_enum_short_form() {
         "
     );
 
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Helper(#[serde(with = "DataSchemaDef")] DataSchema);
-
     // Deserializes fine
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::DataSchema>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
 
     let expected = DataSchema::new(vec![
         DataField::new(
@@ -798,7 +950,7 @@ fn serde_enum_short_form() {
 
     // Serialization expands to long form, but does not include defaults
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&Helper(actual)).unwrap(),
+        serde_yaml::to_string(&serde::DataSchema::from(actual)).unwrap(),
         indoc!(
             "
             fields:
@@ -826,6 +978,347 @@ fn serde_enum_short_form() {
         "
     );
 
-    let res = serde_yaml::from_str::<Helper>(data);
+    let res = serde_yaml::from_str::<serde::DataSchema>(data).map(serde::IntoDto::into_dto);
     assert_matches!(res, Err(e) if e.to_string().contains("unknown variant `Invalid`"));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_generics() {
+    use ::serde::de::IgnoredAny as Ignore;
+
+    let data = indoc!(
+        r#"
+        context: opendatafabric.org/v1
+        kind: Secret
+        header:
+          name: my-secret
+        spec:
+          secrets:
+            tls:
+              value: <cert>
+        "#
+    );
+
+    // Read only header ignoring the rest
+    let val = serde_yaml::from_str::<serde::Resource<Ignore>>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            context: "opendatafabric.org/v1".into(),
+            kind: "Secret".into(),
+            header: ResourceHeader {
+                id: None,
+                name: "my-secret".into(),
+                account: None,
+                labels: None,
+                annotations: None,
+            },
+            spec: Ignore,
+            status: None,
+        }
+    );
+
+    // Read & write typed spec
+    let val = serde_yaml::from_str::<serde::Resource<serde::SecretSet>>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            context: "opendatafabric.org/v1".into(),
+            kind: "Secret".into(),
+            header: ResourceHeader {
+                id: None,
+                name: "my-secret".into(),
+                account: None,
+                labels: None,
+                annotations: None,
+            },
+            spec: SecretSet {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                }
+            },
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Resource::<serde::SecretSet>::from(val)).unwrap(),
+        data
+    );
+
+    // Read & write generic spec
+    let val = serde_yaml::from_str::<serde::Resource<serde_json::Value>>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            context: "opendatafabric.org/v1".into(),
+            kind: "Secret".into(),
+            header: ResourceHeader {
+                id: None,
+                name: "my-secret".into(),
+                account: None,
+                labels: None,
+                annotations: None,
+            },
+            spec: json!({
+                "secrets": {
+                    "tls": {
+                        "value": "<cert>",
+                    }
+                }
+            }),
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Resource::<serde_json::Value>::from(val)).unwrap(),
+        data
+    );
+
+    // Read & write typed spec - all fields
+    let data = indoc!(
+        r#"
+        context: opendatafabric.org/v1
+        kind: Secret
+        header:
+          id: aa-12345
+          name: my-secret
+          account:
+            name: sergiimk
+          labels:
+            nested:
+              a: x
+              b: y
+            string: foo
+          annotations:
+            nested:
+              a: x
+              b: y
+            string: foo
+        spec:
+          secrets:
+            tls:
+              value: <cert>
+        status:
+          phase: Ready
+          observedGeneration: 1
+          conditions:
+            secrets.opendatafabric.org/bool:
+              value: true
+            secrets.opendatafabric.org/nested:
+              value:
+                a: x
+                b: y
+            secrets.opendatafabric.org/str:
+              value: foo
+              lastTransitionTime: 2026-01-01T00:00:00Z
+              observedGeneration: 1
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::Resource<serde::SecretSet>>(data)
+        .map(serde::IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            context: "opendatafabric.org/v1".into(),
+            kind: "Secret".into(),
+            header: ResourceHeader {
+                id: Some("aa-12345".into()),
+                name: "my-secret".into(),
+                account: Some(AccountRef {
+                    id: None,
+                    name: Some("sergiimk".into())
+                }),
+                labels: Some(ResourceLabels {
+                    entries: BTreeMap::from_iter([
+                        ("string".to_string(), json!("foo")),
+                        ("nested".to_string(), json!({"a": "x", "b": "y"}))
+                    ])
+                }),
+                annotations: Some(ResourceAnnotations {
+                    entries: BTreeMap::from_iter([
+                        ("string".to_string(), json!("foo")),
+                        ("nested".to_string(), json!({"a": "x", "b": "y"}))
+                    ])
+                }),
+            },
+            spec: SecretSet {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                }
+            },
+            status: Some(ResourceStatus {
+                phase: ResourcePhase::Ready,
+                observed_generation: Some(1),
+                conditions: Some(ResourceConditions {
+                    entries: BTreeMap::from_iter([
+                        (
+                            "secrets.opendatafabric.org/str".to_string(),
+                            ResourceCondition {
+                                value: json!("foo"),
+                                reason: None,
+                                message: None,
+                                last_transition_time: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                                observed_generation: Some(1),
+                            }
+                        ),
+                        (
+                            "secrets.opendatafabric.org/bool".to_string(),
+                            ResourceCondition {
+                                value: json!(true),
+                                reason: None,
+                                message: None,
+                                last_transition_time: None,
+                                observed_generation: None,
+                            }
+                        ),
+                        (
+                            "secrets.opendatafabric.org/nested".to_string(),
+                            ResourceCondition {
+                                value: json!({"a": "x", "b": "y"}),
+                                reason: None,
+                                message: None,
+                                last_transition_time: None,
+                                observed_generation: None,
+                            }
+                        )
+                    ])
+                }),
+            }),
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Resource::<serde::SecretSet>::from(val)).unwrap(),
+        data
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_short_forms() {
+    #[serde_with::serde_as]
+    #[derive(Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+    struct MySpec {
+        #[serde_as(as = "serde::Secrets")]
+        secrets: Secrets,
+        #[serde_as(as = "serde::Variables")]
+        variables: Variables,
+    }
+
+    impl IntoDto for MySpec {
+        type Dto = Self;
+        fn into_dto(self) -> Self::Dto {
+            self
+        }
+    }
+
+    let data = indoc!(
+        r#"
+        context: opendatafabric.org/v1
+        kind: Secret
+        header:
+          name: my-secret
+          account: sergiimk
+        spec:
+          secrets:
+            tls: <cert>
+          variables:
+            poolSize: '10'
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::Resource<MySpec>>(data)
+        .map(IntoDto::into_dto)
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            context: "opendatafabric.org/v1".into(),
+            kind: "Secret".into(),
+            header: ResourceHeader {
+                id: None,
+                name: "my-secret".into(),
+                account: Some(AccountRef {
+                    id: None,
+                    name: Some("sergiimk".into())
+                }),
+                labels: None,
+                annotations: None,
+            },
+            spec: MySpec {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                },
+                variables: Variables {
+                    entries: BTreeMap::from_iter([(
+                        "poolSize".to_string(),
+                        Variable {
+                            value: "10".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                }
+            },
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::Resource::<MySpec>::from(val)).unwrap(),
+        indoc!(
+            r#"
+            context: opendatafabric.org/v1
+            kind: Secret
+            header:
+              name: my-secret
+              account:
+                name: sergiimk
+            spec:
+              secrets:
+                tls:
+                  value: <cert>
+              variables:
+                poolSize:
+                  value: '10'
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

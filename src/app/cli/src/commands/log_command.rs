@@ -510,11 +510,12 @@ impl AsciiRenderer {
         indent: i32,
         extra: &odf::metadata::ExtraAttributes,
     ) -> Result<(), std::io::Error> {
-        let mut buf = Vec::new();
-        let mut serializer = serde_yaml::Serializer::new(&mut buf);
-        odf::metadata::serde::yaml::ExtraAttributesDef::serialize(extra, &mut serializer).unwrap();
+        let yaml_string = serde_yaml::to_string(
+            &odf::metadata::serde::yaml::ExtraAttributes::from(extra.clone()),
+        )
+        .unwrap();
 
-        self.render_property_multiline(output, indent, "Extra", &String::from_utf8(buf).unwrap())
+        self.render_property_multiline(output, indent, "Extra", &yaml_string)
     }
 
     fn indent(&self, output: &mut impl Write, level: i32) -> Result<(), std::io::Error> {

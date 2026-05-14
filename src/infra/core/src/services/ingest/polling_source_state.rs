@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use odf::metadata::serde::yaml::{SourceStateDef, datetime_rfc3339, datetime_rfc3339_opt};
+use odf::metadata::serde::yaml as serdes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 
@@ -79,8 +79,8 @@ impl PollingSourceState {
         match option {
             None => serializer.serialize_none(),
             Some(pss) => {
-                let ss = pss.to_source_state();
-                SourceStateDef::serialize(&ss, serializer)
+                let ss = serdes::SourceState::from(pss.to_source_state());
+                ss.serialize(serializer)
             }
         }
     }
@@ -88,8 +88,13 @@ impl PollingSourceState {
     pub fn deserialize<'de, D: Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Option<PollingSourceState>, D::Error> {
-        SourceStateDef::deserialize(deserializer)
-            .map(|ss| Some(PollingSourceState::from_source_state(&ss).unwrap().unwrap()))
+        serdes::SourceState::deserialize(deserializer).map(|ss| {
+            Some(
+                PollingSourceState::from_source_state(&ss.into())
+                    .unwrap()
+                    .unwrap(),
+            )
+        })
     }
 }
 
@@ -101,11 +106,11 @@ impl PollingSourceState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct FetchSavepoint {
-    #[serde(with = "datetime_rfc3339")]
+    #[serde(with = "serdes::datetime_rfc3339")]
     pub created_at: DateTime<Utc>,
     #[serde(default, with = "PollingSourceState")]
     pub source_state: Option<PollingSourceState>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
+    #[serde(default, with = "serdes::datetime_rfc3339_opt")]
     pub source_event_time: Option<DateTime<Utc>>,
     pub data: SavepointData,
     pub has_more: bool,
