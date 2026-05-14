@@ -15,7 +15,11 @@ use kamu_configuration::{
     VariableSetProjectionRepository,
     VariableSetResource,
 };
-use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use kamu_resources::{
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceLifecycleMessage,
+    ResourceUID,
+};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,
@@ -64,34 +68,68 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received resource lifecycle message");
 
-        let ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) = message else {
-            return Ok(());
-        };
+        match message {
+            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
+                match succeeded_message.resource.kind.as_str() {
+                    VariableSetResource::RESOURCE_TYPE => {
+                        let repo = target_catalog
+                            .get_one::<dyn VariableSetProjectionRepository>()
+                            .map_err(ErrorIntoInternal::int_err)?;
 
-        match succeeded_message.resource.kind.as_str() {
-            VariableSetResource::RESOURCE_TYPE => {
-                let repo = target_catalog
-                    .get_one::<dyn VariableSetProjectionRepository>()
-                    .map_err(ErrorIntoInternal::int_err)?;
+                        repo.cleanup_entries_before_generation(
+                            &succeeded_message.resource.uid,
+                            succeeded_message.resource.metadata.generation,
+                        )
+                        .await
+                    }
+                    SecretSetResource::RESOURCE_TYPE => {
+                        let repo = target_catalog
+                            .get_one::<dyn SecretSetProjectionRepository>()
+                            .map_err(ErrorIntoInternal::int_err)?;
 
-                repo.cleanup_entries_before_generation(
-                    &succeeded_message.resource.uid,
-                    succeeded_message.resource.metadata.generation,
-                )
-                .await
+                        repo.cleanup_entries_before_generation(
+                            &succeeded_message.resource.uid,
+                            succeeded_message.resource.metadata.generation,
+                        )
+                        .await
+                    }
+                    _ => Ok(()),
+                }
             }
-            SecretSetResource::RESOURCE_TYPE => {
-                let repo = target_catalog
-                    .get_one::<dyn SecretSetProjectionRepository>()
-                    .map_err(ErrorIntoInternal::int_err)?;
+            ResourceLifecycleMessage::Deleted(deleted_message) => {
+                debug_assert!(
+                    !deleted_message.resources.is_empty(),
+                    "deleted message must contain at least one resource"
+                );
 
-                repo.cleanup_entries_before_generation(
-                    &succeeded_message.resource.uid,
-                    succeeded_message.resource.metadata.generation,
-                )
-                .await
+                match deleted_message.resources[0].kind.as_str() {
+                    VariableSetResource::RESOURCE_TYPE => {
+                        let repo = target_catalog
+                            .get_one::<dyn VariableSetProjectionRepository>()
+                            .map_err(ErrorIntoInternal::int_err)?;
+
+                        let uids: Vec<ResourceUID> =
+                            deleted_message.resources.iter().map(|r| r.uid).collect();
+                        repo.delete_all_entries(&uids).await
+                    }
+                    SecretSetResource::RESOURCE_TYPE => {
+                        let repo = target_catalog
+                            .get_one::<dyn SecretSetProjectionRepository>()
+                            .map_err(ErrorIntoInternal::int_err)?;
+
+                        let uids: Vec<ResourceUID> =
+                            deleted_message.resources.iter().map(|r| r.uid).collect();
+                        repo.delete_all_entries(&uids).await
+                    }
+                    _ => Ok(()),
+                }
             }
-            _ => Ok(()),
+
+            ResourceLifecycleMessage::Applied(_)
+            | ResourceLifecycleMessage::ReconciliationFailed(_) => {
+                // Nothing to do here
+                Ok(())
+            }
         }
     }
 }

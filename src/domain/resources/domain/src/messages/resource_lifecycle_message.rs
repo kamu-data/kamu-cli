@@ -24,6 +24,7 @@ pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
     ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
     ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
+    Deleted(ResourceLifecycleMessageDeleted),
 }
 
 impl ResourceLifecycleMessage {
@@ -50,6 +51,23 @@ impl ResourceLifecycleMessage {
         Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
             event_time,
             resource,
+        })
+    }
+
+    pub fn deleted(event_time: DateTime<Utc>, resources: Vec<ResourceSnapshot>) -> Self {
+        debug_assert!(
+            !resources.is_empty(),
+            "deleted message must contain at least one resource"
+        );
+
+        debug_assert!(
+            ResourceSnapshot::check_homogeneous(&resources),
+            "all resources in a deleted message must share the same kind and api_version"
+        );
+
+        Self::Deleted(ResourceLifecycleMessageDeleted {
+            event_time,
+            resources,
         })
     }
 }
@@ -93,6 +111,15 @@ pub struct ResourceLifecycleMessageReconciliationSucceeded {
 pub struct ResourceLifecycleMessageReconciliationFailed {
     pub event_time: DateTime<Utc>,
     pub resource: ResourceSnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageDeleted {
+    pub event_time: DateTime<Utc>,
+    // all resources share the same `kind` and `api_version`
+    pub resources: Vec<ResourceSnapshot>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

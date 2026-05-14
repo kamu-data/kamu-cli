@@ -16,6 +16,8 @@ use kamu_configuration::{
     VariableSetProjectionRepository,
 };
 use kamu_resources::ResourceUID;
+use odf::metadata::AsStackString;
+use odf::metadata::stack_string::StackString;
 
 #[component]
 #[interface(dyn VariableSetProjectionRepository)]
@@ -27,54 +29,6 @@ pub struct PostgresVariableSetProjectionRepository {
 
 #[async_trait::async_trait]
 impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository {
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-        let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
-
-        for entry in entries {
-            let insert_result = sqlx::query!(
-                r#"
-                INSERT INTO config_variable_set_entries (
-                    entry_id,
-                    resource_uid,
-                    resource_generation,
-                    account_id,
-                    variable_key,
-                    value,
-                    updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
-                entry.entry_id,
-                resource_uid,
-                resource_generation,
-                entry.account_id.to_string(),
-                entry.key,
-                entry.value,
-                entry.updated_at,
-            )
-            .execute(&mut *connection_mut)
-            .await;
-
-            match insert_result {
-                Ok(_) => {}
-                Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                    return Err(ReplaceProjectionEntriesError::concurrent_modification());
-                }
-                Err(e) => return Err(e.int_err().into()),
-            }
-        }
-
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -83,6 +37,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
     ) -> Result<Option<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -94,6 +49,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 account_id as "account_id: odf::AccountID",
                 variable_key as key,
                 value,
+                created_at,
                 updated_at
             FROM config_variable_set_entries
             WHERE resource_uid = $1
@@ -118,6 +74,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -129,6 +86,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 account_id as "account_id: odf::AccountID",
                 variable_key as key,
                 value,
+                created_at,
                 updated_at
             FROM config_variable_set_entries
             WHERE resource_uid = $1
@@ -145,6 +103,150 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
         Ok(rows)
     }
 
+    async fn get_latest_entries(
+        &self,
+        resource_uid: &ResourceUID,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                e.entry_id as "entry_id: uuid::Uuid",
+                e.account_id as "account_id: odf::AccountID",
+                e.variable_key as key,
+                e.value,
+                e.created_at,
+                e.updated_at
+            FROM config_variable_set_entries e
+            JOIN resources r ON r.resource_uid = e.resource_uid
+                AND r.generation = e.resource_generation
+                AND r.deleted_at IS NULL
+            WHERE e.resource_uid = $1
+            ORDER BY e.variable_key
+            "#,
+            resource_uid,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                variable_key as key,
+                value,
+                created_at,
+                updated_at
+            FROM config_variable_set_entries
+            WHERE resource_uid = $1
+              AND resource_generation = (
+                  SELECT MAX(resource_generation)
+                  FROM config_variable_set_entries
+                  WHERE resource_uid = $1
+                    AND resource_generation < $2
+              )
+            ORDER BY variable_key
+            "#,
+            resource_uid,
+            resource_generation,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
+        let account_ids: Vec<_> = entries
+            .iter()
+            .map(|e| e.account_id.as_stack_string())
+            .collect();
+        let account_ids_strs = account_ids
+            .iter()
+            .map(StackString::as_str)
+            .collect::<Vec<_>>();
+        let keys: Vec<_> = entries.iter().map(|e| e.key.as_str()).collect();
+        let values: Vec<_> = entries.iter().map(|e| e.value.as_str()).collect();
+        let created_ats: Vec<_> = entries.iter().map(|e| e.created_at).collect();
+        let updated_ats: Vec<_> = entries.iter().map(|e| e.updated_at).collect();
+
+        let insert_result = sqlx::query!(
+            r#"
+            INSERT INTO config_variable_set_entries (
+                entry_id,
+                resource_uid,
+                resource_generation,
+                account_id,
+                variable_key,
+                value,
+                created_at,
+                updated_at
+            )
+            SELECT e.entry_id, $1, $2, e.account_id, e.variable_key, e.value, e.created_at, e.updated_at
+            FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::timestamptz[])
+                AS e(entry_id, account_id, variable_key, value, created_at, updated_at)
+            "#,
+            resource_uid,
+            resource_generation,
+            &entry_ids,
+            &account_ids_strs as &[&str],
+            &keys as &[&str],
+            &values as &[&str],
+            &created_ats,
+            &updated_ats,
+        )
+        .execute(&mut *connection_mut)
+        .await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
+            }
+            Err(e) => return Err(e.int_err().into()),
+        }
+
+        Ok(())
+    }
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &ResourceUID,
@@ -152,6 +254,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -163,6 +266,30 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
             "#,
             resource_uid,
             resource_generation,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
+        if resource_uids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
+
+        sqlx::query!(
+            r#"
+            DELETE FROM config_variable_set_entries
+                WHERE resource_uid = ANY($1::uuid[])
+            "#,
+            &uids,
         )
         .execute(&mut *connection_mut)
         .await

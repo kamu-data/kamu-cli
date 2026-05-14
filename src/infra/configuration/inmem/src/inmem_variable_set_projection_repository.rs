@@ -47,23 +47,6 @@ struct State {
 
 #[async_trait::async_trait]
 impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository {
-    async fn replace_entries(
-        &self,
-        resource_uid: &kamu_resources::ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        let mut guard = self.state.lock().unwrap();
-        let key = (*resource_uid, resource_generation);
-        if guard.entries_by_resource_uid_generation.contains_key(&key) {
-            return Err(ReplaceProjectionEntriesError::concurrent_modification());
-        }
-        guard
-            .entries_by_resource_uid_generation
-            .insert(key, entries.to_vec());
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &kamu_resources::ResourceUID,
@@ -91,6 +74,61 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
             .unwrap_or_default())
     }
 
+    async fn get_latest_entries(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        let max_gen = guard
+            .entries_by_resource_uid_generation
+            .keys()
+            .filter(|(uid, _)| uid == resource_uid)
+            .map(|(_, generation)| *generation)
+            .max();
+        Ok(max_gen
+            .and_then(|generation| {
+                guard
+                    .entries_by_resource_uid_generation
+                    .get(&(*resource_uid, generation))
+            })
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .entries_by_resource_uid_generation
+            .iter()
+            .filter(|((stored_resource_uid, stored_generation), _)| {
+                stored_resource_uid == resource_uid && *stored_generation < resource_generation
+            })
+            .max_by_key(|((_, stored_generation), _)| *stored_generation)
+            .map(|(_, entries)| entries.clone())
+            .unwrap_or_default())
+    }
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        let mut guard = self.state.lock().unwrap();
+        let key = (*resource_uid, resource_generation);
+        if guard.entries_by_resource_uid_generation.contains_key(&key) {
+            return Err(ReplaceProjectionEntriesError::concurrent_modification());
+        }
+        guard
+            .entries_by_resource_uid_generation
+            .insert(key, entries.to_vec());
+        Ok(())
+    }
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &kamu_resources::ResourceUID,
@@ -102,6 +140,17 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
                 stored_resource_uid != resource_uid || *stored_generation >= resource_generation
             },
         );
+        Ok(())
+    }
+
+    async fn delete_all_entries(
+        &self,
+        resource_uids: &[kamu_resources::ResourceUID],
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard
+            .entries_by_resource_uid_generation
+            .retain(|(stored_resource_uid, _), _| !resource_uids.contains(stored_resource_uid));
         Ok(())
     }
 }

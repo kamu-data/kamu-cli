@@ -233,6 +233,7 @@ pub enum PlannedApplyResourceDecision<R: ReconcilableEventSourcedResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct PlannedApplyResource<R: ReconcilableEventSourcedResource> {
     pub(crate) resource: R,
     pub(crate) action: ApplyResourceAction,

@@ -20,6 +20,7 @@ pub struct SecretSetEntry {
     pub key: String,
     pub value: Vec<u8>,
     pub secret_nonce: Vec<u8>,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 

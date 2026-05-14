@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ConcurrentModificationError;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::{DeclarativeResource, FindOwnedResourceError, ResourceUID};
@@ -48,6 +48,7 @@ impl From<FindOwnedResourceError> for DeleteResourcesError {
     fn from(err: FindOwnedResourceError) -> Self {
         match err {
             FindOwnedResourceError::Access(err) => Self::Access(err),
+            FindOwnedResourceError::TypeMismatch(err) => Self::Internal(err.int_err()),
             FindOwnedResourceError::Internal(err) => Self::Internal(err),
         }
     }

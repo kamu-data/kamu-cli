@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+testing = ["dep:kamu-configuration-inmem", "dep:kamu-resources-inmem", "dep:oop", "kamu-resources-services/testing"]
 
 
 [dependencies]
@@ -34,13 +35,15 @@ internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 kamu-configuration = { workspace = true }
+kamu-configuration-inmem = { workspace = true, optional = true }
 kamu-datasets = { workspace = true }
 kamu-resources = { workspace = true }
+kamu-resources-inmem = { workspace = true, optional = true }
 kamu-resources-services = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dill = { version = "0.15", default-features = false }
 paste = { version = "1", default-features = false }
 secrecy = { version = "0.10", default-features = false }
@@ -49,6 +52,16 @@ serde_json = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["v4"] }
+oop = { version = "0.0.2", optional = true }
 
 
 [dev-dependencies]
+kamu-configuration-services = { workspace = true, features = ["testing"] }
+kamu-datasets = { workspace = true, features = ["testing"] }
+kamu-datasets-inmem = { workspace = true }
+odf = { workspace = true, features = ["testing"] }
+
+oop = "0.0.2"
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false }

@@ -10,8 +10,12 @@
 // Re-exports
 pub use kamu_configuration as domain;
 
+mod inmem_dataset_secret_set_binding_repository;
+mod inmem_dataset_variable_set_binding_repository;
 mod inmem_secret_set_projection_repository;
 mod inmem_variable_set_projection_repository;
 
+pub use inmem_dataset_secret_set_binding_repository::*;
+pub use inmem_dataset_variable_set_binding_repository::*;
 pub use inmem_secret_set_projection_repository::*;
 pub use inmem_variable_set_projection_repository::*;

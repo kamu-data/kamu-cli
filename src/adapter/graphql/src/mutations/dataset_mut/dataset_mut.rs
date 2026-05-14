@@ -68,6 +68,11 @@ impl DatasetMut {
         DatasetEnvVarsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
+    /// Access to the mutable configuration bindings of this dataset
+    async fn configuration(&self, ctx: &Context<'_>) -> Result<DatasetConfigurationMut<'_>> {
+        DatasetConfigurationMut::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
     /// Access to collaboration management methods
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut<'_>> {
         DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await

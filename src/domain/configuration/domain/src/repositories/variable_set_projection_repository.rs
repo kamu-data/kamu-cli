@@ -16,13 +16,6 @@ use crate::{ReplaceProjectionEntriesError, VariableSetEntry};
 
 #[async_trait::async_trait]
 pub trait VariableSetProjectionRepository: Send + Sync {
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError>;
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -36,11 +29,31 @@ pub trait VariableSetProjectionRepository: Send + Sync {
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError>;
 
+    async fn get_latest_entries(
+        &self,
+        resource_uid: &ResourceUID,
+    ) -> Result<Vec<VariableSetEntry>, InternalError>;
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError>;
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError>;
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<(), InternalError>;
+
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

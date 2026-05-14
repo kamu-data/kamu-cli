@@ -5,21 +5,30 @@ description: Storage-backed repository test-suite workflow for Kamu CLI. Use whe
 
 # Kamu Repository Tests
 
-Use the shared three-layer pattern when adding tests for a storage-backed repository trait.
+Use the shared three-layer pattern when adding tests for a storage-backed repository trait:
+
+1. **Layer 1 (Repo-Tests Crate)**: Create a storage-agnostic test suite with `pub async fn test_*` functions.
+2. **Layer 2 (Implementation Wiring)**: Wire the suite to each storage implementation (inmem, postgres, sqlite) using harnesses.
+3. **Layer 3 (Macro Invocation)**: Use `database_transactional_test!` to connect suite functions to harnesses.
 
 ## Repo-Tests Crate
 
 Create a plain library crate under `src/infra/<domain>/repo-tests/`.
 
-- Add one `*_test_suite.rs` file per repository trait.
-- Export `pub async fn test_*(catalog: &Catalog)` functions.
-- Resolve the trait only through the public catalog API:
-  `catalog.get_one::<dyn MyRepo>().unwrap()`.
-- Test only the public repository interface; do not depend on implementation internals.
-- In `lib.rs`, declare each suite module and re-export with `pub use`.
-- Keep the crate free of dev-dependencies.
-- Add the crate to root `[workspace]` members and `[workspace.dependencies]`.
-- Depend on the domain crate, `database-common`, supporting utility crates, and test data helpers needed by the suite.
+### Structure
+
+1. **Test suite files**: Add one `*_test_suite.rs` file per repository trait.
+2. **Public test functions**: Export `pub async fn test_*(catalog: &Catalog)` functions.
+3. **Catalog resolution**: Resolve the trait only through the public catalog API:
+   `catalog.get_one::<dyn MyRepo>().unwrap()`.
+4. **Interface testing**: Test only the public repository interface; do not depend on implementation internals.
+5. **Module exports**: In `lib.rs`, declare each suite module and re-export with `pub use`.
+
+### Dependencies
+
+6. **No dev-dependencies**: Keep the repo-tests crate free of dev-dependencies.
+7. **Workspace registration**: Add the crate to root `[workspace]` members and `[workspace.dependencies]`.
+8. **Runtime dependencies**: Depend on the domain crate, `database-common`, supporting utility crates, and test data helpers needed by the suite.
 
 ## Implementation Crate Wiring
 

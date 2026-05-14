@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -15,12 +15,17 @@ use internal_error::InternalError;
 
 use crate::domain::{
     FindOwnedResourceError,
+    FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
+    ResourceIdentityRow,
+    ResourceName,
     ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceSummaryRow,
+    ResourceTypeMismatchError,
+    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +40,7 @@ pub struct GenericResourceQueryServiceImpl {
 
 #[async_trait::async_trait]
 impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
-    async fn allocate_uid(&self) -> Result<crate::domain::ResourceUID, InternalError> {
+    async fn allocate_uid(&self) -> Result<ResourceUID, InternalError> {
         self.resource_repository.new_resource_uid().await
     }
 
@@ -43,8 +48,8 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kind: &str,
-        name: &crate::domain::ResourceName,
-    ) -> Result<Option<crate::domain::ResourceUID>, InternalError> {
+        name: &ResourceName,
+    ) -> Result<Option<ResourceUID>, InternalError> {
         self.resource_repository
             .find_resource_uid_by_name(account_id, kind, name)
             .await
@@ -53,8 +58,8 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn find_resource_identities_by_uids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[crate::domain::ResourceUID],
-    ) -> Result<Vec<crate::domain::ResourceIdentityRow>, InternalError> {
+        uids: &[ResourceUID],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         self.resource_repository
             .find_resource_identities_by_uids(account_id, uids)
             .await
@@ -64,8 +69,8 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kind: &str,
-        names: &[crate::domain::ResourceName],
-    ) -> Result<Vec<crate::domain::ResourceIdentityRow>, InternalError> {
+        names: &[ResourceName],
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         self.resource_repository
             .find_resource_identities_by_names(account_id, kind, names)
             .await
@@ -75,10 +80,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kinds: &[String],
-        exact_names: Option<&[crate::domain::ResourceName]>,
+        exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
-    ) -> Result<Vec<crate::domain::ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         self.resource_repository
             .search_resource_identities(account_id, kinds, exact_names, name_pattern, pagination)
             .await
@@ -88,7 +93,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kinds: &[String],
-        exact_names: Option<&[crate::domain::ResourceName]>,
+        exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
         self.resource_repository
@@ -100,7 +105,8 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kind: &'static str,
-        uid: crate::domain::ResourceUID,
+        api_version: &'static str,
+        uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
         let query = ResourceRawEventQuery {
             kind: kind.to_string(),
@@ -126,6 +132,17 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .into());
         }
 
+        if resource_snapshot.api_version != api_version {
+            return Err(ResourceTypeMismatchError {
+                uid: resource_snapshot.uid,
+                expected_kind: kind.to_string(),
+                expected_api_version: api_version.to_string(),
+                actual_kind: resource_snapshot.kind,
+                actual_api_version: resource_snapshot.api_version,
+            }
+            .into());
+        }
+
         Ok(Some(resource_snapshot))
     }
 
@@ -133,48 +150,66 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         kind: &'static str,
-        uids: &[crate::domain::ResourceUID],
-    ) -> Result<Vec<ResourceSnapshot>, FindOwnedResourceError> {
-        let resource_snapshots = self
+        api_version: &'static str,
+        uids: &[ResourceUID],
+    ) -> Result<FindOwnedSnapshotsOutcome, InternalError> {
+        let owned_any_kind: HashMap<ResourceUID, ResourceSnapshot> = self
             .resource_repository
             .find_resource_snapshots_by_uids(account_id, uids)
-            .await?;
-        let owned_uids = resource_snapshots
-            .iter()
-            .map(|snapshot| snapshot.uid)
-            .collect::<HashSet<_>>();
-        let missing_uids = uids
-            .iter()
-            .copied()
-            .filter(|uid| !owned_uids.contains(uid))
-            .collect::<Vec<_>>();
-
-        if let Some(resource_snapshot) = self
-            .resource_repository
-            .find_resource_snapshots_by_kind_and_uids(kind, &missing_uids)
             .await?
             .into_iter()
-            .next()
-        {
-            return Err(odf::AccessError::Unauthorized(
-                ResourceNotOwnedByAccountError {
-                    uid: resource_snapshot.uid,
-                    resource_type: kind,
-                }
-                .into(),
-            )
-            .into());
-        }
+            .map(|snapshot| (snapshot.uid, snapshot))
+            .collect();
 
-        Ok(resource_snapshots
+        let kind_mismatch: Vec<(ResourceUID, String)> = owned_any_kind
+            .values()
+            .filter(|snapshot| snapshot.kind != kind)
+            .map(|snapshot| (snapshot.uid, snapshot.kind.clone()))
+            .collect();
+
+        let api_version_mismatch: Vec<(ResourceUID, String)> = owned_any_kind
+            .values()
+            .filter(|snapshot| snapshot.kind == kind && snapshot.api_version != api_version)
+            .map(|snapshot| (snapshot.uid, snapshot.api_version.clone()))
+            .collect();
+
+        let missing_uids: Vec<ResourceUID> = uids
+            .iter()
+            .copied()
+            .filter(|uid| !owned_any_kind.contains_key(uid))
+            .collect();
+
+        let access_denied_snapshots = self
+            .resource_repository
+            .find_resource_snapshots_by_kind_and_uids(kind, &missing_uids)
+            .await?;
+        let access_denied_uids: std::collections::HashSet<ResourceUID> =
+            access_denied_snapshots.iter().map(|s| s.uid).collect();
+
+        let access_denied: Vec<ResourceUID> = access_denied_uids.iter().copied().collect();
+
+        let not_found: Vec<ResourceUID> = missing_uids
             .into_iter()
-            .filter(|snapshot| snapshot.kind == kind)
-            .collect())
+            .filter(|uid| !access_denied_uids.contains(uid))
+            .collect();
+
+        let found: Vec<ResourceSnapshot> = owned_any_kind
+            .into_values()
+            .filter(|snapshot| snapshot.kind == kind && snapshot.api_version == api_version)
+            .collect();
+
+        Ok(FindOwnedSnapshotsOutcome {
+            found,
+            not_found,
+            kind_mismatch,
+            api_version_mismatch,
+            access_denied,
+        })
     }
 
     async fn get_snapshot_by_uid(
         &self,
-        uid: &crate::domain::ResourceUID,
+        uid: &ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         self.resource_repository
             .find_resource_snapshot_by_uid(uid)
@@ -184,7 +219,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn find_snapshots_by_uids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[crate::domain::ResourceUID],
+        uids: &[ResourceUID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         self.resource_repository
             .find_resource_snapshots_by_uids(account_id, uids)

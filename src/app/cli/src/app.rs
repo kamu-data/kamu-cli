@@ -916,7 +916,7 @@ pub fn register_config_in_catalog(
                     "Invalid dataset env var encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
-                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarCompatServiceImpl>();
             } else {
                 warn!("Dataset env vars feature will be disabled");
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();

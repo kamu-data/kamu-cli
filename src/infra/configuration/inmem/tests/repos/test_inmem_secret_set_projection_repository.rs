@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = secret_set_repo::test_get_latest_entries_before_generation,
+    harness = InMemorySecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = secret_set_repo::test_replace_entries_concurrent_modification,
     harness = InMemorySecretSetProjectionRepositoryHarness
 );
@@ -74,6 +82,30 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = secret_set_repo::test_cleanup_does_not_affect_other_resources,
+    harness = InMemorySecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = secret_set_repo::test_replace_preserves_stable_identity_and_creation_time,
+    harness = InMemorySecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = secret_set_repo::test_get_latest_entries,
+    harness = InMemorySecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = secret_set_repo::test_delete_all_entries,
     harness = InMemorySecretSetProjectionRepositoryHarness
 );
 

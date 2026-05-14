@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
@@ -19,7 +18,7 @@ use kamu_core::{
     PullRequestPlanner,
     TenancyConfig,
 };
-use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
+use kamu_datasets::DatasetEnvVarResolver;
 use kamu_task_system::*;
 
 use crate::{LogicalPlanDatasetUpdate, TaskDefinitionDatasetUpdate};
@@ -39,25 +38,20 @@ pub struct UpdateDatasetTaskPlanner {
 impl UpdateDatasetTaskPlanner {
     #[transactional_method2(
         pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_env_vars_svc: Arc<dyn DatasetEnvVarService>
+        dataset_env_var_resolver: Arc<dyn DatasetEnvVarResolver>
     )]
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_update(
         &self,
         args: &LogicalPlanDatasetUpdate,
     ) -> Result<TaskDefinition, InternalError> {
-        let dataset_env_vars = dataset_env_vars_svc
-            .get_all_dataset_env_vars_by_dataset_id(&args.dataset_id, None)
-            .await
-            .map(|listing| listing.list)
-            .int_err()?;
+        let dataset_env_vars = dataset_env_var_resolver
+            .resolve_effective_env_vars(&args.dataset_id)
+            .await?;
 
         let pull_options = PullOptions {
             ingest_options: PollingIngestOptions {
-                dataset_env_vars: dataset_env_vars
-                    .into_iter()
-                    .map(|dataset_env_var| (dataset_env_var.key.clone(), dataset_env_var))
-                    .collect::<HashMap<String, DatasetEnvVar>>(),
+                dataset_env_vars,
                 fetch_uncacheable: args.fetch_uncacheable,
                 ..Default::default()
             },

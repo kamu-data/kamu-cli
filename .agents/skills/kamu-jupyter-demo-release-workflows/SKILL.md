@@ -9,15 +9,29 @@ Use this skill when the Jupyter demo at `https://demo.kamu.dev` needs a new imag
 
 ## Jupyter Demo Release
 
+### 1. Update Versions
+
 - Increment `DEMO_VERSION` in `images/demo/Makefile`.
 - Set the same version for `jupyter` and `rustfs` images in `images/demo/docker-compose.yml`.
+
+### 2. Prepare Datasets
+
 - Run `make clean`.
 - Run `make data` to prepare example datasets for the `rustfs` image.
-- Prepare Docker buildx for multi-platform images.
+
+### 3. Configure Docker Buildx
+
+- Prepare Docker buildx for multi-platform images (see Multi-Platform Image Setup section below if not already configured).
+
+### 4. Build and Push Images
+
 - Run `make rustfs-multi-arch` to build and push the multi-arch `rustfs` image.
-- Configure a GitHub package token with `write:packages` permission before pushing the Jupyter image.
+- **Always configure a GitHub package token with `write:packages` permission before pushing the Jupyter image.** This is required for every push.
 - Run `make jupyter-multi-arch` to build and push the multi-arch `jupyter` image.
-- Deploy the new image to the Kubernetes environment after image publication.
+
+### 5. Deploy
+
+- Deploy the new image to the Kubernetes environment after image publication. Deployment steps are specific to your infrastructure and outside the scope of this workflow.
 
 ## Multi-Platform Image Setup
 

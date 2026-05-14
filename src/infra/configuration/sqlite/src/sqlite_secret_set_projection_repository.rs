@@ -29,58 +29,6 @@ pub struct SqliteSecretSetProjectionRepository {
 
 #[async_trait::async_trait]
 impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[SecretSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-        let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
-
-        for entry in entries {
-            let account_id = entry.account_id.to_string();
-
-            let insert_result = sqlx::query!(
-                r#"
-                INSERT INTO config_secret_set_entries (
-                    entry_id,
-                    resource_uid,
-                    resource_generation,
-                    account_id,
-                    secret_key,
-                    value,
-                    secret_nonce,
-                    updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                "#,
-                entry.entry_id,
-                resource_uid,
-                resource_generation,
-                account_id,
-                entry.key,
-                entry.value,
-                entry.secret_nonce,
-                entry.updated_at,
-            )
-            .execute(&mut *connection_mut)
-            .await;
-
-            match insert_result {
-                Ok(_) => {}
-                Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                    return Err(ReplaceProjectionEntriesError::concurrent_modification());
-                }
-                Err(e) => return Err(e.int_err().into()),
-            }
-        }
-
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -89,6 +37,7 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
     ) -> Result<Option<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -101,6 +50,7 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
                 secret_key as key,
                 value as "value: _",
                 secret_nonce as "secret_nonce: _",
+                created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_secret_set_entries
             WHERE resource_uid = $1
@@ -125,6 +75,7 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -137,6 +88,7 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
                 secret_key as key,
                 value as "value: _",
                 secret_nonce as "secret_nonce: _",
+                created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>"
             FROM config_secret_set_entries
             WHERE resource_uid = $1
@@ -153,6 +105,141 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
         Ok(rows)
     }
 
+    async fn get_latest_entries(
+        &self,
+        resource_uid: &ResourceUID,
+    ) -> Result<Vec<SecretSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let rows = sqlx::query_as!(
+            SecretSetEntry,
+            r#"
+            SELECT
+                e.entry_id as "entry_id: Uuid",
+                e.account_id as "account_id: odf::AccountID",
+                e.secret_key as key,
+                e.value as "value: _",
+                e.secret_nonce as "secret_nonce: _",
+                e.created_at as "created_at: DateTime<Utc>",
+                e.updated_at as "updated_at: DateTime<Utc>"
+            FROM config_secret_set_entries e
+            JOIN resources r ON r.resource_uid = e.resource_uid
+                AND r.generation = e.resource_generation
+                AND r.deleted_at IS NULL
+            WHERE e.resource_uid = $1
+            ORDER BY e.secret_key
+            "#,
+            resource_uid,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+    ) -> Result<Vec<SecretSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let rows = sqlx::query_as!(
+            SecretSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: Uuid",
+                account_id as "account_id: odf::AccountID",
+                secret_key as key,
+                value as "value: _",
+                secret_nonce as "secret_nonce: _",
+                created_at as "created_at: DateTime<Utc>",
+                updated_at as "updated_at: DateTime<Utc>"
+            FROM config_secret_set_entries
+            WHERE resource_uid = $1
+              AND resource_generation = (
+                  SELECT MAX(resource_generation)
+                  FROM config_secret_set_entries
+                  WHERE resource_uid = $1
+                    AND resource_generation < $2
+              )
+            ORDER BY secret_key
+            "#,
+            resource_uid,
+            resource_generation,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[SecretSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            INSERT INTO config_secret_set_entries (
+                entry_id,
+                resource_uid,
+                resource_generation,
+                account_id,
+                secret_key,
+                value,
+                secret_nonce,
+                created_at,
+                updated_at
+            )
+            "#,
+        );
+
+        query_builder.push_values(entries, |mut b, entry| {
+            b.push_bind(entry.entry_id);
+            b.push_bind(*resource_uid);
+            b.push_bind(resource_generation);
+            b.push_bind(entry.account_id.to_string());
+            b.push_bind(&entry.key);
+            b.push_bind(&entry.value);
+            b.push_bind(&entry.secret_nonce);
+            b.push_bind(entry.created_at);
+            b.push_bind(entry.updated_at);
+        });
+
+        let insert_result = query_builder.build().execute(&mut *connection_mut).await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
+            }
+            Err(e) => return Err(e.int_err().into()),
+        }
+
+        Ok(())
+    }
+
     async fn cleanup_entries_before_generation(
         &self,
         resource_uid: &ResourceUID,
@@ -160,6 +247,7 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
+
         let resource_generation = i64::try_from(resource_generation).unwrap();
         let resource_uid: &uuid::Uuid = resource_uid.as_ref();
 
@@ -175,6 +263,34 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
         .execute(&mut *connection_mut)
         .await
         .int_err()?;
+
+        Ok(())
+    }
+
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
+        if resource_uids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "DELETE FROM config_secret_set_entries WHERE resource_uid IN (",
+        );
+        let mut separated = query_builder.separated(", ");
+        for uid in &uids {
+            separated.push_bind(*uid);
+        }
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(&mut *connection_mut)
+            .await
+            .int_err()?;
 
         Ok(())
     }

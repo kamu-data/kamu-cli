@@ -167,7 +167,7 @@ where
             ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
                 ResourceLifecycleMessage::reconciliation_failed(failed_message.event_time, snapshot)
             }
-            ResourceLifecycleMessage::Applied(_) => {
+            ResourceLifecycleMessage::Applied(_) | ResourceLifecycleMessage::Deleted(_) => {
                 unreachable!("reconcile use case must only emit reconciliation outcome messages")
             }
         };

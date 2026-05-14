@@ -50,6 +50,10 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
             ) -> Result<(), internal_error::InternalError> {
                 Ok(())
             }
+
+            async fn handle_deleted(&self, resource: &kamu_resources::ResourceSnapshot) -> Result<(), internal_error::InternalError> {
+                Ok(())
+            }
         }
     };
 }

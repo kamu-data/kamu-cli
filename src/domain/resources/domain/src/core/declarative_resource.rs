@@ -13,7 +13,9 @@ use crate::{ResourceMetadata, ResourceSnapshot, ResourceStatusLike, ResourceUID}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait DeclarativeResource: Sized + Send + Sync + AsRef<Self::ResourceState> {
+pub trait DeclarativeResource:
+    Sized + Send + Sync + std::fmt::Debug + AsRef<Self::ResourceState>
+{
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
     type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>

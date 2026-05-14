@@ -52,16 +52,17 @@ impl VariableSetSpec {
 
     pub const WARNING_CODE_RESERVED_VARIABLE_PREFIX: &str = "reserved_variable_prefix";
     pub const WARNING_CODE_LONG_VARIABLE_VALUE: &str = "long_variable_value";
+    pub const WARNING_CODE_LOWERCASE_VARIABLE_NAME: &str = "lowercase_variable_name";
 
     fn is_valid_variable_name(name: &str) -> bool {
         let mut chars = name.chars();
 
         match chars.next() {
-            Some(c) if c == '_' || c.is_ascii_uppercase() => {}
+            Some(c) if c == '_' || c.is_ascii_alphabetic() => {}
             _ => return false,
         }
 
-        chars.all(|c| c == '_' || c.is_ascii_uppercase() || c.is_ascii_digit())
+        chars.all(|c| c == '_' || c.is_ascii_alphabetic() || c.is_ascii_digit())
     }
 }
 
@@ -130,6 +131,18 @@ impl ResourceLinterSpec for VariableSetSpec {
                 });
             }
 
+            if name.chars().any(|c| c.is_ascii_lowercase()) {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_LOWERCASE_VARIABLE_NAME,
+                    path: Some(format!("spec.variables.{name}")),
+                    message: format!(
+                        "Variable '{name}' uses lowercase letters; prefer uppercase names like \
+                         '{}'",
+                        name.to_uppercase()
+                    ),
+                });
+            }
+
             if value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_LONG_VARIABLE_VALUE,
@@ -161,7 +174,7 @@ pub enum VariableSetSpecValidationError {
     #[error("too many variables: got {actual}, max is {max}")]
     TooManyVariables { actual: usize, max: usize },
 
-    #[error("invalid variable name '{name}': expected regex ^[A-Z_][A-Z0-9_]*$")]
+    #[error("invalid variable name '{name}': expected regex ^[A-Za-z_][A-Za-z0-9_]*$")]
     InvalidVariableName { name: String },
 
     #[error("variable '{name}' has empty value")]
@@ -278,6 +291,168 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn lints_reserved_prefix_warning() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = VariableSetSpec {
+            variables: [(
+                "KAMU_INTERNAL".to_string(),
+                VariableSpec::Literal("value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpec::WARNING_CODE_RESERVED_VARIABLE_PREFIX
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.KAMU_INTERNAL".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_lowercase_name_warning() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = VariableSetSpec {
+            variables: [(
+                "my_variable".to_string(),
+                VariableSpec::Literal("value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpec::WARNING_CODE_LOWERCASE_VARIABLE_NAME
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.my_variable".to_string())
+        );
+        assert!(warnings[0].message.contains("MY_VARIABLE"));
+    }
+
+    #[test]
+    fn lints_long_value_warning_literal() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
+        let spec = VariableSetSpec {
+            variables: [(
+                "CONFIG_VALUE".to_string(),
+                VariableSpec::Literal(long_value),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.CONFIG_VALUE".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_long_value_warning_structured() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
+        let spec = VariableSetSpec {
+            variables: [(
+                "CONFIG_VALUE".to_string(),
+                VariableSpec::Value(VariableValueSpec { value: long_value }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.CONFIG_VALUE.value".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_multiple_warnings() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
+        let spec = VariableSetSpec {
+            variables: [
+                (
+                    "KAMU_CONFIG".to_string(),
+                    VariableSpec::Literal("short".to_string()),
+                ),
+                ("my_var".to_string(), VariableSpec::Literal(long_value)),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 3);
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_RESERVED_VARIABLE_PREFIX)
+                .count(),
+            1
+        );
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_LOWERCASE_VARIABLE_NAME)
+                .count(),
+            1
+        );
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn lints_no_warnings_for_valid_variable() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = VariableSetSpec {
+            variables: [(
+                "INPUT_TOPIC".to_string(),
+                VariableSpec::Literal("analytics.events".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 0);
     }
 }
 

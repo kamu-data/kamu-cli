@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
 use internal_error::ErrorIntoInternal;
 use secrecy::{ExposeSecret, SecretString};
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +20,6 @@ pub const SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZO
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DatasetEnvVar {
-    pub id: Uuid,
     pub key: String,
     pub value: Vec<u8>,
     pub secret_nonce: Option<Vec<u8>>,
@@ -37,7 +35,6 @@ impl DatasetEnvVar {
         dataset_id: &odf::DatasetID,
         encryption_key: &str,
     ) -> Result<Self, EncryptionError> {
-        let dataset_env_var_id = Uuid::new_v4();
         let mut secret_nonce: Option<Vec<u8>> = None;
         let final_value: Vec<u8>;
 
@@ -53,7 +50,6 @@ impl DatasetEnvVar {
         }
 
         Ok(DatasetEnvVar {
-            id: dataset_env_var_id,
             value: final_value,
             secret_nonce,
             key: dataset_env_var_key.to_string(),
@@ -103,31 +99,6 @@ impl DatasetEnvVar {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(feature = "sqlx")]
-#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct DatasetEnvVarRowModel {
-    pub id: Uuid,
-    pub key: String,
-    pub value: Vec<u8>,
-    pub secret_nonce: Option<Vec<u8>>,
-    pub created_at: DateTime<Utc>,
-    pub dataset_id: odf::DatasetID,
-}
-
-#[cfg(feature = "sqlx")]
-impl From<DatasetEnvVarRowModel> for DatasetEnvVar {
-    fn from(value: DatasetEnvVarRowModel) -> Self {
-        DatasetEnvVar {
-            id: value.id,
-            key: value.key,
-            value: value.value,
-            secret_nonce: value.secret_nonce,
-            created_at: value.created_at,
-            dataset_id: value.dataset_id,
-        }
-    }
-}
 
 pub enum DatasetEnvVarValue {
     Secret(SecretString),
@@ -233,3 +204,5 @@ mod tests {
         assert_eq!(value, original_value.as_str());
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

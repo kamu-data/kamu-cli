@@ -7,12 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
+mod dataset_env_var_mutation_adapter;
+mod dataset_env_var_resolver;
 mod dependencies;
 mod message_handlers;
 mod reconcilers;
 mod resource_crud_dispatchers;
 mod resources;
 
+pub use dataset_env_var_mutation_adapter::*;
+pub use dataset_env_var_resolver::*;
 pub use dependencies::*;
 pub use reconcilers::*;
 pub use resource_crud_dispatchers::*;

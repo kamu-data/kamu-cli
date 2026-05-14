@@ -22,12 +22,15 @@ doctest = false
 
 
 [dependencies]
+kamu-accounts = { workspace = true }
 kamu-configuration = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-resources = { workspace = true }
 odf = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
+email-utils = { workspace = true }
 serde_json = "1"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 

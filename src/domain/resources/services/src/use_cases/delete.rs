@@ -9,7 +9,10 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use internal_error::ErrorIntoInternal;
+use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -21,6 +24,7 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceNotOwnedByAccountError,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceStatusLike,
@@ -36,6 +40,7 @@ where
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+    outbox: &'a dyn Outbox,
     time_source: &'a dyn SystemTimeSource,
 }
 
@@ -51,12 +56,14 @@ where
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+        outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             generic_resource_query_service,
             resource_aggregate_loader,
             resource_persistence_service,
+            outbox,
             time_source,
         }
     }
@@ -66,32 +73,48 @@ where
         account_id: odf::AccountID,
         uids: Vec<ResourceUID>,
     ) -> Result<(), DeleteResourcesError> {
+        let now = self.time_source.now();
+
         let unique_uids = uids
             .into_iter()
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
 
-        let owned_snapshots = self
+        let outcome = self
             .generic_resource_query_service
-            .find_owned_snapshots(&account_id, R::DESCRIPTOR.resource_type, &unique_uids)
-            .await?;
+            .find_owned_snapshots(
+                &account_id,
+                R::DESCRIPTOR.resource_type,
+                R::DESCRIPTOR.api_version,
+                &unique_uids,
+            )
+            .await
+            .map_err(DeleteResourcesError::Internal)?;
 
-        let owned_uids = owned_snapshots
+        if let Some(&uid) = outcome.access_denied.first() {
+            return Err(DeleteResourcesError::Access(
+                odf::AccessError::Unauthorized(
+                    ResourceNotOwnedByAccountError {
+                        uid,
+                        resource_type: R::DESCRIPTOR.resource_type,
+                    }
+                    .into(),
+                ),
+            ));
+        }
+
+        let owned_resource_uids = outcome
+            .found
             .into_iter()
             .map(|snapshot| snapshot.uid)
-            .collect::<HashSet<_>>();
-
-        let owned_resource_uids = unique_uids
-            .into_iter()
-            .filter(|uid| owned_uids.contains(uid))
             .collect::<Vec<_>>();
 
         let mut resources = self.load_resources(&owned_resource_uids).await?;
 
         match self
             .resource_persistence_service
-            .delete_many(&mut resources, self.time_source.now())
+            .delete_many(&mut resources, now)
             .await
         {
             Ok(()) => Ok(()),
@@ -104,7 +127,11 @@ where
             Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
                 err.with_context("Failed to persist deleted resources"),
             )),
-        }
+        }?;
+
+        self.notify_resources_deleted(now, resources).await?;
+
+        Ok(())
     }
 
     async fn load_resources(&self, uids: &[ResourceUID]) -> Result<Vec<R>, DeleteResourcesError> {
@@ -131,6 +158,31 @@ where
             })
             .collect()
     }
+
+    async fn notify_resources_deleted(
+        &self,
+        now: DateTime<Utc>,
+        resources: Vec<R>,
+    ) -> Result<(), DeleteResourcesError> {
+        let resource_snashots = resources
+            .into_iter()
+            .map(|resource| {
+                resource
+                    .make_resource_snapshot()
+                    .map_err(DeleteResourcesError::Internal)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                ResourceLifecycleMessage::deleted(now, resource_snashots),
+            )
+            .await
+            .map_err(DeleteResourcesError::Internal)?;
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,6 +202,7 @@ macro_rules! declare_delete_resources_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            outbox: std::sync::Arc<dyn messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
@@ -164,6 +217,7 @@ macro_rules! declare_delete_resources_use_case {
                     self.generic_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
+                    self.outbox.as_ref(),
                     self.time_source.as_ref(),
                 );
 

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                dataset_id as \"dataset_id: odf::DatasetID\",\n                resource_uid as \"resource_uid: Uuid\",\n                binding_order as \"binding_order: i64\"\n            FROM config_dataset_variable_set_bindings\n            WHERE dataset_id = $1\n            ORDER BY binding_order\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id: odf::DatasetID",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "resource_uid: Uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "binding_order: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "10d49da1b3bfb7850d4e0f428f25968f1289dd81cf2bf89601c16f2874a16a4d"
+}

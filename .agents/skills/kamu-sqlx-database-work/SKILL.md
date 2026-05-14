@@ -9,12 +9,17 @@ Use compile-time SQL checking for DB-backed repositories.
 
 ## Query Style
 
-- Prefer `sqlx::query!`, `sqlx::query_as!`, and related SQLx macros over function-based queries.
-- Do not assume Postgres is unavailable; this repo uses a local Dockerized Postgres for SQLx macro validation.
-- SQLite-backed repositories have a local database setup for the same purpose.
-- Keep repository layers simple; put domain-level algorithms in services unless storage-specific behavior is the actual concern.
-- Declare row structs implementing `sqlx::FromRow` for query results instead of using name-based dynamic column resolutions. When these can be shared across Postgres/SQLite,
-  place them in a domain crate where repository traits are defined, and use `cfg_attr` to derive `sqlx::FromRow` only when the SQLx feature is enabled. For example:
+### Basic Rules
+
+1. **Prefer SQLx macros**: Use `sqlx::query!`, `sqlx::query_as!`, and related macros over function-based queries for compile-time checking.
+2. **Local DB validation is available**: Do not assume Postgres or SQLite are unavailable — this repo uses local Dockerized databases for SQLx macro validation.
+3. **Keep repositories storage-focused**: Put domain-level algorithms in services unless storage-specific behavior is the actual concern.
+
+### Row Structs
+
+4. **Declare explicit row structs**: Implement `sqlx::FromRow` for query results instead of using name-based dynamic column resolutions.
+5. **Use `query_as!` with structs**: Ensure compile-time column verification and avoid runtime column name lookups.
+6. **Share structs across databases when possible**: When row structs can be shared across Postgres/SQLite, place them in a domain crate where repository traits are defined, and use `cfg_attr` to conditionally derive `sqlx::FromRow`:
 
 ```rust
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
@@ -26,8 +31,6 @@ pub struct MyEntityRow {
 }
 
 ```
-
-- Use `query_as!` and related SQLX macros with explicit struct types to ensure compile-time column verification and avoid runtime column name lookups.
 
 ### Avoiding dynamic QueryBuilder in Postgres
 

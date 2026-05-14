@@ -52,16 +52,17 @@ impl SecretSetSpec {
 
     pub const WARNING_CODE_RESERVED_SECRET_PREFIX: &str = "reserved_secret_prefix";
     pub const WARNING_CODE_LONG_SECRET_VALUE: &str = "long_secret_value";
+    pub const WARNING_CODE_LOWERCASE_SECRET_NAME: &str = "lowercase_secret_name";
 
     fn is_valid_secret_name(name: &str) -> bool {
         let mut chars = name.chars();
 
         match chars.next() {
-            Some(c) if c == '_' || c.is_ascii_uppercase() => {}
+            Some(c) if c == '_' || c.is_ascii_alphabetic() => {}
             _ => return false,
         }
 
-        chars.all(|c| c == '_' || c.is_ascii_uppercase() || c.is_ascii_digit())
+        chars.all(|c| c == '_' || c.is_ascii_alphabetic() || c.is_ascii_digit())
     }
 }
 
@@ -126,6 +127,17 @@ impl ResourceLinterSpec for SecretSetSpec {
                 });
             }
 
+            if name.chars().any(|c| c.is_ascii_lowercase()) {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_LOWERCASE_SECRET_NAME,
+                    path: Some(format!("spec.secrets.{name}")),
+                    message: format!(
+                        "Secret '{name}' uses lowercase letters; prefer uppercase names like '{}'",
+                        name.to_uppercase()
+                    ),
+                });
+            }
+
             if value.len() > Self::WARNING_SECRET_VALUE_LEN {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_LONG_SECRET_VALUE,
@@ -157,7 +169,7 @@ pub enum SecretSetSpecValidationError {
     #[error("too many secrets: got {actual}, max is {max}")]
     TooManySecrets { actual: usize, max: usize },
 
-    #[error("invalid secret name '{name}': expected regex ^[A-Z_][A-Z0-9_]*$")]
+    #[error("invalid secret name '{name}': expected regex ^[A-Za-z_][A-Za-z0-9_]*$")]
     InvalidSecretName { name: String },
 
     #[error("secret '{name}' has empty value")]
@@ -274,6 +286,162 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn lints_reserved_prefix_warning() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "KAMU_INTERNAL".to_string(),
+                SecretSpec::Literal("value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpec::WARNING_CODE_RESERVED_SECRET_PREFIX
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.secrets.KAMU_INTERNAL".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_lowercase_name_warning() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "my_secret".to_string(),
+                SecretSpec::Literal("value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpec::WARNING_CODE_LOWERCASE_SECRET_NAME
+        );
+        assert_eq!(warnings[0].path, Some("spec.secrets.my_secret".to_string()));
+        assert!(warnings[0].message.contains("MY_SECRET"));
+    }
+
+    #[test]
+    fn lints_long_value_warning_literal() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = SecretSetSpec {
+            secrets: [("SECRET_KEY".to_string(), SecretSpec::Literal(long_value))]
+                .into_iter()
+                .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.secrets.SECRET_KEY".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_long_value_warning_structured() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = SecretSetSpec {
+            secrets: [(
+                "SECRET_KEY".to_string(),
+                SecretSpec::Value(SecretValueSpec { value: long_value }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.secrets.SECRET_KEY.value".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_multiple_warnings() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = SecretSetSpec {
+            secrets: [
+                (
+                    "KAMU_TOKEN".to_string(),
+                    SecretSpec::Literal("short".to_string()),
+                ),
+                ("my_key".to_string(), SecretSpec::Literal(long_value)),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 3);
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_RESERVED_SECRET_PREFIX)
+                .count(),
+            1
+        );
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_LOWERCASE_SECRET_NAME)
+                .count(),
+            1
+        );
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn lints_no_warnings_for_valid_secret() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Literal("secret-value".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 0);
     }
 }
 

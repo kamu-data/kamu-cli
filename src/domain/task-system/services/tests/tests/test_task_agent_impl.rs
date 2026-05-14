@@ -17,8 +17,8 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
-use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
@@ -198,8 +198,7 @@ impl TaskAgentHarness {
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-            .add::<DatasetEnvVarServiceImpl>()
-            .add::<InMemoryDatasetEnvVarRepository>()
+            .add::<DatasetEnvVarServiceNull>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(

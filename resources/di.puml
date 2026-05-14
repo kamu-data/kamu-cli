@@ -44,7 +44,8 @@ interface "DatasetEntryRemovalListener" <<i>>
 interface "DatasetEntryRepository" <<i>>
 interface "DatasetEntryService" <<i>>
 interface "DatasetEntryWriter" <<i>>
-interface "DatasetEnvVarRepository" <<i>>
+interface "DatasetEnvVarMutationAdapter" <<i>>
+interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
 interface "DatasetFactory" <<i>>
 interface "DatasetIncrementQueryService" <<i>>
@@ -55,10 +56,12 @@ interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
 interface "DatasetSearchService" <<i>>
+interface "DatasetSecretSetBindingRepository" <<i>>
 interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
+interface "DatasetVariableSetBindingRepository" <<i>>
 interface "DeleteAccountResourcesUseCase" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
@@ -206,6 +209,7 @@ class "CompactDatasetUseCaseImpl"
 class "CompactionExecutorImpl"
 class "CompactionPlannerImpl"
 class "ConfigService"
+class "ConfigurationDatasetLifecycleMessageConsumer"
 class "ConfigurationResourceLifecycleMessageConsumer"
 class "ConfirmDeleteService"
 class "ContainerRuntime"
@@ -226,6 +230,8 @@ class "DatasetBlockIndexer"
 class "DatasetBlockUpdateHandler"
 class "DatasetEntryIndexer"
 class "DatasetEntryServiceImpl"
+class "DatasetEnvVarMutationAdapterImpl"
+class "DatasetEnvVarResolverImpl"
 class "DatasetEnvVarServiceNull"
 class "DatasetEnvVarsConfig" <<singleton>>
 class "DatasetFactoryImpl"
@@ -402,10 +408,11 @@ class "SqliteAccountRepository"
 class "SqliteDatasetDataBlockRepository"
 class "SqliteDatasetDependencyRepository"
 class "SqliteDatasetEntryRepository"
-class "SqliteDatasetEnvVarRepository"
 class "SqliteDatasetKeyBlockRepository"
 class "SqliteDatasetReferenceRepository"
+class "SqliteDatasetSecretSetBindingRepository"
 class "SqliteDatasetStatisticsRepository"
+class "SqliteDatasetVariableSetBindingRepository"
 class "SqliteDidSecretKeyRepository"
 class "SqliteEmbeddingsCacheRepository"
 class "SqliteFlowConfigurationEventStore"
@@ -817,6 +824,22 @@ class "WsSmartTransferProtocolClient"
 "ResourceSummaryServiceImpl"  --> "ResourceContextResolver"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
+"DatasetEnvVarMutationAdapter" <|-- "DatasetEnvVarMutationAdapterImpl"
+"DatasetEnvVarMutationAdapterImpl"  --> "Catalog"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetSecretSetBindingRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetVariableSetBindingRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "SecretSetProjectionRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "VariableSetProjectionRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetEntryRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "GenericResourceQueryService"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetEnvVarsConfig"
+"DatasetEnvVarResolver" <|-- "DatasetEnvVarResolverImpl"
+"DatasetEnvVarResolverImpl"  --> "DatasetSecretSetBindingRepository"
+"DatasetEnvVarResolverImpl"  --> "DatasetVariableSetBindingRepository"
+"DatasetEnvVarResolverImpl"  --> "SecretSetProjectionRepository"
+"DatasetEnvVarResolverImpl"  --> "VariableSetProjectionRepository"
+"MessageConsumer" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ConfigurationResourceLifecycleMessageConsumer"
 "Reconciler" <|-- "SecretSetReconcilerImpl"
@@ -851,6 +874,7 @@ class "WsSmartTransferProtocolClient"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "Outbox"
 "SecretSetDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
 "SecretSetEventStore" <|-- "SecretSetEventStoreBridge"
 "SecretSetEventStoreBridge"  --> "ResourceRawEventStore"
@@ -881,6 +905,7 @@ class "WsSmartTransferProtocolClient"
 "VariableSetDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
 "VariableSetDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
 "VariableSetDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "Outbox"
 "VariableSetDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
 "VariableSetEventStore" <|-- "VariableSetEventStoreBridge"
 "VariableSetEventStoreBridge"  --> "ResourceRawEventStore"
@@ -900,6 +925,10 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
 "VariableSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
+"DatasetSecretSetBindingRepository" <|-- "SqliteDatasetSecretSetBindingRepository"
+"SqliteDatasetSecretSetBindingRepository"  --> "TransactionRefT"
+"DatasetVariableSetBindingRepository" <|-- "SqliteDatasetVariableSetBindingRepository"
+"SqliteDatasetVariableSetBindingRepository"  --> "TransactionRefT"
 "SecretSetProjectionRepository" <|-- "SqliteSecretSetProjectionRepository"
 "SqliteSecretSetProjectionRepository"  --> "TransactionRefT"
 "VariableSetProjectionRepository" <|-- "SqliteVariableSetProjectionRepository"
@@ -1069,8 +1098,6 @@ class "WsSmartTransferProtocolClient"
 "DatasetEntryRepository" <|-- "SqliteDatasetEntryRepository"
 "SqliteDatasetEntryRepository"  --> "TransactionRefT"
 "SqliteDatasetEntryRepository" "*" --> "DatasetEntryRemovalListener"
-"DatasetEnvVarRepository" <|-- "SqliteDatasetEnvVarRepository"
-"SqliteDatasetEnvVarRepository"  --> "TransactionRefT"
 "DatasetKeyBlockRepository" <|-- "SqliteDatasetKeyBlockRepository"
 "SqliteDatasetKeyBlockRepository"  --> "TransactionRefT"
 "DatasetReferenceRepository" <|-- "SqliteDatasetReferenceRepository"
@@ -1146,6 +1173,7 @@ class "WsSmartTransferProtocolClient"
 "StorageDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
 "StorageDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
 "StorageDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"StorageDeleteResourcesUseCaseImpl"  --> "Outbox"
 "StorageDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
 "StorageEventStore" <|-- "StorageEventStoreBridge"
 "StorageEventStoreBridge"  --> "ResourceRawEventStore"

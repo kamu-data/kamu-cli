@@ -29,6 +29,8 @@ pub trait ResourceLifecycleEventDispatcher: Send + Sync {
         &self,
         resource: &ResourceSnapshot,
     ) -> Result<(), InternalError>;
+
+    async fn handle_deleted(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

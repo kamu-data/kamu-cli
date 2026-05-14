@@ -10,6 +10,9 @@
 use kamu_resources as domain;
 pub use messaging_outbox;
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 mod crud_dispatchers;
 mod dependencies;
 mod event_stores;

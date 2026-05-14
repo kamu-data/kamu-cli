@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+testing = ["dep:kamu-resources-inmem"]
 
 
 [dependencies]
@@ -33,10 +34,11 @@ messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-resources = { workspace = true }
+kamu-resources-inmem = { workspace = true, optional = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dill = { version = "0.15", default-features = false }
 enum-variants = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -49,3 +51,5 @@ paste = { version = "1", default-features = false }
 
 
 [dev-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tokio = { version = "1", default-features = false }

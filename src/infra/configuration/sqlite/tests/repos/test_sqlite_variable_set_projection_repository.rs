@@ -59,6 +59,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = variable_set_repo::test_get_latest_entries_before_generation,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = variable_set_repo::test_replace_entries_concurrent_modification,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
@@ -76,6 +84,30 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = variable_set_repo::test_cleanup_does_not_affect_other_resources,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_replace_preserves_stable_identity_and_creation_time,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_get_latest_entries,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_delete_all_entries,
     harness = SqliteVariableSetProjectionRepositoryHarness
 );
 

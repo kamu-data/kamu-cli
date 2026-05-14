@@ -10,6 +10,7 @@
 mod adapters;
 mod dataset;
 mod dataset_collaboration;
+mod dataset_configuration;
 mod dataset_data;
 mod dataset_endpoints;
 mod dataset_env_var;
@@ -29,6 +30,7 @@ mod metadata_chain;
 pub(crate) use adapters::*;
 pub(crate) use dataset::*;
 pub(crate) use dataset_collaboration::*;
+pub(crate) use dataset_configuration::*;
 pub(crate) use dataset_data::*;
 pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_env_var::*;

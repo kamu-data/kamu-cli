@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM config_variable_set_entries\n                WHERE resource_uid = ANY($1::uuid[])\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "afdea4c4c16d1d6a85dcebe656c7dd64c29cf7d89138d921245c2e794d9bf5c4"
+}
