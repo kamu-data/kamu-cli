@@ -25,15 +25,13 @@ async fn test_create_and_get_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-        "foo_value",
-        true,
-    );
-
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            true,
+        ))
         .await;
 
     assert_eq!(
@@ -51,11 +49,10 @@ async fn test_create_and_get_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
 
     assert_eq!(
@@ -78,11 +75,10 @@ async fn test_create_and_get_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -105,12 +101,10 @@ async fn test_create_and_get_dataset_env_var() {
     );
 
     let query_code = DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
-        created_dataset.dataset_handle.id.to_string().as_str(),
+        &created_dataset.dataset_handle.id,
         "foo",
     );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
-        .await;
+    let res = harness.execute_authorized_query(query_code).await;
     assert_eq!(
         res.data,
         value!({
@@ -132,15 +126,13 @@ async fn test_delete_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-        "foo_value",
-        true,
-    );
-
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            true,
+        ))
         .await;
 
     assert_eq!(
@@ -158,12 +150,9 @@ async fn test_delete_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
-        .await;
+    let query_code =
+        DatasetEnvVarsHarness::get_dataset_env_vars(&created_dataset.dataset_handle.id);
+    let res = harness.execute_authorized_query(query_code).await;
     assert_eq!(
         res.data,
         value!({
@@ -184,13 +173,11 @@ async fn test_delete_dataset_env_var() {
         })
     );
 
-    let mutation_code = DatasetEnvVarsHarness::delete_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-    );
-
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::delete_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+        ))
         .await;
 
     assert_eq!(
@@ -216,15 +203,13 @@ async fn test_modify_dataset_env_var() {
     let harness = DatasetEnvVarsHarness::new().await;
     let created_dataset = harness.create_dataset().await;
 
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-        "foo_value",
-        true,
-    );
-
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            true,
+        ))
         .await;
 
     assert_eq!(
@@ -242,15 +227,13 @@ async fn test_modify_dataset_env_var() {
         })
     );
 
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-        "new_foo_value",
-        false,
-    );
-
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "new_foo_value",
+            false,
+        ))
         .await;
 
     assert_eq!(
@@ -268,11 +251,10 @@ async fn test_modify_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
 
     assert_eq!(
@@ -304,14 +286,13 @@ async fn test_create_multiple_dataset_env_vars() {
     let created_dataset = harness.create_dataset().await;
 
     // Create first variable (secret)
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "var1",
-        "value1",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "var1",
+            "value1",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -329,14 +310,13 @@ async fn test_create_multiple_dataset_env_vars() {
     );
 
     // Create second variable (non-secret)
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "var2",
-        "value2",
-        false,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "var2",
+            "value2",
+            false,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -354,14 +334,13 @@ async fn test_create_multiple_dataset_env_vars() {
     );
 
     // Create third variable (secret)
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "var3",
-        "value3",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "var3",
+            "value3",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -379,11 +358,10 @@ async fn test_create_multiple_dataset_env_vars() {
     );
 
     // List all variables
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
 
     assert_eq!(
@@ -427,14 +405,13 @@ async fn test_delete_already_deleted_dataset_env_var() {
     let created_dataset = harness.create_dataset().await;
 
     // Create a variable
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-        "foo_value",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -452,13 +429,9 @@ async fn test_delete_already_deleted_dataset_env_var() {
     );
 
     // Delete it once
-    let mutation_code = DatasetEnvVarsHarness::delete_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "foo",
-    );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
-        .await;
+    let mutation_code =
+        DatasetEnvVarsHarness::delete_dataset_env(&created_dataset.dataset_handle.id, "foo");
+    let res = harness.execute_authorized_query(mutation_code).await;
     assert_eq!(
         res.data,
         value!({
@@ -476,7 +449,10 @@ async fn test_delete_already_deleted_dataset_env_var() {
 
     // Try to delete it again - should get NotFound
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::delete_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+        ))
         .await;
 
     // Should get DeleteDatasetEnvVarResultNotFound
@@ -504,14 +480,13 @@ async fn test_update_dataset_env_var_keep_secret_flag() {
     let created_dataset = harness.create_dataset().await;
 
     // Create a secret variable
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "secret_var",
-        "secret_value",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "secret_var",
+            "secret_value",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -529,14 +504,13 @@ async fn test_update_dataset_env_var_keep_secret_flag() {
     );
 
     // Update it while keeping it secret
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "secret_var",
-        "new_secret_value",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "secret_var",
+            "new_secret_value",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -554,11 +528,10 @@ async fn test_update_dataset_env_var_keep_secret_flag() {
     );
 
     // Verify it's still secret
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -581,12 +554,11 @@ async fn test_update_dataset_env_var_keep_secret_flag() {
     );
 
     // Verify exposed value was updated
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "secret_var",
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
+            &created_dataset.dataset_handle.id,
+            "secret_var",
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -610,14 +582,13 @@ async fn test_update_dataset_env_var_keep_non_secret_flag() {
     let created_dataset = harness.create_dataset().await;
 
     // Create a non-secret variable
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "public_var",
-        "public_value",
-        false,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "public_var",
+            "public_value",
+            false,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -635,14 +606,13 @@ async fn test_update_dataset_env_var_keep_non_secret_flag() {
     );
 
     // Update it while keeping it non-secret
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "public_var",
-        "new_public_value",
-        false,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "public_var",
+            "new_public_value",
+            false,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -660,11 +630,10 @@ async fn test_update_dataset_env_var_keep_non_secret_flag() {
     );
 
     // Verify it's still non-secret and value is updated
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -695,14 +664,13 @@ async fn test_change_dataset_env_var_from_non_secret_to_secret() {
     let created_dataset = harness.create_dataset().await;
 
     // Create a non-secret variable
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "changeable_var",
-        "initial_value",
-        false,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "changeable_var",
+            "initial_value",
+            false,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -720,11 +688,10 @@ async fn test_change_dataset_env_var_from_non_secret_to_secret() {
     );
 
     // Verify it's non-secret initially
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -747,14 +714,13 @@ async fn test_change_dataset_env_var_from_non_secret_to_secret() {
     );
 
     // Change it to secret
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "changeable_var",
-        "secret_value",
-        true,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "changeable_var",
+            "secret_value",
+            true,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -773,7 +739,9 @@ async fn test_change_dataset_env_var_from_non_secret_to_secret() {
 
     // Verify it's now secret
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -796,12 +764,11 @@ async fn test_change_dataset_env_var_from_non_secret_to_secret() {
     );
 
     // Verify exposed value is updated
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "changeable_var",
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(query_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
+            &created_dataset.dataset_handle.id,
+            "changeable_var",
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -825,14 +792,13 @@ async fn test_upsert_dataset_env_var_up_to_date() {
     let created_dataset = harness.create_dataset().await;
 
     // Create a variable
-    let mutation_code = DatasetEnvVarsHarness::upsert_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "my_var",
-        "my_value",
-        false,
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code.clone()))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "my_var",
+            "my_value",
+            false,
+        ))
         .await;
     assert_eq!(
         res.data,
@@ -851,7 +817,12 @@ async fn test_upsert_dataset_env_var_up_to_date() {
 
     // Update it with the exact same value and secret flag
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "my_var",
+            "my_value",
+            false,
+        ))
         .await;
 
     // Currently the implementation returns Updated even for unchanged values
@@ -881,12 +852,11 @@ async fn test_delete_non_existent_dataset_env_var() {
     let created_dataset = harness.create_dataset().await;
 
     // Try to delete a variable that was never created
-    let mutation_code = DatasetEnvVarsHarness::delete_dataset_env(
-        created_dataset.dataset_handle.id.to_string().as_str(),
-        "non_existent_var",
-    );
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(mutation_code))
+        .execute_authorized_query(DatasetEnvVarsHarness::delete_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "non_existent_var",
+        ))
         .await;
 
     // Should get DeleteDatasetEnvVarResultNotFound
@@ -968,12 +938,12 @@ impl DatasetEnvVarsHarness {
             .unwrap()
     }
 
-    fn get_dataset_env_vars(dataset_id: &str) -> String {
-        indoc!(
+    fn get_dataset_env_vars(dataset_id: &odf::DatasetID) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
             r#"
-            query Datasets {
+            query ($datasetId: DatasetID!) {
                 datasets {
-                    byId(datasetId: "<dataset_id>") {
+                    byId(datasetId: $datasetId) {
                         envVars {
                             listEnvVariables(page: 0, perPage: 5) {
                                 totalCount
@@ -988,41 +958,48 @@ impl DatasetEnvVarsHarness {
                 }
             }
             "#
-        )
-        .replace("<dataset_id>", dataset_id)
+        ))
+        .variables(async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": dataset_id,
+        })))
     }
 
-    fn get_dataset_env_var_exposed_value(dataset_id: &str, dataset_env_var_key: &str) -> String {
-        indoc!(
+    fn get_dataset_env_var_exposed_value(
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
+    ) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
             r#"
-            query Datasets {
+            query ($datasetId: DatasetID!, $key: String!) {
                 datasets {
-                    byId(datasetId: "<dataset_id>") {
+                    byId(datasetId: $datasetId) {
                         envVars {
-                            exposedValue(datasetEnvVarKey: "<dataset_env_var_key>")
+                            exposedValue(datasetEnvVarKey: $key)
                         }
                     }
                 }
             }
             "#
-        )
-        .replace("<dataset_id>", dataset_id)
-        .replace("<dataset_env_var_key>", dataset_env_var_key)
+        ))
+        .variables(async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": dataset_id,
+            "key": dataset_env_var_key,
+        })))
     }
 
     fn upsert_dataset_env(
-        dataset_id: &str,
+        dataset_id: &odf::DatasetID,
         env_var_key: &str,
         env_var_value: &str,
         is_secret: bool,
-    ) -> String {
-        indoc!(
+    ) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
             r#"
-            mutation {
+            mutation ($datasetId: DatasetID!, $key: String!, $value: String!, $isSecret: Boolean!) {
                 datasets {
-                    byId(datasetId: "<dataset_id>") {
+                    byId(datasetId: $datasetId) {
                         envVars {
-                            upsertEnvVariable(key: "<env_var_key>", value: "<env_var_value>", isSecret: <is_secret>) {
+                            upsertEnvVariable(key: $key, value: $value, isSecret: $isSecret) {
                                 message
                             }
                         }
@@ -1030,21 +1007,26 @@ impl DatasetEnvVarsHarness {
                 }
             }
             "#
-        )
-        .replace("<dataset_id>", dataset_id)
-        .replace("<env_var_key>", env_var_key)
-        .replace("<env_var_value>", env_var_value)
-        .replace("<is_secret>", if is_secret { "true" } else { "false" })
+        ))
+        .variables(async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": dataset_id,
+            "key": env_var_key,
+            "value": env_var_value,
+            "isSecret": is_secret,
+        })))
     }
 
-    fn delete_dataset_env(dataset_id: &str, env_var_key: &str) -> String {
-        indoc!(
+    fn delete_dataset_env(
+        dataset_id: &odf::DatasetID,
+        env_var_key: &str,
+    ) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
             r#"
-            mutation {
+            mutation ($datasetId: DatasetID!, $key: String!) {
                 datasets {
-                    byId(datasetId: "<dataset_id>") {
+                    byId(datasetId: $datasetId) {
                         envVars {
-                            deleteEnvVariable(key: "<env_var_key>") {
+                            deleteEnvVariable(key: $key) {
                                 message
                             }
                         }
@@ -1052,9 +1034,11 @@ impl DatasetEnvVarsHarness {
                 }
             }
             "#
-        )
-        .replace("<dataset_id>", dataset_id)
-        .replace("<env_var_key>", env_var_key)
+        ))
+        .variables(async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": dataset_id,
+            "key": env_var_key,
+        })))
     }
 }
 
