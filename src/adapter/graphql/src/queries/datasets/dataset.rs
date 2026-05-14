@@ -164,6 +164,11 @@ impl Dataset {
         DatasetEnvVars::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
+    /// Access to the explicit configuration bindings of this dataset
+    async fn configuration(&self, ctx: &Context<'_>) -> Result<DatasetConfiguration<'_>> {
+        DatasetConfiguration::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
     /// Access to the flow configurations of this dataset
     async fn flows(&self) -> DatasetFlows<'_> {
         DatasetFlows::new(&self.dataset_request_state)
@@ -216,6 +221,10 @@ impl Dataset {
             collaboration: DatasetCollaborationPermissions {
                 can_view: can_maintain,
                 can_update: can_maintain,
+            },
+            configuration: DatasetConfigurationPermissions {
+                can_view: is_owner,
+                can_update: is_owner,
             },
             env_vars: DatasetEnvVarsPermissions {
                 can_view: can_maintain,

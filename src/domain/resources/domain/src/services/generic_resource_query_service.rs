@@ -10,7 +10,14 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::{ResourceIdentityRow, ResourceName, ResourceSnapshot, ResourceSummaryRow, ResourceUID};
+use crate::{
+    ResourceIdentityRow,
+    ResourceName,
+    ResourceSnapshot,
+    ResourceSummaryRow,
+    ResourceTypeMismatchError,
+    ResourceUID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +66,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         kind: &'static str,
+        api_version: &'static str,
         uid: ResourceUID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
@@ -66,6 +74,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         kind: &'static str,
+        api_version: &'static str,
         uids: &[ResourceUID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
@@ -104,7 +113,12 @@ pub trait GenericResourceQueryService: Send + Sync {
 pub struct FindOwnedSnapshotsOutcome {
     pub found: Vec<ResourceSnapshot>,
     pub not_found: Vec<ResourceUID>,
-    pub kind_mismatch: Vec<ResourceUID>,
+    /// UIDs owned by the account but with a different kind:
+    /// (uid, `actual_kind`)
+    pub kind_mismatch: Vec<(ResourceUID, String)>,
+    /// UIDs owned by the account, correct kind,
+    /// but wrong `api_version`: (uid, `actual_api_version`)
+    pub api_version_mismatch: Vec<(ResourceUID, String)>,
     pub access_denied: Vec<ResourceUID>,
 }
 
@@ -118,6 +132,9 @@ pub enum FindOwnedResourceError {
         #[backtrace]
         odf::AccessError,
     ),
+
+    #[error(transparent)]
+    TypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
     Internal(#[from] internal_error::InternalError),

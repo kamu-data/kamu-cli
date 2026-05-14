@@ -83,7 +83,12 @@ where
 
         let outcome = self
             .generic_resource_query_service
-            .find_owned_snapshots(&account_id, R::DESCRIPTOR.resource_type, &unique_uids)
+            .find_owned_snapshots(
+                &account_id,
+                R::DESCRIPTOR.resource_type,
+                R::DESCRIPTOR.api_version,
+                &unique_uids,
+            )
             .await
             .map_err(DeleteResourcesError::Internal)?;
 

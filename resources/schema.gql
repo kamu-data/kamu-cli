@@ -1156,6 +1156,10 @@ type Dataset {
 	"""
 	envVars: DatasetEnvVars!
 	"""
+	Access to the explicit configuration bindings of this dataset
+	"""
+	configuration: DatasetConfiguration!
+	"""
 	Access to the flow configurations of this dataset
 	"""
 	flows: DatasetFlows!
@@ -1219,6 +1223,14 @@ enum DatasetArchetype {
 	VERSIONED_FILE
 }
 
+type DatasetBindingView {
+	resourceId: ResourceID!
+	bindingOrder: Int!
+	resourceName: String!
+	resourceKind: ResourceKind!
+	apiVersion: String!
+}
+
 type DatasetCollaboration {
 	"""
 	Accounts (and their roles) that have access to the dataset
@@ -1238,6 +1250,21 @@ type DatasetCollaborationMut {
 }
 
 type DatasetCollaborationPermissions {
+	canView: Boolean!
+	canUpdate: Boolean!
+}
+
+type DatasetConfiguration {
+	variableSetBindings: [DatasetBindingView!]!
+	secretSetBindings: [DatasetBindingView!]!
+}
+
+type DatasetConfigurationMut {
+	replaceVariableSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
+	replaceSecretSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
+}
+
+type DatasetConfigurationPermissions {
 	canView: Boolean!
 	canUpdate: Boolean!
 }
@@ -1560,6 +1587,10 @@ type DatasetMut {
 	"""
 	envVars: DatasetEnvVarsMut!
 	"""
+	Access to the mutable configuration bindings of this dataset
+	"""
+	configuration: DatasetConfigurationMut!
+	"""
 	Access to collaboration management methods
 	"""
 	collaboration: DatasetCollaborationMut!
@@ -1597,6 +1628,7 @@ scalar DatasetName
 
 type DatasetPermissions {
 	collaboration: DatasetCollaborationPermissions!
+	configuration: DatasetConfigurationPermissions!
 	envVars: DatasetEnvVarsPermissions!
 	flows: DatasetFlowsPermissions!
 	webhooks: DatasetWebhooksPermissions!
@@ -3723,6 +3755,43 @@ type RenameResultNoChanges implements RenameResult {
 type RenameResultSuccess implements RenameResult {
 	oldName: DatasetName!
 	newName: DatasetName!
+	message: String!
+}
+
+type ReplaceBindingsDuplicateResources implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	message: String!
+}
+
+type ReplaceBindingsResourceAccountMismatch implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	message: String!
+}
+
+type ReplaceBindingsResourceApiVersionMismatch implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	expectedApiVersion: String!
+	actualApiVersion: String!
+	message: String!
+}
+
+type ReplaceBindingsResourceKindMismatch implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	expectedKind: String!
+	actualKind: String!
+	message: String!
+}
+
+type ReplaceBindingsResourceNotFound implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	message: String!
+}
+
+interface ReplaceDatasetBindingsResult {
+	message: String!
+}
+
+type ReplaceDatasetBindingsSuccess implements ReplaceDatasetBindingsResult {
 	message: String!
 }
 
