@@ -37,6 +37,11 @@ impl CurrentAccountSubject {
         Self::Anonymous(reason)
     }
 
+    #[cfg(any(feature = "testing", test))]
+    pub fn anonymous_no_authentication_provided() -> Self {
+        Self::Anonymous(AnonymousAccountReason::NoAuthenticationProvided)
+    }
+
     pub fn logged(account_id: odf::AccountID, account_name: odf::AccountName) -> Self {
         Self::Logged(LoggedAccount {
             account_id,
