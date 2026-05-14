@@ -19,7 +19,6 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
 };
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,15 +38,6 @@ impl DatasetEnvVarServiceNull {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarService for DatasetEnvVarServiceNull {
-    async fn upsert_dataset_env_var(
-        &self,
-        _dataset_env_var_key: &str,
-        _dataset_env_var_value: &DatasetEnvVarValue,
-        _dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        unreachable!()
-    }
-
     async fn get_exposed_value(
         &self,
         _dataset_env_var: &DatasetEnvVar,
@@ -55,10 +45,10 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
         unreachable!()
     }
 
-    async fn get_dataset_env_var_by_id(
+    async fn get_dataset_env_var_by_key(
         &self,
         _dataset_id: &odf::DatasetID,
-        _dataset_env_var_id: &Uuid,
+        _dataset_env_var_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         unreachable!()
     }
@@ -74,9 +64,19 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
         })
     }
 
+    async fn upsert_dataset_env_var(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _dataset_env_var_key: &str,
+        _dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+        unreachable!()
+    }
+
     async fn delete_dataset_env_var(
         &self,
-        _dataset_env_var_id: &Uuid,
+        _dataset_id: &odf::DatasetID,
+        _dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         unreachable!()
     }

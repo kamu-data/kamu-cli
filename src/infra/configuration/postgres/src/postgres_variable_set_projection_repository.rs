@@ -29,98 +29,6 @@ pub struct PostgresVariableSetProjectionRepository {
 
 #[async_trait::async_trait]
 impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository {
-    async fn find_resource_uid_by_entry_id(
-        &self,
-        entry_id: &uuid::Uuid,
-    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let row = sqlx::query!(
-            r#"
-            SELECT resource_uid as "resource_uid: uuid::Uuid", variable_key
-            FROM config_variable_set_entries
-            WHERE entry_id = $1
-            LIMIT 1
-            "#,
-            entry_id,
-        )
-        .fetch_optional(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(row.map(|r| (ResourceUID::new(r.resource_uid), r.variable_key)))
-    }
-
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
-
-        let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
-        let account_ids: Vec<_> = entries
-            .iter()
-            .map(|e| e.account_id.as_stack_string())
-            .collect();
-        let account_ids_strs = account_ids
-            .iter()
-            .map(StackString::as_str)
-            .collect::<Vec<_>>();
-        let keys: Vec<_> = entries.iter().map(|e| e.key.as_str()).collect();
-        let values: Vec<_> = entries.iter().map(|e| e.value.as_str()).collect();
-        let created_ats: Vec<_> = entries.iter().map(|e| e.created_at).collect();
-        let updated_ats: Vec<_> = entries.iter().map(|e| e.updated_at).collect();
-
-        let insert_result = sqlx::query!(
-            r#"
-            INSERT INTO config_variable_set_entries (
-                entry_id,
-                resource_uid,
-                resource_generation,
-                account_id,
-                variable_key,
-                value,
-                created_at,
-                updated_at
-            )
-            SELECT e.entry_id, $1, $2, e.account_id, e.variable_key, e.value, e.created_at, e.updated_at
-            FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::timestamptz[])
-                AS e(entry_id, account_id, variable_key, value, created_at, updated_at)
-            "#,
-            resource_uid,
-            resource_generation,
-            &entry_ids,
-            &account_ids_strs as &[&str],
-            &keys as &[&str],
-            &values as &[&str],
-            &created_ats,
-            &updated_ats,
-        )
-        .execute(&mut *connection_mut)
-        .await;
-
-        match insert_result {
-            Ok(_) => {}
-            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                return Err(ReplaceProjectionEntriesError::concurrent_modification());
-            }
-            Err(e) => return Err(e.int_err().into()),
-        }
-
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -269,6 +177,74 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
         .int_err()?;
 
         Ok(rows)
+    }
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
+        let account_ids: Vec<_> = entries
+            .iter()
+            .map(|e| e.account_id.as_stack_string())
+            .collect();
+        let account_ids_strs = account_ids
+            .iter()
+            .map(StackString::as_str)
+            .collect::<Vec<_>>();
+        let keys: Vec<_> = entries.iter().map(|e| e.key.as_str()).collect();
+        let values: Vec<_> = entries.iter().map(|e| e.value.as_str()).collect();
+        let created_ats: Vec<_> = entries.iter().map(|e| e.created_at).collect();
+        let updated_ats: Vec<_> = entries.iter().map(|e| e.updated_at).collect();
+
+        let insert_result = sqlx::query!(
+            r#"
+            INSERT INTO config_variable_set_entries (
+                entry_id,
+                resource_uid,
+                resource_generation,
+                account_id,
+                variable_key,
+                value,
+                created_at,
+                updated_at
+            )
+            SELECT e.entry_id, $1, $2, e.account_id, e.variable_key, e.value, e.created_at, e.updated_at
+            FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::timestamptz[])
+                AS e(entry_id, account_id, variable_key, value, created_at, updated_at)
+            "#,
+            resource_uid,
+            resource_generation,
+            &entry_ids,
+            &account_ids_strs as &[&str],
+            &keys as &[&str],
+            &values as &[&str],
+            &created_ats,
+            &updated_ats,
+        )
+        .execute(&mut *connection_mut)
+        .await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
+            }
+            Err(e) => return Err(e.int_err().into()),
+        }
+
+        Ok(())
     }
 
     async fn cleanup_entries_before_generation(

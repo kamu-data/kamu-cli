@@ -49,7 +49,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
         value: String,
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
-        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
+        let dataset_id = self.dataset_request_state.dataset_id();
 
         let dataset_env_var_value = if is_secret {
             DatasetEnvVarValue::Secret(SecretString::from(value))
@@ -57,12 +57,9 @@ impl<'a> DatasetEnvVarsMut<'a> {
             DatasetEnvVarValue::Regular(value)
         };
 
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let upsert_result = dataset_env_var_service
-            .upsert_dataset_env_var(
-                key.as_str(),
-                &dataset_env_var_value,
-                self.dataset_request_state.dataset_id(),
-            )
+            .upsert_dataset_env_var(dataset_id, key.as_str(), &dataset_env_var_value)
             .await?;
 
         Ok(match upsert_result.status {
@@ -86,17 +83,22 @@ impl<'a> DatasetEnvVarsMut<'a> {
     async fn delete_env_variable(
         &self,
         ctx: &Context<'_>,
-        id: DatasetEnvVarID<'static>,
-    ) -> Result<DeleteDatasetEnvVarResult<'_>> {
+        key: String,
+    ) -> Result<DeleteDatasetEnvVarResult> {
+        let dataset_id = self.dataset_request_state.dataset_id();
+
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
-        match dataset_env_var_service.delete_dataset_env_var(&id).await {
+        match dataset_env_var_service
+            .delete_dataset_env_var(dataset_id, &key)
+            .await
+        {
             Ok(_) => Ok(DeleteDatasetEnvVarResult::Success(
-                DeleteDatasetEnvVarResultSuccess { env_var_id: id },
+                DeleteDatasetEnvVarResultSuccess { env_var_key: key },
             )),
             Err(err) => match err {
                 DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
-                    DeleteDatasetEnvVarResultNotFound { env_var_id: id },
+                    DeleteDatasetEnvVarResultNotFound { env_var_key: key },
                 )),
                 DeleteDatasetEnvVarError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))
@@ -156,19 +158,19 @@ impl UpsertDatasetEnvVarResultUpdated {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum DeleteDatasetEnvVarResult<'a> {
-    Success(DeleteDatasetEnvVarResultSuccess<'a>),
-    NotFound(DeleteDatasetEnvVarResultNotFound<'a>),
+pub enum DeleteDatasetEnvVarResult {
+    Success(DeleteDatasetEnvVarResultSuccess),
+    NotFound(DeleteDatasetEnvVarResultNotFound),
 }
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteDatasetEnvVarResultSuccess<'a> {
-    pub env_var_id: DatasetEnvVarID<'a>,
+pub struct DeleteDatasetEnvVarResultSuccess {
+    pub env_var_key: String,
 }
 
 #[ComplexObject]
-impl DeleteDatasetEnvVarResultSuccess<'_> {
+impl DeleteDatasetEnvVarResultSuccess {
     async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -176,14 +178,17 @@ impl DeleteDatasetEnvVarResultSuccess<'_> {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteDatasetEnvVarResultNotFound<'a> {
-    pub env_var_id: DatasetEnvVarID<'a>,
+pub struct DeleteDatasetEnvVarResultNotFound {
+    pub env_var_key: String,
 }
 
 #[ComplexObject]
-impl DeleteDatasetEnvVarResultNotFound<'_> {
+impl DeleteDatasetEnvVarResultNotFound {
     pub async fn message(&self) -> String {
-        format!("Environment variable with {} id not found", self.env_var_id)
+        format!(
+            "Environment variable with {} key not found",
+            self.env_var_key
+        )
     }
 }
 

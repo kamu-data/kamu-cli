@@ -43,13 +43,13 @@ impl<'a> DatasetEnvVars<'a> {
     async fn exposed_value(
         &self,
         ctx: &Context<'_>,
-        dataset_env_var_id: DatasetEnvVarID<'_>,
+        dataset_env_var_key: String,
     ) -> Result<String> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
-            .get_dataset_env_var_by_id(dataset_id, &dataset_env_var_id)
+            .get_dataset_env_var_by_key(dataset_id, &dataset_env_var_key)
             .await
             .map_err(|err| match err {
                 GetDatasetEnvVarError::NotFound(err) => GqlError::Gql(err.into()),

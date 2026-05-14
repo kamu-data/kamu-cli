@@ -9,7 +9,6 @@
 
 use internal_error::InternalError;
 use kamu_resources::ResourceUID;
-use uuid::Uuid;
 
 use crate::{ReplaceProjectionEntriesError, VariableSetEntry};
 
@@ -17,18 +16,6 @@ use crate::{ReplaceProjectionEntriesError, VariableSetEntry};
 
 #[async_trait::async_trait]
 pub trait VariableSetProjectionRepository: Send + Sync {
-    async fn find_resource_uid_by_entry_id(
-        &self,
-        entry_id: &Uuid,
-    ) -> Result<Option<(ResourceUID, String)>, InternalError>;
-
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError>;
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -52,6 +39,13 @@ pub trait VariableSetProjectionRepository: Send + Sync {
         resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError>;
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError>;
 
     async fn cleanup_entries_before_generation(
         &self,

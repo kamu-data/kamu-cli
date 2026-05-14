@@ -10,7 +10,6 @@
 mod dataset_data_blocks_repository_test_suite;
 mod dataset_dependencies_repository_test_suite;
 mod dataset_entry_repository_test_suite;
-mod dataset_env_var_repository_test_suite;
 mod dataset_key_blocks_repository_test_suite;
 mod dataset_reference_repository_test_suite;
 mod dataset_statistics_repository_test_suite;
@@ -22,9 +21,6 @@ pub mod dataset_dependency_repo {
 }
 pub mod dataset_entry_repo {
     pub use crate::dataset_entry_repository_test_suite::*;
-}
-pub mod dataset_env_var_repo {
-    pub use crate::dataset_env_var_repository_test_suite::*;
 }
 pub mod dataset_reference_repo {
     pub use crate::dataset_reference_repository_test_suite::*;

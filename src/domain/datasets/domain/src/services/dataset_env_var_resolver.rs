@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 
 use internal_error::InternalError;
-use uuid::Uuid;
 
 use crate::{DatasetEnvVar, GetDatasetEnvVarError};
 
@@ -26,10 +25,10 @@ pub trait DatasetEnvVarResolver: Send + Sync {
         dataset_id: &odf::DatasetID,
     ) -> Result<HashMap<String, DatasetEnvVar>, InternalError>;
 
-    async fn get_env_var_by_entry_id(
+    async fn get_env_var_by_entry_key(
         &self,
         dataset_id: &odf::DatasetID,
-        entry_id: &Uuid,
+        entry_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError>;
 }
 

@@ -112,7 +112,6 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_postgres::PostgresDidSecretKeyRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_postgres::PostgresDatasetEnvVarRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetDependencyRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetReferenceRepository>();
@@ -160,7 +159,6 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
             b.add::<kamu_accounts_inmem::InMemoryAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
@@ -204,7 +202,6 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_sqlite::SqliteDidSecretKeyRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_sqlite::SqliteDatasetEnvVarRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetDependencyRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetReferenceRepository>();
@@ -267,7 +264,6 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
 
-    b.add::<kamu_datasets_inmem::InMemoryDatasetEnvVarRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use uuid::Uuid;
 
 use crate::{DatasetEnvVarUpsertResult, DatasetEnvVarValue, DeleteDatasetEnvVarError};
 
@@ -23,9 +22,10 @@ pub trait DatasetEnvVarMutationAdapter: Send + Sync {
         value: &DatasetEnvVarValue,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
 
-    async fn delete_env_var_by_entry_id(
+    async fn delete_env_var(
         &self,
-        entry_id: &Uuid,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError>;
 }
 

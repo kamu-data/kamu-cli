@@ -26,11 +26,6 @@ impl ViewDatasetEnvVar {
         Self { env_var }
     }
 
-    /// Unique identifier of the dataset environment variable
-    async fn id(&self) -> DatasetEnvVarID<'_> {
-        self.env_var.id.into()
-    }
-
     /// Key of the dataset environment variable
     async fn key(&self) -> &String {
         &self.env_var.key

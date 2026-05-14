@@ -25,7 +25,6 @@ use kamu_datasets::{
     GetDatasetEnvVarError,
 };
 use secrecy::{ExposeSecret, SecretString};
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,17 +60,6 @@ impl DatasetEnvVarCompatServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetEnvVarService for DatasetEnvVarCompatServiceImpl {
-    async fn upsert_dataset_env_var(
-        &self,
-        dataset_env_var_key: &str,
-        dataset_env_var_value: &DatasetEnvVarValue,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        self.mutation_adapter
-            .upsert_env_var(dataset_id, dataset_env_var_key, dataset_env_var_value)
-            .await
-    }
-
     async fn get_exposed_value(
         &self,
         dataset_env_var: &DatasetEnvVar,
@@ -85,13 +73,13 @@ impl DatasetEnvVarService for DatasetEnvVarCompatServiceImpl {
         }
     }
 
-    async fn get_dataset_env_var_by_id(
+    async fn get_dataset_env_var_by_key(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_env_var_id: &Uuid,
+        dataset_env_var_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         self.resolver
-            .get_env_var_by_entry_id(dataset_id, dataset_env_var_id)
+            .get_env_var_by_entry_key(dataset_id, dataset_env_var_key)
             .await
     }
 
@@ -129,12 +117,24 @@ impl DatasetEnvVarService for DatasetEnvVarCompatServiceImpl {
         }
     }
 
+    async fn upsert_dataset_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
+        dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+        self.mutation_adapter
+            .upsert_env_var(dataset_id, dataset_env_var_key, dataset_env_var_value)
+            .await
+    }
+
     async fn delete_dataset_env_var(
         &self,
-        dataset_env_var_id: &Uuid,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         self.mutation_adapter
-            .delete_env_var_by_entry_id(dataset_env_var_id)
+            .delete_env_var(dataset_id, dataset_env_var_key)
             .await
     }
 }

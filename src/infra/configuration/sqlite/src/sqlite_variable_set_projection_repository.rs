@@ -29,84 +29,6 @@ pub struct SqliteVariableSetProjectionRepository {
 
 #[async_trait::async_trait]
 impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
-    async fn find_resource_uid_by_entry_id(
-        &self,
-        entry_id: &Uuid,
-    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let row = sqlx::query!(
-            r#"
-            SELECT resource_uid as "resource_uid: Uuid", variable_key
-            FROM config_variable_set_entries
-            WHERE entry_id = $1
-            LIMIT 1
-            "#,
-            entry_id,
-        )
-        .fetch_optional(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(row.map(|r| (ResourceUID::new(r.resource_uid), r.variable_key)))
-    }
-
-    async fn replace_entries(
-        &self,
-        resource_uid: &ResourceUID,
-        resource_generation: u64,
-        entries: &[VariableSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
-
-        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            r#"
-            INSERT INTO config_variable_set_entries (
-                entry_id,
-                resource_uid,
-                resource_generation,
-                account_id,
-                variable_key,
-                value,
-                created_at,
-                updated_at
-            )
-            "#,
-        );
-
-        query_builder.push_values(entries, |mut b, entry| {
-            b.push_bind(entry.entry_id);
-            b.push_bind(*resource_uid);
-            b.push_bind(resource_generation);
-            b.push_bind(entry.account_id.to_string());
-            b.push_bind(&entry.key);
-            b.push_bind(&entry.value);
-            b.push_bind(entry.created_at);
-            b.push_bind(entry.updated_at);
-        });
-
-        let insert_result = query_builder.build().execute(&mut *connection_mut).await;
-
-        match insert_result {
-            Ok(_) => {}
-            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                return Err(ReplaceProjectionEntriesError::concurrent_modification());
-            }
-            Err(e) => return Err(e.int_err().into()),
-        }
-
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &ResourceUID,
@@ -255,6 +177,61 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
         .int_err()?;
 
         Ok(rows)
+    }
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &ResourceUID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            r#"
+            INSERT INTO config_variable_set_entries (
+                entry_id,
+                resource_uid,
+                resource_generation,
+                account_id,
+                variable_key,
+                value,
+                created_at,
+                updated_at
+            )
+            "#,
+        );
+
+        query_builder.push_values(entries, |mut b, entry| {
+            b.push_bind(entry.entry_id);
+            b.push_bind(*resource_uid);
+            b.push_bind(resource_generation);
+            b.push_bind(entry.account_id.to_string());
+            b.push_bind(&entry.key);
+            b.push_bind(&entry.value);
+            b.push_bind(entry.created_at);
+            b.push_bind(entry.updated_at);
+        });
+
+        let insert_result = query_builder.build().execute(&mut *connection_mut).await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
+            }
+            Err(e) => return Err(e.int_err().into()),
+        }
+
+        Ok(())
     }
 
     async fn cleanup_entries_before_generation(

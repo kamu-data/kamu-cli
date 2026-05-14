@@ -23,7 +23,6 @@ use kamu_datasets::{
     DatasetEnvVarResolver,
     GetDatasetEnvVarError,
 };
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,7 +61,6 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                 env_map
                     .entry(entry.key.clone())
                     .or_insert_with(|| DatasetEnvVar {
-                        id: entry.entry_id,
                         key: entry.key,
                         value: entry.value.into_bytes(),
                         secret_nonce: None,
@@ -89,7 +87,6 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                 secret_map
                     .entry(entry.key.clone())
                     .or_insert_with(|| DatasetEnvVar {
-                        id: entry.entry_id,
                         key: entry.key,
                         value: entry.value,
                         secret_nonce: Some(entry.secret_nonce),
@@ -105,14 +102,14 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         Ok(env_map)
     }
 
-    async fn get_env_var_by_entry_id(
+    async fn get_env_var_by_entry_key(
         &self,
         dataset_id: &odf::DatasetID,
-        entry_id: &Uuid,
+        entry_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         let not_found = || {
             GetDatasetEnvVarError::NotFound(DatasetEnvVarNotFoundError {
-                dataset_env_var_key: entry_id.to_string(),
+                dataset_env_var_key: entry_key.to_string(),
             })
         };
 
@@ -130,9 +127,8 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                 .await
                 .int_err()?;
 
-            if let Some(entry) = entries.into_iter().find(|e| e.entry_id == *entry_id) {
+            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
                 return Ok(DatasetEnvVar {
-                    id: entry.entry_id,
                     key: entry.key,
                     value: entry.value.into_bytes(),
                     secret_nonce: None,
@@ -156,9 +152,8 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                 .await
                 .int_err()?;
 
-            if let Some(entry) = entries.into_iter().find(|e| e.entry_id == *entry_id) {
+            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
                 return Ok(DatasetEnvVar {
-                    id: entry.entry_id,
                     key: entry.key,
                     value: entry.value,
                     secret_nonce: Some(entry.secret_nonce),

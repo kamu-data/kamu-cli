@@ -45,7 +45,6 @@ interface "DatasetEntryRepository" <<i>>
 interface "DatasetEntryService" <<i>>
 interface "DatasetEntryWriter" <<i>>
 interface "DatasetEnvVarMutationAdapter" <<i>>
-interface "DatasetEnvVarRepository" <<i>>
 interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
 interface "DatasetFactory" <<i>>
@@ -409,7 +408,6 @@ class "SqliteAccountRepository"
 class "SqliteDatasetDataBlockRepository"
 class "SqliteDatasetDependencyRepository"
 class "SqliteDatasetEntryRepository"
-class "SqliteDatasetEnvVarRepository"
 class "SqliteDatasetKeyBlockRepository"
 class "SqliteDatasetReferenceRepository"
 class "SqliteDatasetSecretSetBindingRepository"
@@ -1100,8 +1098,6 @@ class "WsSmartTransferProtocolClient"
 "DatasetEntryRepository" <|-- "SqliteDatasetEntryRepository"
 "SqliteDatasetEntryRepository"  --> "TransactionRefT"
 "SqliteDatasetEntryRepository" "*" --> "DatasetEntryRemovalListener"
-"DatasetEnvVarRepository" <|-- "SqliteDatasetEnvVarRepository"
-"SqliteDatasetEnvVarRepository"  --> "TransactionRefT"
 "DatasetKeyBlockRepository" <|-- "SqliteDatasetKeyBlockRepository"
 "SqliteDatasetKeyBlockRepository"  --> "TransactionRefT"
 "DatasetReferenceRepository" <|-- "SqliteDatasetReferenceRepository"

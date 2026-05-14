@@ -86,20 +86,35 @@ async fn test_create_and_get_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
+    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let created_dataset_env_var_id =
-        json["datasets"]["byId"]["envVars"]["listEnvVariables"]["nodes"][0]["id"].clone();
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 1,
+                            "nodes": [{
+                                "key": "foo",
+                                "value": null,
+                                "isSecret": true
+                            }]
+                        }
+                    }
+                }
+            }
+        })
+    );
 
     let query_code = DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
         created_dataset.dataset_handle.id.to_string().as_str(),
-        created_dataset_env_var_id.to_string().as_str(),
+        "foo",
     );
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
@@ -151,20 +166,35 @@ async fn test_delete_dataset_env_var() {
         })
     );
 
-    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars_with_id(
+    let query_code = DatasetEnvVarsHarness::get_dataset_env_vars(
         created_dataset.dataset_handle.id.to_string().as_str(),
     );
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(query_code.clone()))
         .await;
-    let json = serde_json::to_string(&res.data).unwrap();
-    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
-    let created_dataset_env_var_id =
-        json["datasets"]["byId"]["envVars"]["listEnvVariables"]["nodes"][0]["id"].clone();
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 1,
+                            "nodes": [{
+                                "key": "foo",
+                                "value": null,
+                                "isSecret": true
+                            }]
+                        }
+                    }
+                }
+            }
+        })
+    );
 
     let mutation_code = DatasetEnvVarsHarness::delete_dataset_env(
         created_dataset.dataset_handle.id.to_string().as_str(),
-        &created_dataset_env_var_id.to_string(),
+        "foo",
     );
 
     let res = harness
@@ -373,22 +403,14 @@ impl DatasetEnvVarsHarness {
         .replace("<dataset_id>", dataset_id)
     }
 
-    fn get_dataset_env_vars_with_id(dataset_id: &str) -> String {
+    fn get_dataset_env_var_exposed_value(dataset_id: &str, dataset_env_var_key: &str) -> String {
         indoc!(
             r#"
             query Datasets {
                 datasets {
                     byId(datasetId: "<dataset_id>") {
                         envVars {
-                            listEnvVariables(page: 0, perPage: 5) {
-                                totalCount
-                                nodes {
-                                    id
-                                    key
-                                    value
-                                    isSecret
-                                }
-                            }
+                            exposedValue(datasetEnvVarKey: "<dataset_env_var_key>")
                         }
                     }
                 }
@@ -396,24 +418,7 @@ impl DatasetEnvVarsHarness {
             "#
         )
         .replace("<dataset_id>", dataset_id)
-    }
-
-    fn get_dataset_env_var_exposed_value(dataset_id: &str, dataset_env_var_id: &str) -> String {
-        indoc!(
-            r#"
-            query Datasets {
-                datasets {
-                    byId(datasetId: "<dataset_id>") {
-                        envVars {
-                            exposedValue(datasetEnvVarId: <dataset_env_var_id>)
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<dataset_id>", dataset_id)
-        .replace("<dataset_env_var_id>", dataset_env_var_id)
+        .replace("<dataset_env_var_key>", dataset_env_var_key)
     }
 
     fn upsert_dataset_env(
@@ -443,14 +448,14 @@ impl DatasetEnvVarsHarness {
         .replace("<is_secret>", if is_secret { "true" } else { "false" })
     }
 
-    fn delete_dataset_env(dataset_id: &str, env_var_id: &str) -> String {
+    fn delete_dataset_env(dataset_id: &str, env_var_key: &str) -> String {
         indoc!(
             r#"
             mutation {
                 datasets {
                     byId(datasetId: "<dataset_id>") {
                         envVars {
-                            deleteEnvVariable(id: <env_var_id>) {
+                            deleteEnvVariable(key: "<env_var_key>") {
                                 message
                             }
                         }
@@ -460,7 +465,7 @@ impl DatasetEnvVarsHarness {
             "#
         )
         .replace("<dataset_id>", dataset_id)
-        .replace("<env_var_id>", env_var_id)
+        .replace("<env_var_key>", env_var_key)
     }
 }
 

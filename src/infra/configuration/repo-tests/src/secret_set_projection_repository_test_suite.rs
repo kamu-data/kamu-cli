@@ -88,9 +88,6 @@ pub async fn test_entries_empty_initially(catalog: &Catalog) {
 
     let entries = repo.get_entries(&resource_uid, 0).await.unwrap();
     assert!(entries.is_empty());
-
-    let entry = repo.find_entry(&resource_uid, 0, "key").await.unwrap();
-    assert!(entry.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

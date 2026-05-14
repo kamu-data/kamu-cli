@@ -17,7 +17,6 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
 };
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,36 +47,6 @@ struct State {
 
 #[async_trait::async_trait]
 impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
-    async fn find_resource_uid_by_entry_id(
-        &self,
-        entry_id: &Uuid,
-    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        for ((uid, _generation), entries) in &guard.entries_by_resource_uid_generation {
-            if let Some(entry) = entries.iter().find(|e| &e.entry_id == entry_id) {
-                return Ok(Some((*uid, entry.key.clone())));
-            }
-        }
-        Ok(None)
-    }
-
-    async fn replace_entries(
-        &self,
-        resource_uid: &kamu_resources::ResourceUID,
-        resource_generation: u64,
-        entries: &[SecretSetEntry],
-    ) -> Result<(), ReplaceProjectionEntriesError> {
-        let mut guard = self.state.lock().unwrap();
-        let key = (*resource_uid, resource_generation);
-        if guard.entries_by_resource_uid_generation.contains_key(&key) {
-            return Err(ReplaceProjectionEntriesError::concurrent_modification());
-        }
-        guard
-            .entries_by_resource_uid_generation
-            .insert(key, entries.to_vec());
-        Ok(())
-    }
-
     async fn find_entry(
         &self,
         resource_uid: &kamu_resources::ResourceUID,
@@ -141,6 +110,23 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
             .max_by_key(|((_, stored_generation), _)| *stored_generation)
             .map(|(_, entries)| entries.clone())
             .unwrap_or_default())
+    }
+
+    async fn replace_entries(
+        &self,
+        resource_uid: &kamu_resources::ResourceUID,
+        resource_generation: u64,
+        entries: &[SecretSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        let mut guard = self.state.lock().unwrap();
+        let key = (*resource_uid, resource_generation);
+        if guard.entries_by_resource_uid_generation.contains_key(&key) {
+            return Err(ReplaceProjectionEntriesError::concurrent_modification());
+        }
+        guard
+            .entries_by_resource_uid_generation
+            .insert(key, entries.to_vec());
+        Ok(())
     }
 
     async fn cleanup_entries_before_generation(

@@ -47,7 +47,6 @@ use kamu_resources::{
 };
 use kamu_resources_services::get_resource_crud_dispatcher_by_kind;
 use secrecy::ExposeSecret;
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,33 +112,30 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         }
     }
 
-    async fn delete_env_var_by_entry_id(
+    async fn delete_env_var(
         &self,
-        entry_id: &Uuid,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
-        // Try variable set first
-        if let Some((resource_uid, key)) = self
-            .variable_set_projection_repo
-            .find_resource_uid_by_entry_id(entry_id)
-            .await
-            .int_err()?
-        {
-            return self.delete_variable(resource_uid, &key).await;
+        // Try deleting as a variable
+        let was_variable = self
+            .delete_if_variable(dataset_id, dataset_env_var_key)
+            .await?;
+        if was_variable {
+            return Ok(());
         }
 
-        // Try secret set
-        if let Some((resource_uid, key)) = self
-            .secret_set_projection_repo
-            .find_resource_uid_by_entry_id(entry_id)
-            .await
-            .int_err()?
-        {
-            return self.delete_secret(resource_uid, &key).await;
+        // Maybe it's a secret then?
+        let was_secret = self
+            .delete_if_secret(dataset_id, dataset_env_var_key)
+            .await?;
+        if was_secret {
+            return Ok(());
         }
 
         Err(DeleteDatasetEnvVarError::NotFound(
             DatasetEnvVarNotFoundError {
-                dataset_env_var_key: entry_id.to_string(),
+                dataset_env_var_key: dataset_env_var_key.to_string(),
             },
         ))
     }
@@ -148,6 +144,14 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetEnvVarMutationAdapterImpl {
+    fn legacy_variable_set_resource_name(dataset_id: &odf::DatasetID) -> String {
+        format!("legacy-vars-{}", dataset_id.as_multibase())
+    }
+
+    fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> String {
+        format!("legacy-secrets-{}", dataset_id.as_multibase())
+    }
+
     async fn upsert_variable(
         &self,
         dataset_id: &odf::DatasetID,
@@ -155,15 +159,9 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_id: &odf::AccountID,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        let resource_name = format!("legacy-vars-{}", dataset_id.as_multibase());
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            VariableSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
-
-        let (existing_uid, mut variables, existing_entry_id) = self
-            .load_existing_variable_spec(account_id, &resource_name, key)
+        let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
+        let (existing_uid, mut variables) = self
+            .load_existing_variable_spec(account_id, &resource_name)
             .await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -186,6 +184,12 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
         let metadata = self.make_metadata(account_id.clone(), resource_name);
 
+        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
+            &self.catalog,
+            VariableSetResource::RESOURCE_TYPE,
+        )
+        .map_err(InternalError::from)?;
+
         let apply_decision = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
                 uid: existing_uid,
@@ -207,8 +211,6 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await
             .int_err()?;
 
-        let entry_id = existing_entry_id.unwrap_or_else(Uuid::new_v4);
-
         let status = if is_new_key {
             UpsertDatasetEnvVarStatus::Created
         } else {
@@ -217,7 +219,6 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         Ok(DatasetEnvVarUpsertResult {
             dataset_env_var: DatasetEnvVar {
-                id: entry_id,
                 key: key.to_string(),
                 value: plaintext.as_bytes().to_vec(),
                 secret_nonce: None,
@@ -235,15 +236,10 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_id: &odf::AccountID,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        let resource_name = format!("legacy-secrets-{}", dataset_id.as_multibase());
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
-            &self.catalog,
-            SecretSetResource::RESOURCE_TYPE,
-        )
-        .map_err(InternalError::from)?;
+        let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
-        let (existing_uid, mut secrets, existing_entry_id) = self
-            .load_existing_secret_spec_decrypted(account_id, &resource_name, key)
+        let (existing_uid, mut secrets) = self
+            .load_existing_secret_spec_decrypted(account_id, &resource_name)
             .await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -260,6 +256,12 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
         let metadata = self.make_metadata(account_id.clone(), resource_name);
+
+        let dispatcher = get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(
+            &self.catalog,
+            SecretSetResource::RESOURCE_TYPE,
+        )
+        .map_err(InternalError::from)?;
 
         let apply_decision = dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
@@ -282,8 +284,6 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await
             .int_err()?;
 
-        let entry_id = existing_entry_id.unwrap_or_else(Uuid::new_v4);
-
         let encryption_key = self
             .dataset_env_var_config
             .encryption_key
@@ -300,7 +300,6 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         Ok(DatasetEnvVarUpsertResult {
             dataset_env_var: DatasetEnvVar {
-                id: entry_id,
                 key: key.to_string(),
                 value: encrypted_value,
                 secret_nonce: Some(nonce),
@@ -434,29 +433,17 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
     ) -> Result<bool, InternalError> {
-        let bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
-            .await?;
-
-        for binding in bindings {
-            let entries = self
-                .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
-                .await?;
-
-            if entries.iter().any(|e| e.key == key) {
-                self.delete_secret(binding.resource_uid, key)
-                    .await
-                    .map_err(|e| match e {
-                        DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
-                        DeleteDatasetEnvVarError::Internal(e) => e,
-                    })?;
-                return Ok(true);
-            }
+        match self.find_secret(dataset_id, key).await? {
+            Some((resource_uid, key)) => self
+                .delete_secret(resource_uid, &key)
+                .await
+                .map_err(|e| match e {
+                    DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
+                    DeleteDatasetEnvVarError::Internal(e) => e,
+                })
+                .map(|_| true),
+            None => Ok(false),
         }
-
-        Ok(false)
     }
 
     /// Returns true if `key` existed as a variable for `dataset_id` and was
@@ -466,29 +453,89 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
     ) -> Result<bool, InternalError> {
+        match self.find_variable(dataset_id, key).await? {
+            Some((resource_uid, key)) => self
+                .delete_variable(resource_uid, &key)
+                .await
+                .map_err(|e| match e {
+                    DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
+                    DeleteDatasetEnvVarError::Internal(e) => e,
+                })
+                .map(|_| true),
+            None => Ok(false),
+        }
+    }
+
+    async fn find_secret(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
+        let bindings = self
+            .secret_set_binding_repo
+            .list_bindings(dataset_id)
+            .await?;
+
+        match bindings.len() {
+            0 => return Ok(None),
+            1 => {} // expected case, continue with lookup
+            _ => {
+                return Err(format!(
+                    "Multiple SecretSet bindings found for dataset {dataset_id}: {bindings:?}. \
+                     This does not qualify for legacy env var resolution",
+                )
+                .int_err());
+            }
+        }
+
+        let the_binding = &bindings[0];
+
+        let entries = self
+            .secret_set_projection_repo
+            .get_latest_entries(&the_binding.resource_uid)
+            .await?;
+
+        if entries.iter().any(|e| e.key == key) {
+            return Ok(Some((the_binding.resource_uid, key.to_string())));
+        }
+
+        Ok(None)
+    }
+
+    async fn find_variable(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
         let bindings = self
             .variable_set_binding_repo
             .list_bindings(dataset_id)
             .await?;
 
-        for binding in bindings {
-            let entries = self
-                .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
-                .await?;
-
-            if entries.iter().any(|e| e.key == key) {
-                self.delete_variable(binding.resource_uid, key)
-                    .await
-                    .map_err(|e| match e {
-                        DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
-                        DeleteDatasetEnvVarError::Internal(e) => e,
-                    })?;
-                return Ok(true);
+        match bindings.len() {
+            0 => return Ok(None),
+            1 => {} // expected case, continue with lookup
+            _ => {
+                return Err(format!(
+                    "Multiple VariableSet bindings found for dataset {dataset_id}: {bindings:?}. \
+                     This does not qualify for legacy env var resolution",
+                )
+                .int_err());
             }
         }
 
-        Ok(false)
+        let the_binding = &bindings[0];
+
+        let entries = self
+            .variable_set_projection_repo
+            .get_latest_entries(&the_binding.resource_uid)
+            .await?;
+
+        if entries.iter().any(|e| e.key == key) {
+            return Ok(Some((the_binding.resource_uid, key.to_string())));
+        }
+
+        Ok(None)
     }
 
     // Returns (existing_uid, variables_map, existing_entry_id_for_key)
@@ -496,12 +543,10 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-        key: &str,
     ) -> Result<
         (
             Option<kamu_resources::ResourceUID>,
             BTreeMap<String, VariableSpec>,
-            Option<Uuid>,
         ),
         InternalError,
     > {
@@ -515,7 +560,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await?;
 
         let Some(uid) = uid else {
-            return Ok((None, BTreeMap::new(), None));
+            return Ok((None, BTreeMap::new()));
         };
 
         let snapshot = self
@@ -525,30 +570,18 @@ impl DatasetEnvVarMutationAdapterImpl {
             .ok_or_else(|| format!("VariableSet {uid} missing snapshot").int_err())?;
 
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
-
-        // Look up the existing entry_id for this key from the projection
-        let existing_entry_id = self
-            .variable_set_projection_repo
-            .get_latest_entries(&uid)
-            .await?
-            .into_iter()
-            .find(|e| e.key == key)
-            .map(|e| e.entry_id);
-
-        Ok((Some(uid), spec.variables, existing_entry_id))
+        Ok((Some(uid), spec.variables))
     }
 
-    // Returns (existing_uid, decrypted_secrets_map, existing_entry_id_for_key)
+    // Returns (existing_uid, decrypted_secrets_map)
     async fn load_existing_secret_spec_decrypted(
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-        key: &str,
     ) -> Result<
         (
             Option<kamu_resources::ResourceUID>,
             BTreeMap<String, SecretSpec>,
-            Option<Uuid>,
         ),
         InternalError,
     > {
@@ -562,25 +595,17 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await?;
 
         let Some(uid) = uid else {
-            return Ok((None, BTreeMap::new(), None));
+            return Ok((None, BTreeMap::new()));
         };
 
         let decrypted = self.decrypt_secret_entries(&uid).await?;
-
-        let existing_entry_id = self
-            .secret_set_projection_repo
-            .get_latest_entries(&uid)
-            .await?
-            .into_iter()
-            .find(|e| e.key == key)
-            .map(|e| e.entry_id);
 
         let secrets = decrypted
             .into_iter()
             .map(|(k, v)| (k, SecretSpec::Literal(v)))
             .collect();
 
-        Ok((Some(uid), secrets, existing_entry_id))
+        Ok((Some(uid), secrets))
     }
 
     async fn decrypt_secret_entries(
