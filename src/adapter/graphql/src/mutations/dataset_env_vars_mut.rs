@@ -186,7 +186,7 @@ pub struct DeleteDatasetEnvVarResultNotFound {
 impl DeleteDatasetEnvVarResultNotFound {
     pub async fn message(&self) -> String {
         format!(
-            "Environment variable with {} key not found",
+            "Environment variable with '{}' key not found",
             self.env_var_key
         )
     }
