@@ -15,7 +15,6 @@ use datafusion::arrow::datatypes::*;
 use datafusion::prelude::*;
 use kamu::domain::*;
 use kamu::*;
-use kamu_adapter_http::data::query_types::IdentityConfig;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::metadata::ed25519::Signer;
@@ -42,10 +41,10 @@ impl Harness {
         let run_info_dir = tempfile::tempdir().unwrap();
 
         let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
-        let identity_config = IdentityConfig {
+        let identity_config = kamu_signing::entities::IdentityConfig {
             ed25519_private_key: ed25519_private_key.clone(),
             secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer::from_bytes(
-                [124; _].into(),
+                &[124; _].into(),
             )
             .unwrap(),
         };

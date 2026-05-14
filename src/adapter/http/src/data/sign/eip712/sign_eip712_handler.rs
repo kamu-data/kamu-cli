@@ -56,7 +56,7 @@ pub async fn sign_eip712_handler(
     use_case
         .execute(
             params.key,
-            request.into(),
+            request,
             SignEip712UseCaseOptions::builder()
                 .include_node_proof(params.include_node_proof)
                 .build(),

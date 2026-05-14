@@ -24,7 +24,7 @@ impl Secp256k1Signer {
         Secp256k1Signer(LocalSigner::from_signing_key(key))
     }
 
-    pub fn from_bytes(data: zeroize::Zeroizing<[u8; 32]>) -> Result<Self, InternalError> {
+    pub fn from_bytes(data: &zeroize::Zeroizing<[u8; 32]>) -> Result<Self, InternalError> {
         SigningKey::from_slice(data.as_slice())
             .map(Self::from_signing_key)
             .int_err()
@@ -185,7 +185,7 @@ impl Secp256k1VerifyingKey {
     }
 
     pub fn as_address(&self) -> Address {
-        Address::from_public_key(&*self)
+        Address::from_public_key(self)
     }
 
     pub fn verify_prehash(

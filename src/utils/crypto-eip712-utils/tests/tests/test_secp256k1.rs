@@ -19,7 +19,7 @@ fn test_signer_does_not_leak_keys() -> eyre::Result<()> {
     // Label: "kamu-attester"
     //        privateKey = uint256(keccak256(abi.encodePacked(label)))
     let private_key = b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
-    let signer = Secp256k1Signer::from_bytes((*private_key).into())?;
+    let signer = Secp256k1Signer::from_bytes(&(private_key.0.into()))?;
 
     assert_eq!("Secp256k1Signer(***)", format!("{:?}", signer));
 

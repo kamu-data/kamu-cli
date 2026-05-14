@@ -15,7 +15,7 @@ use pretty_assertions::assert_eq;
 fn test_does_not_leak_keys() {
     let cfg = kamu_signing::entities::IdentityConfig {
         ed25519_private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
-        secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer::from_bytes([124; _].into())
+        secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer::from_bytes(&[124; _].into())
             .unwrap(),
     };
 

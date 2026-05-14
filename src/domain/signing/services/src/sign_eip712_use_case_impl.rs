@@ -96,7 +96,7 @@ impl SignEip712UseCaseImpl {
         };
 
         let has_access = self
-            .has_access_for_account(&logged_account, &account)
+            .has_access_for_account(logged_account, &account)
             .await?;
 
         if !has_access {
@@ -231,7 +231,7 @@ async fn get_did_secret_key(
     match did_secret_key_repo.get_did_secret_key(&entity).await {
         Ok(key) => Ok(Some(key)),
         Err(GetDidSecretKeyError::NotFound(_)) => Ok(None),
-        Err(e) => Err(e.int_err().into()),
+        Err(e) => Err(e.int_err()),
     }
 }
 
