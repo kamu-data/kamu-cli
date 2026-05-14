@@ -88,6 +88,9 @@ pub async fn test_entries_empty_initially(catalog: &Catalog) {
 
     let entries = repo.get_entries(&resource_uid, 0).await.unwrap();
     assert!(entries.is_empty());
+
+    let entry = repo.find_entry(&resource_uid, 0, "key").await.unwrap();
+    assert!(entry.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -366,6 +369,60 @@ pub async fn test_replace_preserves_stable_identity_and_creation_time(catalog: &
     assert_eq!(stored.updated_at, replacement.updated_at);
     assert_eq!(stored.value, b"v2");
     assert_eq!(stored.secret_nonce, vec![2u8; 12]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_latest_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn SecretSetProjectionRepository>()
+        .unwrap();
+    let resource_uid = make_secret_set_resource(catalog).await;
+
+    repo.replace_entries(&resource_uid, 1, &[make_entry("KEY", b"gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_uid, 3, &[make_entry("KEY", b"gen3")])
+        .await
+        .unwrap();
+
+    // Empty resource returns empty vec
+    let empty_resource = make_secret_set_resource(catalog).await;
+    let empty_latest = repo.get_latest_entries(&empty_resource).await.unwrap();
+    assert!(empty_latest.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_all_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn SecretSetProjectionRepository>()
+        .unwrap();
+    let resource_a = make_secret_set_resource(catalog).await;
+    let resource_b = make_secret_set_resource(catalog).await;
+
+    repo.replace_entries(&resource_a, 1, &[make_entry("K1", b"a-gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_a, 2, &[make_entry("K1", b"a-gen2")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_a, 3, &[make_entry("K1", b"a-gen3")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_b, 1, &[make_entry("K1", b"b-gen1")])
+        .await
+        .unwrap();
+
+    repo.delete_all_entries(&resource_a).await.unwrap();
+
+    assert!(repo.get_entries(&resource_a, 1).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_a, 2).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_a, 3).await.unwrap().is_empty());
+
+    let b_entries = repo.get_entries(&resource_b, 1).await.unwrap();
+    assert_eq!(1, b_entries.len());
+    assert_eq!(b_entries[0].value, b"b-gen1");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

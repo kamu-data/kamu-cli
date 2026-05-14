@@ -51,6 +51,22 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = binding_repo::test_list_bindings_empty_initially,
+    harness = PostgresDatasetVariableSetBindingRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = binding_repo::test_delete_bindings_for_dataset_no_op,
+    harness = PostgresDatasetVariableSetBindingRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresDatasetVariableSetBindingRepositoryHarness {
     catalog: Catalog,
 }

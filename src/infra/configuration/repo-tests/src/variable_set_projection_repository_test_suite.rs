@@ -364,3 +364,57 @@ pub async fn test_replace_preserves_stable_identity_and_creation_time(catalog: &
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_latest_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn VariableSetProjectionRepository>()
+        .unwrap();
+    let resource_uid = make_variable_set_resource(catalog).await;
+
+    repo.replace_entries(&resource_uid, 1, &[make_entry("key", "gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_uid, 3, &[make_entry("key", "gen3")])
+        .await
+        .unwrap();
+
+    // Empty resource returns empty vec
+    let empty_resource = make_variable_set_resource(catalog).await;
+    let empty_latest = repo.get_latest_entries(&empty_resource).await.unwrap();
+    assert!(empty_latest.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_all_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn VariableSetProjectionRepository>()
+        .unwrap();
+    let resource_a = make_variable_set_resource(catalog).await;
+    let resource_b = make_variable_set_resource(catalog).await;
+
+    repo.replace_entries(&resource_a, 1, &[make_entry("k1", "a-gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_a, 2, &[make_entry("k1", "a-gen2")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_a, 3, &[make_entry("k1", "a-gen3")])
+        .await
+        .unwrap();
+    repo.replace_entries(&resource_b, 1, &[make_entry("k1", "b-gen1")])
+        .await
+        .unwrap();
+
+    repo.delete_all_entries(&resource_a).await.unwrap();
+
+    assert!(repo.get_entries(&resource_a, 1).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_a, 2).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_a, 3).await.unwrap().is_empty());
+
+    let b_entries = repo.get_entries(&resource_b, 1).await.unwrap();
+    assert_eq!(1, b_entries.len());
+    assert_eq!(b_entries[0].value, "b-gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

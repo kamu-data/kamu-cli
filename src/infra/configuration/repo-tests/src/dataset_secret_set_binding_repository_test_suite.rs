@@ -94,3 +94,29 @@ pub async fn test_delete_bindings_for_dataset(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_list_bindings_empty_initially(catalog: &Catalog) {
+    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let repo = catalog
+        .get_one::<dyn DatasetSecretSetBindingRepository>()
+        .unwrap();
+
+    let bindings = repo.list_bindings(&dataset_id).await.unwrap();
+    assert!(bindings.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_bindings_for_dataset_no_op(catalog: &Catalog) {
+    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let repo = catalog
+        .get_one::<dyn DatasetSecretSetBindingRepository>()
+        .unwrap();
+
+    let result = repo.delete_bindings_for_dataset(&dataset_id).await;
+    assert!(result.is_ok());
+
+    assert!(repo.list_bindings(&dataset_id).await.unwrap().is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
